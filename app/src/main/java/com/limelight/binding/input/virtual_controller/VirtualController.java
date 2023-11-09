@@ -11,6 +11,7 @@ import android.util.DisplayMetrics;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.limelight.LimeLog;
@@ -159,9 +160,16 @@ public class VirtualController {
 
         int buttonSize = (int)(screen.heightPixels*0.06f);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(buttonSize, buttonSize);
-        params.leftMargin = 15;
-        params.topMargin = 15;
-        frame_layout.addView(buttonConfigure, params);
+        //params.leftMargin = 15;
+        //params.topMargin = 15;
+        //测试
+        //context.getResources().getLayout(R.id.advance_setting_view);
+
+        params.leftMargin = 0;
+        params.topMargin = 0;
+        //frame_layout.addView();
+        //测试
+        //frame_layout.addView(buttonConfigure, params);
 
         // Start with the default layout
         VirtualControllerConfigurationLoader.createDefaultLayout(this, context);

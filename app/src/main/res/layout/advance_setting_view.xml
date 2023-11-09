@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:id="@+id/advance_setting_view">
+
+    <Button
+        android:layout_width="150dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@color/advance_setting_button_background"
+        android:text="setting 1" />
+    <View
+        android:layout_width="150dp"
+        android:layout_height="1dp"
+        android:background="@color/advance_setting_line"/>
+    <Button
+        android:layout_width="150dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@color/advance_setting_background"
+        android:text="setting 2" />
+    <View
+        android:layout_width="150dp"
+        android:layout_height="1dp"
+        android:background="@color/advance_setting_line"/>
+    <Button
+        android:layout_width="150dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@color/advance_setting_button_background"
+        android:text="setting 3" />
+    <View
+        android:layout_width="150dp"
+        android:layout_height="1dp"
+        android:background="@color/advance_setting_line"/>
+    <Button
+        android:layout_width="150dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@color/advance_setting_button_background"
+        android:text="setting 3" />
+    <View
+        android:layout_width="150dp"
+        android:layout_height="1dp"
+        android:background="@color/advance_setting_line"/>
+    <Button
+        android:layout_width="150dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@color/advance_setting_button_background"
+        android:text="setting 3" />
+</LinearLayout>
