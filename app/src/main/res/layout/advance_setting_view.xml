@@ -3,111 +3,53 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/advance_setting_view"
-    android:visibility="visible">
+    android:visibility="gone">
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <LinearLayout
-            android:orientation="vertical"
-            android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:background="@color/advance_setting_background">
+        <RadioGroup
+            android:id="@+id/advance_setting_radio_group"
+            android:layout_width="150dp"
             android:layout_height="match_parent"
             android:background="@color/advance_setting_background">
-
-            <!--        <Button-->
-            <!--            android:id="@+id/advance_setting1"-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="match_parent"-->
-            <!--            android:layout_weight="1"-->
-            <!--            android:background="@color/advance_setting_button_background"-->
-            <!--            android:text="setting 1" />-->
-            <!--        <View-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="1dp"-->
-            <!--            android:background="@color/advance_setting_line"/>-->
-            <!--        <Button-->
-            <!--            android:id="@+id/advance_setting2"-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="match_parent"-->
-            <!--            android:layout_weight="1"-->
-            <!--            android:background="@color/advance_setting_background"-->
-            <!--            android:text="setting 2" />-->
-            <!--        <View-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="1dp"-->
-            <!--            android:background="@color/advance_setting_line"/>-->
-            <!--        <Button-->
-            <!--            android:id="@+id/advance_setting3"-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="match_parent"-->
-            <!--            android:layout_weight="1"-->
-            <!--            android:background="@color/advance_setting_button_background"-->
-            <!--            android:text="setting 3" />-->
-            <!--        <View-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="1dp"-->
-            <!--            android:background="@color/advance_setting_line"/>-->
-            <!--        <Button-->
-            <!--            android:id="@+id/advance_setting4"-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="match_parent"-->
-            <!--            android:layout_weight="1"-->
-            <!--            android:background="@color/advance_setting_button_background"-->
-            <!--            android:text="setting 4" />-->
-            <!--        <View-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="1dp"-->
-            <!--            android:background="@color/advance_setting_line"/>-->
-            <!--        <Button-->
-            <!--            android:id="@+id/advance_setting5"-->
-            <!--            android:layout_width="150dp"-->
-            <!--            android:layout_height="match_parent"-->
-            <!--            android:layout_weight="1"-->
-            <!--            android:background="@color/advance_setting_button_background"-->
-            <!--            android:text="setting 5" />-->
-            <RadioGroup
-                android:id="@+id/advance_setting_radio_group"
-                android:layout_width="150dp"
+            <RadioButton
+                android:id="@+id/advance_setting_1_button"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@color/advance_setting_background">
-                <RadioButton
-                    android:id="@+id/advance_setting_1_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:button="@null"
-                    android:background="@color/advance_setting_background"
-                    android:gravity="center"
-                    android:text="setting 1"/>
-                <View
-                    android:layout_width="150dp"
-                    android:layout_height="1dp"
-                    android:background="@color/advance_setting_line"/>
-                <RadioButton
-                    android:id="@+id/advance_setting_2_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:button="@null"
-                    android:background="@color/advance_setting_button_background"
-                    android:gravity="center"
-                    android:text="setting 2"/>
-                <View
-                    android:layout_width="150dp"
-                    android:layout_height="1dp"
-                    android:background="@color/advance_setting_line"/>
-                <RadioButton
-                    android:id="@+id/advance_setting_3_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:button="@null"
-                    android:background="@color/advance_setting_button_background"
-                    android:gravity="center"
-                    android:text="setting 3" />
-
-            </RadioGroup>
-        </LinearLayout>
+                android:layout_weight="1"
+                android:button="@null"
+                android:background="@color/advance_setting_background"
+                android:gravity="center"
+                android:text="setting 1"/>
+            <View
+                android:layout_width="150dp"
+                android:layout_height="1dp"
+                android:background="@color/advance_setting_line"/>
+            <RadioButton
+                android:id="@+id/advance_setting_2_button"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:button="@null"
+                android:background="@color/advance_setting_button_background"
+                android:gravity="center"
+                android:text="setting 2"/>
+            <View
+                android:layout_width="150dp"
+                android:layout_height="1dp"
+                android:background="@color/advance_setting_line"/>
+            <RadioButton
+                android:id="@+id/advance_setting_3_button"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:button="@null"
+                android:background="@color/advance_setting_button_background"
+                android:gravity="center"
+                android:text="setting 3" />
+        </RadioGroup>
         <LinearLayout
             android:id="@+id/advance_setting_1_layout"
             android:orientation="vertical"
@@ -142,7 +84,4 @@
                 android:text="setting3"/>
         </LinearLayout>
     </LinearLayout>
-
-
-
 </FrameLayout>

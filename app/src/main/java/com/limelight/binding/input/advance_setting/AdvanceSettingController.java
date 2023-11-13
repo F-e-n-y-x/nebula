@@ -2,6 +2,7 @@ package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
 import android.util.DisplayMetrics;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
@@ -41,6 +42,7 @@ public class AdvanceSettingController {
         this.context = context;
 
         advanceSettingLayout = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.advance_setting_view,null);
+        fatherLayout.addView(advanceSettingLayout);
         advanceSettingRadioGroup = advanceSettingLayout.findViewById(R.id.advance_setting_radio_group);
         setting1Button = advanceSettingLayout.findViewById(R.id.advance_setting_1_button);
         setting2Button = advanceSettingLayout.findViewById(R.id.advance_setting_2_button);
@@ -50,9 +52,9 @@ public class AdvanceSettingController {
         setting3Layout = advanceSettingLayout.findViewById(R.id.advance_setting_3_layout);
         /*
         * 设置界面初始化，最开始是"设置1"被选中,初始化的内容有
-        * "设置1"的按钮背景需要设置为黑色，这个在layout中实现
-        * "设置1"的界面需要显示，这个在layout中实现
-        * 把当前的设置项设置为"设置1"，这个在下面实现
+        * 1. "设置1"的按钮背景需要设置为黑色，这个在layout中实现
+        * 2. "设置1"的界面需要显示，这个在layout中实现
+        * 3. 把当前的设置项设置为"设置1"，这个在下面实现
         * */
         currentSettingButton = setting1Button;
         currentSettingLayout = setting1Layout;
@@ -77,8 +79,11 @@ public class AdvanceSettingController {
         buttonConfigure.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Toast.makeText(context,"wangguan",Toast.LENGTH_SHORT);
-                advanceSettingLayout.setVisibility(View.VISIBLE);
+                if (advanceSettingLayout.getVisibility() == View.VISIBLE){
+                    advanceSettingLayout.setVisibility(View.GONE);
+                } else {
+                    advanceSettingLayout.setVisibility(View.VISIBLE);
+                }
             }
         });
     }
@@ -95,11 +100,12 @@ public class AdvanceSettingController {
     }
 
     public void refreshLayout(){
-        DisplayMetrics screen = context.getResources().getDisplayMetrics();
+        fatherLayout.removeView(buttonConfigure);
 
+        DisplayMetrics screen = context.getResources().getDisplayMetrics();
         int buttonSize = (int)(screen.heightPixels*0.06f);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(buttonSize, buttonSize);
-        params.leftMargin = 15;
+        params.rightMargin = 15;
         params.topMargin = 15;
         fatherLayout.addView(buttonConfigure, params);
     }

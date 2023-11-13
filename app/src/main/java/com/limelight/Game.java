@@ -624,6 +624,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // Refresh layout of OSC for possible new screen size
             virtualController.refreshLayout();
         }
+        if (advanceSettingController != null) {
+            // Refresh layout of OSC for possible new screen size
+            System.out.println("wangguan test game");
+            advanceSettingController.refreshLayout();
+        }
 
         // Hide on-screen overlays in PiP mode
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
