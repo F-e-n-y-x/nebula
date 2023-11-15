@@ -3,25 +3,23 @@ package com.limelight.binding.input.advance_setting;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-
-import com.limelight.binding.input.advance_setting.keyboard_bean.KeyboardBean;
-
+import com.google.gson.Gson;
 import java.util.HashMap;
 import java.util.Map;
 
 public class KeyboardElementPreference {
 
-    private final String keyboardElementPreference;
-    private final Map<String, KeyboardBean> elements;
+    private final String keyboardLayoutId;
+    private final Map<String, KeyboardBean> elements = new HashMap<>();
     private final Context context;
+    private final Gson gson = new Gson();
 
-    public KeyboardElementPreference(String keyboardElementPreference, Context context){
+    public KeyboardElementPreference(String keyboardLayoutId, Context context){
         this.context = context;
-        this.keyboardElementPreference = keyboardElementPreference;
-        elements = new HashMap<>();
+        this.keyboardLayoutId = keyboardLayoutId;
 
         // 对象创建的时候读取按钮信息
-        SharedPreferences preferences = context.getSharedPreferences(keyboardElementPreference,Activity.MODE_PRIVATE);
+        SharedPreferences preferences = context.getSharedPreferences(keyboardLayoutId,Activity.MODE_PRIVATE);
         // 从SharePreference中获取Map<String, String>格式的Element信息
         Map<String, String> elementsString = (Map<String, String>) preferences.getAll();
         // 将Map<String, String>格式转换为Map<String, KeyboardBean>
@@ -32,7 +30,12 @@ public class KeyboardElementPreference {
         }
     }
 
-    public void addElement(String keyboardElementName, KeyboardBean element){
+    public int addElement(String keyboardElementName, KeyboardBean element){
+        if (elements.containsKey(keyboardElementName)){
+            //新增失败，按钮名称已存在
+            return -1;
+        }
+
         /*
          * 两步操作：
          * 1.加入MAP中
@@ -40,18 +43,21 @@ public class KeyboardElementPreference {
          * */
         elements.put(keyboardElementName, element);
         String elementString = JSONToString(element);
-        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardElementPreference, Activity.MODE_PRIVATE).edit();
+        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
         editor.putString(keyboardElementName, elementString);
         editor.apply();
+        //新增成功
+        return 0;
 
     }
     public void deleteElement(String keyboardElementName){
+
         /*
          * 两步操作：
          * 1.从SharedPreference中删除
          * 2.从MAP中删除
          * */
-        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardElementPreference, Activity.MODE_PRIVATE).edit();
+        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
         editor.remove(keyboardElementName);
         editor.apply();
         elements.remove(keyboardElementName);
@@ -61,10 +67,10 @@ public class KeyboardElementPreference {
     }
 
     private KeyboardBean stringToJSON(String element){
-        return null;
+        return gson.fromJson(element,KeyboardBean.class);
     }
 
-    private String JSONToString(KeyboardBean elements){
-        return null;
+    private String JSONToString(KeyboardBean element){
+        return gson.toJson(element);
     }
 }
