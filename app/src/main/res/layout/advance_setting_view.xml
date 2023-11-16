@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/advance_setting_view"
-    android:visibility="gone">
+    android:visibility="visible">
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -50,27 +50,123 @@
                 android:gravity="center"
                 android:text="setting 3" />
         </RadioGroup>
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/advance_setting_line"/>
         <LinearLayout
             android:id="@+id/advance_setting_1_layout"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="visible">
-            <TextView
+            android:visibility="gone">
+            <LinearLayout
+                android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:text="setting1"/>
+                android:layout_weight="1"
+                android:layout_marginLeft="5dp"
+                android:layout_marginRight="5dp">
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:textSize="20dp"
+                    android:gravity="center"
+                    android:text="布局设置"/>
+                <Spinner
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"/>
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp">
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="选择"/>
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="删除"/>
+                </LinearLayout>
+                <Button
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:text="重命名"/>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="5dp"
+                    android:layout_marginBottom="5dp"
+                    android:background="@color/advance_setting_line"
+                    android:layout_marginLeft="5dp" />
+            </LinearLayout>
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="@color/advance_setting_line"/>
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1">
+            </LinearLayout>
         </LinearLayout>
         <LinearLayout
             android:id="@+id/advance_setting_2_layout"
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone">
-            <TextView
+            android:visibility="visible">
+            <LinearLayout
+                android:orientation="horizontal"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:text="setting2"/>
+                android:layout_weight="3">
+                <FrameLayout
+                    android:layout_width="200dp"
+                    android:layout_height="match_parent">
+                    <TextView
+                        android:layout_width="150dp"
+                        android:layout_height="150dp"
+                        android:background="@drawable/button"
+                        android:text="A"
+                        android:textSize="40dp"
+                        android:gravity="center"
+                        android:layout_gravity="center"/>
+                </FrameLayout>
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:text="名称:"
+                        android:textSize="20dp"
+                        android:gravity="center"
+                        android:layout_weight="3"/>
+                    <EditText
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:layout_weight="2"/>
+                    <Button
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:layout_weight="3"/>
+                </LinearLayout>
+
+            </LinearLayout>
+            <LinearLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="2">
+
+            </LinearLayout>
         </LinearLayout>
         <LinearLayout
             android:id="@+id/advance_setting_3_layout"
@@ -84,4 +180,31 @@
                 android:text="setting3"/>
         </LinearLayout>
     </LinearLayout>
+    <!--   浮动窗口背景   -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#C0303030"
+        android:visibility="gone">
+        <!--   浮动窗口   -->
+        <FrameLayout
+            android:layout_width="300dp"
+            android:layout_height="200dp"
+            android:layout_gravity="center"
+            android:background="#202020">
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center">
+                <EditText
+                    android:layout_width="200dp"
+                    android:layout_height="50dp"/>
+                <Button
+                    android:layout_width="200dp"
+                    android:layout_height="50dp"
+                    android:text="确认"/>
+            </LinearLayout>
+        </FrameLayout>
+    </FrameLayout>
 </FrameLayout>
