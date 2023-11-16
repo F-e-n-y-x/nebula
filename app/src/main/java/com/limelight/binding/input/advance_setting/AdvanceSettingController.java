@@ -36,11 +36,12 @@ public class AdvanceSettingController {
     private RadioGroup advanceSettingRadioGroup;
     private Context context;
     private Button buttonConfigure;
+    private KeyboardController keyboardController;
 
     public AdvanceSettingController(FrameLayout layout, final Context context) {
         this.fatherLayout = layout;
         this.context = context;
-
+        keyboardController = new KeyboardController(layout,context);
         advanceSettingLayout = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.advance_setting_view,null);
         fatherLayout.addView(advanceSettingLayout);
         advanceSettingRadioGroup = advanceSettingLayout.findViewById(R.id.advance_setting_radio_group);
@@ -108,5 +109,7 @@ public class AdvanceSettingController {
         params.rightMargin = 15;
         params.topMargin = 15;
         fatherLayout.addView(buttonConfigure, params);
+
+        keyboardController.refreshLayout();
     }
 }

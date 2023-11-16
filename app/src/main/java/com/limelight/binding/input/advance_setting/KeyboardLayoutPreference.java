@@ -98,12 +98,5 @@ public class KeyboardLayoutPreference {
         return layoutsMap.get(layoutName);
     }
 
-    public void wg_debug(){
-        SharedPreferences preferences = context.getSharedPreferences(LAYOUT_LIST_PREFERENCE, Activity.MODE_PRIVATE);
-        System.out.println(
-                "wg_debug2" + (Map<String, String>) preferences.getAll()
-        );
-    }
-
 
 }

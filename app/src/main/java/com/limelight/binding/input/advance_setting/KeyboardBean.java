@@ -2,11 +2,11 @@ package com.limelight.binding.input.advance_setting;
 
 public class KeyboardBean {
 
-    private String value;
-    private String valueUp;
-    private String valueDown;
-    private String valueLeft;
-    private String valueRight;
+    private int value;
+    private int valueUp;
+    private int valueDown;
+    private int valueLeft;
+    private int valueRight;
     /*
     * type有三个值
     * 0:BUTTON
@@ -18,44 +18,46 @@ public class KeyboardBean {
     private int positionY;
     private int size;
     private int opacity;
+    private int layer;
 
-    public String getValue() {
+
+    public int getValue() {
         return value;
     }
 
-    public void setValue(String value) {
+    public void setValue(int value) {
         this.value = value;
     }
 
-    public String getValueUp() {
+    public int getValueUp() {
         return valueUp;
     }
 
-    public void setValueUp(String valueUp) {
+    public void setValueUp(int valueUp) {
         this.valueUp = valueUp;
     }
 
-    public String getValueDown() {
+    public int getValueDown() {
         return valueDown;
     }
 
-    public void setValueDown(String valueDown) {
+    public void setValueDown(int valueDown) {
         this.valueDown = valueDown;
     }
 
-    public String getValueLeft() {
+    public int getValueLeft() {
         return valueLeft;
     }
 
-    public void setValueLeft(String valueLeft) {
+    public void setValueLeft(int valueLeft) {
         this.valueLeft = valueLeft;
     }
 
-    public String getValueRight() {
+    public int getValueRight() {
         return valueRight;
     }
 
-    public void setValueRight(String valueRight) {
+    public void setValueRight(int valueRight) {
         this.valueRight = valueRight;
     }
 
@@ -97,5 +99,13 @@ public class KeyboardBean {
 
     public void setOpacity(int opacity) {
         this.opacity = opacity;
+    }
+
+    public int getLayer() {
+        return layer;
+    }
+
+    public void setLayer(int layer) {
+        this.layer = layer;
     }
 }
