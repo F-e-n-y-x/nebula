@@ -73,6 +73,25 @@
                     android:textSize="20dp"
                     android:gravity="center"
                     android:text="布局设置"/>
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp">
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:textSize="20dp"
+                        android:gravity="center"
+                        android:layout_weight="2"
+                        android:text="布局："/>
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:textSize="20dp"
+                        android:gravity="center"
+                        android:layout_weight="1"
+                        android:text="default"/>
+                </LinearLayout>
                 <Spinner
                     android:layout_width="match_parent"
                     android:layout_height="50dp"/>
@@ -112,6 +131,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_weight="1">
+                <ListView
+                    android:id="@+id/keyboard_layout_listview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"/>
             </LinearLayout>
         </LinearLayout>
         <LinearLayout
@@ -125,10 +148,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_weight="3">
+                <!-- 按钮 -->
                 <FrameLayout
+                    android:id="@+id/button_drawing"
                     android:layout_width="200dp"
-                    android:layout_height="match_parent">
+                    android:layout_height="match_parent"
+                    android:visibility="visible">
                     <TextView
+                        android:id="@+id/button_drawing_text"
                         android:layout_width="150dp"
                         android:layout_height="150dp"
                         android:background="@drawable/button"
@@ -137,35 +164,137 @@
                         android:gravity="center"
                         android:layout_gravity="center"/>
                 </FrameLayout>
+                <!-- 十字键 -->
                 <LinearLayout
-                    android:orientation="horizontal"
-                    android:layout_width="match_parent"
+                    android:orientation="vertical"
+                    android:layout_width="200dp"
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"/>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:background="@drawable/square_border"
+                            android:text="W"/>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:gravity="center"
+                            android:layout_weight="1" />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:background="@drawable/square_border"
+                            android:text="A"/>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:background="@drawable/square_border"/>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:background="@drawable/square_border"
+                            android:text="D"/>
+                    </LinearLayout>
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:background="@drawable/square_border"
+                            android:text="S"/>
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"/>
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1">
-                    <TextView
+                    <LinearLayout
+                        android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="50dp"
-                        android:text="名称:"
-                        android:textSize="20dp"
-                        android:gravity="center"
-                        android:layout_weight="3"/>
-                    <EditText
+                        android:layout_height="wrap_content">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:text="名称:"
+                            android:gravity="center"
+                            android:layout_weight="3"/>
+                        <EditText
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:text="ceshi"
+                            android:layout_weight="2"/>
+                        <Button
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:layout_weight="3"
+                            android:text="确定"/>
+                    </LinearLayout>
+                    <LinearLayout
+                        android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="50dp"
-                        android:layout_weight="2"/>
-                    <Button
-                        android:layout_width="match_parent"
-                        android:layout_height="50dp"
-                        android:layout_weight="3"/>
+                        android:layout_height="wrap_content">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:text="按键类型："
+                            android:gravity="center"
+                            android:layout_weight="3"/>
+                        <Spinner
+                            android:layout_width="match_parent"
+                            android:layout_height="50dp"
+                            android:layout_weight="1"
+                            android:entries="@array/button_name"
+                            />
+                    </LinearLayout>
                 </LinearLayout>
-
             </LinearLayout>
             <LinearLayout
-                android:orientation="horizontal"
+                android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_weight="2">
-
+                <include layout="@layout/keyboard_layout"/>
             </LinearLayout>
         </LinearLayout>
         <LinearLayout

@@ -1,14 +1,20 @@
 package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
+import android.database.DataSetObserver;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.LinearInterpolator;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ListAdapter;
+import android.widget.ListView;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
@@ -98,6 +104,17 @@ public class AdvanceSettingController {
             currentSettingButton.setBackgroundColor(context.getResources().getColor(R.color.advance_setting_background));
             currentSettingLayout.setVisibility(View.VISIBLE);
         }
+    }
+
+    private void setSetting1Layout(){
+        LinearLayout linearLayout = setting2Layout.findViewById(R.id.keyboard_drawing);
+        linearLayout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+               View view = v.findFocus();
+               View view1 = view.findFocus();
+            }
+        });
     }
 
     public void refreshLayout(){
