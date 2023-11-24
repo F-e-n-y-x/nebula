@@ -50,6 +50,14 @@ public class KeyboardElementPreference {
         return 0;
 
     }
+
+    public void saveElements(){
+        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
+        for (Map.Entry<String, KeyboardBean> entry: elements.entrySet()){
+            editor.putString(entry.getKey(),JSONToString(entry.getValue()));
+        }
+        editor.apply();
+    }
     public void deleteElement(String keyboardElementName){
 
         /*

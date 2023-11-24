@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/advance_setting_view"
-    android:visibility="gone">
+    android:visibility="invisible">
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -146,7 +146,7 @@
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone">
+            android:visibility="invisible">
             <!--  上半部分   -->
             <LinearLayout
                 android:orientation="horizontal"
@@ -273,23 +273,24 @@
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content">
+                        android:layout_height="match_parent"
+                        android:layout_weight="100">
                         <TextView
                             android:layout_width="match_parent"
-                            android:layout_height="50dp"
+                            android:layout_height="match_parent"
                             android:text="名称:"
                             android:gravity="center"
                             android:layout_weight="3"/>
                         <EditText
                             android:id="@+id/add_element_name"
                             android:layout_width="match_parent"
-                            android:layout_height="50dp"
+                            android:layout_height="match_parent"
                             android:text="ceshi"
                             android:layout_weight="2"/>
                         <Button
                             android:id="@+id/add_element_button"
                             android:layout_width="match_parent"
-                            android:layout_height="50dp"
+                            android:layout_height="match_parent"
                             android:layout_weight="3"
                             android:text="确定"/>
                     </LinearLayout>
@@ -297,7 +298,8 @@
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content">
+                        android:layout_height="match_parent"
+                        android:layout_weight="100">
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
@@ -307,10 +309,27 @@
                         <Spinner
                             android:id="@+id/select_element_type"
                             android:layout_width="match_parent"
-                            android:layout_height="50dp"
+                            android:layout_height="match_parent"
                             android:layout_weight="1"
                             android:entries="@array/button_name"
                             />
+                    </LinearLayout>
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_weight="100">
+                        <Button
+                            android:id="@+id/delete_element"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="100"
+                            android:text="移动按键"/>
+                        <Button
+                            android:id="@+id/move_element"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="100"
+                            android:text="删除按键"/>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -337,31 +356,4 @@
                 android:text="setting3"/>
         </LinearLayout>
     </LinearLayout>
-    <!--   浮动窗口背景   -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#C0303030"
-        android:visibility="gone">
-        <!--   浮动窗口   -->
-        <FrameLayout
-            android:layout_width="300dp"
-            android:layout_height="200dp"
-            android:layout_gravity="center"
-            android:background="#202020">
-            <LinearLayout
-                android:orientation="vertical"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center">
-                <EditText
-                    android:layout_width="200dp"
-                    android:layout_height="50dp"/>
-                <Button
-                    android:layout_width="200dp"
-                    android:layout_height="50dp"
-                    android:text="确认"/>
-            </LinearLayout>
-        </FrameLayout>
-    </FrameLayout>
 </FrameLayout>

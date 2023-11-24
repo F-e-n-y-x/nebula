@@ -6,7 +6,12 @@ import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.SeekBar;
+
 import com.limelight.Game;
+import com.limelight.R;
+import com.limelight.binding.input.virtual_controller.VirtualControllerElement;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -16,8 +21,8 @@ public class KeyboardController {
 
     public enum ControllerMode {
         Active,
-        MoveButtons,
-        ResizeButtons
+        EditButtons,
+        DeleteButtons
     }
 
     private final Context context;
@@ -32,14 +37,24 @@ public class KeyboardController {
     private KeyboardLayoutPreference keyboardLayoutPreference;
     private Map<Integer, Runnable> keyEventRunnableMap = new HashMap<>();
     private FrameLayout elementsLayout;
-
-    public KeyboardController(FrameLayout layout, final Context context) {
+    private AdvanceSettingController advanceSettingController;
+    private KeyboardElement currentEditElement;
+    public KeyboardController(FrameLayout layout, AdvanceSettingController advanceSettingController, final Context context) {
         this.elementsLayout = layout;
         this.context = context;
         this.game = (Game) context;
         this.handler = new Handler(Looper.getMainLooper());
+        this.advanceSettingController = advanceSettingController;
         this.advanceSettingPreference = new AdvanceSettingPreference(context);
         this.keyboardLayoutPreference = new KeyboardLayoutPreference(context);
+    }
+
+    public SeekBar getSizeSeekbar() {
+        return advanceSettingController.getSizeSeekbar();
+    }
+
+    public void saveLayout(){
+        keyboardElementPreference.saveElements();
     }
 
     Handler getHandler() {
@@ -64,6 +79,8 @@ public class KeyboardController {
         }
         elements.clear();
     }
+
+
 
     public void setOpacity(int opacity) {
         for (KeyboardElement element : elements) {
@@ -182,9 +199,23 @@ public class KeyboardController {
         return currentMode;
     }
 
+    public void setControllerMode(ControllerMode currentMode){
+        this.currentMode = currentMode;
+    }
 
+    public void elementsInvalidate(){
+        for (KeyboardElement element : elements) {
+            element.invalidate();
+        }
+    }
 
+    public KeyboardElement getCurrentEditElement() {
+        return currentEditElement;
+    }
 
+    public void setCurrentEditElement(KeyboardElement currentEditElement) {
+        this.currentEditElement = currentEditElement;
+    }
 
     void sendKeyEvent(KeyEvent keyEvent) {
         game.onKey(null,keyEvent.getKeyCode(),keyEvent);

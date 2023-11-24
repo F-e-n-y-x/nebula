@@ -13,12 +13,9 @@ import android.widget.FrameLayout;
 public abstract class KeyboardElement extends View {
     private int normalColor = 0xF0888888;
     protected int pressedColor = 0xF00000FF;
-    private int configMoveColor = 0xF0FF0000;
-    private int configResizeColor = 0xF0FF00FF;
+    private int configEditColor = 0xF0FF00FF;
+    private int configDeleteColor = 0xF0FF0000;
     private int configSelectedColor = 0xF000FF00;
-
-    protected int startSize_x;
-    protected int startSize_y;
 
     float position_pressed_x = 0;
     float position_pressed_y = 0;
@@ -31,8 +28,8 @@ public abstract class KeyboardElement extends View {
 
     private enum Mode {
         Normal,
-        Resize,
-        Move
+        Delete,
+        Edit
     }
 
     private Mode currentMode = Mode.Normal;
@@ -51,22 +48,22 @@ public abstract class KeyboardElement extends View {
 
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
 
-        layoutParams.leftMargin = newPos_x > 0 ? newPos_x : 0;
-        layoutParams.topMargin = newPos_y > 0 ? newPos_y : 0;
+        layoutParams.leftMargin = Math.max(newPos_x, -(keyboardBean.getSize() / 2));
+        layoutParams.topMargin = Math.max(newPos_y, -(keyboardBean.getSize() / 2));
         layoutParams.rightMargin = 0;
         layoutParams.bottomMargin = 0;
+
+        keyboardBean.setPositionX(newPos_x);
+        keyboardBean.setPositionY(newPos_y);
 
         requestLayout();
     }
 
-    protected void resizeElement(int pressed_x, int pressed_y, int width, int height) {
+    protected void resizeElement(int size) {
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
-
-        int newHeight = height + (startSize_y - pressed_y);
-        int newWidth = width + (startSize_x - pressed_x);
-
-        layoutParams.height = newHeight > 20 ? newHeight : 20;
-        layoutParams.width = newWidth > 20 ? newWidth : 20;
+        keyboardBean.setSize(size);
+        layoutParams.height = Math.max(keyboardBean.getSize(), 20);
+        layoutParams.width = Math.max(keyboardBean.getSize(), 20);
 
         requestLayout();
     }
@@ -74,17 +71,6 @@ public abstract class KeyboardElement extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         onElementDraw(canvas);
-
-        if (currentMode != Mode.Normal) {
-            paint.setColor(configSelectedColor);
-            paint.setStrokeWidth(getDefaultStrokeWidth());
-            paint.setStyle(Paint.Style.STROKE);
-
-            canvas.drawRect(paint.getStrokeWidth(), paint.getStrokeWidth(),
-                    getWidth()-paint.getStrokeWidth(), getHeight()-paint.getStrokeWidth(),
-                    paint);
-        }
-
         super.onDraw(canvas);
     }
 
@@ -120,12 +106,12 @@ public abstract class KeyboardElement extends View {
     }
     */
 
-    protected void actionEnableMove() {
-        currentMode = Mode.Move;
+    protected void actionEnableEdit() {
+        currentMode = Mode.Edit;
     }
 
-    protected void actionEnableResize() {
-        currentMode = Mode.Resize;
+    protected void actionEnableDelete() {
+        currentMode = Mode.Delete;
     }
 
     protected void actionCancel() {
@@ -134,10 +120,13 @@ public abstract class KeyboardElement extends View {
     }
 
     protected int getDefaultColor() {
-        if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.MoveButtons)
-            return configMoveColor;
-        else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.ResizeButtons)
-            return configResizeColor;
+        System.out.println("wg_debug:getcolor");
+        if (keyboardController.getCurrentEditElement() == this){
+            return configSelectedColor;
+        } else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.EditButtons)
+            return configEditColor;
+        else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.DeleteButtons)
+            return configDeleteColor;
         else
             return normalColor;
     }
@@ -153,8 +142,8 @@ public abstract class KeyboardElement extends View {
         alertBuilder.setTitle("Configuration");
 
         CharSequence functions[] = new CharSequence[]{
-                "Move",
-                "Resize",
+                "Edit",
+                "Delete",
                 /*election
                 "Set n
                 Disable color sormal color",
@@ -168,12 +157,12 @@ public abstract class KeyboardElement extends View {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 switch (which) {
-                    case 0: { // move
-                        actionEnableMove();
+                    case 0: { // Edit
+                        actionEnableEdit();
                         break;
                     }
-                    case 1: { // resize
-                        actionEnableResize();
+                    case 1: { // delete
+                        actionEnableDelete();
                         break;
                     }
                 /*
@@ -217,19 +206,22 @@ public abstract class KeyboardElement extends View {
             case MotionEvent.ACTION_DOWN: {
                 position_pressed_x = event.getX();
                 position_pressed_y = event.getY();
-                startSize_x = getWidth();
-                startSize_y = getHeight();
 
-                if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.MoveButtons)
-                    actionEnableMove();
-                else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.ResizeButtons)
-                    actionEnableResize();
+                if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.EditButtons)
+                    actionEnableEdit();
+                else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.DeleteButtons)
+                    actionEnableDelete();
+                if (currentMode == Mode.Edit){
+                    keyboardController.elementsInvalidate();
+                    keyboardController.setCurrentEditElement(this);
+                    keyboardController.getSizeSeekbar().setProgress(keyboardBean.getSize());
+                }
 
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
                 switch (currentMode) {
-                    case Move: {
+                    case Edit: {
                         moveElement(
                                 (int) position_pressed_x,
                                 (int) position_pressed_y,
@@ -237,12 +229,7 @@ public abstract class KeyboardElement extends View {
                                 (int) event.getY());
                         break;
                     }
-                    case Resize: {
-                        resizeElement(
-                                (int) position_pressed_x,
-                                (int) position_pressed_y,
-                                (int) event.getX(),
-                                (int) event.getY());
+                    case Delete: {
                         break;
                     }
                     case Normal: {
