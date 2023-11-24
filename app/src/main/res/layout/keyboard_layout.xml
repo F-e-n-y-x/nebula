@@ -16,6 +16,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
+            android:tag=""
             android:text="F1"/>
         <TextView
             android:layout_width="match_parent"
@@ -245,6 +246,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
+            android:tag="51"
             android:text="W"/>
         <TextView
             android:layout_width="match_parent"
@@ -342,6 +344,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
+            android:tag="29"
             android:text="A"/>
         <TextView
             android:layout_width="match_parent"
@@ -349,6 +352,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
+            android:tag="47"
             android:text="S"/>
         <TextView
             android:layout_width="match_parent"
@@ -356,6 +360,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
+            android:tag="32"
             android:text="D"/>
         <TextView
             android:layout_width="match_parent"

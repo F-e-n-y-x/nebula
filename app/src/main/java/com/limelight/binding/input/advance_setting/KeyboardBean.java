@@ -108,4 +108,21 @@ public class KeyboardBean {
     public void setLayer(int layer) {
         this.layer = layer;
     }
+
+    @Override
+    public String toString() {
+        return "KeyboardBean{" +
+                "value=" + value +
+                ", valueUp=" + valueUp +
+                ", valueDown=" + valueDown +
+                ", valueLeft=" + valueLeft +
+                ", valueRight=" + valueRight +
+                ", type=" + type +
+                ", positionX=" + positionX +
+                ", positionY=" + positionY +
+                ", size=" + size +
+                ", opacity=" + opacity +
+                ", layer=" + layer +
+                '}';
+    }
 }

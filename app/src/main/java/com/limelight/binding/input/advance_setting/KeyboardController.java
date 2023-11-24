@@ -24,8 +24,6 @@ public class KeyboardController {
     private final Game game;
     private final Handler handler;
 
-    private FrameLayout frame_layout = null;
-
     ControllerMode currentMode = ControllerMode.Active;
 
     private final List<KeyboardElement> elements = new ArrayList<>();
@@ -33,9 +31,10 @@ public class KeyboardController {
     private KeyboardElementPreference keyboardElementPreference;
     private KeyboardLayoutPreference keyboardLayoutPreference;
     private Map<Integer, Runnable> keyEventRunnableMap = new HashMap<>();
+    private FrameLayout elementsLayout;
 
     public KeyboardController(FrameLayout layout, final Context context) {
-        this.frame_layout = layout;
+        this.elementsLayout = layout;
         this.context = context;
         this.game = (Game) context;
         this.handler = new Handler(Looper.getMainLooper());
@@ -61,7 +60,7 @@ public class KeyboardController {
 
     public void removeElements() {
         for (KeyboardElement element : elements) {
-            frame_layout.removeView(element);
+            elementsLayout.removeView(element);
         }
         elements.clear();
     }
@@ -73,12 +72,24 @@ public class KeyboardController {
     }
 
 
-    public void addElement(KeyboardElement element, int x, int y, int size) {
-        elements.add(element);
-        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(size, size);
-        layoutParams.setMargins(x, y, 0, 0);
+    public void addElement(String elementId, KeyboardBean keyboardBean) {
+        KeyboardElement keyboardElement = null;
+        switch (keyboardBean.getType()){
+            case 0:
+                keyboardElement = createButton(elementId,keyboardBean,keyboardBean.getLayer());
+                break;
+            case 1:
+                keyboardElement = createSwitch(elementId,keyboardBean,keyboardBean.getLayer());
+                break;
+            case 2:
+                keyboardElement = createPad(elementId,keyboardBean);
+                break;
+        }
+        elements.add(keyboardElement);
+        FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(keyboardBean.getSize(), keyboardBean.getSize());
+        layoutParams.setMargins(keyboardBean.getPositionX(), keyboardBean.getPositionY(), 0, 0);
 
-        frame_layout.addView(element, layoutParams);
+        elementsLayout.addView(keyboardElement, layoutParams);
     }
 
     public void loadCurrentLayout(){
@@ -87,33 +98,9 @@ public class KeyboardController {
         keyboardElementPreference = new KeyboardElementPreference(currentLayoutId,context);
         Map<String,KeyboardBean> elementsMap = keyboardElementPreference.getElements();
         for (Map.Entry<String,KeyboardBean> entry: elementsMap.entrySet()){
-            KeyboardBean keyboardBean = entry.getValue();
-            switch (keyboardBean.getType()){
-                case 0:
-                    addElement(
-                            createButton(entry.getKey(),keyboardBean,keyboardBean.getLayer()),
-                            keyboardBean.getPositionX(),
-                            keyboardBean.getPositionY(),
-                            keyboardBean.getSize());
-                    break;
-                case 1:
-                    addElement(
-                            createSwitch(entry.getKey(),keyboardBean,keyboardBean.getLayer()),
-                            keyboardBean.getPositionX(),
-                            keyboardBean.getPositionY(),
-                            keyboardBean.getSize());
-                    break;
-                case 2:
-                    addElement(
-                            createPad(entry.getKey(),keyboardBean),
-                            keyboardBean.getPositionX(),
-                            keyboardBean.getPositionY(),
-                            keyboardBean.getSize());
-                    break;
-            }
+            addElement(entry.getKey(),entry.getValue());
         }
     }
-
     public KeyboardElement createPad(String elementId, KeyboardBean keyboardBean){
         KeyboardDigitalPad keyboardDigitalPad = new KeyboardDigitalPad(this, keyboardBean, elementId, context);
         keyboardDigitalPad.addDigitalPadListener(new KeyboardDigitalPad.DigitalPadListener() {
@@ -153,6 +140,7 @@ public class KeyboardController {
     }
     public KeyboardElement createButton(String elementId, KeyboardBean keyboardBean, int layer){
         KeyboardDigitalButton keyboardDigitalButton = new KeyboardDigitalButton(this, keyboardBean, elementId, layer, context);
+        keyboardDigitalButton.setText(elementId);
         keyboardDigitalButton.addDigitalButtonListener(new KeyboardDigitalButton.DigitalButtonListener() {
             @Override
             public void onClick() {
@@ -175,6 +163,10 @@ public class KeyboardController {
     }
     public KeyboardElement createSwitch(String elementId, KeyboardBean keyboardBean, int layer){
         return new KeyboardDigitalButton(this, keyboardBean, elementId, layer, context);
+    }
+
+    public int saveElement(String elementId, KeyboardBean keyboardBean){
+        return keyboardElementPreference.addElement(elementId,keyboardBean);
     }
 
     public List<KeyboardElement> getElements() {

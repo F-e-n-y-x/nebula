@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/advance_setting_view"
-    android:visibility="visible">
+    android:visibility="gone">
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -54,12 +54,14 @@
             android:layout_width="1dp"
             android:layout_height="match_parent"
             android:background="@color/advance_setting_line"/>
+        <!--    setting1    -->
         <LinearLayout
             android:id="@+id/advance_setting_1_layout"
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone">
+            android:visibility="visible">
+            <!--   左半部分    -->
             <LinearLayout
                 android:orientation="vertical"
                 android:layout_width="match_parent"
@@ -126,6 +128,7 @@
                 android:layout_width="1dp"
                 android:layout_height="match_parent"
                 android:background="@color/advance_setting_line"/>
+            <!--   右半部分    -->
             <LinearLayout
                 android:orientation="vertical"
                 android:layout_width="match_parent"
@@ -137,118 +140,136 @@
                     android:layout_height="match_parent"/>
             </LinearLayout>
         </LinearLayout>
+        <!--    setting2    -->
         <LinearLayout
             android:id="@+id/advance_setting_2_layout"
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="visible">
+            android:visibility="gone">
+            <!--  上半部分   -->
             <LinearLayout
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_weight="3">
-                <!-- 按钮 -->
+                <!--  图示部分   -->
                 <FrameLayout
-                    android:id="@+id/button_drawing"
                     android:layout_width="200dp"
-                    android:layout_height="match_parent"
-                    android:visibility="visible">
-                    <TextView
-                        android:id="@+id/button_drawing_text"
-                        android:layout_width="150dp"
-                        android:layout_height="150dp"
-                        android:background="@drawable/button"
-                        android:text="A"
-                        android:textSize="40dp"
-                        android:gravity="center"
-                        android:layout_gravity="center"/>
+                    android:layout_height="match_parent">
+                    <!-- 按钮 -->
+                    <FrameLayout
+                        android:id="@+id/button_drawing"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="visible">
+                        <TextView
+                            android:id="@+id/button_drawing_text"
+                            android:layout_width="150dp"
+                            android:layout_height="150dp"
+                            android:background="@drawable/button"
+                            android:text="A"
+                            android:textSize="40dp"
+                            android:tag="29"
+                            android:gravity="center"
+                            android:layout_gravity="center"/>
+                    </FrameLayout>
+                    <!--  十字键  -->
+                    <LinearLayout
+                        android:id="@+id/pad_drawing"
+                        android:orientation="vertical"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone">
+                        <LinearLayout
+                            android:orientation="horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1">
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"/>
+                            <TextView
+                                android:id="@+id/pad_drawing_up"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:background="@drawable/confirm_square_border"
+                                android:tag="51"
+                                android:text="W"/>
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:gravity="center"
+                                android:layout_weight="1" />
+                        </LinearLayout>
+                        <LinearLayout
+                            android:orientation="horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1">
+                            <TextView
+                                android:id="@+id/pad_drawing_left"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:background="@drawable/square_border"
+                                android:tag="29"
+                                android:text="A"/>
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center" />
+                            <TextView
+                                android:id="@+id/pad_drawing_right"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:background="@drawable/square_border"
+                                android:tag="32"
+                                android:text="D"/>
+                        </LinearLayout>
+                        <LinearLayout
+                            android:orientation="horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1">
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                />
+                            <TextView
+                                android:id="@+id/pad_drawing_down"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:background="@drawable/square_border"
+                                android:tag="47"
+                                android:text="S"/>
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_weight="1"
+                                android:gravity="center"/>
+                        </LinearLayout>
+                    </LinearLayout>
                 </FrameLayout>
-                <!-- 十字键 -->
-                <LinearLayout
-                    android:orientation="vertical"
-                    android:layout_width="200dp"
-                    android:layout_height="match_parent"
-                    android:visibility="gone">
-                    <LinearLayout
-                        android:orientation="horizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1">
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"/>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:background="@drawable/square_border"
-                            android:text="W"/>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:layout_weight="1" />
-                    </LinearLayout>
-                    <LinearLayout
-                        android:orientation="horizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1">
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:background="@drawable/square_border"
-                            android:text="A"/>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:background="@drawable/square_border"/>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:background="@drawable/square_border"
-                            android:text="D"/>
-                    </LinearLayout>
-                    <LinearLayout
-                        android:orientation="horizontal"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1">
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            />
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"
-                            android:background="@drawable/square_border"
-                            android:text="S"/>
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="1"
-                            android:gravity="center"/>
-                    </LinearLayout>
-                </LinearLayout>
+                <!--  设置部分   -->
                 <LinearLayout
                     android:orientation="vertical"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1">
+                    <!--  名称设置以及按钮创建   -->
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
@@ -260,16 +281,19 @@
                             android:gravity="center"
                             android:layout_weight="3"/>
                         <EditText
+                            android:id="@+id/add_element_name"
                             android:layout_width="match_parent"
                             android:layout_height="50dp"
                             android:text="ceshi"
                             android:layout_weight="2"/>
                         <Button
+                            android:id="@+id/add_element_button"
                             android:layout_width="match_parent"
                             android:layout_height="50dp"
                             android:layout_weight="3"
                             android:text="确定"/>
                     </LinearLayout>
+                    <!--  按钮类型选择部分   -->
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
@@ -281,6 +305,7 @@
                             android:gravity="center"
                             android:layout_weight="3"/>
                         <Spinner
+                            android:id="@+id/select_element_type"
                             android:layout_width="match_parent"
                             android:layout_height="50dp"
                             android:layout_weight="1"
@@ -289,14 +314,17 @@
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
+            <!--  下半部分   -->
             <LinearLayout
                 android:orientation="vertical"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_weight="2">
+                <!--  键盘部分   -->
                 <include layout="@layout/keyboard_layout"/>
             </LinearLayout>
         </LinearLayout>
+        <!--    setting3    -->
         <LinearLayout
             android:id="@+id/advance_setting_3_layout"
             android:orientation="vertical"
