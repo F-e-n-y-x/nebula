@@ -9,8 +9,6 @@ import android.widget.FrameLayout;
 import android.widget.SeekBar;
 
 import com.limelight.Game;
-import com.limelight.R;
-import com.limelight.binding.input.virtual_controller.VirtualControllerElement;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,27 +30,22 @@ public class KeyboardController {
     ControllerMode currentMode = ControllerMode.Active;
 
     private final List<KeyboardElement> elements = new ArrayList<>();
-    private final AdvanceSettingPreference advanceSettingPreference;
     private KeyboardElementPreference keyboardElementPreference;
     private KeyboardLayoutPreference keyboardLayoutPreference;
     private Map<Integer, Runnable> keyEventRunnableMap = new HashMap<>();
     private FrameLayout elementsLayout;
     private AdvanceSettingController advanceSettingController;
-    private KeyboardElement currentEditElement;
+    private KeyboardElement currentSelectedElement;
     public KeyboardController(FrameLayout layout, AdvanceSettingController advanceSettingController, final Context context) {
         this.elementsLayout = layout;
         this.context = context;
         this.game = (Game) context;
         this.handler = new Handler(Looper.getMainLooper());
         this.advanceSettingController = advanceSettingController;
-        this.advanceSettingPreference = new AdvanceSettingPreference(context);
         this.keyboardLayoutPreference = new KeyboardLayoutPreference(context);
     }
 
-    public SeekBar getSizeSeekbar() {
-        return advanceSettingController.getSizeSeekbar();
-    }
-
+    public FrameLayout getFloatWindowsLayout(){return advanceSettingController.getFloatWindowsLayout();}
     public void saveLayout(){
         keyboardElementPreference.saveElements();
     }
@@ -80,15 +73,6 @@ public class KeyboardController {
         elements.clear();
     }
 
-
-
-    public void setOpacity(int opacity) {
-        for (KeyboardElement element : elements) {
-            element.setOpacity(opacity);
-        }
-    }
-
-
     public void addElement(String elementId, KeyboardBean keyboardBean) {
         KeyboardElement keyboardElement = null;
         switch (keyboardBean.getType()){
@@ -109,8 +93,20 @@ public class KeyboardController {
         elementsLayout.addView(keyboardElement, layoutParams);
     }
 
+    public void deleteElement(KeyboardElement element){
+        elements.remove(element);
+        elementsLayout.removeView(element);
+        keyboardElementPreference.deleteElement(element.getElementId());
+    }
+
+    public void setOpacity(int opacity) {
+        for (KeyboardElement element : elements) {
+            element.setOpacity(opacity);
+        }
+    }
+
     public void loadCurrentLayout(){
-        String currentLayout = advanceSettingPreference.getCurrentLayoutName();
+        String currentLayout = advanceSettingController.getAdvanceSettingPreference().getCurrentLayoutName();
         String currentLayoutId = keyboardLayoutPreference.getLayoutId(currentLayout);
         keyboardElementPreference = new KeyboardElementPreference(currentLayoutId,context);
         Map<String,KeyboardBean> elementsMap = keyboardElementPreference.getElements();
@@ -118,6 +114,7 @@ public class KeyboardController {
             addElement(entry.getKey(),entry.getValue());
         }
     }
+
     public KeyboardElement createPad(String elementId, KeyboardBean keyboardBean){
         KeyboardDigitalPad keyboardDigitalPad = new KeyboardDigitalPad(this, keyboardBean, elementId, context);
         keyboardDigitalPad.addDigitalPadListener(new KeyboardDigitalPad.DigitalPadListener() {
@@ -155,6 +152,7 @@ public class KeyboardController {
         });
         return keyboardDigitalPad;
     }
+
     public KeyboardElement createButton(String elementId, KeyboardBean keyboardBean, int layer){
         KeyboardDigitalButton keyboardDigitalButton = new KeyboardDigitalButton(this, keyboardBean, elementId, layer, context);
         keyboardDigitalButton.setText(elementId);
@@ -178,8 +176,35 @@ public class KeyboardController {
         });
         return keyboardDigitalButton;
     }
+
     public KeyboardElement createSwitch(String elementId, KeyboardBean keyboardBean, int layer){
-        return new KeyboardDigitalButton(this, keyboardBean, elementId, layer, context);
+        KeyboardDigitalSwitch keyboardDigitalSwitch = new KeyboardDigitalSwitch(this, keyboardBean, elementId, layer, context);
+        keyboardDigitalSwitch.setText(elementId);
+        keyboardDigitalSwitch.addDigitalSwitchListener(new KeyboardDigitalSwitch.DigitalSwitchListener() {
+            @Override
+            public void onClick() {
+                int keyCode = keyboardBean.getValue();
+                if (keyboardDigitalSwitch.getCurrentAction() == KeyEvent.ACTION_UP){
+                    sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
+                    keyboardDigitalSwitch.setCurrentAction(KeyEvent.ACTION_DOWN);
+                } else {
+                    sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
+                    keyboardDigitalSwitch.setCurrentAction(KeyEvent.ACTION_UP);
+                }
+
+            }
+
+            @Override
+            public void onLongClick() {
+
+            }
+
+            @Override
+            public void onRelease() {
+
+            }
+        });
+        return keyboardDigitalSwitch;
     }
 
     public int saveElement(String elementId, KeyboardBean keyboardBean){
@@ -209,12 +234,12 @@ public class KeyboardController {
         }
     }
 
-    public KeyboardElement getCurrentEditElement() {
-        return currentEditElement;
+    public KeyboardElement getCurrentSelectedElement() {
+        return currentSelectedElement;
     }
 
-    public void setCurrentEditElement(KeyboardElement currentEditElement) {
-        this.currentEditElement = currentEditElement;
+    public void setCurrentSelectedElement(KeyboardElement currentSelectedElement) {
+        this.currentSelectedElement = currentSelectedElement;
     }
 
     void sendKeyEvent(KeyEvent keyEvent) {
@@ -236,6 +261,7 @@ public class KeyboardController {
         handler.postDelayed(runnable, 50);
         handler.postDelayed(runnable, 75);
     }
+
 }
 
 

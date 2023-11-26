@@ -6,9 +6,14 @@ import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.util.DisplayMetrics;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
+
+import com.limelight.R;
 
 public abstract class KeyboardElement extends View {
     private int normalColor = 0xF0888888;
@@ -40,6 +45,14 @@ public abstract class KeyboardElement extends View {
         this.keyboardController = keyboardController;
         this.elementId = elementId;
         this.keyboardBean = keyboardBean;
+    }
+
+    public KeyboardBean getKeyboardBean() {
+        return keyboardBean;
+    }
+
+    public String getElementId() {
+        return elementId;
     }
 
     protected void moveElement(int pressed_x, int pressed_y, int x, int y) {
@@ -74,38 +87,6 @@ public abstract class KeyboardElement extends View {
         super.onDraw(canvas);
     }
 
-    /*
-    protected void actionShowNormalColorChooser() {
-        AmbilWarnaDialog colorDialog = new AmbilWarnaDialog(getContext(), normalColor, true, new AmbilWarnaDialog.OnAmbilWarnaListener() {
-            @Override
-            public void onCancel(AmbilWarnaDialog dialog)
-            {}
-
-            @Override
-            public void onOk(AmbilWarnaDialog dialog, int color) {
-                normalColor = color;
-                invalidate();
-            }
-        });
-        colorDialog.show();
-    }
-
-    protected void actionShowPressedColorChooser() {
-        AmbilWarnaDialog colorDialog = new AmbilWarnaDialog(getContext(), normalColor, true, new AmbilWarnaDialog.OnAmbilWarnaListener() {
-            @Override
-            public void onCancel(AmbilWarnaDialog dialog) {
-            }
-
-            @Override
-            public void onOk(AmbilWarnaDialog dialog, int color) {
-                pressedColor = color;
-                invalidate();
-            }
-        });
-        colorDialog.show();
-    }
-    */
-
     protected void actionEnableEdit() {
         currentMode = Mode.Edit;
     }
@@ -121,7 +102,7 @@ public abstract class KeyboardElement extends View {
 
     protected int getDefaultColor() {
         System.out.println("wg_debug:getcolor");
-        if (keyboardController.getCurrentEditElement() == this){
+        if (keyboardController.getCurrentSelectedElement() == this){
             return configSelectedColor;
         } else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.EditButtons)
             return configEditColor;
@@ -136,56 +117,6 @@ public abstract class KeyboardElement extends View {
         return (int)(screen.heightPixels*0.004f);
     }
 
-    protected void showConfigurationDialog() {
-        AlertDialog.Builder alertBuilder = new AlertDialog.Builder(getContext());
-
-        alertBuilder.setTitle("Configuration");
-
-        CharSequence functions[] = new CharSequence[]{
-                "Edit",
-                "Delete",
-                /*election
-                "Set n
-                Disable color sormal color",
-                "Set pressed color",
-                */
-                "Cancel"
-        };
-
-        alertBuilder.setItems(functions, new DialogInterface.OnClickListener() {
-
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                switch (which) {
-                    case 0: { // Edit
-                        actionEnableEdit();
-                        break;
-                    }
-                    case 1: { // delete
-                        actionEnableDelete();
-                        break;
-                    }
-                /*
-                case 2: { // set default color
-                    actionShowNormalColorChooser();
-                    break;
-                }
-                case 3: { // set pressed color
-                    actionShowPressedColorChooser();
-                    break;
-                }
-                */
-                    default: { // cancel
-                        actionCancel();
-                        break;
-                    }
-                }
-            }
-        });
-        AlertDialog alert = alertBuilder.create();
-        // show menu
-        alert.show();
-    }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -213,8 +144,14 @@ public abstract class KeyboardElement extends View {
                     actionEnableDelete();
                 if (currentMode == Mode.Edit){
                     keyboardController.elementsInvalidate();
-                    keyboardController.setCurrentEditElement(this);
-                    keyboardController.getSizeSeekbar().setProgress(keyboardBean.getSize());
+                    keyboardController.setCurrentSelectedElement(this);
+                    ((SeekBar) keyboardController.getFloatWindowsLayout().findViewById(R.id.element_size_seekbar)).setProgress(keyboardBean.getSize());
+                }else if (currentMode == Mode.Delete){
+                    keyboardController.elementsInvalidate();
+                    keyboardController.setCurrentSelectedElement(this);
+                    ((TextView) keyboardController.getFloatWindowsLayout().findViewById(R.id.delete_element_windows_text)).setText("是否删除:" + elementId);
+                    keyboardController.getFloatWindowsLayout().findViewById(R.id.delete_element_windows).setVisibility(VISIBLE);
+                    keyboardController.getFloatWindowsLayout().findViewById(R.id.delete_element_exit_windows).setVisibility(INVISIBLE);
                 }
 
                 return true;
@@ -229,9 +166,7 @@ public abstract class KeyboardElement extends View {
                                 (int) event.getY());
                         break;
                     }
-                    case Delete: {
-                        break;
-                    }
+                    case Delete:
                     case Normal: {
                         break;
                     }

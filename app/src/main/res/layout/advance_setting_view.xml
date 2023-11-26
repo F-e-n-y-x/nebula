@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/advance_setting_view"
-    android:visibility="invisible">
+    android:visibility="gone">
     <LinearLayout
         android:orientation="horizontal"
         android:layout_width="match_parent"
@@ -146,7 +146,7 @@
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="invisible">
+            android:visibility="gone">
             <!--  上半部分   -->
             <LinearLayout
                 android:orientation="horizontal"
@@ -168,6 +168,22 @@
                             android:layout_width="150dp"
                             android:layout_height="150dp"
                             android:background="@drawable/button"
+                            android:text="A"
+                            android:textSize="40dp"
+                            android:tag="29"
+                            android:gravity="center"
+                            android:layout_gravity="center"/>
+                    </FrameLayout>
+                    <FrameLayout
+                        android:id="@+id/switch_drawing"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:visibility="gone">
+                        <TextView
+                            android:id="@+id/switch_drawing_text"
+                            android:layout_width="150dp"
+                            android:layout_height="150dp"
+                            android:background="@drawable/confirm_square_border"
                             android:text="A"
                             android:textSize="40dp"
                             android:tag="29"
@@ -323,13 +339,13 @@
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:layout_weight="100"
-                            android:text="移动按键"/>
+                            android:text="删除按键"/>
                         <Button
-                            android:id="@+id/move_element"
+                            android:id="@+id/edit_element"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:layout_weight="100"
-                            android:text="删除按键"/>
+                            android:text="编辑按键"/>
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>

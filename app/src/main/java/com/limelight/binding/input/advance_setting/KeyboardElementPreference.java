@@ -58,7 +58,7 @@ public class KeyboardElementPreference {
         }
         editor.apply();
     }
-    public void deleteElement(String keyboardElementName){
+    public void deleteElement(String elementId){
 
         /*
          * 两步操作：
@@ -66,9 +66,9 @@ public class KeyboardElementPreference {
          * 2.从MAP中删除
          * */
         SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
-        editor.remove(keyboardElementName);
+        editor.remove(elementId);
         editor.apply();
-        elements.remove(keyboardElementName);
+        elements.remove(elementId);
     }
     public Map<String, KeyboardBean> getElements() {
         return elements;
