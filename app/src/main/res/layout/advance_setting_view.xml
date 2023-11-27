@@ -2,14 +2,14 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:visibility="gone">
+    android:visibility="visible">
     <LinearLayout
         android:id="@+id/advance_setting_layout"
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/advance_setting_background"
-        android:visibility="visible">
+        android:visibility="gone">
         <RadioGroup
             android:id="@+id/advance_setting_radio_group"
             android:layout_width="150dp"
@@ -480,4 +480,39 @@
         android:layout_marginTop="20dp"
         android:text="退出"
         android:visibility="gone"/>
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom">
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="35dp">
+            <Button
+                android:id="@+id/keyboard_window_button"
+                android:layout_width="50dp"
+                android:layout_height="match_parent"
+                android:text="↓"
+                android:alpha="0.5"
+                android:visibility="visible"/>
+            <SeekBar
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="14"
+                android:min="1"
+                android:visibility="visible"/>
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/keyboard_window_keyboard"
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:alpha="0.5"
+            android:visibility="visible">
+            <include layout="@layout/keyboard_layout"/>
+        </LinearLayout>
+    </LinearLayout>
 </FrameLayout>
