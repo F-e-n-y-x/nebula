@@ -2,92 +2,49 @@ package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
 import android.util.DisplayMetrics;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.AdapterView;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
 import android.widget.SeekBar;
-import android.widget.Spinner;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import com.limelight.R;
+import com.limelight.binding.input.advance_setting.funtion.AddElement;
+import com.limelight.binding.input.advance_setting.funtion.DeleteElement;
+import com.limelight.binding.input.advance_setting.funtion.EditElement;
 
 public class AdvanceSettingController {
     /**
      * 不同层的layout成员
      */
     private FrameLayout fatherLayout;
-    private FrameLayout advanceSettingLayout;
-    private FrameLayout floatWindowsLayout;
+    private FrameLayout advanceSettingLayoutFather;
+    private LinearLayout advanceSettingLayout;
     private FrameLayout elementsLayout;
     private Button buttonConfigure;
-    /**
-     * 设置相关的成员
-     */
-    private Button setting1Button;
-    private Button setting2Button;
-    private Button setting3Button;
-    //辅助切换设置按钮
-    private Button currentSettingButton;
-    private LinearLayout setting1Layout;
-    private LinearLayout setting2Layout;
-    private LinearLayout setting3Layout;
-    //辅助切换设置界面
-    private LinearLayout currentSettingLayout;
-    /**
-     * 其他成员
-     */
     private Context context;
     private KeyboardController keyboardController;
     private AdvanceSettingPreference advanceSettingPreference;
-    /**
-     * setting2Layout内的成员变量
-     */
-    private TextView currentPadView;
+    private AddElement addElement;
+    private EditElement editElement;
+    private DeleteElement deleteElement;
     public AdvanceSettingController(FrameLayout layout, final Context context) {
         this.fatherLayout = layout;
         this.context = context;
-        this.elementsLayout = new FrameLayout(context);
-        this.advanceSettingPreference = new AdvanceSettingPreference(context);
-        this.keyboardController = new KeyboardController(elementsLayout,this,context);
-        this.floatWindowsLayout = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.float_windows,null);
-        /**
-         * 初始化设置界面
-         */
-        advanceSettingLayout = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.advance_setting_view,null);
-        setting1Button = advanceSettingLayout.findViewById(R.id.advance_setting_1_button);
-        setting2Button = advanceSettingLayout.findViewById(R.id.advance_setting_2_button);
-        setting3Button = advanceSettingLayout.findViewById(R.id.advance_setting_3_button);
-        setting1Layout = advanceSettingLayout.findViewById(R.id.advance_setting_1_layout);
-        setting2Layout = advanceSettingLayout.findViewById(R.id.advance_setting_2_layout);
 
-        setting3Layout = advanceSettingLayout.findViewById(R.id.advance_setting_3_layout);
-        /*
-         * 设置界面初始化，最开始是"设置1"被选中,初始化的内容有
-         * 1. "设置1"的按钮背景需要设置为黑色，这个在layout中实现
-         * 2. "设置1"的界面需要显示，这个在layout中实现
-         * 3. 把当前的设置项设置为"设置1"，这个在下面实现
-         * */
-        currentSettingButton = setting1Button;
-        currentSettingLayout = setting1Layout;
-        ((RadioGroup) advanceSettingLayout.findViewById(R.id.advance_setting_radio_group)).setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(RadioGroup group, int checkedId) {
-                if (checkedId == R.id.advance_setting_1_button){
-                    switchAdvanceSetting(setting1Button,setting1Layout);
-                }else if (checkedId == R.id.advance_setting_2_button){
-                    switchAdvanceSetting(setting2Button,setting2Layout);
-                }else if (checkedId == R.id.advance_setting_3_button){
-                    switchAdvanceSetting(setting3Button,setting3Layout);
-                }
-            }
-        });
+        advanceSettingPreference = new AdvanceSettingPreference(context);
+
+        advanceSettingLayoutFather = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.advance_setting_view,null);
+        advanceSettingLayout = advanceSettingLayoutFather.findViewById(R.id.advance_setting_layout);
+        elementsLayout = new FrameLayout(context);
+
+        keyboardController = new KeyboardController(elementsLayout,this,context);
+        addElement = new AddElement(advanceSettingLayoutFather, this, context);
+        editElement = new EditElement(advanceSettingLayoutFather,this);
+        deleteElement = new DeleteElement(advanceSettingLayoutFather,this);
+
         buttonConfigure = new Button(context);
         buttonConfigure.setAlpha(0.25f);
         buttonConfigure.setFocusable(false);
@@ -95,308 +52,86 @@ public class AdvanceSettingController {
         buttonConfigure.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (advanceSettingLayout.getVisibility() == View.VISIBLE){
-                    advanceSettingLayout.setVisibility(View.GONE);
+                if (advanceSettingLayoutFather.getVisibility() == View.VISIBLE){
+                    advanceSettingLayoutFather.setVisibility(View.GONE);
                 } else {
-                    advanceSettingLayout.setVisibility(View.VISIBLE);
+                    advanceSettingLayoutFather.setVisibility(View.VISIBLE);
                 }
             }
         });
 
-        initSetting2Layout();
-        initFloatWindows();
+        initSetting();
+    }
+
+    public KeyboardController getKeyboardController() {
+        return keyboardController;
     }
 
     public AdvanceSettingPreference getAdvanceSettingPreference() {
         return advanceSettingPreference;
     }
 
-    public FrameLayout getFloatWindowsLayout() {
-        return floatWindowsLayout;
+    public EditElement getEditElement() {
+        return editElement;
     }
 
-    private void switchAdvanceSetting(Button settingButton, LinearLayout settingLayout){
-        if (currentSettingButton != settingButton){
-            currentSettingButton.setBackgroundColor(context.getResources().getColor(R.color.advance_setting_button_background));
-            currentSettingLayout.setVisibility(View.GONE);
-            currentSettingButton = settingButton;
-            currentSettingLayout = settingLayout;
-            currentSettingButton.setBackgroundColor(context.getResources().getColor(R.color.advance_setting_background));
-            currentSettingLayout.setVisibility(View.VISIBLE);
-        }
+    public DeleteElement getDeleteElement() {
+        return deleteElement;
     }
 
-    private void initSetting2Layout(){
-        /**
-         * 初始化spinner和drawing
-         */
-        FrameLayout buttonDrawing = setting2Layout.findViewById(R.id.button_drawing);
-        FrameLayout switchDrawing = setting2Layout.findViewById(R.id.switch_drawing);
-        LinearLayout padDrawing = setting2Layout.findViewById(R.id.pad_drawing);
-        Spinner elementType = setting2Layout.findViewById(R.id.select_element_type);
-        elementType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                switch (position){
-                    case 0: {
-                        buttonDrawing.setVisibility(View.VISIBLE);
-                        switchDrawing.setVisibility(View.INVISIBLE);
-                        padDrawing.setVisibility(View.INVISIBLE);
-                        break;
-                    }
-                    case 1: {
-                        buttonDrawing.setVisibility(View.INVISIBLE);
-                        switchDrawing.setVisibility(View.VISIBLE);
-                        padDrawing.setVisibility(View.INVISIBLE);
-                        break;
-                    }
-                    case 2:{
-                        buttonDrawing.setVisibility(View.INVISIBLE);
-                        switchDrawing.setVisibility(View.INVISIBLE);
-                        padDrawing.setVisibility(View.VISIBLE);
-                        break;
-                    }
-
-                }
-            }
-
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-
-            }
-        });
-        /**
-         * 设置十字键的选中逻辑
-         */
-        TextView padUp = setting2Layout.findViewById(R.id.pad_drawing_up);
-        TextView padDown = setting2Layout.findViewById(R.id.pad_drawing_down);
-        TextView padLeft = setting2Layout.findViewById(R.id.pad_drawing_left);
-        TextView padRight = setting2Layout.findViewById(R.id.pad_drawing_right);
-        //默认选中padUp
-        currentPadView = padUp;
-        //给四个键设置onClick方法，点击时聚焦到那个View中，并将currentPadView设置为选中的View。
-        View.OnClickListener padListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                padUp.setBackgroundResource(R.drawable.square_border);
-                padDown.setBackgroundResource(R.drawable.square_border);
-                padLeft.setBackgroundResource(R.drawable.square_border);
-                padRight.setBackgroundResource(R.drawable.square_border);
-                currentPadView = (TextView) v;
-                v.setBackgroundResource(R.drawable.confirm_square_border);
-            }
-        };
-        padUp.setOnClickListener(padListener);
-        padDown.setOnClickListener(padListener);
-        padLeft.setOnClickListener(padListener);
-        padRight.setOnClickListener(padListener);
-        /**
-         * 设置keyBoard的按键逻辑
-         */
-        LinearLayout settingInnerKeyboard = setting2Layout.findViewById(R.id.keyboard_drawing);
-        TextView buttonDrawingText = setting2Layout.findViewById(R.id.button_drawing_text);
-        TextView switchDrawingText = setting2Layout.findViewById(R.id.switch_drawing_text);
-        View.OnClickListener keyboardListener = new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                TextView keyButton = (TextView) v;
-                System.out.println("wg_debug:" + keyButton.getText());
-                switch (elementType.getSelectedItemPosition()){
-                    case 0: {
-                        //设置Button的内容选择
-                        buttonDrawingText.setText(keyButton.getText());
-                        //将键盘的keyEvent值传递给drawing中
-                        buttonDrawingText.setTag(keyButton.getTag());
-                        break;
-                    }
-                    case 1: {
-                        switchDrawingText.setText(keyButton.getText());
-                        switchDrawingText.setTag(keyButton.getTag());
-                        break;
-                    }
-                    case 2:{
-                        //设置Pad其中一个按键的内容选中
-                        currentPadView.setText(keyButton.getText());
-                        currentPadView.setTag(keyButton.getTag());
-                        break;
-                    }
-                }
-            }
-        };
-        for (int i = 0; i < settingInnerKeyboard.getChildCount(); i++){
-            LinearLayout keyboardRow = (LinearLayout) settingInnerKeyboard.getChildAt(i);
-            for (int j = 0; j < keyboardRow.getChildCount(); j++){
-                keyboardRow.getChildAt(j).setOnClickListener(keyboardListener);
-            }
-        }
-        /**
-         * 设置确定键的逻辑
-         */
-        EditText addElementName = setting2Layout.findViewById(R.id.add_element_name);
-        Button addElementButton = setting2Layout.findViewById(R.id.add_element_button);
-        addElementButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String elementId = addElementName.getText().toString();
-                if (elementId.matches("^[a-zA-Z0-9]{1,6}$")){
-                    int type = elementType.getSelectedItemPosition();
-                    KeyboardBean keyboardBean = new KeyboardBean();
-                    keyboardBean.setLayer(1);
-                    keyboardBean.setPositionX(0);
-                    keyboardBean.setPositionY(100);
-                    keyboardBean.setOpacity(100);
-                    keyboardBean.setType(type);
-                    switch (type){
-                        case 0: {
-                            keyboardBean.setSize(200);
-                            keyboardBean.setValue(Integer.parseInt((String) buttonDrawingText.getTag()));
-                            break;
-                        }
-                        case 1: {
-                            keyboardBean.setSize(200);
-                            keyboardBean.setValue(Integer.parseInt((String) switchDrawingText.getTag()));
-                        }
-                        case 2:{
-                            keyboardBean.setSize(400);
-                            keyboardBean.setValueUp(Integer.parseInt((String) padUp.getTag()));
-                            keyboardBean.setValueDown(Integer.parseInt((String) padDown.getTag()));
-                            keyboardBean.setValueLeft(Integer.parseInt((String) padLeft.getTag()));
-                            keyboardBean.setValueRight(Integer.parseInt((String) padRight.getTag()));
-                            break;
-                        }
-                    }
-                    System.out.println("wg_debug:" + keyboardBean);
-                    if (keyboardController.saveElement(elementId,keyboardBean) == 0){
-                        keyboardController.removeElements();
-                        keyboardController.loadCurrentLayout();
-                        Toast.makeText(context,"创建成功",Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(context,"名称已存在",Toast.LENGTH_SHORT).show();
-                    }
-
-                } else {
-                    Toast.makeText(context,"名称只能由1-6个数字、小写字母组成",Toast.LENGTH_SHORT).show();
-                }
-
-            }
-        });
-        /**
-         * 编辑按键
-         */
-        Button moveButton = setting2Layout.findViewById(R.id.edit_element);
-        moveButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                keyboardController.setControllerMode(KeyboardController.ControllerMode.EditButtons);
-                keyboardController.elementsInvalidate();
-                advanceSettingLayout.setVisibility(View.INVISIBLE);
-                buttonConfigure.setVisibility(View.INVISIBLE);
-                floatWindowsLayout.setVisibility(View.VISIBLE);
-                floatWindowsLayout.findViewById(R.id.edit_element_windows).setVisibility(View.VISIBLE);
-
-            }
-        });
-        /**
-         * 删除按键
-         */
-        setting2Layout.findViewById(R.id.delete_element).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                keyboardController.setControllerMode(KeyboardController.ControllerMode.DeleteButtons);
-                keyboardController.elementsInvalidate();
-                advanceSettingLayout.setVisibility(View.INVISIBLE);
-                buttonConfigure.setVisibility(View.INVISIBLE);
-                floatWindowsLayout.setVisibility(View.VISIBLE);
-                floatWindowsLayout.findViewById(R.id.delete_element_exit_windows).setVisibility(View.VISIBLE);
-            }
-        });
-
+    public void setAdvanceSettingLayoutVisibility(int visibility){
+        advanceSettingLayout.setVisibility(visibility);
     }
 
-    private void initFloatWindows(){
-        /**
-         * EditWindows
-         */
-        ((SeekBar) keyboardController.getFloatWindowsLayout().findViewById(R.id.element_size_seekbar)).setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+    public void setButtonConfigureVisibility(int visibility){
+        buttonConfigure.setVisibility(visibility);
+    }
+
+    private void initSetting(){
+
+        Button setting1Button = advanceSettingLayoutFather.findViewById(R.id.advance_setting_1_radio_button);
+        Button setting2Button = advanceSettingLayoutFather.findViewById(R.id.advance_setting_2_radio_button);
+        Button setting3Button = advanceSettingLayoutFather.findViewById(R.id.advance_setting_3_radio_button);
+        LinearLayout setting1Layout = advanceSettingLayoutFather.findViewById(R.id.advance_setting_1_linear_layout);
+        LinearLayout setting2Layout = advanceSettingLayoutFather.findViewById(R.id.advance_setting_2_linear_layout);
+        LinearLayout setting3Layout = advanceSettingLayoutFather.findViewById(R.id.advance_setting_3_linear_layout);
+        ((RadioGroup) advanceSettingLayoutFather.findViewById(R.id.advance_setting_radio_group)).setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            /*
+             * 设置界面初始化，最开始是"设置1"被选中,初始化的内容有
+             * 1. "设置1"的按钮背景需要设置为黑色，这个在layout中实现
+             * 2. "设置1"的界面需要显示，这个在layout中实现
+             * 3. 把当前的设置项设置为"设置1"，这个在下面实现
+             * */
+            private LinearLayout currentSettingLayout = setting1Layout;
+            private Button currentSettingButton = setting1Button;
             @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                KeyboardElement currentElement = keyboardController.getCurrentSelectedElement();
-                if (currentElement == null){
-                    return;
+            public void onCheckedChanged(RadioGroup group, int checkedId) {
+                if (checkedId == R.id.advance_setting_1_radio_button){
+                    switchAdvanceSetting(setting1Button,setting1Layout);
+                }else if (checkedId == R.id.advance_setting_2_radio_button){
+                    switchAdvanceSetting(setting2Button,setting2Layout);
+                }else if (checkedId == R.id.advance_setting_3_radio_button){
+                    switchAdvanceSetting(setting3Button,setting3Layout);
                 }
-                currentElement.resizeElement(progress);
+            }
+            private void switchAdvanceSetting(Button settingButton, LinearLayout settingLayout){
+                if (currentSettingButton != settingButton){
+                    currentSettingButton.setBackgroundColor(context.getResources().getColor(R.color.advance_setting_button_background));
+                    currentSettingLayout.setVisibility(View.GONE);
+                    currentSettingButton = settingButton;
+                    currentSettingLayout = settingLayout;
+                    currentSettingButton.setBackgroundColor(context.getResources().getColor(R.color.advance_setting_background));
+                    currentSettingLayout.setVisibility(View.VISIBLE);
+                }
             }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-
-            }
-        });
-        floatWindowsLayout.findViewById(R.id.save_layout_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                keyboardController.setControllerMode(KeyboardController.ControllerMode.Active);
-                floatWindowsLayout.setVisibility(View.INVISIBLE);
-                floatWindowsLayout.findViewById(R.id.edit_element_windows).setVisibility(View.INVISIBLE);
-                keyboardController.elementsInvalidate();
-                advanceSettingLayout.setVisibility(View.VISIBLE);
-                buttonConfigure.setVisibility(View.VISIBLE);
-                keyboardController.setCurrentSelectedElement(null);
-                keyboardController.saveLayout();
-            }
-        });
-        /**
-         * delete_exit_windows
-         */
-        floatWindowsLayout.findViewById(R.id.delete_element_exit_windows_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                keyboardController.setControllerMode(KeyboardController.ControllerMode.Active);
-                keyboardController.elementsInvalidate();
-                floatWindowsLayout.setVisibility(View.INVISIBLE);
-                floatWindowsLayout.findViewById(R.id.delete_element_exit_windows).setVisibility(View.INVISIBLE);
-                advanceSettingLayout.setVisibility(View.VISIBLE);
-                buttonConfigure.setVisibility(View.VISIBLE);
-            }
-        });
-        /**
-         * delete_confirm_windows
-         */
-        //confirm_button
-        floatWindowsLayout.findViewById(R.id.delete_element_windows_confirm_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                KeyboardElement element = keyboardController.getCurrentSelectedElement();
-                if (element == null)
-                    return;
-                keyboardController.deleteElement(element);
-                floatWindowsLayout.findViewById(R.id.delete_element_exit_windows).setVisibility(View.VISIBLE);
-                floatWindowsLayout.findViewById(R.id.delete_element_windows).setVisibility(View.INVISIBLE);
-                keyboardController.setCurrentSelectedElement(null);
-                keyboardController.elementsInvalidate();
-            }
-        });
-        //cancel_button
-        floatWindowsLayout.findViewById(R.id.delete_element_windows_cancel_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                floatWindowsLayout.findViewById(R.id.delete_element_windows).setVisibility(View.INVISIBLE);
-                keyboardController.setCurrentSelectedElement(null);
-                keyboardController.elementsInvalidate();
-            }
         });
     }
 
     public void refreshLayout(){
         fatherLayout.removeView(buttonConfigure);
-        fatherLayout.removeView(advanceSettingLayout);
+        fatherLayout.removeView(advanceSettingLayoutFather);
         fatherLayout.removeView(elementsLayout);
-        fatherLayout.removeView(floatWindowsLayout);
 
         DisplayMetrics screen = context.getResources().getDisplayMetrics();
         int buttonSize = (int)(screen.heightPixels*0.06f);
@@ -404,9 +139,8 @@ public class AdvanceSettingController {
         params.rightMargin = 15;
         params.topMargin = 15;
         fatherLayout.addView(elementsLayout);
-        fatherLayout.addView(advanceSettingLayout);
+        fatherLayout.addView(advanceSettingLayoutFather);
         fatherLayout.addView(buttonConfigure, params);
-        fatherLayout.addView(floatWindowsLayout);
 
         keyboardController.refreshLayout();
     }

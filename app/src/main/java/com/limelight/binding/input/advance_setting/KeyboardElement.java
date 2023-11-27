@@ -1,17 +1,12 @@
 package com.limelight.binding.input.advance_setting;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.util.DisplayMetrics;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.SeekBar;
-import android.widget.TextView;
 
 import com.limelight.R;
 
@@ -101,7 +96,6 @@ public abstract class KeyboardElement extends View {
     }
 
     protected int getDefaultColor() {
-        System.out.println("wg_debug:getcolor");
         if (keyboardController.getCurrentSelectedElement() == this){
             return configSelectedColor;
         } else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.EditButtons)
@@ -145,13 +139,11 @@ public abstract class KeyboardElement extends View {
                 if (currentMode == Mode.Edit){
                     keyboardController.elementsInvalidate();
                     keyboardController.setCurrentSelectedElement(this);
-                    ((SeekBar) keyboardController.getFloatWindowsLayout().findViewById(R.id.element_size_seekbar)).setProgress(keyboardBean.getSize());
+                    keyboardController.setSeekbarProgress(keyboardBean.getSize());
                 }else if (currentMode == Mode.Delete){
                     keyboardController.elementsInvalidate();
                     keyboardController.setCurrentSelectedElement(this);
-                    ((TextView) keyboardController.getFloatWindowsLayout().findViewById(R.id.delete_element_windows_text)).setText("是否删除:" + elementId);
-                    keyboardController.getFloatWindowsLayout().findViewById(R.id.delete_element_windows).setVisibility(VISIBLE);
-                    keyboardController.getFloatWindowsLayout().findViewById(R.id.delete_element_exit_windows).setVisibility(INVISIBLE);
+                    keyboardController.confirmDeleteElement("是否删除:" + elementId);
                 }
 
                 return true;

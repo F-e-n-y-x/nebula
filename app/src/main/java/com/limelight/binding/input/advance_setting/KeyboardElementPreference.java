@@ -65,10 +65,10 @@ public class KeyboardElementPreference {
          * 1.从SharedPreference中删除
          * 2.从MAP中删除
          * */
+        elements.remove(elementId);
         SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
         editor.remove(elementId);
         editor.apply();
-        elements.remove(elementId);
     }
     public Map<String, KeyboardBean> getElements() {
         return elements;

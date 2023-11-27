@@ -6,7 +6,6 @@ import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.SeekBar;
 
 import com.limelight.Game;
 
@@ -40,12 +39,12 @@ public class KeyboardController {
         this.elementsLayout = layout;
         this.context = context;
         this.game = (Game) context;
-        this.handler = new Handler(Looper.getMainLooper());
         this.advanceSettingController = advanceSettingController;
-        this.keyboardLayoutPreference = new KeyboardLayoutPreference(context);
+
+        handler = new Handler(Looper.getMainLooper());
+        keyboardLayoutPreference = new KeyboardLayoutPreference(context);
     }
 
-    public FrameLayout getFloatWindowsLayout(){return advanceSettingController.getFloatWindowsLayout();}
     public void saveLayout(){
         keyboardElementPreference.saveElements();
     }
@@ -66,14 +65,37 @@ public class KeyboardController {
         }
     }
 
-    public void removeElements() {
-        for (KeyboardElement element : elements) {
-            elementsLayout.removeView(element);
+
+    public boolean addElement(String elementId, KeyboardBean keyboardBean){
+        if (keyboardElementPreference.addElement(elementId,keyboardBean) != 0){
+            return false;
         }
-        elements.clear();
+        createElement(elementId,keyboardBean);
+        return true;
+    }
+    public void removeSelectedElement(){
+        elementsLayout.removeView(currentSelectedElement);
+        elements.remove(currentSelectedElement);
+        keyboardElementPreference.deleteElement(currentSelectedElement.getElementId());
+        currentSelectedElement = null;
+    }
+    public void setOpacity(int opacity) {
+        for (KeyboardElement element : elements) {
+            element.setOpacity(opacity);
+        }
     }
 
-    public void addElement(String elementId, KeyboardBean keyboardBean) {
+    public void loadCurrentLayout(){
+        String currentLayout = advanceSettingController.getAdvanceSettingPreference().getCurrentLayoutName();
+        String currentLayoutId = keyboardLayoutPreference.getLayoutId(currentLayout);
+        keyboardElementPreference = new KeyboardElementPreference(currentLayoutId,context);
+        Map<String,KeyboardBean> elementsMap = keyboardElementPreference.getElements();
+        for (Map.Entry<String,KeyboardBean> entry: elementsMap.entrySet()){
+            createElement(entry.getKey(),entry.getValue());
+        }
+    }
+
+    private void createElement(String elementId, KeyboardBean keyboardBean) {
         KeyboardElement keyboardElement = null;
         switch (keyboardBean.getType()){
             case 0:
@@ -93,29 +115,7 @@ public class KeyboardController {
         elementsLayout.addView(keyboardElement, layoutParams);
     }
 
-    public void deleteElement(KeyboardElement element){
-        elements.remove(element);
-        elementsLayout.removeView(element);
-        keyboardElementPreference.deleteElement(element.getElementId());
-    }
-
-    public void setOpacity(int opacity) {
-        for (KeyboardElement element : elements) {
-            element.setOpacity(opacity);
-        }
-    }
-
-    public void loadCurrentLayout(){
-        String currentLayout = advanceSettingController.getAdvanceSettingPreference().getCurrentLayoutName();
-        String currentLayoutId = keyboardLayoutPreference.getLayoutId(currentLayout);
-        keyboardElementPreference = new KeyboardElementPreference(currentLayoutId,context);
-        Map<String,KeyboardBean> elementsMap = keyboardElementPreference.getElements();
-        for (Map.Entry<String,KeyboardBean> entry: elementsMap.entrySet()){
-            addElement(entry.getKey(),entry.getValue());
-        }
-    }
-
-    public KeyboardElement createPad(String elementId, KeyboardBean keyboardBean){
+    private KeyboardElement createPad(String elementId, KeyboardBean keyboardBean){
         KeyboardDigitalPad keyboardDigitalPad = new KeyboardDigitalPad(this, keyboardBean, elementId, context);
         keyboardDigitalPad.addDigitalPadListener(new KeyboardDigitalPad.DigitalPadListener() {
             @Override
@@ -153,7 +153,7 @@ public class KeyboardController {
         return keyboardDigitalPad;
     }
 
-    public KeyboardElement createButton(String elementId, KeyboardBean keyboardBean, int layer){
+    private KeyboardElement createButton(String elementId, KeyboardBean keyboardBean, int layer){
         KeyboardDigitalButton keyboardDigitalButton = new KeyboardDigitalButton(this, keyboardBean, elementId, layer, context);
         keyboardDigitalButton.setText(elementId);
         keyboardDigitalButton.addDigitalButtonListener(new KeyboardDigitalButton.DigitalButtonListener() {
@@ -177,7 +177,7 @@ public class KeyboardController {
         return keyboardDigitalButton;
     }
 
-    public KeyboardElement createSwitch(String elementId, KeyboardBean keyboardBean, int layer){
+    private KeyboardElement createSwitch(String elementId, KeyboardBean keyboardBean, int layer){
         KeyboardDigitalSwitch keyboardDigitalSwitch = new KeyboardDigitalSwitch(this, keyboardBean, elementId, layer, context);
         keyboardDigitalSwitch.setText(elementId);
         keyboardDigitalSwitch.addDigitalSwitchListener(new KeyboardDigitalSwitch.DigitalSwitchListener() {
@@ -207,39 +207,61 @@ public class KeyboardController {
         return keyboardDigitalSwitch;
     }
 
-    public int saveElement(String elementId, KeyboardBean keyboardBean){
-        return keyboardElementPreference.addElement(elementId,keyboardBean);
-    }
-
+    //其他辅助方法----------------------------------
     public List<KeyboardElement> getElements() {
         return elements;
     }
-
-    public void refreshLayout() {
-        removeElements();
-        loadCurrentLayout();
+    public void removeElements() {
+        for (KeyboardElement element : elements) {
+            elementsLayout.removeView(element);
+        }
+        elements.clear();
     }
 
-    public ControllerMode getControllerMode() {
-        return currentMode;
+    //编辑、删除模式切换相关---------------------------
+    public KeyboardElement getCurrentSelectedElement() {
+        return currentSelectedElement;
     }
-
-    public void setControllerMode(ControllerMode currentMode){
-        this.currentMode = currentMode;
+    public void setCurrentSelectedElement(KeyboardElement currentSelectedElement) {
+        this.currentSelectedElement = currentSelectedElement;
     }
-
+    /**
+     * 这个函数用于重绘所有的对象，如果不用这个函数，选择编辑对象的时候
+     * 会导致之前选择的对象不能恢复原来的颜色
+     */
     public void elementsInvalidate(){
         for (KeyboardElement element : elements) {
             element.invalidate();
         }
     }
-
-    public KeyboardElement getCurrentSelectedElement() {
-        return currentSelectedElement;
+    public ControllerMode getControllerMode() {
+        return currentMode;
+    }
+    public void setControllerMode(ControllerMode currentMode){
+        this.currentMode = currentMode;
+        elementsInvalidate();
     }
 
-    public void setCurrentSelectedElement(KeyboardElement currentSelectedElement) {
-        this.currentSelectedElement = currentSelectedElement;
+    //编辑模式相关---------------------------
+    public void resizeElement(int size) {
+        if (currentSelectedElement == null){
+            return;
+        }
+        currentSelectedElement.resizeElement(size);
+    }
+    protected void setSeekbarProgress(int progress){
+        advanceSettingController.getEditElement().setSeekbarValue(progress);
+    }
+
+    //删除模式相关---------------------------
+    protected void confirmDeleteElement(String DeleteElementName){
+        advanceSettingController.getDeleteElement().confirmDeleteElement(DeleteElementName);
+    }
+
+
+    public void refreshLayout() {
+        removeElements();
+        loadCurrentLayout();
     }
 
     void sendKeyEvent(KeyEvent keyEvent) {
