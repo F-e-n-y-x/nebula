@@ -8,12 +8,14 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
-import android.widget.SeekBar;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.funtion.AddElement;
 import com.limelight.binding.input.advance_setting.funtion.DeleteElement;
 import com.limelight.binding.input.advance_setting.funtion.EditElement;
+import com.limelight.binding.input.advance_setting.funtion.FloatKeyboard;
+import com.limelight.binding.input.advance_setting.funtion.OtherSetting;
+import com.limelight.binding.input.advance_setting.funtion.SelectLayout;
 
 public class AdvanceSettingController {
     /**
@@ -21,15 +23,20 @@ public class AdvanceSettingController {
      */
     private FrameLayout fatherLayout;
     private FrameLayout advanceSettingLayoutFather;
-    private LinearLayout advanceSettingLayout;
     private FrameLayout elementsLayout;
+    private LinearLayout advanceSettingLayout;
+    private FrameLayout keyboardFrameLayout;
     private Button buttonConfigure;
     private Context context;
     private KeyboardController keyboardController;
+    private KeyboardLayoutController keyboardLayoutController;
     private AdvanceSettingPreference advanceSettingPreference;
     private AddElement addElement;
     private EditElement editElement;
     private DeleteElement deleteElement;
+    private FloatKeyboard floatKeyboard;
+    private SelectLayout selectLayout;
+    private OtherSetting otherSetting;
     public AdvanceSettingController(FrameLayout layout, final Context context) {
         this.fatherLayout = layout;
         this.context = context;
@@ -37,13 +44,19 @@ public class AdvanceSettingController {
         advanceSettingPreference = new AdvanceSettingPreference(context);
 
         advanceSettingLayoutFather = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.advance_setting_view,null);
-        advanceSettingLayout = advanceSettingLayoutFather.findViewById(R.id.advance_setting_layout);
         elementsLayout = new FrameLayout(context);
+        keyboardFrameLayout = (FrameLayout) LayoutInflater.from(context).inflate(R.layout.float_keyboard,null);
+        advanceSettingLayout = advanceSettingLayoutFather.findViewById(R.id.advance_setting_layout);
 
         keyboardController = new KeyboardController(elementsLayout,this,context);
+        keyboardLayoutController = new KeyboardLayoutController(this,context);
+
         addElement = new AddElement(advanceSettingLayoutFather, this, context);
         editElement = new EditElement(advanceSettingLayoutFather,this);
         deleteElement = new DeleteElement(advanceSettingLayoutFather,this);
+        floatKeyboard = new FloatKeyboard(advanceSettingLayoutFather,keyboardFrameLayout,this);
+        selectLayout = new SelectLayout(advanceSettingLayoutFather,this,context);
+        otherSetting = new OtherSetting(advanceSettingLayoutFather,this);
 
         buttonConfigure = new Button(context);
         buttonConfigure.setAlpha(0.25f);
@@ -63,12 +76,21 @@ public class AdvanceSettingController {
         initSetting();
     }
 
+
+
+    public String getAdvancePreference(String key){
+        return advanceSettingPreference.getValue(key);
+    }
+
+    public void setAdvancePreference(String key, String value){
+        advanceSettingPreference.setValue(key,value);
+    }
     public KeyboardController getKeyboardController() {
         return keyboardController;
     }
 
-    public AdvanceSettingPreference getAdvanceSettingPreference() {
-        return advanceSettingPreference;
+    public KeyboardLayoutController getKeyboardLayoutController() {
+        return keyboardLayoutController;
     }
 
     public EditElement getEditElement() {
@@ -77,6 +99,10 @@ public class AdvanceSettingController {
 
     public DeleteElement getDeleteElement() {
         return deleteElement;
+    }
+
+    public FloatKeyboard getFloatKeyboard() {
+        return floatKeyboard;
     }
 
     public void setAdvanceSettingLayoutVisibility(int visibility){
@@ -132,15 +158,19 @@ public class AdvanceSettingController {
         fatherLayout.removeView(buttonConfigure);
         fatherLayout.removeView(advanceSettingLayoutFather);
         fatherLayout.removeView(elementsLayout);
+        fatherLayout.removeView(keyboardFrameLayout);
 
         DisplayMetrics screen = context.getResources().getDisplayMetrics();
         int buttonSize = (int)(screen.heightPixels*0.06f);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(buttonSize, buttonSize);
         params.rightMargin = 15;
         params.topMargin = 15;
+
         fatherLayout.addView(elementsLayout);
+        fatherLayout.addView(keyboardFrameLayout);
         fatherLayout.addView(advanceSettingLayoutFather);
         fatherLayout.addView(buttonConfigure, params);
+
 
         keyboardController.refreshLayout();
     }

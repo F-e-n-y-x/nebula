@@ -2,14 +2,14 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:visibility="visible">
+    android:visibility="gone">
     <LinearLayout
         android:id="@+id/advance_setting_layout"
         android:orientation="horizontal"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@color/advance_setting_background"
-        android:visibility="gone">
+        android:visibility="visible">
         <RadioGroup
             android:id="@+id/advance_setting_radio_group"
             android:layout_width="150dp"
@@ -18,7 +18,7 @@
             <RadioButton
                 android:id="@+id/advance_setting_1_radio_button"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
                 android:button="@null"
                 android:background="@color/advance_setting_background"
@@ -31,7 +31,7 @@
             <RadioButton
                 android:id="@+id/advance_setting_2_radio_button"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
                 android:button="@null"
                 android:background="@color/advance_setting_button_background"
@@ -40,16 +40,18 @@
             <View
                 android:layout_width="150dp"
                 android:layout_height="1dp"
-                android:background="@color/advance_setting_line"/>
+                android:background="@color/advance_setting_line"
+                android:visibility="gone"/>
             <RadioButton
                 android:id="@+id/advance_setting_3_radio_button"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
                 android:button="@null"
                 android:background="@color/advance_setting_button_background"
                 android:gravity="center"
-                android:text="setting 3" />
+                android:text="setting 3"
+                android:visibility="gone"/>
         </RadioGroup>
         <View
             android:layout_width="1dp"
@@ -63,68 +65,36 @@
             android:layout_height="match_parent"
             android:visibility="visible">
             <!--   左半部分    -->
-            <LinearLayout
-                android:orientation="vertical"
-                android:layout_width="match_parent"
+            <ScrollView
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginLeft="5dp"
                 android:layout_marginRight="5dp">
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:textSize="20dp"
-                    android:gravity="center"
-                    android:text="布局设置"/>
                 <LinearLayout
-                    android:orientation="horizontal"
+                    android:id="@+id/keyboard_layout_container"
+                    android:orientation="vertical"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp">
+                    android:layout_height="match_parent">
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="50dp"
-                        android:textSize="20dp"
-                        android:gravity="center"
-                        android:layout_weight="2"
-                        android:text="布局："/>
-                    <TextView
+                        android:textSize="25dp"
+                        android:text="布局选择"
+                        android:gravity="center"/>
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/advance_setting_line"
+                        android:layout_marginBottom="15dp"/>
+                    <Button
+                        android:id="@+id/add_layout_button"
                         android:layout_width="match_parent"
                         android:layout_height="50dp"
-                        android:textSize="20dp"
-                        android:gravity="center"
-                        android:layout_weight="1"
-                        android:text="default"/>
+                        android:text="+"
+                        android:textSize="25dp"/>
                 </LinearLayout>
-                <Spinner
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"/>
-                <LinearLayout
-                    android:orientation="horizontal"
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp">
-                    <Button
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="选择"/>
-                    <Button
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="删除"/>
-                </LinearLayout>
-                <Button
-                    android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:text="重命名"/>
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginBottom="5dp"
-                    android:background="@color/advance_setting_line"
-                    android:layout_marginLeft="5dp" />
-            </LinearLayout>
+            </ScrollView>
             <View
                 android:layout_width="1dp"
                 android:layout_height="match_parent"
@@ -132,13 +102,28 @@
             <!--   右半部分    -->
             <LinearLayout
                 android:orientation="vertical"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1">
-                <ListView
-                    android:id="@+id/keyboard_layout_listview"
+                <LinearLayout
+                    android:orientation="horizontal"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"/>
+                    android:layout_height="40dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp">
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:layout_weight="100"
+                        android:text="键盘"/>
+                    <Switch
+                        android:id="@+id/keyboard_enable_switch"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="40"/>
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
         <!--    setting2    -->
@@ -152,8 +137,8 @@
             <LinearLayout
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_weight="3">
+                android:layout_height="0dp"
+                android:layout_weight="2">
                 <!--  图示部分   -->
                 <FrameLayout
                     android:layout_width="200dp"
@@ -201,16 +186,16 @@
                         <LinearLayout
                             android:orientation="horizontal"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="0dp"
                             android:layout_weight="1">
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"/>
                             <TextView
                                 android:id="@+id/pad_drawing_up"
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"
@@ -218,7 +203,7 @@
                                 android:tag="51"
                                 android:text="W"/>
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:gravity="center"
                                 android:layout_weight="1" />
@@ -226,11 +211,11 @@
                         <LinearLayout
                             android:orientation="horizontal"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="0dp"
                             android:layout_weight="1">
                             <TextView
                                 android:id="@+id/pad_drawing_left"
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"
@@ -238,13 +223,13 @@
                                 android:tag="29"
                                 android:text="A"/>
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center" />
                             <TextView
                                 android:id="@+id/pad_drawing_right"
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"
@@ -255,17 +240,17 @@
                         <LinearLayout
                             android:orientation="horizontal"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"
+                            android:layout_height="0dp"
                             android:layout_weight="1">
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"
                                 />
                             <TextView
                                 android:id="@+id/pad_drawing_down"
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"
@@ -273,7 +258,7 @@
                                 android:tag="47"
                                 android:text="S"/>
                             <TextView
-                                android:layout_width="match_parent"
+                                android:layout_width="0dp"
                                 android:layout_height="match_parent"
                                 android:layout_weight="1"
                                 android:gravity="center"/>
@@ -290,60 +275,60 @@
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:layout_weight="100">
                         <TextView
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:text="名称:"
                             android:gravity="center"
-                            android:layout_weight="3"/>
+                            android:layout_weight="2"/>
                         <EditText
                             android:id="@+id/add_element_name"
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:text="ceshi"
-                            android:layout_weight="2"/>
+                            android:text="A1"
+                            android:layout_weight="3"/>
                         <Button
                             android:id="@+id/add_element_button"
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="3"
+                            android:layout_weight="2"
                             android:text="确定"/>
                     </LinearLayout>
                     <!--  按钮类型选择部分   -->
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:layout_weight="100">
                         <TextView
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:text="按键类型："
                             android:gravity="center"
-                            android:layout_weight="3"/>
+                            android:layout_weight="1"/>
                         <Spinner
                             android:id="@+id/select_element_type"
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="1"
+                            android:layout_weight="3"
                             android:entries="@array/button_name"
                             />
                     </LinearLayout>
                     <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="0dp"
                         android:layout_weight="100">
                         <Button
                             android:id="@+id/delete_element"
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:layout_weight="100"
                             android:text="删除按键"/>
                         <Button
                             android:id="@+id/edit_element"
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:layout_weight="100"
                             android:text="编辑按键"/>
@@ -354,8 +339,8 @@
             <LinearLayout
                 android:orientation="vertical"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_weight="2">
+                android:layout_height="0dp"
+                android:layout_weight="3">
                 <!--  键盘部分   -->
                 <include layout="@layout/keyboard_layout"/>
             </LinearLayout>
@@ -367,10 +352,11 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:visibility="gone">
-            <TextView
+            <LinearLayout
+                android:orientation="horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:text="setting3"/>
+                android:layout_height="match_parent">
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
     <!-- resize seekbar -->
@@ -388,21 +374,22 @@
             android:background="@color/advance_setting_background">
             <SeekBar
                 android:id="@+id/resize_element_windows_seekbar"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="20"
+                android:layout_weight="100"
                 android:max="600"
                 android:min="20" />
             <Button
                 android:id="@+id/resize_element_windows_button"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_weight="100"
+                android:layout_weight="20"
                 android:text="保存"/>
         </LinearLayout>
     </FrameLayout>
     <!--  重命名窗口  -->
     <FrameLayout
+        android:id="@+id/rename_layout_window_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#C0303030"
@@ -419,16 +406,73 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center">
                 <EditText
+                    android:id="@+id/rename_window_edittext"
                     android:layout_width="200dp"
                     android:layout_height="50dp"/>
-                <Button
+                <LinearLayout
+                    android:orientation="horizontal"
                     android:layout_width="200dp"
-                    android:layout_height="50dp"
-                    android:text="确认"/>
+                    android:layout_height="50dp">
+                    <Button
+                        android:id="@+id/rename_window_confirm_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:text="确认"/>
+                    <Button
+                        android:id="@+id/rename_window_cancel_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:text="取消"/>
+                </LinearLayout>
             </LinearLayout>
         </FrameLayout>
     </FrameLayout>
-    <!-- 确认删除窗口 -->
+<!--  新增布局window  -->
+    <FrameLayout
+        android:id="@+id/add_layout_window_background"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#C0303030"
+        android:visibility="gone">
+        <!--   浮动窗口   -->
+        <FrameLayout
+            android:layout_width="300dp"
+            android:layout_height="200dp"
+            android:layout_gravity="center"
+            android:background="#202020">
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center">
+                <EditText
+                    android:id="@+id/add_window_edittext"
+                    android:layout_width="200dp"
+                    android:layout_height="50dp"/>
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="200dp"
+                    android:layout_height="50dp">
+                    <Button
+                        android:id="@+id/add_window_confirm_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:text="确认"/>
+                    <Button
+                        android:id="@+id/add_window_cancel_button"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:text="取消"/>
+                </LinearLayout>
+
+            </LinearLayout>
+        </FrameLayout>
+    </FrameLayout>
+    <!-- 删除element窗口 -->
     <FrameLayout
         android:id="@+id/delete_element_confirm_windows"
         android:layout_width="match_parent"
@@ -471,6 +515,49 @@
             </LinearLayout>
         </FrameLayout>
     </FrameLayout>
+<!--  删除布局window  -->
+    <FrameLayout
+        android:id="@+id/delete_layout_confirm_windows"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#C0303030"
+        android:visibility="gone">
+        <!--   浮动窗口   -->
+        <FrameLayout
+            android:layout_width="300dp"
+            android:layout_height="200dp"
+            android:layout_gravity="center"
+            android:background="#202020">
+            <LinearLayout
+                android:orientation="vertical"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center">
+                <TextView
+                    android:id="@+id/delete_layout_confirm_windows_text"
+                    android:layout_width="200dp"
+                    android:layout_height="50dp"
+                    android:text="是否删除:"
+                    android:textSize="20dp"
+                    android:gravity="center"/>
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+                    <Button
+                        android:id="@+id/delete_layout_confirm_windows_confirm_button"
+                        android:layout_width="100dp"
+                        android:layout_height="50dp"
+                        android:text="确认"/>
+                    <Button
+                        android:id="@+id/delete_layout_confirm_windows_cancel_button"
+                        android:layout_width="100dp"
+                        android:layout_height="50dp"
+                        android:text="取消"/>
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+    </FrameLayout>
     <!-- 删除模式退出按钮 -->
     <Button
         android:id="@+id/delete_element_exit_button"
@@ -480,39 +567,4 @@
         android:layout_marginTop="20dp"
         android:text="退出"
         android:visibility="gone"/>
-
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom">
-        <LinearLayout
-            android:orientation="horizontal"
-            android:layout_width="match_parent"
-            android:layout_height="35dp">
-            <Button
-                android:id="@+id/keyboard_window_button"
-                android:layout_width="50dp"
-                android:layout_height="match_parent"
-                android:text="↓"
-                android:alpha="0.5"
-                android:visibility="visible"/>
-            <SeekBar
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_weight="14"
-                android:min="1"
-                android:visibility="visible"/>
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/keyboard_window_keyboard"
-            android:orientation="vertical"
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:alpha="0.5"
-            android:visibility="visible">
-            <include layout="@layout/keyboard_layout"/>
-        </LinearLayout>
-    </LinearLayout>
 </FrameLayout>

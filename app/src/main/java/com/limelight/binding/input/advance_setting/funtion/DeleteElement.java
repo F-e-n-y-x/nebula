@@ -38,8 +38,8 @@ public class DeleteElement {
             @Override
             public void onClick(View v) {
                 advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.DeleteButtons);
-                advanceSettingController.setAdvanceSettingLayoutVisibility(View.INVISIBLE);
-                advanceSettingController.setButtonConfigureVisibility(View.INVISIBLE);
+                advanceSettingController.setAdvanceSettingLayoutVisibility(View.GONE);
+                advanceSettingController.setButtonConfigureVisibility(View.GONE);
                 exitDeleteButton.setVisibility(View.VISIBLE);
             }
         });
@@ -52,14 +52,14 @@ public class DeleteElement {
             public void onClick(View v) {
                 advanceSettingController.getKeyboardController().removeSelectedElement();
                 exitDeleteButton.setVisibility(View.VISIBLE);
-                confirmDeleteWindow.setVisibility(View.INVISIBLE);
+                confirmDeleteWindow.setVisibility(View.GONE);
             }
         });
         //cancel_button
         deleteCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                confirmDeleteWindow.setVisibility(View.INVISIBLE);
+                confirmDeleteWindow.setVisibility(View.GONE);
                 advanceSettingController.getKeyboardController().setCurrentSelectedElement(null);
                 advanceSettingController.getKeyboardController().elementsInvalidate();
             }
@@ -71,7 +71,7 @@ public class DeleteElement {
             @Override
             public void onClick(View v) {
                 advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.Active);
-                exitDeleteButton.setVisibility(View.INVISIBLE);
+                exitDeleteButton.setVisibility(View.GONE);
                 advanceSettingController.setAdvanceSettingLayoutVisibility(View.VISIBLE);
                 advanceSettingController.setButtonConfigureVisibility(View.VISIBLE);
             }
@@ -81,7 +81,7 @@ public class DeleteElement {
     public void confirmDeleteElement(String deleteElementName){
         deleteConfirmText.setText(deleteElementName);
         confirmDeleteWindow.setVisibility(View.VISIBLE);
-        exitDeleteButton.setVisibility(View.INVISIBLE);
+        exitDeleteButton.setVisibility(View.GONE);
     }
 
 }

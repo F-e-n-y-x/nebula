@@ -30,7 +30,6 @@ public class KeyboardController {
 
     private final List<KeyboardElement> elements = new ArrayList<>();
     private KeyboardElementPreference keyboardElementPreference;
-    private KeyboardLayoutPreference keyboardLayoutPreference;
     private Map<Integer, Runnable> keyEventRunnableMap = new HashMap<>();
     private FrameLayout elementsLayout;
     private AdvanceSettingController advanceSettingController;
@@ -42,7 +41,6 @@ public class KeyboardController {
         this.advanceSettingController = advanceSettingController;
 
         handler = new Handler(Looper.getMainLooper());
-        keyboardLayoutPreference = new KeyboardLayoutPreference(context);
     }
 
     public void saveLayout(){
@@ -86,8 +84,8 @@ public class KeyboardController {
     }
 
     public void loadCurrentLayout(){
-        String currentLayout = advanceSettingController.getAdvanceSettingPreference().getCurrentLayoutName();
-        String currentLayoutId = keyboardLayoutPreference.getLayoutId(currentLayout);
+        String currentLayout = advanceSettingController.getKeyboardLayoutController().getCurrentLayoutName();
+        String currentLayoutId = advanceSettingController.getKeyboardLayoutController().getLayoutId(currentLayout);
         keyboardElementPreference = new KeyboardElementPreference(currentLayoutId,context);
         Map<String,KeyboardBean> elementsMap = keyboardElementPreference.getElements();
         for (Map.Entry<String,KeyboardBean> entry: elementsMap.entrySet()){
@@ -264,7 +262,7 @@ public class KeyboardController {
         loadCurrentLayout();
     }
 
-    void sendKeyEvent(KeyEvent keyEvent) {
+    public void sendKeyEvent(KeyEvent keyEvent) {
         game.onKey(null,keyEvent.getKeyCode(),keyEvent);
         //如果map中有对应按键的runnable，则删除该按键的runnable。
         if (keyEventRunnableMap.containsKey(keyEvent.getKeyCode())){

@@ -28,6 +28,9 @@ public class KeyboardElementPreference {
             // 转换完成后放到Map<String, KeyboardBean>中
             elements.put(entry.getKey(),keyboardBean);
         }
+
+        //wg_debug
+        System.out.println("wg_debug elements preference:" + elements);
     }
 
     public int addElement(String keyboardElementName, KeyboardBean element){
@@ -47,6 +50,9 @@ public class KeyboardElementPreference {
         editor.putString(keyboardElementName, elementString);
         editor.apply();
         //新增成功
+
+        //wg_debug
+        System.out.println("wg_debug elements preference:" + elements);
         return 0;
 
     }
@@ -57,6 +63,9 @@ public class KeyboardElementPreference {
             editor.putString(entry.getKey(),JSONToString(entry.getValue()));
         }
         editor.apply();
+
+        //wg_debug
+        System.out.println("wg_debug elements preference:" + elements);
     }
     public void deleteElement(String elementId){
 
@@ -69,6 +78,9 @@ public class KeyboardElementPreference {
         SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
         editor.remove(elementId);
         editor.apply();
+
+        //wg_debug
+        System.out.println("wg_debug elements preference:" + elements);
     }
     public Map<String, KeyboardBean> getElements() {
         return elements;

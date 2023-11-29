@@ -69,19 +69,19 @@ public class AddElement {
                 switch (position){
                     case 0: {
                         buttonDrawing.setVisibility(View.VISIBLE);
-                        switchDrawing.setVisibility(View.INVISIBLE);
-                        padDrawing.setVisibility(View.INVISIBLE);
+                        switchDrawing.setVisibility(View.GONE);
+                        padDrawing.setVisibility(View.GONE);
                         break;
                     }
                     case 1: {
-                        buttonDrawing.setVisibility(View.INVISIBLE);
+                        buttonDrawing.setVisibility(View.GONE);
                         switchDrawing.setVisibility(View.VISIBLE);
-                        padDrawing.setVisibility(View.INVISIBLE);
+                        padDrawing.setVisibility(View.GONE);
                         break;
                     }
                     case 2:{
-                        buttonDrawing.setVisibility(View.INVISIBLE);
-                        switchDrawing.setVisibility(View.INVISIBLE);
+                        buttonDrawing.setVisibility(View.GONE);
+                        switchDrawing.setVisibility(View.GONE);
                         padDrawing.setVisibility(View.VISIBLE);
                         break;
                     }

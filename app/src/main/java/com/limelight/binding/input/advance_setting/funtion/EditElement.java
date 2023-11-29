@@ -33,8 +33,8 @@ public class EditElement {
             @Override
             public void onClick(View v) {
                 advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.EditButtons);
-                advanceSettingController.setAdvanceSettingLayoutVisibility(View.INVISIBLE);
-                advanceSettingController.setButtonConfigureVisibility(View.INVISIBLE);
+                advanceSettingController.setAdvanceSettingLayoutVisibility(View.GONE);
+                advanceSettingController.setButtonConfigureVisibility(View.GONE);
                 resizeElementWindows.setVisibility(View.VISIBLE);
 
             }
@@ -67,7 +67,7 @@ public class EditElement {
                 advanceSettingController.getKeyboardController().saveLayout();
                 advanceSettingController.setAdvanceSettingLayoutVisibility(View.VISIBLE);
                 advanceSettingController.setButtonConfigureVisibility(View.VISIBLE);
-                resizeElementWindows.setVisibility(View.INVISIBLE);
+                resizeElementWindows.setVisibility(View.GONE);
             }
         });
     }

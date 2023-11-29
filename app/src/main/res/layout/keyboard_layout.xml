@@ -11,7 +11,7 @@
         android:layout_height="match_parent"
         android:layout_weight="100">
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -19,7 +19,7 @@
             android:tag="111"
             android:text="ESC"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -27,7 +27,7 @@
             android:tag="131"
             android:text="F1"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -35,7 +35,7 @@
             android:tag="132"
             android:text="F2"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -43,7 +43,7 @@
             android:tag="133"
             android:text="F3"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -51,7 +51,7 @@
             android:tag="134"
             android:text="F4"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -59,7 +59,7 @@
             android:tag="135"
             android:text="F5"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -67,7 +67,7 @@
             android:tag="136"
             android:text="F6"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -75,7 +75,7 @@
             android:tag="137"
             android:text="F7"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -83,7 +83,7 @@
             android:tag="138"
             android:text="F8"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -91,7 +91,7 @@
             android:tag="139"
             android:text="F9"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -99,7 +99,7 @@
             android:tag="140"
             android:text="F10"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -107,7 +107,7 @@
             android:tag="141"
             android:text="F11"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -115,7 +115,7 @@
             android:tag="142"
             android:text="F12"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -123,7 +123,7 @@
             android:tag="124"
             android:text="Ins"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -137,15 +137,15 @@
         android:layout_height="match_parent"
         android:layout_weight="100">
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="100"
+            android:layout_weight="90"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="68"
-            android:text="`"/>
+            android:text="~\n`"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -154,7 +154,7 @@
             android:text="1"/>
         <!-- 继续更新其他 TextView 的 android:tag 值 -->
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -162,7 +162,7 @@
             android:tag="9"
             android:text="2"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -171,7 +171,7 @@
             android:text="3"/>
         <!-- 以此类推，更新其他 TextView 的 android:tag 值 -->
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -179,7 +179,7 @@
             android:tag="11"
             android:text="4"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -187,7 +187,7 @@
             android:tag="12"
             android:text="5"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -195,7 +195,7 @@
             android:tag="13"
             android:text="6"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -203,7 +203,7 @@
             android:tag="14"
             android:text="7"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -211,7 +211,7 @@
             android:tag="15"
             android:text="8"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -219,7 +219,7 @@
             android:tag="16"
             android:text="9"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -227,7 +227,7 @@
             android:tag="7"
             android:text="0"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -235,7 +235,7 @@
             android:tag="69"
             android:text="_\n-"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -243,9 +243,9 @@
             android:tag="70"
             android:text="+\n="/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="97"
+            android:layout_weight="140"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="67"
@@ -257,15 +257,15 @@
         android:layout_height="match_parent"
         android:layout_weight="100">
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="98"
+            android:layout_weight="140"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="61"
             android:text="Tab"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -273,7 +273,7 @@
             android:tag="45"
             android:text="Q"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -281,7 +281,7 @@
             android:tag="51"
             android:text="W"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -289,7 +289,7 @@
             android:tag="33"
             android:text="E"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -297,7 +297,7 @@
             android:tag="46"
             android:text="R"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -305,7 +305,7 @@
             android:tag="48"
             android:text="T"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -313,7 +313,7 @@
             android:tag="53"
             android:text="Y"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -321,7 +321,7 @@
             android:tag="49"
             android:text="U"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -329,7 +329,7 @@
             android:tag="37"
             android:text="I"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -337,7 +337,7 @@
             android:tag="43"
             android:text="O"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -345,7 +345,7 @@
             android:tag="44"
             android:text="P"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -353,7 +353,7 @@
             android:tag="71"
             android:text="{\n["/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -361,7 +361,7 @@
             android:tag="72"
             android:text="}\n]"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -375,15 +375,15 @@
         android:layout_height="match_parent"
         android:layout_weight="100">
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="97"
+            android:layout_weight="150"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="115"
             android:text="Cap"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -391,7 +391,7 @@
             android:tag="29"
             android:text="A"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -399,7 +399,7 @@
             android:tag="47"
             android:text="S"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -407,7 +407,7 @@
             android:tag="32"
             android:text="D"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -415,7 +415,7 @@
             android:tag="34"
             android:text="F"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -423,7 +423,7 @@
             android:tag="35"
             android:text="G"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -431,7 +431,7 @@
             android:tag="36"
             android:text="H"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -439,7 +439,7 @@
             android:tag="38"
             android:text="J"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -447,7 +447,7 @@
             android:tag="39"
             android:text="K"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -455,7 +455,7 @@
             android:tag="40"
             android:text="L"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -463,7 +463,7 @@
             android:tag="74"
             android:text=":\n;"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -471,9 +471,9 @@
             android:tag="75"
             android:text="&quot;\n'"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="94"
+            android:layout_weight="160"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="66"
@@ -485,15 +485,15 @@
         android:layout_height="match_parent"
         android:layout_weight="100">
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="94"
+            android:layout_weight="160"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="59"
             android:text="Shift"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -501,7 +501,7 @@
             android:tag="54"
             android:text="Z"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -509,7 +509,7 @@
             android:tag="52"
             android:text="X"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -517,7 +517,7 @@
             android:tag="31"
             android:text="C"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -525,7 +525,7 @@
             android:tag="50"
             android:text="V"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -533,7 +533,7 @@
             android:tag="30"
             android:text="B"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -541,7 +541,7 @@
             android:tag="42"
             android:text="N"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -549,7 +549,7 @@
             android:tag="41"
             android:text="M"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -557,7 +557,7 @@
             android:tag="55"
             android:text="&lt;\n,"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -565,7 +565,7 @@
             android:tag="56"
             android:text=">\n."/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -573,9 +573,9 @@
             android:tag="76"
             android:text="&#63;&#10;/"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="97"
+            android:layout_weight="160"
             android:gravity="center"
             android:background="@drawable/square_border"
             android:tag="60"
@@ -587,7 +587,7 @@
         android:layout_height="match_parent"
         android:layout_weight="100">
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -595,7 +595,7 @@
             android:tag="113"
             android:text="Ctrl"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -603,7 +603,7 @@
             android:tag="171"
             android:text="Win"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -611,7 +611,7 @@
             android:tag="57"
             android:text="Alt"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="95"
             android:gravity="center"
@@ -619,7 +619,7 @@
             android:tag="62"
             android:text="Space"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -627,7 +627,7 @@
             android:tag="58"
             android:text="Alt"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -635,7 +635,7 @@
             android:tag="114"
             android:text="Ctrl"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -643,7 +643,7 @@
             android:tag="19"
             android:text="↑"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -651,7 +651,7 @@
             android:tag="20"
             android:text="↓"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -659,7 +659,7 @@
             android:tag="21"
             android:text="←"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -667,7 +667,7 @@
             android:tag="22"
             android:text="→"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -675,7 +675,7 @@
             android:tag="122"
             android:text="Home"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -683,7 +683,7 @@
             android:tag="123"
             android:text="End"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"
@@ -691,7 +691,7 @@
             android:tag="92"
             android:text="PgUp"/>
         <TextView
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="100"
             android:gravity="center"

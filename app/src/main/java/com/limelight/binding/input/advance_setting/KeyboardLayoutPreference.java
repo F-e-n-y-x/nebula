@@ -26,7 +26,10 @@ public class KeyboardLayoutPreference {
         layoutsMap = (Map<String, String>) preferences.getAll();
 
         //初始化默认布局：每次创建该对象的时候，都会检查有没有默认布局
-        addLayout(AdvanceSettingPreference.CURRENT_LAYOUT_VALUE);
+        addLayout(KeyboardLayoutController.DEFAULT_LAYOUT_NAME);
+
+        //wg_debug
+        System.out.println("wg_debug layoutsMap:" + layoutsMap);
     }
 
     public int addLayout(String layoutName){
@@ -45,12 +48,15 @@ public class KeyboardLayoutPreference {
         SharedPreferences.Editor editor = context.getSharedPreferences(LAYOUT_LIST_PREFERENCE,Context.MODE_PRIVATE).edit();
         editor.putString(layoutName, layoutId);
         editor.apply();
+
+        //wg_debug
+        System.out.println("wg_debug layoutsMap:" + layoutsMap);
         //新增布局成功
         return 0;
     }
 
     public int deleteLayout(String layoutName){
-        if (layoutName.equals(AdvanceSettingPreference.CURRENT_LAYOUT_VALUE)){
+        if (layoutName.equals(KeyboardLayoutController.DEFAULT_LAYOUT_NAME)){
             //删除失败，不能删除默认布局
             return -1;
         }
@@ -65,11 +71,14 @@ public class KeyboardLayoutPreference {
         //3.再从list中删除
         layoutsMap.remove(layoutName);
         //删除成功
+
+        //wg_debug
+        System.out.println("wg_debug layoutsMap:" + layoutsMap);
         return 0;
     }
 
     public int renameLayout(String layoutOldName, String layoutNewName){
-        if (layoutOldName.equals(AdvanceSettingPreference.CURRENT_LAYOUT_VALUE)){
+        if (layoutOldName.equals(KeyboardLayoutController.DEFAULT_LAYOUT_NAME)){
             //重命名失败，不能重命名默认布局
             return -1;
         }
@@ -86,6 +95,9 @@ public class KeyboardLayoutPreference {
         layoutEditor.putString(layoutNewName,layoutId);
         layoutEditor.apply();
         //重命名成功
+
+        //wg_debug
+        System.out.println("wg_debug layoutsMap:" + layoutsMap);
         return 0;
     }
 

@@ -6,33 +6,30 @@ import android.content.SharedPreferences;
 
 public class AdvanceSettingPreference {
     public static final String ADVANCE_PREFERENCE = "advance_preference";
-    public static final String CURRENT_LAYOUT_KEY = "current_layout_key";
-    public static final String CURRENT_LAYOUT_VALUE = "default";
-
     private final Context context;
 
     public AdvanceSettingPreference(Context context){
         this.context = context;
-        SharedPreferences preferences = context.getSharedPreferences(ADVANCE_PREFERENCE, Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        //初始化advance_preference表
-        if (!preferences.contains(CURRENT_LAYOUT_KEY)){
-            editor.putString(CURRENT_LAYOUT_KEY,CURRENT_LAYOUT_VALUE);
-        }
-        editor.apply();
+        //wg_debug
+        wg_debugGetAll();
     }
 
-    public String getCurrentLayoutName(){
+    public String getValue(String key){
         SharedPreferences preferences = context.getSharedPreferences(ADVANCE_PREFERENCE, Activity.MODE_PRIVATE);
-        return preferences.getString(CURRENT_LAYOUT_KEY, CURRENT_LAYOUT_VALUE);
+        return preferences.getString(key, null);
     }
 
-    public void setCurrentLayoutName(String layoutName){
+    public void setValue(String key, String value){
         SharedPreferences.Editor editor = context.getSharedPreferences(ADVANCE_PREFERENCE,Activity.MODE_PRIVATE).edit();
-        editor.putString(CURRENT_LAYOUT_KEY,layoutName);
+        editor.putString(key,value);
         editor.apply();
+        //wg_debug
+        wg_debugGetAll();
     }
 
-
+    private void wg_debugGetAll(){
+        SharedPreferences preferences = context.getSharedPreferences(ADVANCE_PREFERENCE, Activity.MODE_PRIVATE);
+        System.out.println("wg_debug setting preference:" + preferences.getAll());
+    }
 
 }
