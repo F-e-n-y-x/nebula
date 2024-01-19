@@ -61,7 +61,9 @@ public class DeleteElement {
             public void onClick(View v) {
                 confirmDeleteWindow.setVisibility(View.GONE);
                 advanceSettingController.getKeyboardController().setCurrentSelectedElement(null);
+                //取消后需要重绘选择的按钮，但是只有重绘所有
                 advanceSettingController.getKeyboardController().elementsInvalidate();
+                confirmDeleteWindow.setVisibility(View.GONE);
             }
         });
     }

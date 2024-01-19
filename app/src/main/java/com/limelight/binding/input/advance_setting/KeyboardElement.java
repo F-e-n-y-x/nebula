@@ -137,13 +137,13 @@ public abstract class KeyboardElement extends View {
                 else if (keyboardController.getControllerMode() == KeyboardController.ControllerMode.DeleteButtons)
                     actionEnableDelete();
                 if (currentMode == Mode.Edit){
-                    keyboardController.elementsInvalidate();
                     keyboardController.setCurrentSelectedElement(this);
                     keyboardController.setSeekbarProgress(keyboardBean.getSize());
-                }else if (currentMode == Mode.Delete){
                     keyboardController.elementsInvalidate();
+                }else if (currentMode == Mode.Delete){
                     keyboardController.setCurrentSelectedElement(this);
                     keyboardController.confirmDeleteElement("是否删除:" + elementId);
+                    keyboardController.elementsInvalidate();
                 }
 
                 return true;
