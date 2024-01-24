@@ -4,50 +4,51 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import com.google.gson.Gson;
+
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
-public class KeyboardElementPreference {
+public class ElementPreference {
 
-    private final String keyboardLayoutId;
-    private final Map<String, KeyboardBean> elements = new HashMap<>();
+    final private static String ELEMENT_TABLE_PREFIX = "element_";
+
+    private final String elementLayoutName;
+    private final Map<String, ElementBean> elements = new HashMap<>();
     private final Context context;
     private final Gson gson = new Gson();
 
-    public KeyboardElementPreference(String keyboardLayoutId, Context context){
+    public ElementPreference(String configurationId, Context context){
         this.context = context;
-        this.keyboardLayoutId = keyboardLayoutId;
+        this.elementLayoutName = ELEMENT_TABLE_PREFIX + configurationId;
 
         // 对象创建的时候读取按钮信息
-        SharedPreferences preferences = context.getSharedPreferences(keyboardLayoutId,Activity.MODE_PRIVATE);
+        SharedPreferences preferences = context.getSharedPreferences(configurationId,Activity.MODE_PRIVATE);
         // 从SharePreference中获取Map<String, String>格式的Element信息
         Map<String, String> elementsString = (Map<String, String>) preferences.getAll();
         // 将Map<String, String>格式转换为Map<String, KeyboardBean>
         for (Map.Entry<String, String> entry: elementsString.entrySet()){
-            KeyboardBean keyboardBean = stringToJSON(entry.getValue());
+            ElementBean elementBean = stringToJSON(entry.getValue());
             // 转换完成后放到Map<String, KeyboardBean>中
-            elements.put(entry.getKey(),keyboardBean);
+            elements.put(entry.getKey(), elementBean);
         }
 
         //wg_debug
         System.out.println("wg_debug elements preference:" + elements);
     }
 
-    public int addElement(String keyboardElementName, KeyboardBean element){
-        if (elements.containsKey(keyboardElementName)){
-            //新增失败，按钮名称已存在
-            return -1;
-        }
-
+    public int addElement(ElementBean element){
+        String elementName = element.getName();
         /*
          * 两步操作：
          * 1.加入MAP中
          * 2.加入SharedPreference
          * */
-        elements.put(keyboardElementName, element);
+        elements.put(elementName, element);
         String elementString = JSONToString(element);
-        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
-        editor.putString(keyboardElementName, elementString);
+        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
+        editor.putString(elementName, elementString);
         editor.apply();
         //新增成功
 
@@ -58,8 +59,8 @@ public class KeyboardElementPreference {
     }
 
     public void saveElements(){
-        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
-        for (Map.Entry<String, KeyboardBean> entry: elements.entrySet()){
+        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
+        for (Map.Entry<String, ElementBean> entry: elements.entrySet()){
             editor.putString(entry.getKey(),JSONToString(entry.getValue()));
         }
         editor.apply();
@@ -75,22 +76,27 @@ public class KeyboardElementPreference {
          * 2.从MAP中删除
          * */
         elements.remove(elementId);
-        SharedPreferences.Editor editor = context.getSharedPreferences(keyboardLayoutId, Activity.MODE_PRIVATE).edit();
+        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
         editor.remove(elementId);
         editor.apply();
 
         //wg_debug
         System.out.println("wg_debug elements preference:" + elements);
     }
-    public Map<String, KeyboardBean> getElements() {
-        return elements;
+    public Collection<ElementBean> getElements() {
+        return elements.values();
     }
 
-    private KeyboardBean stringToJSON(String element){
-        return gson.fromJson(element,KeyboardBean.class);
+    public boolean containsElement(String elementName){
+        //新增失败，按钮名称已存在
+        return elements.containsKey(elementName);
     }
 
-    private String JSONToString(KeyboardBean element){
+    private ElementBean stringToJSON(String element){
+        return gson.fromJson(element, ElementBean.class);
+    }
+
+    private String JSONToString(ElementBean element){
         return gson.toJson(element);
     }
 }

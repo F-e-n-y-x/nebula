@@ -8,7 +8,7 @@ import android.widget.CheckBox;
 import android.widget.LinearLayout;
 
 import com.limelight.R;
-import com.limelight.binding.input.advance_setting.KeyboardLayoutController;
+import com.limelight.binding.input.advance_setting.ElementLayoutController;
 
 public class KeyboardLayoutItem{
     private LinearLayout keyboardLayoutItemLayout;
@@ -28,7 +28,7 @@ public class KeyboardLayoutItem{
         layoutItemRenameButton       = (Button) ((LinearLayout) keyboardLayoutItemLayout.getChildAt(1)).getChildAt(0);
         layoutItemDeleteButton       = (Button) ((LinearLayout) keyboardLayoutItemLayout.getChildAt(1)).getChildAt(1);
         setText(layoutName);
-        if (layoutName.equals(KeyboardLayoutController.DEFAULT_LAYOUT_NAME)){
+        if (layoutName.equals(ElementLayoutController.DEFAULT_LAYOUT_NAME)){
             ((LinearLayout) keyboardLayoutItemLayout.getChildAt(1)).setVisibility(View.GONE);
         }
         layoutItemCheckBox.setOnClickListener(new View.OnClickListener() {
@@ -77,7 +77,7 @@ public class KeyboardLayoutItem{
     }
 
     private void displayDeleteButton(boolean display){
-        if (layoutItemCheckBox.getText().toString().equals(KeyboardLayoutController.DEFAULT_LAYOUT_NAME)){
+        if (layoutItemCheckBox.getText().toString().equals(ElementLayoutController.DEFAULT_LAYOUT_NAME)){
             return;
         }
 

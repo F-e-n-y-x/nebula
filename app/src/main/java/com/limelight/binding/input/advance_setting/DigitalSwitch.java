@@ -6,37 +6,39 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This is a digital button on screen element. It is used to get click and double click user input.
+ * This is a digital Switch on screen element. It is used to get click and double click user input.
  */
-public class KeyboardDigitalButton extends KeyboardElement {
+public class DigitalSwitch extends Element {
 
     /**
      * Listener interface to update registered observers.
      */
-    public interface DigitalButtonListener {
+    public interface DigitalSwitchListener {
 
         /**
-         * onClick event will be fired on button click.
+         * onClick event will be fired on switch click.
          */
         void onClick();
 
         /**
-         * onLongClick event will be fired on button long click.
+         * onLongClick event will be fired on switch long click.
          */
         void onLongClick();
 
         /**
-         * onRelease event will be fired on button unpress.
+         * onRelease event will be fired on switch unpress.
          */
         void onRelease();
     }
 
-    private List<DigitalButtonListener> listeners = new ArrayList<>();
+    private List<DigitalSwitchListener> listeners = new ArrayList<>();
     private String text = "";
     private int icon = -1;
     private long timerLongClickTimeout = 3000;
@@ -51,45 +53,54 @@ public class KeyboardDigitalButton extends KeyboardElement {
     private final RectF rect = new RectF();
 
     private int layer;
-    private KeyboardDigitalButton movingButton = null;
+    private DigitalSwitch movingSwitch = null;
+    private int currentAction = KeyEvent.ACTION_UP;
+
+    public int getCurrentAction() {
+        return currentAction;
+    }
+
+    public void setCurrentAction(int currentAction) {
+        this.currentAction = currentAction;
+    }
 
     boolean inRange(float x, float y) {
         return (this.getX() < x && this.getX() + this.getWidth() > x) &&
                 (this.getY() < y && this.getY() + this.getHeight() > y);
     }
 
-    public boolean checkMovement(float x, float y, KeyboardDigitalButton movingButton) {
+    public boolean checkMovement(float x, float y, DigitalSwitch movingSwitch) {
         // check if the movement happened in the same layer
-        if (movingButton.layer != this.layer) {
+        if (movingSwitch.layer != this.layer) {
             return false;
         }
 
         // save current pressed state
         boolean wasPressed = isPressed();
 
-        // check if the movement directly happened on the button
-        if ((this.movingButton == null || movingButton == this.movingButton)
+        // check if the movement directly happened on the switch
+        if ((this.movingSwitch == null || movingSwitch == this.movingSwitch)
                 && this.inRange(x, y)) {
-            // set button pressed state depending on moving button pressed state
-            if (this.isPressed() != movingButton.isPressed()) {
-                this.setPressed(movingButton.isPressed());
+            // set switch pressed state depending on moving switch pressed state
+            if (this.isPressed() != movingSwitch.isPressed()) {
+                this.setPressed(movingSwitch.isPressed());
             }
         }
-        // check if the movement is outside of the range and the movement button
-        // is the saved moving button
-        else if (movingButton == this.movingButton) {
+        // check if the movement is outside of the range and the movement switch
+        // is the saved moving switch
+        else if (movingSwitch == this.movingSwitch) {
             this.setPressed(false);
         }
 
         // check if a change occurred
         if (wasPressed != isPressed()) {
             if (isPressed()) {
-                // is pressed set moving button and emit click event
-                this.movingButton = movingButton;
+                // is pressed set moving switch and emit click event
+                this.movingSwitch = movingSwitch;
                 onClickCallback();
             } else {
-                // no longer pressed reset moving button and emit release event
-                this.movingButton = null;
+                // no longer pressed reset moving switch and emit release event
+                this.movingSwitch = null;
                 onReleaseCallback();
             }
 
@@ -101,20 +112,20 @@ public class KeyboardDigitalButton extends KeyboardElement {
         return false;
     }
 
-    private void checkMovementForAllButtons(float x, float y) {
-        for (KeyboardElement element : keyboardController.getElements()) {
-            if (element != this && element instanceof KeyboardDigitalButton) {
-                ((KeyboardDigitalButton) element).checkMovement(x, y, this);
+    private void checkMovementForAllSwitches(float x, float y) {
+        for (Element element : elementController.getElements()) {
+            if (element != this && element instanceof DigitalSwitch) {
+                ((DigitalSwitch) element).checkMovement(x, y, this);
             }
         }
     }
 
-    public KeyboardDigitalButton(KeyboardController controller, KeyboardBean keyboardBean, String elementId, int layer, Context context) {
-        super(controller, keyboardBean, elementId,context);
+    public DigitalSwitch(ElementController controller, ElementBean elementBean, String elementId, int layer, Context context) {
+        super(controller, elementBean, elementId,context);
         this.layer = layer;
     }
 
-    public void addDigitalButtonListener(KeyboardDigitalButton.DigitalButtonListener listener) {
+    public void addDigitalSwitchListener(DigitalSwitch.DigitalSwitchListener listener) {
         listeners.add(listener);
     }
 
@@ -136,15 +147,19 @@ public class KeyboardDigitalButton extends KeyboardElement {
         paint.setTextSize(getPercent(getWidth(), 25));
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setStrokeWidth(getDefaultStrokeWidth());
+        if (isPressed() || currentAction == KeyEvent.ACTION_DOWN){
+            paint.setColor(pressedColor);
+        } else {
+            paint.setColor(getDefaultColor());
+        }
 
-        paint.setColor(isPressed() ? pressedColor : getDefaultColor());
         paint.setStyle(Paint.Style.STROKE);
 
         rect.left = rect.top = paint.getStrokeWidth();
         rect.right = getWidth() - rect.left;
         rect.bottom = getHeight() - rect.top;
 
-        canvas.drawOval(rect, paint);
+        canvas.drawRect(rect, paint);
 
         if (icon != -1) {
             Drawable d = getResources().getDrawable(icon);
@@ -160,18 +175,18 @@ public class KeyboardDigitalButton extends KeyboardElement {
     private void onClickCallback() {
         _DBG("clicked");
         // notify listeners
-        for (KeyboardDigitalButton.DigitalButtonListener listener : listeners) {
+        for (DigitalSwitch.DigitalSwitchListener listener : listeners) {
             listener.onClick();
         }
 
-        keyboardController.getHandler().removeCallbacks(longClickRunnable);
-        keyboardController.getHandler().postDelayed(longClickRunnable, timerLongClickTimeout);
+        elementController.getHandler().removeCallbacks(longClickRunnable);
+        elementController.getHandler().postDelayed(longClickRunnable, timerLongClickTimeout);
     }
 
     private void onLongClickCallback() {
         _DBG("long click");
         // notify listeners
-        for (KeyboardDigitalButton.DigitalButtonListener listener : listeners) {
+        for (DigitalSwitch.DigitalSwitchListener listener : listeners) {
             listener.onLongClick();
         }
     }
@@ -179,12 +194,12 @@ public class KeyboardDigitalButton extends KeyboardElement {
     private void onReleaseCallback() {
         _DBG("released");
         // notify listeners
-        for (KeyboardDigitalButton.DigitalButtonListener listener : listeners) {
+        for (DigitalSwitch.DigitalSwitchListener listener : listeners) {
             listener.onRelease();
         }
 
         // We may be called for a release without a prior click
-        keyboardController.getHandler().removeCallbacks(longClickRunnable);
+        elementController.getHandler().removeCallbacks(longClickRunnable);
     }
 
     @Override
@@ -196,7 +211,7 @@ public class KeyboardDigitalButton extends KeyboardElement {
 
         switch (action) {
             case MotionEvent.ACTION_DOWN: {
-                movingButton = null;
+                movingSwitch = null;
                 setPressed(true);
                 onClickCallback();
 
@@ -205,7 +220,7 @@ public class KeyboardDigitalButton extends KeyboardElement {
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
-                checkMovementForAllButtons(x, y);
+                checkMovementForAllSwitches(x, y);
 
                 return true;
             }
@@ -214,7 +229,7 @@ public class KeyboardDigitalButton extends KeyboardElement {
                 setPressed(false);
                 onReleaseCallback();
 
-                checkMovementForAllButtons(x, y);
+                checkMovementForAllSwitches(x, y);
 
                 invalidate();
 
@@ -226,3 +241,4 @@ public class KeyboardDigitalButton extends KeyboardElement {
         return true;
     }
 }
+

@@ -8,7 +8,7 @@
         <item>@string/resolution_1440p</item>
         <item>@string/resolution_4k</item>
     </string-array>
-    <string-array name="button_name">
+    <string-array name="element_type_arrays">
         <item>BUTTON</item>
         <item>SWITCH</item>
         <item>PAD</item>

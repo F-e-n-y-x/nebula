@@ -7,7 +7,7 @@ import android.widget.TextView;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.AdvanceSettingController;
-import com.limelight.binding.input.advance_setting.KeyboardController;
+import com.limelight.binding.input.advance_setting.ElementController;
 
 public class DeleteElement {
     private Button      deleteButton;
@@ -37,7 +37,7 @@ public class DeleteElement {
         deleteButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.DeleteButtons);
+                advanceSettingController.getKeyboardController().setControllerMode(ElementController.ControllerMode.DeleteButtons);
                 advanceSettingController.setAdvanceSettingLayoutVisibility(View.GONE);
                 advanceSettingController.setButtonConfigureVisibility(View.GONE);
                 exitDeleteButton.setVisibility(View.VISIBLE);
@@ -50,7 +50,7 @@ public class DeleteElement {
         deleteConfirmButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                advanceSettingController.getKeyboardController().removeSelectedElement();
+                //advanceSettingController.getKeyboardController().removeElement();
                 exitDeleteButton.setVisibility(View.VISIBLE);
                 confirmDeleteWindow.setVisibility(View.GONE);
             }
@@ -72,7 +72,7 @@ public class DeleteElement {
         exitDeleteButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.Active);
+                advanceSettingController.getKeyboardController().setControllerMode(ElementController.ControllerMode.Active);
                 exitDeleteButton.setVisibility(View.GONE);
                 advanceSettingController.setAdvanceSettingLayoutVisibility(View.VISIBLE);
                 advanceSettingController.setButtonConfigureVisibility(View.VISIBLE);

@@ -8,7 +8,7 @@ import android.view.MotionEvent;
 import java.util.ArrayList;
 import java.util.List;
 
-public class KeyboardDigitalPad extends KeyboardElement{
+public class DigitalPad extends Element {
 
     private String value;
 
@@ -24,8 +24,8 @@ public class KeyboardDigitalPad extends KeyboardElement{
 
     private final Paint paint = new Paint();
 
-    public KeyboardDigitalPad(KeyboardController keyboardController, KeyboardBean keyboardBean,String elementId, Context context) {
-        super(keyboardController, keyboardBean, elementId, context);
+    public DigitalPad(ElementController elementController, ElementBean elementBean, String elementId, Context context) {
+        super(elementController, elementBean, elementId, context);
 
     }
 

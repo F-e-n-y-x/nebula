@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" >
-    <corners android:radius="300dp" /> <!-- 设置圆角的半径 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <corners android:radius="5dp" />
     <stroke android:color="@color/advance_setting_line" android:width="3dp"/> <!-- 边界的颜色和宽度 -->
 </shape>

@@ -3,18 +3,16 @@ package com.limelight.binding.input.advance_setting.funtion;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.WindowId;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
-import android.widget.TextView;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.AdvanceSettingController;
-import com.limelight.binding.input.advance_setting.KeyboardController;
+import com.limelight.binding.input.advance_setting.ElementController;
 
 public class FloatKeyboard {
 
@@ -47,19 +45,19 @@ public class FloatKeyboard {
     }
 
     private void initKeyboard(){
-        KeyboardController keyboardController = advanceSettingController.getKeyboardController();
+        ElementController elementController = advanceSettingController.getKeyboardController();
         View.OnTouchListener touchListener = new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         // 处理按下事件
-                        keyboardController.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,Integer.parseInt((String) v.getTag())));
+                        elementController.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,Integer.parseInt((String) v.getTag())));
                         v.setBackgroundResource(R.drawable.confirm_square_border);
                         return true;
                     case MotionEvent.ACTION_UP:
                         // 处理释放事件
-                        keyboardController.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,Integer.parseInt((String) v.getTag())));
+                        elementController.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,Integer.parseInt((String) v.getTag())));
                         v.setBackgroundResource(R.drawable.square_border);
                         return true;
                 }

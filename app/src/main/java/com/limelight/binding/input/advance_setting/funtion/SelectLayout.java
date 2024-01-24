@@ -59,29 +59,9 @@ public class SelectLayout {
         deleteCancelButton      = advanceSettingFatherLayout.findViewById(R.id.delete_layout_confirm_windows_cancel_button);
         deleteConfirmText       = advanceSettingFatherLayout.findViewById(R.id.delete_layout_confirm_windows_text);
 
-        loadLayouts();
         initAddWindow();
         initDeleteWindow();
         initRenameWindow();
-    }
-
-    private void loadLayouts(){
-        String currentLayoutName = advanceSettingController.getKeyboardLayoutController().getCurrentLayoutName();
-
-        Map<Long, String> idNameMap = new HashMap<>();
-        for (String name : advanceSettingController.getKeyboardLayoutController().getLayoutNames()){
-            idNameMap.put(Long.parseLong(advanceSettingController.getKeyboardLayoutController().getLayoutId(name)),name);
-        }
-        Map<Long, String> sortedMap = new TreeMap<>(idNameMap);
-        for (Map.Entry<Long, String> entry : sortedMap.entrySet()) {
-            String name = entry.getValue();
-            KeyboardLayoutItem item = addLayoutItem(name);
-            if (name.equals(currentLayoutName)){
-                currentSelectedItem = item;
-                currentSelectedItem.selected();
-            }
-        }
-
     }
 
     private void initAddWindow(){
@@ -90,12 +70,12 @@ public class SelectLayout {
             public void onClick(View v) {
                 String name = addEditText.getText().toString();
                 if (name.matches("^[a-zA-Z0-9]{1,10}$")){
-                    if (advanceSettingController.getKeyboardLayoutController().addLayout(name) == 0){
-                        addLayoutItem(name);
-                        addWindow.setVisibility(View.GONE);
-                    } else {
-                        Toast.makeText(context,"名称已存在",Toast.LENGTH_SHORT).show();
-                    }
+//                    if (advanceSettingController.getKeyboardLayoutController().addLayout(name) == 0){
+//                        addLayoutItem(name);
+//                        addWindow.setVisibility(View.GONE);
+//                    } else {
+//                        Toast.makeText(context,"名称已存在",Toast.LENGTH_SHORT).show();
+//                    }
                 } else {
                     Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
                 }
@@ -127,25 +107,25 @@ public class SelectLayout {
                     return;
                 }
                 if (name.matches("^[a-zA-Z0-9]{1,10}$")){
-                    switch (advanceSettingController.getKeyboardLayoutController().renameLayout(editingLayoutItem.getText(),name)){
-                        case -1 : {
-
-                            Toast.makeText(context,"不能重命名默认布局",Toast.LENGTH_SHORT).show();
-                            break;
-                        }
-                        case -2 : {
-                            Toast.makeText(context,"布局名已存在",Toast.LENGTH_SHORT).show();
-                            break;
-                        }
-                        case 0 : {
-                            editingLayoutItem.setText(name);
-                            if (currentSelectedItem == editingLayoutItem){
-                                advanceSettingController.getKeyboardLayoutController().setCurrentLayoutName(name);
-                            }
-                            renameWindow.setVisibility(View.GONE);
-                            break;
-                        }
-                    }
+//                    switch (advanceSettingController.getKeyboardLayoutController().renameLayout(editingLayoutItem.getText(),name)){
+//                        case -1 : {
+//
+//                            Toast.makeText(context,"不能重命名默认布局",Toast.LENGTH_SHORT).show();
+//                            break;
+//                        }
+//                        case -2 : {
+//                            Toast.makeText(context,"布局名已存在",Toast.LENGTH_SHORT).show();
+//                            break;
+//                        }
+//                        case 0 : {
+//                            editingLayoutItem.setText(name);
+//                            if (currentSelectedItem == editingLayoutItem){
+//                                advanceSettingController.getKeyboardLayoutController().setCurrentLayoutName(name);
+//                            }
+//                            renameWindow.setVisibility(View.GONE);
+//                            break;
+//                        }
+//                    }
                 } else {
                     Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
                 }
@@ -164,12 +144,12 @@ public class SelectLayout {
         deleteConfirmButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (advanceSettingController.getKeyboardLayoutController().deleteLayout(editingLayoutItem.getText()) == 0){
-                    keyboardLayoutContainer.removeView(editingLayoutItem.getView());
-                    confirmDeleteWindow.setVisibility(View.GONE);
-                } else {
-                    Toast.makeText(context,"不能删除默认布局",Toast.LENGTH_SHORT).show();
-                }
+//                if (advanceSettingController.getKeyboardLayoutController().deleteLayout(editingLayoutItem.getText()) == 0){
+//                    keyboardLayoutContainer.removeView(editingLayoutItem.getView());
+//                    confirmDeleteWindow.setVisibility(View.GONE);
+//                } else {
+//                    Toast.makeText(context,"不能删除默认布局",Toast.LENGTH_SHORT).show();
+//                }
             }
         });
         deleteCancelButton.setOnClickListener(new View.OnClickListener() {
@@ -188,11 +168,11 @@ public class SelectLayout {
     }
 
     public void selectItem(KeyboardLayoutItem item){
-        currentSelectedItem.unselected();
-        currentSelectedItem = item;
-        currentSelectedItem.selected();
-        advanceSettingController.getKeyboardLayoutController().setCurrentLayoutName(currentSelectedItem.getText());
-        advanceSettingController.getKeyboardController().refreshLayout();
+//        currentSelectedItem.unselected();
+//        currentSelectedItem = item;
+//        currentSelectedItem.selected();
+//        advanceSettingController.getKeyboardLayoutController().setCurrentLayoutName(currentSelectedItem.getText());
+//        advanceSettingController.getKeyboardController().refreshLayout();
     }
 
     public void jumpRenameWindow(KeyboardLayoutItem item){

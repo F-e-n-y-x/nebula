@@ -7,7 +7,7 @@ import android.widget.SeekBar;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.AdvanceSettingController;
-import com.limelight.binding.input.advance_setting.KeyboardController;
+import com.limelight.binding.input.advance_setting.ElementController;
 
 public class EditElement {
     private Button editButton;
@@ -32,7 +32,7 @@ public class EditElement {
         editButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.EditButtons);
+                advanceSettingController.getKeyboardController().setControllerMode(ElementController.ControllerMode.EditButtons);
                 advanceSettingController.setAdvanceSettingLayoutVisibility(View.GONE);
                 advanceSettingController.setButtonConfigureVisibility(View.GONE);
                 resizeElementWindows.setVisibility(View.VISIBLE);
@@ -42,27 +42,11 @@ public class EditElement {
     }
 
     private void initEditWindows(){
-        resizeElementWindowsSeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                advanceSettingController.getKeyboardController().resizeElement(progress);
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-
-            }
-        });
 
         resizeElementWindowsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                advanceSettingController.getKeyboardController().setControllerMode(KeyboardController.ControllerMode.Active);
+                advanceSettingController.getKeyboardController().setControllerMode(ElementController.ControllerMode.Active);
                 advanceSettingController.getKeyboardController().setCurrentSelectedElement(null);
                 advanceSettingController.getKeyboardController().saveLayout();
                 advanceSettingController.setAdvanceSettingLayoutVisibility(View.VISIBLE);
