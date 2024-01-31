@@ -31,7 +31,6 @@
                 android:text="类型:"
                 android:gravity="center"/>
             <Spinner
-                android:id="@+id/element_type_spinner"
                 android:layout_width="0dp"
                 android:layout_height="50dp"
                 android:layout_weight="5"
@@ -95,7 +94,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/advance_setting_line"
+        android:background="@color/configuration_line"
         android:layout_margin="10dp"/>
     <!--  上半部分   -->
     <LinearLayout
@@ -121,7 +120,7 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="@color/advance_setting_line"
+        android:background="@color/configuration_line"
         android:layout_margin="10dp"/>
     <!--  下半部分   -->
     <LinearLayout

@@ -5,7 +5,7 @@ import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.audio.AndroidAudioRenderer;
 import com.limelight.binding.input.ControllerHandler;
 import com.limelight.binding.input.KeyboardTranslator;
-import com.limelight.binding.input.advance_setting.AdvanceSettingController;
+import com.limelight.binding.input.advance_setting.ControllerManager;
 import com.limelight.binding.input.capture.InputCaptureManager;
 import com.limelight.binding.input.capture.InputCaptureProvider;
 import com.limelight.binding.input.touch.AbsoluteTouchContext;
@@ -24,7 +24,6 @@ import com.limelight.nvstream.StreamConfiguration;
 import com.limelight.nvstream.http.ComputerDetails;
 import com.limelight.nvstream.http.NvApp;
 import com.limelight.nvstream.http.NvHTTP;
-import com.limelight.nvstream.input.ControllerPacket;
 import com.limelight.nvstream.input.KeyboardPacket;
 import com.limelight.nvstream.input.MouseButtonPacket;
 import com.limelight.nvstream.jni.MoonBridge;
@@ -113,7 +112,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private ControllerHandler controllerHandler;
     private KeyboardTranslator keyboardTranslator;
     private VirtualController virtualController;
-    private AdvanceSettingController advanceSettingController;
+
+    private ControllerManager controllerManager;
 
     private PreferenceConfiguration prefConfig;
     private SharedPreferences tombstonePrefs;
@@ -528,8 +528,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         if (prefConfig.onscreenKeyboard) {
             // create virtual onscreen keyboard
-            advanceSettingController = new AdvanceSettingController((FrameLayout)streamView.getParent(),this);
-            advanceSettingController.refreshLayout();
+            controllerManager = new ControllerManager((FrameLayout)streamView.getParent(),this);
+            controllerManager.refreshLayout();
         }
 
         if (prefConfig.usbDriver) {
@@ -624,10 +624,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // Refresh layout of OSC for possible new screen size
             virtualController.refreshLayout();
         }
-        if (advanceSettingController != null) {
+        if (controllerManager != null) {
             // Refresh layout of OSC for possible new screen size
             System.out.println("wangguan test game");
-            advanceSettingController.refreshLayout();
+            controllerManager.refreshLayout();
         }
 
         // Hide on-screen overlays in PiP mode

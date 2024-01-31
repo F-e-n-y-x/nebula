@@ -12,6 +12,7 @@
         <item>BUTTON</item>
         <item>SWITCH</item>
         <item>PAD</item>
+        <item>G-ISTICK</item>
     </string-array>
 
     <!-- Keep this in sync with PreferenceConfiguration.isNativeResolution()! -->

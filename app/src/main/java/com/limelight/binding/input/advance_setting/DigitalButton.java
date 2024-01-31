@@ -109,12 +109,12 @@ public class DigitalButton extends Element {
         }
     }
 
-    public DigitalButton(ElementController controller, ElementBean elementBean, String elementId, int layer, Context context) {
-        super(controller, elementBean, elementId,context);
+    public DigitalButton(ElementController controller, ElementBean elementBean, int layer, Context context) {
+        super(controller, elementBean,context);
         this.layer = layer;
     }
 
-    public void addDigitalButtonListener(DigitalButton.DigitalButtonListener listener) {
+    public void addDigitalButtonListener(DigitalButtonListener listener) {
         listeners.add(listener);
     }
 
@@ -160,7 +160,7 @@ public class DigitalButton extends Element {
     private void onClickCallback() {
         _DBG("clicked");
         // notify listeners
-        for (DigitalButton.DigitalButtonListener listener : listeners) {
+        for (DigitalButtonListener listener : listeners) {
             listener.onClick();
         }
 
@@ -171,7 +171,7 @@ public class DigitalButton extends Element {
     private void onLongClickCallback() {
         _DBG("long click");
         // notify listeners
-        for (DigitalButton.DigitalButtonListener listener : listeners) {
+        for (DigitalButtonListener listener : listeners) {
             listener.onLongClick();
         }
     }
@@ -179,7 +179,7 @@ public class DigitalButton extends Element {
     private void onReleaseCallback() {
         _DBG("released");
         // notify listeners
-        for (DigitalButton.DigitalButtonListener listener : listeners) {
+        for (DigitalButtonListener listener : listeners) {
             listener.onRelease();
         }
 

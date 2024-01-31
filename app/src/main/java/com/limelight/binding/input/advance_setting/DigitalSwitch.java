@@ -120,12 +120,12 @@ public class DigitalSwitch extends Element {
         }
     }
 
-    public DigitalSwitch(ElementController controller, ElementBean elementBean, String elementId, int layer, Context context) {
-        super(controller, elementBean, elementId,context);
+    public DigitalSwitch(ElementController controller, ElementBean elementBean, int layer, Context context) {
+        super(controller, elementBean, context);
         this.layer = layer;
     }
 
-    public void addDigitalSwitchListener(DigitalSwitch.DigitalSwitchListener listener) {
+    public void addDigitalSwitchListener(DigitalSwitchListener listener) {
         listeners.add(listener);
     }
 
@@ -175,7 +175,7 @@ public class DigitalSwitch extends Element {
     private void onClickCallback() {
         _DBG("clicked");
         // notify listeners
-        for (DigitalSwitch.DigitalSwitchListener listener : listeners) {
+        for (DigitalSwitchListener listener : listeners) {
             listener.onClick();
         }
 
@@ -186,7 +186,7 @@ public class DigitalSwitch extends Element {
     private void onLongClickCallback() {
         _DBG("long click");
         // notify listeners
-        for (DigitalSwitch.DigitalSwitchListener listener : listeners) {
+        for (DigitalSwitchListener listener : listeners) {
             listener.onLongClick();
         }
     }
@@ -194,7 +194,7 @@ public class DigitalSwitch extends Element {
     private void onReleaseCallback() {
         _DBG("released");
         // notify listeners
-        for (DigitalSwitch.DigitalSwitchListener listener : listeners) {
+        for (DigitalSwitchListener listener : listeners) {
             listener.onRelease();
         }
 

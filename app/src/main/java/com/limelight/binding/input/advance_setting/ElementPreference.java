@@ -8,7 +8,6 @@ import com.google.gson.Gson;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
 public class ElementPreference {
 
@@ -19,12 +18,12 @@ public class ElementPreference {
     private final Context context;
     private final Gson gson = new Gson();
 
-    public ElementPreference(String configurationId, Context context){
+    public ElementPreference(String configId, Context context){
         this.context = context;
-        this.elementLayoutName = ELEMENT_TABLE_PREFIX + configurationId;
+        this.elementLayoutName = ELEMENT_TABLE_PREFIX + configId;
 
         // 对象创建的时候读取按钮信息
-        SharedPreferences preferences = context.getSharedPreferences(configurationId,Activity.MODE_PRIVATE);
+        SharedPreferences preferences = context.getSharedPreferences(elementLayoutName,Activity.MODE_PRIVATE);
         // 从SharePreference中获取Map<String, String>格式的Element信息
         Map<String, String> elementsString = (Map<String, String>) preferences.getAll();
         // 将Map<String, String>格式转换为Map<String, KeyboardBean>

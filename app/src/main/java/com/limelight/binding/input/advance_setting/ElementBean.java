@@ -17,12 +17,6 @@ public class ElementBean {
     * 7:G-ISTICK
     * */
     private int type;
-    /*
-    * typeAttributes are unique attributes of the element
-    * typeAttributes format:
-    * "attribute1^value1!attribute2^#value21,value22,value23$!"
-    *  ^ = : , ! = ; , # = [ , $ = ]
-    * */
     private Map<String,String> typeAttributes;
     private int positionX;
     private int positionY;
@@ -31,12 +25,6 @@ public class ElementBean {
     private int opacity;
     private int color;
     private int layer;
-    /*
-     * otherAttributes are an extension of the basic attributes
-     * otherAttributes format:
-     * "attribute1^value1!attribute2^#value21,value22,value23$!"
-     *  ^ = : , ! = ; , # = [ , $ = ]
-     * */
     private Map<String,String> otherAttributes;
 
     public String getName() {

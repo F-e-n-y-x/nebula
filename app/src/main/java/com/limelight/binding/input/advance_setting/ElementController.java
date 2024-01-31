@@ -15,7 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ElementController {
+public class ElementController extends Controller{
 
     private final int[] positionScale = new int[4];//minX,maxX,minY,maxY
     private final int[] sizeScale = new int[4];//minWidth,maxWidth,minHeight,maxHeight
@@ -28,7 +28,7 @@ public class ElementController {
     private final List<Element> elements = new ArrayList<>();
     private Map<Integer, Runnable> keyEventRunnableMap = new HashMap<>();
     private FrameLayout elementsLayout;
-    public ElementController(FrameLayout layout, final Context context) {
+    public ElementController(ControllerManager controllerManager, FrameLayout layout, final Context context) {
         this.elementsLayout = layout;
         this.context = context;
         this.game = (Game) context;
@@ -185,11 +185,6 @@ public class ElementController {
         element.resizeElement(width, height);
     }
 
-
-    public void refreshLayout() {
-        removeElements();
-    }
-
     public void sendKeyEvent(KeyEvent keyEvent) {
         game.onKey(null,keyEvent.getKeyCode(),keyEvent);
         //如果map中有对应按键的runnable，则删除该按键的runnable。
@@ -210,6 +205,13 @@ public class ElementController {
         handler.postDelayed(runnable, 75);
     }
 
+    @Override
+    public void receiveMessage(Message message) {
+        switch (message.getMessageTitle()){
+            case "load_elements":
+                loadElements((Collection<ElementBean>) message.getMessageContent().get("elements"));
+        }
+    }
 }
 
 

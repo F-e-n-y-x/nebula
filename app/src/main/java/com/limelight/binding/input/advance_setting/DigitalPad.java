@@ -24,8 +24,8 @@ public class DigitalPad extends Element {
 
     private final Paint paint = new Paint();
 
-    public DigitalPad(ElementController elementController, ElementBean elementBean, String elementId, Context context) {
-        super(elementController, elementBean, elementId, context);
+    public DigitalPad(ElementController elementController, ElementBean elementBean, Context context) {
+        super(elementController, elementBean, context);
 
     }
 

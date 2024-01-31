@@ -27,7 +27,7 @@
             <View
                 android:layout_width="150dp"
                 android:layout_height="1dp"
-                android:background="@color/advance_setting_line"/>
+                android:background="@color/configuration_line"/>
             <RadioButton
                 android:id="@+id/advance_setting_2_radio_button"
                 android:layout_width="match_parent"
@@ -40,7 +40,7 @@
             <View
                 android:layout_width="150dp"
                 android:layout_height="1dp"
-                android:background="@color/advance_setting_line"
+                android:background="@color/configuration_line"
                 android:visibility="gone"/>
             <RadioButton
                 android:id="@+id/advance_setting_3_radio_button"
@@ -56,7 +56,7 @@
         <View
             android:layout_width="1dp"
             android:layout_height="match_parent"
-            android:background="@color/advance_setting_line"/>
+            android:background="@color/configuration_line"/>
         <!--    setting1    -->
         <LinearLayout
             android:id="@+id/advance_setting_1_linear_layout"
@@ -64,7 +64,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:visibility="visible">
-            <include layout="@layout/advance_setting_1"/>
+
         </LinearLayout>
 
         <!--    setting2    -->
@@ -74,7 +74,6 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:visibility="gone">
-            <include layout="@layout/advance_setting_2"/>
         </LinearLayout>
 
     </LinearLayout>
@@ -108,7 +107,7 @@
     </FrameLayout>
     <!--  重命名窗口  -->
     <FrameLayout
-        android:id="@+id/rename_layout_window_background"
+        android:id="@+id/rename_configuration_window_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#C0303030"
@@ -148,9 +147,9 @@
             </LinearLayout>
         </FrameLayout>
     </FrameLayout>
-<!--  新增布局window  -->
+    <!--  新增布局window  -->
     <FrameLayout
-        android:id="@+id/add_layout_window_background"
+        android:id="@+id/add_configuration_window_background"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#C0303030"
@@ -234,9 +233,9 @@
             </LinearLayout>
         </FrameLayout>
     </FrameLayout>
-<!--  删除布局window  -->
+    <!--  删除布局window  -->
     <FrameLayout
-        android:id="@+id/delete_layout_confirm_windows"
+        android:id="@+id/delete_configuration_confirm_windows"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="#C0303030"
@@ -253,7 +252,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center">
                 <TextView
-                    android:id="@+id/delete_layout_confirm_windows_text"
+                    android:id="@+id/delete_configuration_confirm_windows_text"
                     android:layout_width="200dp"
                     android:layout_height="50dp"
                     android:text="是否删除:"
@@ -264,12 +263,12 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content">
                     <Button
-                        android:id="@+id/delete_layout_confirm_windows_confirm_button"
+                        android:id="@+id/delete_configuration_confirm_windows_confirm_button"
                         android:layout_width="100dp"
                         android:layout_height="50dp"
                         android:text="确认"/>
                     <Button
-                        android:id="@+id/delete_layout_confirm_windows_cancel_button"
+                        android:id="@+id/delete_configuration_confirm_windows_cancel_button"
                         android:layout_width="100dp"
                         android:layout_height="50dp"
                         android:text="取消"/>

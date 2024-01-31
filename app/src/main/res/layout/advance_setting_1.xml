@@ -11,7 +11,7 @@
         android:layout_marginLeft="5dp"
         android:layout_marginRight="5dp">
         <LinearLayout
-            android:id="@+id/keyboard_layout_container"
+            android:id="@+id/configuration_item_container"
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -24,10 +24,10 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:background="@color/advance_setting_line"
+                android:background="@color/configuration_line"
                 android:layout_marginBottom="15dp"/>
             <Button
-                android:id="@+id/add_layout_button"
+                android:id="@+id/add_configuration_button"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:text="+"
@@ -37,7 +37,7 @@
     <View
         android:layout_width="1dp"
         android:layout_height="match_parent"
-        android:background="@color/advance_setting_line"/>
+        android:background="@color/configuration_line"/>
     <!--   右半部分    -->
     <LinearLayout
         android:orientation="vertical"
