@@ -14,6 +14,10 @@
         <item>PAD</item>
         <item>G-ISTICK</item>
     </string-array>
+    <string-array name="element_shape">
+        <item>CIRCLE</item>
+        <item>SQUARE</item>
+    </string-array>
 
     <!-- Keep this in sync with PreferenceConfiguration.isNativeResolution()! -->
     <string-array name="resolution_values" translatable="false">

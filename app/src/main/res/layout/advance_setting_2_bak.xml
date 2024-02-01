@@ -178,20 +178,19 @@
                     android:text="按键类型："
                     android:gravity="center"
                     android:layout_weight="1"/>
+
                 <Spinner
-                    android:id="@+id/select_element_type"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="3"
-                    android:entries="@array/element_type_arrays"
-                    />
+                    android:entries="@array/element_type_arrays" />
             </LinearLayout>
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="100">
                 <Button
-                    android:id="@+id/delete_element"
+
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="100"
@@ -212,7 +211,7 @@
         android:layout_height="0dp"
         android:layout_weight="3">
         <!--  键盘部分   -->
-        <include layout="@layout/keyboard_layout"/>
+        <include layout="@layout/layout_keyboard"/>
     </LinearLayout>
 
 </LinearLayout>

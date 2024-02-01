@@ -69,42 +69,6 @@ public class ConfigController extends Controller{
     @Override
     public void receiveMessage(Message message) {
         switch (message.getMessageTitle()){
-            case "text_window_confirm":
-                String textWindowPurpose = (String) message.getMessageContent().get("purpose");
-                if (textWindowPurpose.equals("delete")){
-                    purposeDelete(message);
-                }
-                break;
-            case "text_window_cancel":
-                controllerManager.sendMessage(new Message(
-                        "text_window_close",
-                        0,
-                        ConfigController.class,
-                        new Class[]{
-                                WindowsController.class
-                        },
-                        null
-                ));
-                break;
-            case "edittext_window_confirm":
-                String EdittextWindowPurpose = (String) message.getMessageContent().get("purpose");
-                if (EdittextWindowPurpose.equals("rename")){
-                    purposeRename(message);
-                } else if (EdittextWindowPurpose.equals("add")) {
-                    purposeAdd(message);
-                }
-                break;
-            case "edittext_window_cancel":
-                controllerManager.sendMessage(new Message(
-                        "edittext_window_close",
-                        0,
-                        ConfigController.class,
-                        new Class[]{
-                                WindowsController.class
-                        },
-                        null
-                ));
-                break;
             case "ready_init":
                 loadElements(currentSelectItem.getText());
                 break;
@@ -116,85 +80,6 @@ public class ConfigController extends Controller{
                 break;
 
         }
-    }
-
-    private void purposeRename(Message message){
-        String nowName = (String) message.getMessageContent().get("return_edittext_text");
-        String preName = (String) message.getMessageContent().get("text");
-        //如果名字没有改变，点击确认键也可以返回，如果没有这个判断，点击确认键会显示名称已存在
-        if (preName.equals(nowName)){
-            controllerManager.sendMessage(new Message(
-                    "edittext_window_close",
-                    0,
-                    ConfigController.class,
-                    new Class[]{
-                            WindowsController.class
-                    },
-                    null
-            ));
-            return;
-        }
-        if (configListPreference.isContainedName(nowName)){
-            Toast.makeText(context,"配置名字已存在",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (!nowName.matches("^[a-zA-Z0-9]{1,10}$")){
-            Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        //如果编辑的这个配置先前的名字和当前选择的配置的名字一样，则说明在修改选中的配置，需要修改存储中目前的配置名称
-        if (preName.equals(currentSelectItem.getText())){
-            configListPreference.renameConfiguration(preName,nowName);
-            configListPreference.setCurrentConfigName(nowName);
-        }
-        ((ConfigItem)message.getMessageContent().get("config_item")).setText(nowName);
-        controllerManager.sendMessage(new Message(
-                "edittext_window_close",
-                0,
-                ConfigController.class,
-                new Class[]{
-                        WindowsController.class
-                },
-                null
-        ));
-    }
-
-    private void purposeAdd(Message message){
-        String name = (String) message.getMessageContent().get("return_edittext_text");
-        if (configListPreference.isContainedName(name)){
-            Toast.makeText(context,"配置名字已存在",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (!name.matches("^[a-zA-Z0-9]{1,10}$")){
-            Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
-            return;
-        }
-        configListPreference.addConfiguration(name);
-        addConfigItem(name);
-        controllerManager.sendMessage(new Message(
-                "edittext_window_close",
-                0,
-                ConfigController.class,
-                new Class[]{
-                        WindowsController.class
-                },
-                null
-        ));
-    }
-
-    public void purposeDelete(Message message){
-        ConfigItem configItem = (ConfigItem) message.getMessageContent().get("config_item");
-        configListPreference.deleteConfig(configItem.getText());
-        configItemContainer.removeView(configItem.getView());
-        controllerManager.sendMessage(new Message(
-                "text_window_close",
-                0,
-                ConfigController.class,
-                new Class[]{
-                        WindowsController.class
-                },
-                null
-        ));
     }
 
     private void loadElements(String configName){
@@ -227,9 +112,52 @@ public class ConfigController extends Controller{
 
     public void jumpAddWindow(){
         Map<String,Object> messageContent = new HashMap<>();
-        messageContent.put("purpose","add");
+        WindowsController.EditTextWindowListener addListener = new WindowsController.EditTextWindowListener() {
+            @Override
+            public void onConfirmClick(String text) {
+                if (configListPreference.isContainedName(text)){
+                    Toast.makeText(context,"配置名字已存在",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!text.matches("^[a-zA-Z0-9]{1,10}$")){
+                    Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                configListPreference.addConfiguration(text);
+                addConfigItem(text);
+                controllerManager.sendMessage(new Message(
+                        "edit_text_window_close",
+                        0,
+                        ConfigController.class,
+                        new Class[]{
+                                WindowsController.class
+                        },
+                        null
+                ));
+            }
+
+            @Override
+            public void onCancelClick(String text) {
+                controllerManager.sendMessage(new Message(
+                        "edit_text_window_close",
+                        0,
+                        ConfigController.class,
+                        new Class[]{
+                                WindowsController.class
+                        },
+                        null
+                ));
+            }
+
+            @Override
+            public String getText() {
+                return "";
+            }
+        };
+
+        messageContent.put("edit_text_window_listener",addListener);
         controllerManager.sendMessage(new Message(
-                "edittext_window_open",
+                "edit_text_window_open",
                 0,
                 ConfigController.class,
                 new Class[]{
@@ -241,11 +169,70 @@ public class ConfigController extends Controller{
 
     public void jumpRenameWindow(ConfigItem configItem){
         Map<String,Object> messageContent = new HashMap<>();
-        messageContent.put("text",configItem.getText());
-        messageContent.put("config_item",configItem);
-        messageContent.put("purpose","rename");
+        WindowsController.EditTextWindowListener renameListener = new WindowsController.EditTextWindowListener() {
+            @Override
+            public void onConfirmClick(String text) {
+                String preName = configItem.getText();
+                String nowName = text;
+                //如果名字没有改变，点击确认键也可以返回，如果没有这个判断，点击确认键会显示名称已存在
+                if (preName.equals(nowName)){
+                    controllerManager.sendMessage(new Message(
+                            "edit_text_window_close",
+                            0,
+                            ConfigController.class,
+                            new Class[]{
+                                    WindowsController.class
+                            },
+                            null
+                    ));
+                    return;
+                }
+                if (configListPreference.isContainedName(nowName)){
+                    Toast.makeText(context,"配置名字已存在",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!nowName.matches("^[a-zA-Z0-9]{1,10}$")){
+                    Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                //如果编辑的这个配置先前的名字和当前选择的配置的名字一样，则说明在修改选中的配置，需要修改存储中目前的配置名称
+                if (preName.equals(currentSelectItem.getText())){
+                    configListPreference.setCurrentConfigName(nowName);
+                }
+                configListPreference.renameConfiguration(preName,nowName);
+                configItem.setText(nowName);
+                controllerManager.sendMessage(new Message(
+                        "edit_text_window_close",
+                        0,
+                        ConfigController.class,
+                        new Class[]{
+                                WindowsController.class
+                        },
+                        null
+                ));
+            }
+
+            @Override
+            public void onCancelClick(String text) {
+                controllerManager.sendMessage(new Message(
+                        "edit_text_window_close",
+                        0,
+                        ConfigController.class,
+                        new Class[]{
+                                WindowsController.class
+                        },
+                        null
+                ));
+            }
+
+            @Override
+            public String getText() {
+                return configItem.getText();
+            }
+        };
+        messageContent.put("edit_text_window_listener",renameListener);
         controllerManager.sendMessage(new Message(
-                "edittext_window_open",
+                "edit_text_window_open",
                 0,
                 ConfigController.class,
                 new Class[]{
@@ -257,9 +244,42 @@ public class ConfigController extends Controller{
 
     public void jumpDeleteWindow(ConfigItem configItem){
         Map<String,Object> messageContent = new HashMap<>();
-        messageContent.put("text","是否删除:" + configItem.getText());
-        messageContent.put("purpose","delete");
-        messageContent.put("config_item",configItem);
+        WindowsController.TextWindowListener deleteListener = new WindowsController.TextWindowListener() {
+            @Override
+            public void onConfirmCLick() {
+                configListPreference.deleteConfig(configItem.getText());
+                configItemContainer.removeView(configItem.getView());
+                controllerManager.sendMessage(new Message(
+                        "text_window_close",
+                        0,
+                        ConfigController.class,
+                        new Class[]{
+                                WindowsController.class
+                        },
+                        null
+                ));
+            }
+
+            @Override
+            public void onCancelClick() {
+                controllerManager.sendMessage(new Message(
+                        "text_window_close",
+                        0,
+                        ConfigController.class,
+                        new Class[]{
+                                WindowsController.class
+                        },
+                        null
+                ));
+            }
+
+            @Override
+            public String getText() {
+                return "是否删除:" + configItem.getText();
+            }
+        };
+
+        messageContent.put("text_window_listener",deleteListener);
         controllerManager.sendMessage(new Message(
                 "text_window_open",
                 0,

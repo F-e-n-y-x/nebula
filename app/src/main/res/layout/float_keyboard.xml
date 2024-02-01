@@ -37,7 +37,7 @@
             android:layout_height="200dp"
             android:alpha="1"
             android:visibility="gone">
-            <include layout="@layout/keyboard_layout"/>
+            <include layout="@layout/layout_keyboard"/>
         </LinearLayout>
     </LinearLayout>
 

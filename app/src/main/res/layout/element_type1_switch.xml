@@ -17,9 +17,9 @@
                 android:layout_height="40dp"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="值"/>
+                android:text="值1:"/>
             <TextView
-                android:id="@+id/element_switch_card_value"
+                android:id="@+id/switch_card_value"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:gravity="center"
@@ -32,10 +32,11 @@
                 android:gravity="center"
                 android:text="形状:"/>
             <Spinner
-                android:id="@+id/element_switch_card_shape"
+                android:id="@+id/switch_card_shape"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
-                android:layout_weight="3"/>
+                android:layout_weight="3"
+                android:entries="@array/element_shape"/>
         </LinearLayout>
 
 

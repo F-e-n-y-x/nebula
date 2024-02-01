@@ -14,22 +14,22 @@ import com.limelight.binding.input.advance_setting.ElementBean;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ButtonCard extends ElementCard{
+public class SwitchCard extends ElementCard{
 
-    private LinearLayout buttonCardLayout;
+    private LinearLayout switchCardLayout;
     private TextView value;
     private Spinner shape;
 
-    public ButtonCard(EditController editController,Context context){
-        buttonCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type0_button,null);
-        value = buttonCardLayout.findViewById(R.id.button_card_value);
+    public SwitchCard(EditController editController,Context context){
+        switchCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type1_switch,null);
+        value = switchCardLayout.findViewById(R.id.switch_card_value);
         value.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 editController.jumpDeviceLayout((TextView) v);
             }
         });
-        shape = buttonCardLayout.findViewById(R.id.button_card_shape);
+        shape = switchCardLayout.findViewById(R.id.switch_card_shape);
 
     }
 
@@ -44,6 +44,6 @@ public class ButtonCard extends ElementCard{
 
     @Override
     public View getView() {
-        return buttonCardLayout;
+        return switchCardLayout;
     }
 }

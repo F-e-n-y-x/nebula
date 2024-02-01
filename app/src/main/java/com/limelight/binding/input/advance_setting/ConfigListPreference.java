@@ -108,6 +108,7 @@ public class ConfigListPreference {
 
     public List<String> getConfigurationNames(){
         Set<String> configurationNamesSet = configMap.keySet();
+        System.out.println("wg_debug getConfigurationNames:" + configurationNamesSet);
         return new ArrayList<>(configurationNamesSet);
     }
 
@@ -116,10 +117,12 @@ public class ConfigListPreference {
     }
 
     public String getCurrentConfigName() {
+        System.out.println("wg_debug getCurrentConfigName:" + currentConfigName);
         return currentConfigName;
     }
 
     public void setCurrentConfigName(String currentConfigName) {
+        System.out.println("wg_debug setCurrentConfigName:" + currentConfigName);
         this.currentConfigName = currentConfigName;
         SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(context).edit();
         editor.putString(CURRENT_CONFIG_NAME_KEY,currentConfigName);
