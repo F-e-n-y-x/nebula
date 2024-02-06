@@ -56,17 +56,6 @@ public class ElementPreference {
         return 0;
 
     }
-
-    public void saveElements(){
-        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
-        for (Map.Entry<String, ElementBean> entry: elements.entrySet()){
-            editor.putString(entry.getKey(),JSONToString(entry.getValue()));
-        }
-        editor.apply();
-
-        //wg_debug
-        System.out.println("wg_debug elements preference:" + elements);
-    }
     public void deleteElement(String elementId){
 
         /*
@@ -92,10 +81,30 @@ public class ElementPreference {
     }
 
     private ElementBean stringToJSON(String element){
+        //这个elementBean的原因是因为Gson会报错，无法转换Map，但是新建一个elementBean就可以了，可能是创建之后，这个对象并没有被回收，于是就被gson使用了
+        new ElementBean(
+            null,
+            0,
+            new HashMap<>(),
+            0,
+            0,
+            0,
+            0,
+            100,
+            0xF0888888,
+            0xF00000FF,
+            0,
+            new HashMap<>());
         return gson.fromJson(element, ElementBean.class);
     }
 
     private String JSONToString(ElementBean element){
         return gson.toJson(element);
+    }
+
+    public void clear(){
+        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
+        editor.clear();
+        editor.apply();
     }
 }

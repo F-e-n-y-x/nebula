@@ -39,7 +39,7 @@ public class SwitchCard extends ElementCard{
         Map<String, String> typeAttributes = new HashMap<>();
         typeAttributes.put("value",(String) value.getTag());
         typeAttributes.put("shape",shape.getSelectedItem().toString());
-        return null;
+        return typeAttributes;
     }
 
     @Override

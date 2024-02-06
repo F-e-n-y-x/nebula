@@ -10,19 +10,18 @@ import android.widget.FrameLayout;
 import com.limelight.Game;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ElementController extends Controller{
-
-    private final int[] positionScale = new int[4];//minX,maxX,minY,maxY
-    private final int[] sizeScale = new int[4];//minWidth,maxWidth,minHeight,maxHeight
+public class ElementController {
 
     private final Context context;
     private final Game game;
     private final Handler handler;
+    private ElementPreference elementPreference;
+
+    private final ControllerManager controllerManager;
 
 
     private final List<Element> elements = new ArrayList<>();
@@ -32,60 +31,66 @@ public class ElementController extends Controller{
         this.elementsLayout = layout;
         this.context = context;
         this.game = (Game) context;
+        this.controllerManager = controllerManager;
 
         handler = new Handler(Looper.getMainLooper());
-    }
-
-    public int[] getPositionScale() {
-        return positionScale;
-    }
-
-    public int[] getSizeScale() {
-        return sizeScale;
     }
 
     Handler getHandler() {
         return handler;
     }
 
-    public void hide() {
+
+
+
+    public boolean isContainedElement(String name){
         for (Element element : elements) {
-            element.setVisibility(View.INVISIBLE);
+            if (element.getElementId().equals(name)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void loadElementConfig(String configId){
+        removeElementsFromScreen();
+        elementPreference = new ElementPreference(configId,context);
+        for (ElementBean elementBean : elementPreference.getElements()){
+            addElementToScreen(elementBean);
         }
     }
 
-    public void show() {
-        for (Element element : elements) {
-            element.setVisibility(View.VISIBLE);
-        }
+    public void deleteElementConfig(String configId){
+        new ElementPreference(configId,context).clear();
     }
-    public void removeElement(Element element){
+
+    public void deleteElement(Element element){
         elementsLayout.removeView(element);
         elements.remove(element);
-    }
-    public void setOpacity(int opacity) {
-        for (Element element : elements) {
-            element.setOpacity(opacity);
-        }
+        elementPreference.deleteElement(element.getElementId());
     }
 
-    public void loadElements(Collection<ElementBean> elementBeans){
-        removeElements();
-        for (ElementBean elementBean : elementBeans){
-            addElement(elementBean);
+    public void saveElements(){
+        for (Element element : elements) {
+            elementPreference.addElement(element.getElementBean());
         }
     }
 
 
     public void addElement(ElementBean elementBean){
+        elementPreference.addElement(elementBean);
+        addElementToScreen(elementBean);
+    }
+
+    private void addElementToScreen(ElementBean elementBean){
         Element element = null;
         switch (elementBean.getType()){
             case 0:{
-                element = addButton(elementBean);
+                element = new DigitalButton(this,elementBean,context);
                 break;
             }
             case 1:{
-                element = addSwitch(elementBean);
+                element = new DigitalSwitch(this,elementBean,context);
                 break;
             }
             case 2:{
@@ -116,16 +121,10 @@ public class ElementController extends Controller{
         }
         elements.add(element);
         FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(elementBean.getWidth(), elementBean.getHeight());
-        layoutParams.setMargins(elementBean.getPositionX(), elementBean.getPositionY(), 0, 0);
+        layoutParams.setMargins(elementBean.getPositionX() - elementBean.getWidth()/2, elementBean.getPositionY() - elementBean.getHeight()/2, 0, 0);
 
         elementsLayout.addView(element, layoutParams);
 
-    }
-    private Element addButton(ElementBean elementBean){
-        return null;
-    }
-    private Element addSwitch(ElementBean elementBean){
-        return null;
     }
     private Element addPad(ElementBean elementBean){
         return null;
@@ -146,44 +145,33 @@ public class ElementController extends Controller{
         return null;
     }
 
-    public boolean positionIsInvalid(int positionX,int positionY){
-        return true;
-    }
-
-    public boolean sizeIsInvalid(int length,int high){
-        return true;
-    }
-
 
     //其他辅助方法----------------------------------
     public List<Element> getElements() {
         return elements;
     }
-    public void removeElements() {
+    public void removeElementsFromScreen() {
         for (Element element : elements) {
             elementsLayout.removeView(element);
         }
         elements.clear();
     }
-    /**
-     * 这个函数用于重绘所有的对象，如果不用这个函数，选择编辑对象的时候
-     * 会导致之前选择的对象不能恢复原来的颜色
-     */
-    public void elementsInvalidate(){
+
+    public Element selectElement(float x, float y){
         for (Element element : elements) {
-            element.invalidate();
+            if (element.inRange(x,y)){
+                return element;
+            }
+        }
+        return null;
+    }
+
+    public void setOpacity(int opacity) {
+        for (Element element : elements) {
+            element.setOpacity(opacity);
         }
     }
 
-
-    public void moveElement(Element element, int x, int y){
-
-        element.moveElement(x, y);
-    }
-    public void resizeElement(Element element, int width, int height) {
-
-        element.resizeElement(width, height);
-    }
 
     public void sendKeyEvent(KeyEvent keyEvent) {
         game.onKey(null,keyEvent.getKeyCode(),keyEvent);
@@ -205,13 +193,6 @@ public class ElementController extends Controller{
         handler.postDelayed(runnable, 75);
     }
 
-    @Override
-    public void receiveMessage(Message message) {
-        switch (message.getMessageTitle()){
-            case "load_elements":
-                loadElements((Collection<ElementBean>) message.getMessageContent().get("elements"));
-        }
-    }
 }
 
 

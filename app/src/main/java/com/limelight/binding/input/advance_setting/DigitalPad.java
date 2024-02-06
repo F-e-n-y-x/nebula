@@ -45,7 +45,7 @@ public class DigitalPad extends Element {
         if (direction == DIGITAL_PAD_DIRECTION_NO_DIRECTION) {
             // draw no direction rect
             paint.setStyle(Paint.Style.STROKE);
-            paint.setColor(getDefaultColor());
+            paint.setColor(getNormalColor());
             canvas.drawRect(
                     getPercent(getWidth(), 36), getPercent(getHeight(), 36),
                     getPercent(getWidth(), 63), getPercent(getHeight(), 63),
@@ -55,7 +55,7 @@ public class DigitalPad extends Element {
 
         // draw left rect
         paint.setColor(
-                (direction & DIGITAL_PAD_DIRECTION_LEFT) > 0 ? pressedColor : getDefaultColor());
+                (direction & DIGITAL_PAD_DIRECTION_LEFT) > 0 ? pressedColor : getNormalColor());
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawRect(
                 paint.getStrokeWidth()+DPAD_MARGIN, getPercent(getHeight(), 33),
@@ -66,7 +66,7 @@ public class DigitalPad extends Element {
 
         // draw up rect
         paint.setColor(
-                (direction & DIGITAL_PAD_DIRECTION_UP) > 0 ? pressedColor : getDefaultColor());
+                (direction & DIGITAL_PAD_DIRECTION_UP) > 0 ? pressedColor : getNormalColor());
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawRect(
                 getPercent(getWidth(), 33), paint.getStrokeWidth()+DPAD_MARGIN,
@@ -76,7 +76,7 @@ public class DigitalPad extends Element {
 
         // draw right rect
         paint.setColor(
-                (direction & DIGITAL_PAD_DIRECTION_RIGHT) > 0 ? pressedColor : getDefaultColor());
+                (direction & DIGITAL_PAD_DIRECTION_RIGHT) > 0 ? pressedColor : getNormalColor());
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawRect(
                 getPercent(getWidth(), 66), getPercent(getHeight(), 33),
@@ -86,7 +86,7 @@ public class DigitalPad extends Element {
 
         // draw down rect
         paint.setColor(
-                (direction & DIGITAL_PAD_DIRECTION_DOWN) > 0 ? pressedColor : getDefaultColor());
+                (direction & DIGITAL_PAD_DIRECTION_DOWN) > 0 ? pressedColor : getNormalColor());
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawRect(
                 getPercent(getWidth(), 33), getPercent(getHeight(), 66),
@@ -98,7 +98,7 @@ public class DigitalPad extends Element {
         paint.setColor((
                         (direction & DIGITAL_PAD_DIRECTION_LEFT) > 0 &&
                                 (direction & DIGITAL_PAD_DIRECTION_UP) > 0
-                ) ? pressedColor : getDefaultColor()
+                ) ? pressedColor : getNormalColor()
         );
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawLine(
@@ -111,7 +111,7 @@ public class DigitalPad extends Element {
         paint.setColor((
                         (direction & DIGITAL_PAD_DIRECTION_UP) > 0 &&
                                 (direction & DIGITAL_PAD_DIRECTION_RIGHT) > 0
-                ) ? pressedColor : getDefaultColor()
+                ) ? pressedColor : getNormalColor()
         );
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawLine(
@@ -124,7 +124,7 @@ public class DigitalPad extends Element {
         paint.setColor((
                         (direction & DIGITAL_PAD_DIRECTION_RIGHT) > 0 &&
                                 (direction & DIGITAL_PAD_DIRECTION_DOWN) > 0
-                ) ? pressedColor : getDefaultColor()
+                ) ? pressedColor : getNormalColor()
         );
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawLine(
@@ -137,7 +137,7 @@ public class DigitalPad extends Element {
         paint.setColor((
                         (direction & DIGITAL_PAD_DIRECTION_DOWN) > 0 &&
                                 (direction & DIGITAL_PAD_DIRECTION_LEFT) > 0
-                ) ? pressedColor : getDefaultColor()
+                ) ? pressedColor : getNormalColor()
         );
         paint.setStyle(Paint.Style.STROKE);
         canvas.drawLine(

@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:visibility="gone">
-    <FrameLayout
+    <View
         android:id="@+id/operation_panel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
@@ -28,44 +28,56 @@
                     android:layout_weight="10"
                     android:gravity="center"
                     android:text="宽"/>
-                <EditText
+                <TextView
                     android:id="@+id/element_width"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="15"/>
+                    android:layout_weight="15"
+                    android:background="@drawable/enabled_square"
+                    android:gravity="center"
+                    android:text="0"/>
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="10"
                     android:gravity="center"
                     android:text="高"/>
-                <EditText
+                <TextView
                     android:id="@+id/element_height"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="15"/>
+                    android:layout_weight="15"
+                    android:background="@drawable/enabled_square"
+                    android:gravity="center"
+                    android:text="0"/>
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="10"
                     android:gravity="center"
                     android:text="X"/>
-                <EditText
+                <TextView
                     android:id="@+id/element_x"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="15"/>
+                    android:layout_weight="15"
+                    android:background="@drawable/enabled_square"
+                    android:gravity="center"
+                    android:text="0"/>
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="10"
                     android:gravity="center"
                     android:text="Y"/>
-                <EditText
+                <TextView
                     android:id="@+id/element_y"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_weight="15"/>
+                    android:layout_weight="15"
+                    android:background="@drawable/enabled_square"
+                    android:gravity="center"
+                    android:text="0"/>
             </LinearLayout>
             <LinearLayout
                 android:orientation="vertical"
@@ -82,7 +94,8 @@
                     <LinearLayout
                         android:orientation="horizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="40dp">
+                        android:layout_height="40dp"
+                        android:layout_marginTop="5dp">
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -90,10 +103,11 @@
                             android:gravity="center"
                             android:text="名称"/>
                         <EditText
-                            android:id="@+id/element_name"
+                            android:id="@+id/element_name_edittext"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
-                            android:layout_weight="10"/>
+                            android:layout_weight="10"
+                            android:gravity="center" />
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -120,6 +134,7 @@
                     </FrameLayout>
                 </LinearLayout>
             </LinearLayout>
+
 
             <LinearLayout
                 android:orientation="horizontal"

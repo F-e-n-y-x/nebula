@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,11 +53,7 @@ public class DigitalButton extends Element {
 
     private int layer;
     private DigitalButton movingButton = null;
-
-    boolean inRange(float x, float y) {
-        return (this.getX() < x && this.getX() + this.getWidth() > x) &&
-                (this.getY() < y && this.getY() + this.getHeight() > y);
-    }
+    private String shape = "CIRCLE";
 
     public boolean checkMovement(float x, float y, DigitalButton movingButton) {
         // check if the movement happened in the same layer
@@ -109,9 +106,28 @@ public class DigitalButton extends Element {
         }
     }
 
-    public DigitalButton(ElementController controller, ElementBean elementBean, int layer, Context context) {
+    public DigitalButton(ElementController controller, ElementBean elementBean, Context context) {
         super(controller, elementBean,context);
-        this.layer = layer;
+        this.layer = elementBean.getLayer();
+        this.text = elementBean.getName();
+        this.shape = elementBean.getTypeAttributes().get("shape");
+        int keyCode = Integer.parseInt(elementBean.getTypeAttributes().get("value"));
+        addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
+            @Override
+            public void onClick() {
+                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
+            }
+
+            @Override
+            public void onLongClick() {
+
+            }
+
+            @Override
+            public void onRelease() {
+                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
+            }
+        });
     }
 
     public void addDigitalButtonListener(DigitalButtonListener listener) {
@@ -137,14 +153,22 @@ public class DigitalButton extends Element {
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setStrokeWidth(getDefaultStrokeWidth());
 
-        paint.setColor(isPressed() ? pressedColor : getDefaultColor());
+        paint.setColor(isPressed() ? pressedColor : getNormalColor());
         paint.setStyle(Paint.Style.STROKE);
 
         rect.left = rect.top = paint.getStrokeWidth();
         rect.right = getWidth() - rect.left;
         rect.bottom = getHeight() - rect.top;
 
-        canvas.drawOval(rect, paint);
+        switch (shape){
+            case "CIRCLE":
+                canvas.drawOval(rect, paint);
+                break;
+            case "SQUARE":
+                canvas.drawRect(rect, paint);
+                break;
+        }
+
 
         if (icon != -1) {
             Drawable d = getResources().getDrawable(icon);

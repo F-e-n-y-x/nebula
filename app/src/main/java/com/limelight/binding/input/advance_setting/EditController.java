@@ -1,6 +1,8 @@
 package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
+import android.text.InputType;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -9,36 +11,37 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.element_card.ButtonCard;
 import com.limelight.binding.input.advance_setting.element_card.ElementCard;
-import com.limelight.binding.input.advance_setting.element_card.PadCard;
 import com.limelight.binding.input.advance_setting.element_card.SwitchCard;
 
-import java.util.HashMap;
-import java.util.Map;
+public class EditController {
+    private int editColor = 0xF0FF0000;
+    private int normalColor = 0xF0888888;
+    private int elementMiniSize = 50;
 
-public class EditController extends Controller{
-
-    private ElementPreference elementPreference;
     private Context context;
     private ControllerManager controllerManager;
     private FrameLayout layerEdit;
     private Element editElement;
     private ElementCard elementCard;
     private EditController myself;
-    private TextView currentSetValuePlace;
+
+
 
 
     //edit views
-    private EditText elementWidth;
-    private EditText elementHeight;
-    private EditText elementX;
-    private EditText elementY;
+    private TextView elementWidthInput;
+    private TextView elementHeightInput;
+    private TextView elementXInput;
+    private TextView elementYInput;
     private Button addButton;
     private Button deleteButton;
     private LinearLayout addElementView;
+    private View operationPanel;
 
 
     //add views
@@ -46,6 +49,8 @@ public class EditController extends Controller{
     private Spinner elementType;
     private Button addConfirm;
     private FrameLayout elementCardSlot;
+    private boolean enableSelect = true;
+
 
 
 
@@ -59,6 +64,30 @@ public class EditController extends Controller{
 
         addElementView = layout.findViewById(R.id.add_element_view);
         deleteButton = layout.findViewById(R.id.delete_element_button);
+        deleteButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (editElement == null){
+                    return;
+                }
+                WindowsController.TextWindowListener deleteListener = new WindowsController.TextWindowListener() {
+                    @Override
+                    public boolean onConfirmCLick() {
+                        controllerManager.getElementController().deleteElement(editElement);
+                        editElement = null;
+                        return true;
+                    }
+
+                    @Override
+                    public boolean onCancelClick() {
+                        return true;
+                    }
+
+                };
+
+                controllerManager.getWindowsController().openTextWindow(deleteListener, "是否删除:" + editElement.getElementId());
+            }
+        });
         layout.findViewById(R.id.add_element_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -69,24 +98,167 @@ public class EditController extends Controller{
                 } else {
                     addElementView.setVisibility(View.VISIBLE);
                     deleteButton.setVisibility(View.GONE);
+                    elementWidthInput.setText("200");
+                    elementHeightInput.setText("200");
+                    elementXInput.setText("500");
+                    elementYInput.setText("500");
                     ((Button) v).setText("退出");
                 }
             }
         });
 
-        //add view
-        layout.findViewById(R.id.add_element_confirm_button).setOnClickListener(new View.OnClickListener() {
+        //edit view
+        elementWidthInput = layout.findViewById(R.id.element_width);
+        elementWidthInput.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                jumpNumWindow((TextView) v,50,layout.getWidth());
+            }
+        });
+        elementHeightInput = layout.findViewById(R.id.element_height);
+        elementHeightInput.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                jumpNumWindow((TextView) v,50,layout.getHeight());
+            }
+        });
+        elementXInput = layout.findViewById(R.id.element_x);
+        elementXInput.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                jumpNumWindow((TextView) v,0,layout.getWidth());
+            }
+        });
+        elementYInput = layout.findViewById(R.id.element_y);
+        elementYInput.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                jumpNumWindow((TextView) v,0,layout.getHeight());
             }
         });
 
+        operationPanel = layout.findViewById(R.id.operation_panel);
+        operationPanel.setOnTouchListener(new View.OnTouchListener() {
+            int lastX;
+            int lastY;
+            int lastDistanceX;
+            int lastDistanceY;
+            //是否要选择element标志
+            boolean isSelect = false;
+            //两根手指变一根手指的标志，不然抬起一根手指后，element的位置可能会跳变。
+            boolean twoToOne = false;
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                int action = event.getActionMasked();
+                int pointerCount = event.getPointerCount();
+
+                switch (action) {
+                    case MotionEvent.ACTION_DOWN:
+                        // 单指按下时选中按钮
+                        if (pointerCount == 1) {
+                            lastX = (int) event.getX();
+                            lastY = (int) event.getY();
+                            isSelect = true;
+                            return true;
+                        }
+                        break;
+                    case MotionEvent.ACTION_POINTER_DOWN:
+                        isSelect = false;
+                        if (pointerCount == 2){
+                            lastDistanceX = (int) Math.abs(event.getX(1) - event.getX(0));
+                            lastDistanceY = (int) Math.abs(event.getY(1) - event.getY(0));
+                        }
+                        break;
+
+                    case MotionEvent.ACTION_MOVE:
+                        isSelect = false;
+                        // 单指移动时移动按钮
+                        if (pointerCount == 1 && editElement != null) {
+                            if (twoToOne){
+                                lastX = (int) event.getX();
+                                lastY = (int) event.getY();
+                                twoToOne = false;
+                            }
+                            int x = (int) event.getX();
+                            int y = (int) event.getY();
+                            int dx = x - lastX;
+                            int dy = y - lastY;
+                            lastX = x;
+                            lastY = y;
+                            //这里使用layoutParams而不用getX的原因是因为：当点击edittext之后，requestLayout有时会失效，无法更新params。
+                            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams)editElement.getLayoutParams();
+                            //坐标是中心点的坐标，不是右上角
+                            int elementCentralX = (int) (layoutParams.leftMargin + editElement.getWidth()/2 + dx);
+                            int elementCentralY = (int) (layoutParams.topMargin + editElement.getHeight()/2 + dy);
+                            elementCentralX = Math.min(elementCentralX,operationPanel.getWidth());
+                            elementCentralX = Math.max(elementCentralX,0);
+                            elementCentralY = Math.min(elementCentralY,operationPanel.getHeight());
+                            elementCentralY = Math.max(elementCentralY,0);
+                            elementXInput.setText(String.valueOf(elementCentralX));
+                            elementYInput.setText(String.valueOf(elementCentralY));
+                            editElement.setCentralX(elementCentralX);
+                            editElement.setCentralY(elementCentralY);
+                            return true;
+                        }
+                        // 双指调整按钮大小
+                        else if (pointerCount == 2 && editElement != null) {
+                            int distanceX = (int) Math.abs(event.getX(1) - event.getX(0));
+                            int distanceY = (int) Math.abs(event.getY(1) - event.getY(0));
+                            int scalingX = distanceX - lastDistanceX;
+                            int scalingY = distanceY - lastDistanceY;
+                            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams)editElement.getLayoutParams();
+                            int newWidth = (int) (layoutParams.width+ scalingX);
+                            int newHeight = (int) (layoutParams.height+ scalingY);
+                            newWidth = Math.min(newWidth, operationPanel.getWidth());
+                            newWidth = Math.max(newWidth, elementMiniSize);
+                            newHeight = Math.min(newHeight,operationPanel.getHeight());
+                            newHeight = Math.max(newHeight,elementMiniSize);
+                            lastDistanceX = distanceX;
+                            lastDistanceY = distanceY;
+                            elementWidthInput.setText(String.valueOf(newWidth));
+                            elementHeightInput.setText(String.valueOf(newHeight));
+                            editElement.setWidth(newWidth);
+                            editElement.setHeight(newHeight);
+                            return true;
+                        }
+                        break;
+                    case MotionEvent.ACTION_POINTER_UP:
+                        twoToOne = true;
+                        break;
+
+                    case MotionEvent.ACTION_UP:
+                        if (isSelect && enableSelect){
+
+                            Element element = controllerManager.getElementController().selectElement(lastX,lastY);
+                            if (element == null){
+                                return true;
+                            }
+                            if (editElement != null){
+                                editElement.setNormalColor(normalColor);
+                            }
+                            editElement = element;
+                            editElement.setNormalColor(editColor);
+                            elementXInput.setText(String.valueOf((int)editElement.getX() + editElement.getWidth()/2));
+                            elementYInput.setText(String.valueOf((int)editElement.getY() + editElement.getHeight()/2));
+                            elementWidthInput.setText(String.valueOf((int)editElement.getWidth()));
+                            elementHeightInput.setText(String.valueOf((int)editElement.getHeight()));
+                            return true;
+                        }
+                        break;
+                }
+                return true;
+            }
+        });
+
+
+
+        //add element
         //初始化elementCardSlot
         elementCardSlot = layout.findViewById(R.id.element_slot);
         elementCard = new ButtonCard(this,context);
         elementCardSlot.addView(elementCard.getView());
         elementType = layout.findViewById(R.id.element_type_spinner);
+        elementName = layout.findViewById(R.id.element_name_edittext);
         elementType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
@@ -106,10 +278,85 @@ public class EditController extends Controller{
             }
         });
 
+        //add button
+        layout.findViewById(R.id.add_element_confirm_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String name = elementName.getText().toString();
 
-        
+                if (controllerManager.getElementController().isContainedElement(name)){
+                    Toast.makeText(context,"按键名字已存在",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (!name.matches("^[a-zA-Z0-9]{1,10}$")){
+                    Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ElementBean elementBean = new ElementBean(
+                        name,
+                        elementType.getSelectedItemPosition(),
+                        elementCard.getTypeAttributes(),
+                        Integer.parseInt(elementXInput.getText().toString()),
+                        Integer.parseInt(elementYInput.getText().toString()),
+                        Integer.parseInt(elementWidthInput.getText().toString()),
+                        Integer.parseInt(elementHeightInput.getText().toString()),
+                        100,
+                        0xF0888888,
+                        0xF00000FF,
+                        0,
+                        null
+                );
+
+                controllerManager.getElementController().addElement(elementBean);
+
+            }
+        });
+
+
 
     }
+
+    private void jumpNumWindow(TextView inputNumView,int min ,int max){
+        WindowsController.EditTextWindowListener inputNumListener = new WindowsController.EditTextWindowListener() {
+            @Override
+            public boolean onConfirmClick(String text) {
+                if (text.equals("")){
+                    Toast.makeText(context,"请输入" + min + "~" + max + "的数字",Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                int value = Integer.parseInt(text);
+                if (value > max || value < min){
+                    Toast.makeText(context,"请输入" + min + "~" + max + "的数字",Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                inputNumView.setText(String.valueOf(value));
+
+                if (editElement == null){
+                    return true;
+                }
+                if (inputNumView == elementWidthInput){
+                    editElement.setWidth(value);
+                } else if (inputNumView == elementHeightInput){
+                    editElement.setHeight(value);
+                } else if (inputNumView == elementXInput){
+                    editElement.setCentralX(value);
+                } else if (inputNumView == elementYInput){
+                    editElement.setCentralY(value);
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onCancelClick(String text) {
+                return true;
+            }
+
+        };
+
+        controllerManager.getWindowsController().openEditTextWindow(inputNumListener,
+                inputNumView.getText().toString(), "","", InputType.TYPE_CLASS_NUMBER);
+    }
+
 
 
     private void insertCard(ElementCard elementCard){
@@ -119,39 +366,23 @@ public class EditController extends Controller{
     }
 
 
-    @Override
-    public void receiveMessage(Message message) {
-        switch (message.getMessageTitle()){
-            case "edit_load_elements":
-                loadElements((String) message.getMessageContent().get("config_id"));
-                break;
-            case "edit_mode":
-                layerEdit.setVisibility(View.VISIBLE);
-                break;
-            case "exit_edit_mode":
-                layerEdit.setVisibility(View.GONE);
-                break;
-        }
+
+    public void open(){
+        layerEdit.setVisibility(View.VISIBLE);
     }
 
-    public void loadElements(String configId){
-        elementPreference = new ElementPreference(configId,context);
-        Map<String,Object> messageContent = new HashMap<>();
-        messageContent.put("elements",elementPreference.getElements());
-        controllerManager.sendMessage(new Message(
-                "load_elements",
-                0,
-                EditController.class,
-                new Class[]{
-                      ElementController.class
-                },
-                messageContent
-        ));
+    public void close(){
+        layerEdit.setVisibility(View.GONE);
+        if (editElement != null){
+            editElement.setNormalColor(normalColor);
+        }
+
+        editElement = null;
+        controllerManager.getElementController().saveElements();
     }
+
 
     public void jumpDeviceLayout(TextView valueTextView){
-        currentSetValuePlace = valueTextView;
-        Map<String,Object> messageContent = new HashMap<>();
         WindowsController.DeviceWindowListener keySelectListener = new WindowsController.DeviceWindowListener() {
             @Override
             public void onElementClick(String text, String tag) {
@@ -159,15 +390,6 @@ public class EditController extends Controller{
                 valueTextView.setText(text);
             }
         };
-        messageContent.put("text_window_listener",keySelectListener);
-        controllerManager.sendMessage(new Message(
-                "device_window_open",
-                0,
-                ConfigController.class,
-                new Class[]{
-                        WindowsController.class
-                },
-                messageContent
-        ));
+        controllerManager.getWindowsController().openDeviceWindow(keySelectListener);
     }
 }

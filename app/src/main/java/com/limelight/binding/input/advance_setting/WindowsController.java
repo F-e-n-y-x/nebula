@@ -8,27 +8,22 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import com.limelight.Game;
 import com.limelight.R;
 
-import java.util.Map;
-import java.util.Objects;
-
-public class WindowsController extends Controller{
+public class WindowsController {
 
     public interface TextWindowListener{
-        void onConfirmCLick();
+        boolean onConfirmCLick();
 
-        void onCancelClick();
-        String getText();
+        boolean onCancelClick();
+
     }
 
     public interface EditTextWindowListener{
-        void onConfirmClick(String text);
+        boolean onConfirmClick(String text);
 
-        void onCancelClick(String text);
+        boolean onCancelClick(String text);
 
-        String getText();
     }
 
     public interface DeviceWindowListener{
@@ -48,19 +43,19 @@ public class WindowsController extends Controller{
     //edittext window
     private FrameLayout editTextWindow;
     private EditText editTextWindowText;
+    private TextView editTextWindowTitle;
     private Button editTextWindowConfirmButton;
     private Button editTextWindowCancelButton;
     private EditTextWindowListener editTextWindowListener;
 
     //device window
-    private FrameLayout deviceLayout;
+    private FrameLayout deviceWindow;
     private Button keyboardButton;
     private Button mouseButton;
     private Button gamepadButton;
     private FrameLayout keyboardLayout;
     private FrameLayout mouseLayout;
     private FrameLayout gamepadLayout;
-    private Message incomeMessage;
     private DeviceWindowListener deviceWindowListener;
 
 
@@ -76,18 +71,23 @@ public class WindowsController extends Controller{
         textWindowConfirmButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                textWindowListener.onConfirmCLick();
+                if (textWindowListener.onConfirmCLick()){
+                    textWindow.setVisibility(View.GONE);
+                }
             }
         });
         textWindowCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                textWindowListener.onCancelClick();
+                if (textWindowListener.onCancelClick()){
+                    textWindow.setVisibility(View.GONE);
+                }
             }
         });
 
 
         editTextWindow = layout.findViewById(R.id.edittext_window);
+        editTextWindowTitle = layout.findViewById(R.id.edittext_window_title);
         editTextWindowText = layout.findViewById(R.id.edittext_window_text);
         editTextWindowConfirmButton = layout.findViewById(R.id.edittext_window_confirm);
         editTextWindowCancelButton = layout.findViewById(R.id.edittext_window_canel);
@@ -96,19 +96,23 @@ public class WindowsController extends Controller{
             @Override
             public void onClick(View v) {
                 String text = editTextWindowText.getText().toString();
-                editTextWindowListener.onConfirmClick(text);
+                if (editTextWindowListener.onConfirmClick(text)) {
+                    editTextWindow.setVisibility(View.GONE);
+                }
             }
         });
         editTextWindowCancelButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String text = editTextWindowText.getText().toString();
-                editTextWindowListener.onCancelClick(text);
+                if (editTextWindowListener.onCancelClick(text)) {
+                    editTextWindow.setVisibility(View.GONE);
+                }
             }
         });
 
         //device views
-        deviceLayout = layout.findViewById(R.id.device_layout_container);
+        deviceWindow = layout.findViewById(R.id.device_layout_container);
         keyboardButton = layout.findViewById(R.id.keyboard_open_button);
         mouseButton = layout.findViewById(R.id.mouse_open_button);
         gamepadButton = layout.findViewById(R.id.gamepad_open_button);
@@ -140,7 +144,7 @@ public class WindowsController extends Controller{
                 String text = ((TextView)v).getText().toString();
                 String tag = ((TextView)v).getTag().toString();
                 deviceWindowListener.onElementClick(text,tag);
-                deviceLayout.setVisibility(View.GONE);
+                deviceWindow.setVisibility(View.GONE);
             }
         };
         LinearLayout keyboardDrawing = keyboardLayout.findViewById(R.id.keyboard_drawing);
@@ -169,37 +173,33 @@ public class WindowsController extends Controller{
         frameLayout.setVisibility(View.VISIBLE);
     }
 
-
-    @Override
-    public void receiveMessage(Message message) {
-        String messageTitle = message.getMessageTitle();
-        switch (messageTitle){
-            case "text_window_open":
-                incomeMessage = message;
-                textWindow.setVisibility(View.VISIBLE);
-                textWindowListener = (TextWindowListener) incomeMessage.getMessageContent().get("text_window_listener");
-                textWindowText.setText(textWindowListener.getText());
-                break;
-            case "text_window_close":
-                incomeMessage = null;
-                textWindow.setVisibility(View.GONE);
-                break;
-            case "edit_text_window_open":
-                incomeMessage = message;
-                editTextWindow.setVisibility(View.VISIBLE);
-                editTextWindowListener = (EditTextWindowListener) incomeMessage.getMessageContent().get("edit_text_window_listener");
-                editTextWindowText.setText(editTextWindowListener.getText());
-                break;
-            case "edit_text_window_close":
-                incomeMessage = null;
-                editTextWindow.setVisibility(View.GONE);
-                break;
-            case "device_window_open":
-                incomeMessage = message;
-                deviceLayout.setVisibility(View.VISIBLE);
-                deviceWindowListener = (DeviceWindowListener) incomeMessage.getMessageContent().get("device_window_listener");
-                break;
+    public void openTextWindow(TextWindowListener textWindowListener, String text){
+        this.textWindowListener = textWindowListener;
+        if (text != null){
+            textWindowText.setText(text);
         }
+        textWindow.setVisibility(View.VISIBLE);
+    }
 
+
+    public void openEditTextWindow(EditTextWindowListener editTextWindowListener, String text, String hint, String title,int inputType){
+        this.editTextWindowListener = editTextWindowListener;
+        if (text != null){
+            editTextWindowText.setText(text);
+        }
+        if (hint != null) {
+            editTextWindowText.setHint(hint);
+        }
+        if (title != null){
+            editTextWindowTitle.setText(title);
+        }
+        editTextWindowText.setInputType(inputType);
+        editTextWindow.setVisibility(View.VISIBLE);
+    }
+
+
+    public void openDeviceWindow(DeviceWindowListener deviceWindowListener){
+        this.deviceWindowListener = deviceWindowListener;
+        deviceWindow.setVisibility(View.VISIBLE);
     }
 }

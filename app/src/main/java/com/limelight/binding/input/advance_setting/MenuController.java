@@ -6,12 +6,18 @@ import android.widget.FrameLayout;
 
 import com.limelight.R;
 
-public class MenuController extends Controller{
+public class MenuController {
+
+    public enum Mode{
+        config,
+        setting,
+        edit,
+    }
 
     private final ControllerManager controllerManager;
 
     private final FrameLayout layerMenu;
-    private String lastMode;
+    private Mode lastMode;
     private Button lastButton;
 
     private Button openMenuButton;
@@ -42,31 +48,33 @@ public class MenuController extends Controller{
         configModeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                switchMode("config_mode");
+                switchMode(Mode.config);
             }
         });
         settingModeButton = layerMenu.findViewById(R.id.button_setting_mode);
         settingModeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                switchMode("setting_mode");
+                switchMode(Mode.setting);
             }
         });
         editModeButton = layerMenu.findViewById(R.id.button_edit_mode);
         editModeButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                switchMode("edit_mode");
+                switchMode(Mode.edit);
             }
         });
         lastButton = settingModeButton;
-        lastMode = "setting_mode";
+        lastMode = Mode.setting;
     }
 
+    public void showMenu(){
+        layerMenu.setVisibility(View.VISIBLE);
+    }
 
-
-    @Override
-    public void receiveMessage(Message message) {
+    public void hideMenu(){
+        layerMenu.setVisibility(View.GONE);
     }
 
 
@@ -77,17 +85,7 @@ public class MenuController extends Controller{
         settingModeButton.setVisibility(View.VISIBLE);
         editModeButton.setVisibility(View.VISIBLE);
         lastButton.setAlpha(1);
-        controllerManager.sendMessage(new Message(
-                lastMode,
-                0,
-                MenuController.class,
-                new Class[]{
-                        ConfigController.class,
-                        SettingController.class,
-                        EditController.class
-                },
-                null
-        ));
+        modeOpen(lastMode);
     }
 
     private void closeMenu(){
@@ -96,65 +94,63 @@ public class MenuController extends Controller{
         configModeButton.setVisibility(View.GONE);
         settingModeButton.setVisibility(View.GONE);
         editModeButton.setVisibility(View.GONE);
-        controllerManager.sendMessage(new Message(
-                "exit_" + lastMode,
-                0,
-                MenuController.class,
-                new Class[]{
-                        ConfigController.class,
-                        SettingController.class,
-                        EditController.class
-                },
-                null
-        ));
+        modeClose(lastMode);
     }
 
-    private void switchMode(String mode){
-        Button modeButton = null;
+    private void modeOpen(Mode mode){
+        switch (mode) {
+            case setting:
+                controllerManager.getSettingController().open();
+                break;
+            case edit:
+                controllerManager.getEditController().open();
+                break;
+            case config:
+                controllerManager.getConfigController().open();
+                break;
 
-        switch (mode){
-            case "config_mode":
-                modeButton = configModeButton;
+        }
+    }
+    private void modeClose(Mode mode){
+        switch (mode) {
+            case setting:
+                controllerManager.getSettingController().close();
                 break;
-            case "setting_mode":
-                modeButton = settingModeButton;
+            case edit:
+                controllerManager.getEditController().close();
                 break;
-            case "edit_mode":
-                modeButton = editModeButton;
+            case config:
+                controllerManager.getConfigController().close();
+                break;
+
+        }
+    }
+
+    private void switchMode(Mode nowMode){
+        modeClose(lastMode);
+        lastButton.setAlpha(0.5f);
+        lastButton.setClickable(true);
+
+        modeOpen(nowMode);
+        lastMode = nowMode;
+        switch (nowMode){
+            case config:
+                lastButton = configModeButton;
+                break;
+            case setting:
+                lastButton = settingModeButton;
+                break;
+            case edit:
+                lastButton = editModeButton;
                 break;
             default:
                 return;
         }
+        lastButton.setAlpha(1);
+        lastButton.setClickable(false);
 
-        lastButton.setAlpha(0.5f);
-        modeButton.setAlpha(1);
-        modeButton.setClickable(false);
-        lastButton.setClickable(true);
-        lastButton = modeButton;
 
-        controllerManager.sendMessage(new Message(
-                "exit_" + lastMode,
-                0,
-                MenuController.class,
-                new Class[]{
-                        ConfigController.class,
-                        SettingController.class,
-                        EditController.class
-                },
-                null
-        ));
-        controllerManager.sendMessage(new Message(
-                mode,
-                0,
-                MenuController.class,
-                new Class[]{
-                        ConfigController.class,
-                        SettingController.class,
-                        EditController.class
-                },
-                null
-        ));
-        lastMode = mode;
+
     }
 
 

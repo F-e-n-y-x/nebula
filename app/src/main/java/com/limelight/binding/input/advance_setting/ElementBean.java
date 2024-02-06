@@ -23,9 +23,25 @@ public class ElementBean {
     private int width;
     private int height;
     private int opacity;
-    private int color;
+    private int normalColor;
+    private int pressedColor;
     private int layer;
     private Map<String,String> otherAttributes;
+
+    public ElementBean(String name, int type, Map<String, String> typeAttributes, int positionX, int positionY, int width, int height, int opacity, int normalColor, int pressedColor,int layer, Map<String, String> otherAttributes) {
+        this.name = name;
+        this.type = type;
+        this.typeAttributes = typeAttributes;
+        this.positionX = positionX;
+        this.positionY = positionY;
+        this.width = width;
+        this.height = height;
+        this.opacity = opacity;
+        this.normalColor = normalColor;
+        this.pressedColor = pressedColor;
+        this.layer = layer;
+        this.otherAttributes = otherAttributes;
+    }
 
     public String getName() {
         return name;
@@ -91,12 +107,16 @@ public class ElementBean {
         this.opacity = opacity;
     }
 
-    public int getColor() {
-        return color;
+    public int getNormalColor() {
+        return normalColor;
     }
 
-    public void setColor(int color) {
-        this.color = color;
+    public void setNormalColor(int normalColor) {
+        this.normalColor = normalColor;
+    }
+
+    public void setPressedColor(int pressedColor) {
+        this.pressedColor = pressedColor;
     }
 
     public int getLayer() {
@@ -123,10 +143,11 @@ public class ElementBean {
                 ", typeAttributes='" + typeAttributes + '\'' +
                 ", positionX=" + positionX +
                 ", positionY=" + positionY +
-                ", sizeX=" + width +
-                ", sizeY=" + height +
+                ", width=" + width +
+                ", height=" + height +
                 ", opacity=" + opacity +
-                ", color=" + color +
+                ", normalColor=" + normalColor +
+                ", pressedColor=" + pressedColor +
                 ", layer=" + layer +
                 ", otherAttributes='" + otherAttributes + '\'' +
                 '}';

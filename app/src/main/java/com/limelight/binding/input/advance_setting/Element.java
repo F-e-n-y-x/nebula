@@ -8,13 +8,11 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 
+import java.sql.Time;
+
 public abstract class Element extends View {
     private int normalColor = 0xF0888888;
     protected int pressedColor = 0xF00000FF;
-    private int configEditColor = 0xF0FF00FF;
-    private int configDeleteColor = 0xF0FF0000;
-    private int configSelectedColor = 0xF000FF00;
-    private int defaultColor = normalColor;
     private final Paint paint = new Paint();
 
     private String elementId;
@@ -28,34 +26,58 @@ public abstract class Element extends View {
         this.elementController = elementController;
         this.elementId = elementBean.getName();
         this.elementBean = elementBean;
+        setOpacity(elementBean.getOpacity());
     }
 
-    public ElementBean getKeyboardBean() {
+    public ElementBean getElementBean() {
         return elementBean;
     }
 
     public String getElementId() {
         return elementId;
     }
+    boolean inRange(float x, float y) {
+        return (this.getX() < x && this.getX() + this.getWidth() > x) &&
+                (this.getY() < y && this.getY() + this.getHeight() > y);
+    }
 
-    protected void moveElement(int x,int y) {
-
+    public void setCentralX(int x){
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
-        layoutParams.leftMargin = x;
-        layoutParams.topMargin = y;
-        layoutParams.rightMargin = 0;
-        layoutParams.bottomMargin = 0;
+        layoutParams.leftMargin = x - getWidth()/2;
+        //保存中心点坐标
+        elementBean.setPositionX(x);
+        requestLayout();
 
+
+    }
+
+    public void setCentralY(int y){
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        layoutParams.topMargin = y - getHeight()/2;
+        elementBean.setPositionY(y);
         requestLayout();
     }
 
-    protected void resizeElement(int width,int height) {
+    public void setWidth(int width){
+        int centralPosX = (int) (getX() + getWidth()/2);
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
         layoutParams.width = width;
-        layoutParams.height = height;
-
+        elementBean.setWidth(width);
+        setLayoutParams(layoutParams);
         requestLayout();
+        setCentralX(centralPosX);
     }
+
+    public void setHeight(int height){
+        int centralPosY = (int) (getY() + getHeight()/2);
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        layoutParams.height = height;
+        elementBean.setHeight(height);
+        setLayoutParams(layoutParams);
+        requestLayout();
+        setCentralY(centralPosY);
+    }
+
 
     @Override
     protected void onDraw(Canvas canvas) {
@@ -64,13 +86,10 @@ public abstract class Element extends View {
     }
 
 
-    protected int getDefaultColor() {
-        return defaultColor;
+    protected int getNormalColor() {
+        return normalColor;
     }
 
-    protected void setDefaultColor(int defaultColor) {
-        this.defaultColor = defaultColor;
-    }
 
     protected int getDefaultStrokeWidth() {
         DisplayMetrics screen = getResources().getDisplayMetrics();
@@ -87,6 +106,7 @@ public abstract class Element extends View {
         // an area of the OSC control.
         if (event.getActionIndex() != 0) {
             return true;
+
         }
 
         return onElementTouchEvent(event);
@@ -100,13 +120,16 @@ public abstract class Element extends View {
         System.out.println(text);
     }
 
-    public void setColors(int normalColor, int pressedColor) {
-        this.normalColor = normalColor;
-        this.pressedColor = pressedColor;
 
+    public void setNormalColor(int normalColor) {
+        this.normalColor = normalColor;
         invalidate();
     }
 
+    public void setPressedColor(int pressedColor) {
+        this.pressedColor = pressedColor;
+        invalidate();
+    }
 
     public void setOpacity(int opacity) {
         int hexOpacity = opacity * 255 / 100;
