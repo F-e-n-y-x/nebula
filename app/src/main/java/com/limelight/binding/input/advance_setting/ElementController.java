@@ -4,10 +4,12 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 
 import com.limelight.Game;
+import com.limelight.R;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +34,7 @@ public class ElementController {
         this.context = context;
         this.game = (Game) context;
         this.controllerManager = controllerManager;
+        layout.findViewById(R.id.element_touch_view).setOnTouchListener(game);
 
         handler = new Handler(Looper.getMainLooper());
     }
