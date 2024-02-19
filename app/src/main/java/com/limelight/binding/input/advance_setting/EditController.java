@@ -185,11 +185,9 @@ public class EditController {
                             int dy = y - lastY;
                             lastX = x;
                             lastY = y;
-                            //这里使用layoutParams而不用getX的原因是因为：当点击edittext之后，requestLayout有时会失效，无法更新params。
-                            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams)editElement.getLayoutParams();
                             //坐标是中心点的坐标，不是右上角
-                            int elementCentralX = (int) (layoutParams.leftMargin + editElement.getWidth()/2 + dx);
-                            int elementCentralY = (int) (layoutParams.topMargin + editElement.getHeight()/2 + dy);
+                            int elementCentralX = editElement.getCentralX() + dx;
+                            int elementCentralY = editElement.getCentralY() + dy;
                             elementCentralX = Math.min(elementCentralX,operationPanel.getWidth());
                             elementCentralX = Math.max(elementCentralX,0);
                             elementCentralY = Math.min(elementCentralY,operationPanel.getHeight());
@@ -206,9 +204,9 @@ public class EditController {
                             int distanceY = (int) Math.abs(event.getY(1) - event.getY(0));
                             int scalingX = distanceX - lastDistanceX;
                             int scalingY = distanceY - lastDistanceY;
-                            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams)editElement.getLayoutParams();
-                            int newWidth = (int) (layoutParams.width+ scalingX);
-                            int newHeight = (int) (layoutParams.height+ scalingY);
+
+                            int newWidth = editElement.getParamWidth()+ scalingX;
+                            int newHeight = editElement.getParamHeight()+ scalingY;
                             newWidth = Math.min(newWidth, operationPanel.getWidth());
                             newWidth = Math.max(newWidth, elementMiniSize);
                             newHeight = Math.min(newHeight,operationPanel.getHeight());
@@ -217,8 +215,8 @@ public class EditController {
                             lastDistanceY = distanceY;
                             elementWidthInput.setText(String.valueOf(newWidth));
                             elementHeightInput.setText(String.valueOf(newHeight));
-                            editElement.setWidth(newWidth);
-                            editElement.setHeight(newHeight);
+                            editElement.setParamWidth(newWidth);
+                            editElement.setParamHeight(newHeight);
                             return true;
                         }
                         break;
@@ -238,10 +236,10 @@ public class EditController {
                             }
                             editElement = element;
                             editElement.setNormalColor(editColor);
-                            elementXInput.setText(String.valueOf((int)editElement.getX() + editElement.getWidth()/2));
-                            elementYInput.setText(String.valueOf((int)editElement.getY() + editElement.getHeight()/2));
-                            elementWidthInput.setText(String.valueOf((int)editElement.getWidth()));
-                            elementHeightInput.setText(String.valueOf((int)editElement.getHeight()));
+                            elementXInput.setText(String.valueOf(editElement.getCentralX()));
+                            elementYInput.setText(String.valueOf(editElement.getCentralY()));
+                            elementWidthInput.setText(String.valueOf(editElement.getParamWidth()));
+                            elementHeightInput.setText(String.valueOf(editElement.getParamHeight()));
                             return true;
                         }
                         break;
@@ -262,11 +260,11 @@ public class EditController {
         elementType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                switch (position){
-                    case 0:
+                switch (elementType.getSelectedItem().toString()){
+                    case "BUTTON":
                         insertCard(new ButtonCard(myself,context));
                         break;
-                    case 1:
+                    case "SWITCH":
                         insertCard(new SwitchCard(myself,context));
                         break;
                 }
@@ -294,7 +292,7 @@ public class EditController {
                 }
                 ElementBean elementBean = new ElementBean(
                         name,
-                        elementType.getSelectedItemPosition(),
+                        elementType.getSelectedItem().toString(),
                         elementCard.getTypeAttributes(),
                         Integer.parseInt(elementXInput.getText().toString()),
                         Integer.parseInt(elementYInput.getText().toString()),
@@ -335,9 +333,9 @@ public class EditController {
                     return true;
                 }
                 if (inputNumView == elementWidthInput){
-                    editElement.setWidth(value);
+                    editElement.setParamWidth(value);
                 } else if (inputNumView == elementHeightInput){
-                    editElement.setHeight(value);
+                    editElement.setParamHeight(value);
                 } else if (inputNumView == elementXInput){
                     editElement.setCentralX(value);
                 } else if (inputNumView == elementYInput){

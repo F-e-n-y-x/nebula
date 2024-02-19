@@ -3,6 +3,14 @@ package com.limelight.binding.input.advance_setting;
 import java.util.Map;
 
 public class ElementBean {
+    public static final String TYPE_BUTTON = "BUTTON";
+    public static final String TYPE_SWITCH = "SWITCH";
+    public static final String TYPE_PAD = "PAD";
+    public static final String TYPE_M_BUTTON = "M-BUTTON";
+    public static final String TYPE_K_STICK = "K-STICK";
+    public static final String TYPE_K_ISTICK = "K-ISTICK";
+    public static final String TYPE_G_STICK = "G-STICK";
+    public static final String TYPE_G_ISTICK = "G-ISTICK";
 
     private String name;
     /*
@@ -16,7 +24,7 @@ public class ElementBean {
     * 6:G-STICK
     * 7:G-ISTICK
     * */
-    private int type;
+    private String type;
     private Map<String,String> typeAttributes;
     private int positionX;
     private int positionY;
@@ -28,7 +36,7 @@ public class ElementBean {
     private int layer;
     private Map<String,String> otherAttributes;
 
-    public ElementBean(String name, int type, Map<String, String> typeAttributes, int positionX, int positionY, int width, int height, int opacity, int normalColor, int pressedColor,int layer, Map<String, String> otherAttributes) {
+    public ElementBean(String name, String type, Map<String, String> typeAttributes, int positionX, int positionY, int width, int height, int opacity, int normalColor, int pressedColor,int layer, Map<String, String> otherAttributes) {
         this.name = name;
         this.type = type;
         this.typeAttributes = typeAttributes;
@@ -51,11 +59,11 @@ public class ElementBean {
         this.name = name;
     }
 
-    public int getType() {
+    public String getType() {
         return type;
     }
 
-    public void setType(int type) {
+    public void setType(String type) {
         this.type = type;
     }
 

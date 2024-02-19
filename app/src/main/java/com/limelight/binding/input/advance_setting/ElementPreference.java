@@ -84,7 +84,7 @@ public class ElementPreference {
         //这个elementBean的原因是因为Gson会报错，无法转换Map，但是新建一个elementBean就可以了，可能是创建之后，这个对象并没有被回收，于是就被gson使用了
         new ElementBean(
             null,
-            0,
+            "BUTTON",
             new HashMap<>(),
             0,
             0,

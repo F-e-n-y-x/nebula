@@ -85,35 +85,35 @@ public class ElementController {
     private void addElementToScreen(ElementBean elementBean){
         Element element = null;
         switch (elementBean.getType()){
-            case 0:{
+            case ElementBean.TYPE_BUTTON:{
                 element = new DigitalButton(this,elementBean,context);
                 break;
             }
-            case 1:{
+            case ElementBean.TYPE_SWITCH:{
                 element = new DigitalSwitch(this,elementBean,context);
                 break;
             }
-            case 2:{
+            case ElementBean.TYPE_PAD:{
                 element = addPad(elementBean);
                 break;
             }
-            case 3:{
+            case ElementBean.TYPE_M_BUTTON:{
                 element = addMButton(elementBean);
                 break;
             }
-            case 4:{
+            case ElementBean.TYPE_K_STICK:{
                 element = addKStick(elementBean);
                 break;
             }
-            case 5:{
+            case ElementBean.TYPE_K_ISTICK:{
                 element = addKIStick(elementBean);
                 break;
             }
-            case 6:{
+            case ElementBean.TYPE_G_STICK:{
                 element = addGStick(elementBean);
                 break;
             }
-            case 7:{
+            case ElementBean.TYPE_G_ISTICK:{
                 element = addGIStick(elementBean);
                 break;
             }

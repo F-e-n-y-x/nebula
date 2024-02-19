@@ -8,8 +8,6 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 
-import java.sql.Time;
-
 public abstract class Element extends View {
     private int normalColor = 0xF0888888;
     protected int pressedColor = 0xF00000FF;
@@ -41,9 +39,20 @@ public abstract class Element extends View {
                 (this.getY() < y && this.getY() + this.getHeight() > y);
     }
 
+    public int getCentralX(){
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        return layoutParams.leftMargin + layoutParams.width/2;
+    }
+
+    public int getCentralY(){
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        return layoutParams.topMargin + layoutParams.height/2;
+    }
+
+
     public void setCentralX(int x){
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
-        layoutParams.leftMargin = x - getWidth()/2;
+        layoutParams.leftMargin = x - layoutParams.width/2;
         //保存中心点坐标
         elementBean.setPositionX(x);
         requestLayout();
@@ -53,30 +62,41 @@ public abstract class Element extends View {
 
     public void setCentralY(int y){
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
-        layoutParams.topMargin = y - getHeight()/2;
+        layoutParams.topMargin = y - layoutParams.height/2;
         elementBean.setPositionY(y);
         requestLayout();
     }
 
-    public void setWidth(int width){
-        int centralPosX = (int) (getX() + getWidth()/2);
+    public void setParamWidth(int width){
+        int centralPosX = getCentralX();
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
         layoutParams.width = width;
         elementBean.setWidth(width);
         setLayoutParams(layoutParams);
-        requestLayout();
         setCentralX(centralPosX);
     }
 
-    public void setHeight(int height){
-        int centralPosY = (int) (getY() + getHeight()/2);
+    public void setParamHeight(int height){
+        int centralPosY = getCentralY();
         FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
         layoutParams.height = height;
         elementBean.setHeight(height);
         setLayoutParams(layoutParams);
-        requestLayout();
         setCentralY(centralPosY);
     }
+
+    public int getParamWidth(){
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        return layoutParams.width;
+    }
+
+    public int getParamHeight(){
+        FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
+        return layoutParams.height;
+    }
+
+
+
 
 
     @Override
