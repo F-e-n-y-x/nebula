@@ -3,6 +3,7 @@ package com.limelight.binding.input.advance_setting;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.text.InputType;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -12,7 +13,10 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
 
+import com.limelight.Game;
 import com.limelight.R;
 
 import java.util.Map;
@@ -20,12 +24,15 @@ import java.util.Map;
 public class SettingController {
 
     private static final String KEYBOARD_SETTING = "keyboard_setting";
+    private static final String MSENSE = "msense";
+
     private SharedPreferences sharedPreferences;
     private ControllerManager controllerManager;
     private FrameLayout settingLayout;
     private FrameLayout floatLayout;
 
     private Switch floatKeyboardSwitch;
+    private TextView msenseTextView;
 
     private Context context;
 
@@ -35,7 +42,10 @@ public class SettingController {
         this.floatLayout = floatLayout;
         this.context = context;
         floatKeyboardSwitch = settingLayout.findViewById(R.id.float_keyboard_enable_switch);
+        msenseTextView = settingLayout.findViewById(R.id.msense_textview);
+
         initFloatKeyboard();
+        initMsense();
     }
 
     private void initFloatKeyboard(){
@@ -120,6 +130,43 @@ public class SettingController {
 
 
     }
+
+    private void initMsense(){
+        int min = 1;
+        int max = 500;
+        WindowsController.EditTextWindowListener inputMsenseListener = new WindowsController.EditTextWindowListener() {
+            @Override
+            public boolean onConfirmClick(String text) {
+                if (text.equals("")){
+                    Toast.makeText(context,"请输入" + min + "~" + max + "的数字",Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                int value = Integer.parseInt(text);
+                if (value > max || value < min){
+                    Toast.makeText(context,"请输入" + min + "~" + max + "的数字",Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                String sense = String.valueOf(value);
+                msenseTextView.setText(sense);
+                doSetting(MSENSE, sense);
+                saveSetting(MSENSE, sense);
+
+                return true;
+            }
+
+            @Override
+            public boolean onCancelClick(String text) {
+                return true;
+            }
+
+        };
+        msenseTextView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                controllerManager.getWindowsController().openEditTextWindow(inputMsenseListener,msenseTextView.getText().toString(),null,null, InputType.TYPE_CLASS_NUMBER);
+            }
+        });
+    }
     public void loadSettingConfig(String configId){
         sharedPreferences = context.getSharedPreferences(configId, Activity.MODE_PRIVATE);
         Map<String, String> map = (Map<String, String>) sharedPreferences.getAll();
@@ -142,6 +189,9 @@ public class SettingController {
             case KEYBOARD_SETTING:
                 floatKeyboardSwitch.setChecked(Boolean.valueOf(settingValue));
                 break;
+            case MSENSE:
+                msenseTextView.setText(settingValue);
+                break;
         }
     }
 
@@ -155,6 +205,10 @@ public class SettingController {
                 } else {
                     floatKeyboardDisplayButton.setVisibility(View.GONE);
                 }
+                break;
+            }
+            case MSENSE:{
+                ((Game)context).adjustMsenseRelative(Integer.parseInt(settingValue));
                 break;
             }
 

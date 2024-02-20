@@ -2725,4 +2725,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 return false;
         }
     }
+
+    public void adjustMsenseRelative(int sense){
+        for (TouchContext aTouchContext : touchContextMap) {
+            if (aTouchContext instanceof RelativeTouchContext){
+                ((RelativeTouchContext) aTouchContext).adjustMsense(sense * 0.01);
+            }
+        }
+    }
 }

@@ -64,9 +64,9 @@ public class DigitalSwitch extends Element {
                     @Override
                     public void onSwitch(boolean wasPressed) {
                         if (wasPressed){
-                            controller.sendMouseEvent(keyCode,true);;
-                        } else {
                             controller.sendMouseEvent(keyCode,false);;
+                        } else {
+                            controller.sendMouseEvent(keyCode,true);;
                         }
                     }
                 });
