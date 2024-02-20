@@ -42,15 +42,14 @@ public class EditController {
     private Button addButton;
     private Button deleteButton;
     private LinearLayout addElementView;
+    private FrameLayout editUi;
     private View operationPanel;
 
 
     //add views
     private EditText elementName;
     private Spinner elementType;
-    private Button addConfirm;
     private FrameLayout elementCardSlot;
-    private boolean enableSelect = true;
 
 
 
@@ -109,6 +108,7 @@ public class EditController {
         });
 
         //edit view
+        editUi = layout.findViewById(R.id.layer_edit_ui);
         elementWidthInput = layout.findViewById(R.id.element_width);
         elementWidthInput.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -145,7 +145,10 @@ public class EditController {
             int lastDistanceX;
             int lastDistanceY;
             //是否要选择element标志
+            //单指点击动作记录标识
             boolean isSelect = false;
+            //双指点击动作记录标识
+            boolean isHideAction = false;
             //两根手指变一根手指的标志，不然抬起一根手指后，element的位置可能会跳变。
             boolean twoToOne = false;
             @Override
@@ -168,11 +171,13 @@ public class EditController {
                         if (pointerCount == 2){
                             lastDistanceX = (int) Math.abs(event.getX(1) - event.getX(0));
                             lastDistanceY = (int) Math.abs(event.getY(1) - event.getY(0));
+                            isHideAction = true;
                         }
                         break;
 
                     case MotionEvent.ACTION_MOVE:
                         isSelect = false;
+                        isHideAction = false;
                         // 单指移动时移动按钮
                         if (pointerCount == 1 && editElement != null) {
                             if (twoToOne){
@@ -198,9 +203,7 @@ public class EditController {
                             editElement.setCentralX(elementCentralX);
                             editElement.setCentralY(elementCentralY);
                             return true;
-                        }
-                        // 双指调整按钮大小
-                        else if (pointerCount == 2 && editElement != null) {
+                        } else if (pointerCount == 2 && editElement != null) {
                             int distanceX = (int) Math.abs(event.getX(1) - event.getX(0));
                             int distanceY = (int) Math.abs(event.getY(1) - event.getY(0));
                             int scalingX = distanceX - lastDistanceX;
@@ -226,7 +229,7 @@ public class EditController {
                         break;
 
                     case MotionEvent.ACTION_UP:
-                        if (isSelect && enableSelect){
+                        if (isSelect){
 
                             Element element = controllerManager.getElementController().selectElement(lastX,lastY);
                             if (element == null){
@@ -242,11 +245,20 @@ public class EditController {
                             elementWidthInput.setText(String.valueOf(editElement.getParamWidth()));
                             elementHeightInput.setText(String.valueOf(editElement.getParamHeight()));
                             return true;
+                        } else if (isHideAction){
+                            if (editUi.getVisibility() == View.GONE){
+                                editUi.setVisibility(View.VISIBLE);
+                                controllerManager.getMenuController().showMenu();
+                            } else {
+                                editUi.setVisibility(View.GONE);
+                                controllerManager.getMenuController().hideMenu();
+                            }
                         } else {
                             if (editElement != null){
                                 controllerManager.getElementController().saveElement(editElement);
                             }
                         }
+
                         break;
                 }
                 return true;
