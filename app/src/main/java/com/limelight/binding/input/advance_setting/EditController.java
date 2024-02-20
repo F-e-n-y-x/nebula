@@ -16,6 +16,7 @@ import android.widget.Toast;
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.element_card.ButtonCard;
 import com.limelight.binding.input.advance_setting.element_card.ElementCard;
+import com.limelight.binding.input.advance_setting.element_card.PadCard;
 import com.limelight.binding.input.advance_setting.element_card.SwitchCard;
 
 public class EditController {
@@ -241,6 +242,10 @@ public class EditController {
                             elementWidthInput.setText(String.valueOf(editElement.getParamWidth()));
                             elementHeightInput.setText(String.valueOf(editElement.getParamHeight()));
                             return true;
+                        } else {
+                            if (editElement != null){
+                                controllerManager.getElementController().saveElement(editElement);
+                            }
                         }
                         break;
                 }
@@ -266,6 +271,11 @@ public class EditController {
                         break;
                     case "SWITCH":
                         insertCard(new SwitchCard(myself,context));
+                        break;
+                    case "PAD":
+                        insertCard(new PadCard(myself,context));
+                        break;
+                    case "K-STICK":
                         break;
                 }
             }
@@ -367,16 +377,16 @@ public class EditController {
 
     public void open(){
         layerEdit.setVisibility(View.VISIBLE);
+        controllerManager.getSettingController().hideFloat();
     }
 
     public void close(){
         layerEdit.setVisibility(View.GONE);
+        controllerManager.getSettingController().displayFloat();
         if (editElement != null){
             editElement.setNormalColor(normalColor);
         }
-
         editElement = null;
-        controllerManager.getElementController().saveElements();
     }
 
 

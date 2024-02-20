@@ -30,9 +30,13 @@ public class ControllerManager {
         FrameLayout layerConfig = advanceSettingView.findViewById(R.id.layer_config);
         configController = new ConfigController(this,layerConfig,context);
 
+        FrameLayout layerElement = advanceSettingView.findViewById(R.id.layer_element);
+        elementController = new ElementController(this,layerElement,context);
 
         //setting controller
-        settingController = new SettingController();
+        FrameLayout layerFloat = advanceSettingView.findViewById(R.id.layer_float);
+        FrameLayout layerSetting = advanceSettingView.findViewById(R.id.layer_setting);
+        settingController = new SettingController(this,layerSetting,layerFloat,context);
 
 
         //Edit controller
@@ -40,8 +44,7 @@ public class ControllerManager {
         editController = new EditController(this,layerEdit,context);
 
 
-        FrameLayout layerElement = advanceSettingView.findViewById(R.id.layer_element);
-        elementController = new ElementController(this,layerElement,context);
+
 
         //window controller
         FrameLayout layerWindows = advanceSettingView.findViewById(R.id.layer_windows);

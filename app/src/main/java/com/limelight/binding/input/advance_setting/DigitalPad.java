@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,8 +25,42 @@ public class DigitalPad extends Element {
 
     private final Paint paint = new Paint();
 
-    public DigitalPad(ElementController elementController, ElementBean elementBean, Context context) {
-        super(elementController, elementBean, context);
+    public DigitalPad(ElementController controller, ElementBean elementBean, Context context) {
+        super(controller, elementBean, context);
+        int topValue = Integer.parseInt(elementBean.getTypeAttributes().get("top_value"));
+        int downValue = Integer.parseInt(elementBean.getTypeAttributes().get("down_value"));
+        int leftValue = Integer.parseInt(elementBean.getTypeAttributes().get("left_value"));
+        int rightValue = Integer.parseInt(elementBean.getTypeAttributes().get("right_value"));
+
+        addDigitalPadListener(new DigitalPadListener() {
+            @Override
+            public void onDirectionChange(int direction) {
+                if ((direction & DIGITAL_PAD_DIRECTION_LEFT) != 0) {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,leftValue));
+                }
+                else {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,leftValue));
+                }
+                if ((direction & DIGITAL_PAD_DIRECTION_RIGHT) != 0) {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,rightValue));
+                }
+                else {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,rightValue));
+                }
+                if ((direction & DIGITAL_PAD_DIRECTION_UP) != 0) {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,topValue));
+                }
+                else {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,topValue));
+                }
+                if ((direction & DIGITAL_PAD_DIRECTION_DOWN) != 0) {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,downValue));
+                }
+                else {
+                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,downValue));
+                }
+            }
+        });
 
     }
 

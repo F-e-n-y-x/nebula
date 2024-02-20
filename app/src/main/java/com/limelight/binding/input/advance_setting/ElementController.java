@@ -73,10 +73,8 @@ public class ElementController {
         elementPreference.deleteElement(element.getElementId());
     }
 
-    public void saveElements(){
-        for (Element element : elements) {
-            elementPreference.addElement(element.getElementBean());
-        }
+    public void saveElement(Element element){
+        elementPreference.addElement(element.getElementBean());
     }
 
 
@@ -97,7 +95,7 @@ public class ElementController {
                 break;
             }
             case ElementBean.TYPE_PAD:{
-                element = addPad(elementBean);
+                element = new DigitalPad(this,elementBean,context);
                 break;
             }
             case ElementBean.TYPE_M_BUTTON:{
@@ -129,9 +127,7 @@ public class ElementController {
         elementsLayout.addView(element, layoutParams);
 
     }
-    private Element addPad(ElementBean elementBean){
-        return null;
-    }
+
     private Element addMButton(ElementBean elementBean){
         return null;
     }

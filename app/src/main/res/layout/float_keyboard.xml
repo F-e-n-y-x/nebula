@@ -12,7 +12,7 @@
             android:layout_width="match_parent"
             android:layout_height="37dp">
             <Button
-                android:id="@+id/float_keyboard_button"
+                android:id="@+id/float_keyboard_display_button"
                 android:layout_width="50dp"
                 android:layout_height="match_parent"
                 android:text="↑"
