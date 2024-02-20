@@ -16,7 +16,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="111"
+            android:tag="k111"
             android:text="ESC"/>
         <TextView
             android:layout_width="0dp"
@@ -24,7 +24,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="131"
+            android:tag="k131"
             android:text="F1"/>
         <TextView
             android:layout_width="0dp"
@@ -32,7 +32,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="132"
+            android:tag="k132"
             android:text="F2"/>
         <TextView
             android:layout_width="0dp"
@@ -40,7 +40,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="133"
+            android:tag="k133"
             android:text="F3"/>
         <TextView
             android:layout_width="0dp"
@@ -48,7 +48,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="134"
+            android:tag="k134"
             android:text="F4"/>
         <TextView
             android:layout_width="0dp"
@@ -56,7 +56,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="135"
+            android:tag="k135"
             android:text="F5"/>
         <TextView
             android:layout_width="0dp"
@@ -64,7 +64,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="136"
+            android:tag="k136"
             android:text="F6"/>
         <TextView
             android:layout_width="0dp"
@@ -72,7 +72,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="137"
+            android:tag="k137"
             android:text="F7"/>
         <TextView
             android:layout_width="0dp"
@@ -80,7 +80,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="138"
+            android:tag="k138"
             android:text="F8"/>
         <TextView
             android:layout_width="0dp"
@@ -88,7 +88,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="139"
+            android:tag="k139"
             android:text="F9"/>
         <TextView
             android:layout_width="0dp"
@@ -96,7 +96,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="140"
+            android:tag="k140"
             android:text="F10"/>
         <TextView
             android:layout_width="0dp"
@@ -104,7 +104,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="141"
+            android:tag="k141"
             android:text="F11"/>
         <TextView
             android:layout_width="0dp"
@@ -112,7 +112,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="142"
+            android:tag="k142"
             android:text="F12"/>
         <TextView
             android:layout_width="0dp"
@@ -120,7 +120,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="124"
+            android:tag="k124"
             android:text="Ins"/>
         <TextView
             android:layout_width="0dp"
@@ -128,7 +128,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="112"
+            android:tag="k112"
             android:text="Del"/>
     </LinearLayout>
     <LinearLayout
@@ -142,7 +142,7 @@
             android:layout_weight="90"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="68"
+            android:tag="k68"
             android:text="~\n`"/>
         <TextView
             android:layout_width="0dp"
@@ -150,7 +150,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="8"
+            android:tag="k8"
             android:text="1"/>
         <!-- 继续更新其他 TextView 的 android:tag 值 -->
         <TextView
@@ -159,7 +159,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="9"
+            android:tag="k9"
             android:text="2"/>
         <TextView
             android:layout_width="0dp"
@@ -167,7 +167,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="10"
+            android:tag="k10"
             android:text="3"/>
         <!-- 以此类推，更新其他 TextView 的 android:tag 值 -->
         <TextView
@@ -176,7 +176,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="11"
+            android:tag="k11"
             android:text="4"/>
         <TextView
             android:layout_width="0dp"
@@ -184,7 +184,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="12"
+            android:tag="k12"
             android:text="5"/>
         <TextView
             android:layout_width="0dp"
@@ -192,7 +192,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="13"
+            android:tag="k13"
             android:text="6"/>
         <TextView
             android:layout_width="0dp"
@@ -200,7 +200,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="14"
+            android:tag="k14"
             android:text="7"/>
         <TextView
             android:layout_width="0dp"
@@ -208,7 +208,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="15"
+            android:tag="k15"
             android:text="8"/>
         <TextView
             android:layout_width="0dp"
@@ -216,7 +216,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="16"
+            android:tag="k16"
             android:text="9"/>
         <TextView
             android:layout_width="0dp"
@@ -224,7 +224,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="7"
+            android:tag="k7"
             android:text="0"/>
         <TextView
             android:layout_width="0dp"
@@ -232,7 +232,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="69"
+            android:tag="k69"
             android:text="_\n-"/>
         <TextView
             android:layout_width="0dp"
@@ -240,7 +240,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="70"
+            android:tag="k70"
             android:text="+\n="/>
         <TextView
             android:layout_width="0dp"
@@ -248,7 +248,7 @@
             android:layout_weight="140"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="67"
+            android:tag="k67"
             android:text="Back"/>
     </LinearLayout>
     <LinearLayout
@@ -262,7 +262,7 @@
             android:layout_weight="140"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="61"
+            android:tag="k61"
             android:text="Tab"/>
         <TextView
             android:layout_width="0dp"
@@ -270,7 +270,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="45"
+            android:tag="k45"
             android:text="Q"/>
         <TextView
             android:layout_width="0dp"
@@ -278,7 +278,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="51"
+            android:tag="k51"
             android:text="W"/>
         <TextView
             android:layout_width="0dp"
@@ -286,7 +286,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="33"
+            android:tag="k33"
             android:text="E"/>
         <TextView
             android:layout_width="0dp"
@@ -294,7 +294,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="46"
+            android:tag="k46"
             android:text="R"/>
         <TextView
             android:layout_width="0dp"
@@ -302,7 +302,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="48"
+            android:tag="k48"
             android:text="T"/>
         <TextView
             android:layout_width="0dp"
@@ -310,7 +310,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="53"
+            android:tag="k53"
             android:text="Y"/>
         <TextView
             android:layout_width="0dp"
@@ -318,7 +318,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="49"
+            android:tag="k49"
             android:text="U"/>
         <TextView
             android:layout_width="0dp"
@@ -326,7 +326,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="37"
+            android:tag="k37"
             android:text="I"/>
         <TextView
             android:layout_width="0dp"
@@ -334,7 +334,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="43"
+            android:tag="k43"
             android:text="O"/>
         <TextView
             android:layout_width="0dp"
@@ -342,7 +342,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="44"
+            android:tag="k44"
             android:text="P"/>
         <TextView
             android:layout_width="0dp"
@@ -350,7 +350,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="71"
+            android:tag="k71"
             android:text="{\n["/>
         <TextView
             android:layout_width="0dp"
@@ -358,7 +358,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="72"
+            android:tag="k72"
             android:text="}\n]"/>
         <TextView
             android:layout_width="0dp"
@@ -366,7 +366,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="73"
+            android:tag="k73"
             android:text="|\n\\"/>
     </LinearLayout>
     <LinearLayout
@@ -380,7 +380,7 @@
             android:layout_weight="150"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="115"
+            android:tag="k115"
             android:text="Cap"/>
         <TextView
             android:layout_width="0dp"
@@ -388,7 +388,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="29"
+            android:tag="k29"
             android:text="A"/>
         <TextView
             android:layout_width="0dp"
@@ -396,7 +396,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="47"
+            android:tag="k47"
             android:text="S"/>
         <TextView
             android:layout_width="0dp"
@@ -404,7 +404,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="32"
+            android:tag="k32"
             android:text="D"/>
         <TextView
             android:layout_width="0dp"
@@ -412,7 +412,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="34"
+            android:tag="k34"
             android:text="F"/>
         <TextView
             android:layout_width="0dp"
@@ -420,7 +420,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="35"
+            android:tag="k35"
             android:text="G"/>
         <TextView
             android:layout_width="0dp"
@@ -428,7 +428,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="36"
+            android:tag="k36"
             android:text="H"/>
         <TextView
             android:layout_width="0dp"
@@ -436,7 +436,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="38"
+            android:tag="k38"
             android:text="J"/>
         <TextView
             android:layout_width="0dp"
@@ -444,7 +444,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="39"
+            android:tag="k39"
             android:text="K"/>
         <TextView
             android:layout_width="0dp"
@@ -452,7 +452,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="40"
+            android:tag="k40"
             android:text="L"/>
         <TextView
             android:layout_width="0dp"
@@ -460,7 +460,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="74"
+            android:tag="k74"
             android:text=":\n;"/>
         <TextView
             android:layout_width="0dp"
@@ -468,7 +468,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="75"
+            android:tag="k75"
             android:text="&quot;\n'"/>
         <TextView
             android:layout_width="0dp"
@@ -476,7 +476,7 @@
             android:layout_weight="160"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="66"
+            android:tag="k66"
             android:text="Enter"/>
     </LinearLayout>
     <LinearLayout
@@ -490,7 +490,7 @@
             android:layout_weight="160"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="59"
+            android:tag="k59"
             android:text="Shift"/>
         <TextView
             android:layout_width="0dp"
@@ -498,7 +498,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="54"
+            android:tag="k54"
             android:text="Z"/>
         <TextView
             android:layout_width="0dp"
@@ -506,7 +506,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="52"
+            android:tag="k52"
             android:text="X"/>
         <TextView
             android:layout_width="0dp"
@@ -514,7 +514,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="31"
+            android:tag="k31"
             android:text="C"/>
         <TextView
             android:layout_width="0dp"
@@ -522,7 +522,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="50"
+            android:tag="k50"
             android:text="V"/>
         <TextView
             android:layout_width="0dp"
@@ -530,7 +530,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="30"
+            android:tag="k30"
             android:text="B"/>
         <TextView
             android:layout_width="0dp"
@@ -538,7 +538,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="42"
+            android:tag="k42"
             android:text="N"/>
         <TextView
             android:layout_width="0dp"
@@ -546,7 +546,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="41"
+            android:tag="k41"
             android:text="M"/>
         <TextView
             android:layout_width="0dp"
@@ -554,7 +554,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="55"
+            android:tag="k55"
             android:text="&lt;\n,"/>
         <TextView
             android:layout_width="0dp"
@@ -562,7 +562,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="56"
+            android:tag="k56"
             android:text=">\n."/>
         <TextView
             android:layout_width="0dp"
@@ -570,7 +570,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="76"
+            android:tag="k76"
             android:text="&#63;&#10;/"/>
         <TextView
             android:layout_width="0dp"
@@ -578,7 +578,7 @@
             android:layout_weight="160"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="60"
+            android:tag="k60"
             android:text="Shift"/>
     </LinearLayout>
     <LinearLayout
@@ -592,7 +592,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="113"
+            android:tag="k113"
             android:text="Ctrl"/>
         <TextView
             android:layout_width="0dp"
@@ -600,7 +600,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="171"
+            android:tag="k171"
             android:text="Win"/>
         <TextView
             android:layout_width="0dp"
@@ -608,7 +608,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="57"
+            android:tag="k57"
             android:text="Alt"/>
         <TextView
             android:layout_width="0dp"
@@ -616,7 +616,7 @@
             android:layout_weight="95"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="62"
+            android:tag="k62"
             android:text="Space"/>
         <TextView
             android:layout_width="0dp"
@@ -624,7 +624,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="58"
+            android:tag="k58"
             android:text="Alt"/>
         <TextView
             android:layout_width="0dp"
@@ -632,7 +632,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="114"
+            android:tag="k114"
             android:text="Ctrl"/>
         <TextView
             android:layout_width="0dp"
@@ -640,7 +640,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="19"
+            android:tag="k19"
             android:text="↑"/>
         <TextView
             android:layout_width="0dp"
@@ -648,7 +648,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="20"
+            android:tag="k20"
             android:text="↓"/>
         <TextView
             android:layout_width="0dp"
@@ -656,7 +656,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="21"
+            android:tag="k21"
             android:text="←"/>
         <TextView
             android:layout_width="0dp"
@@ -664,7 +664,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="22"
+            android:tag="k22"
             android:text="→"/>
         <TextView
             android:layout_width="0dp"
@@ -672,7 +672,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="122"
+            android:tag="k122"
             android:text="Home"/>
         <TextView
             android:layout_width="0dp"
@@ -680,7 +680,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="123"
+            android:tag="k123"
             android:text="End"/>
         <TextView
             android:layout_width="0dp"
@@ -688,7 +688,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="92"
+            android:tag="k92"
             android:text="PgUp"/>
         <TextView
             android:layout_width="0dp"
@@ -696,7 +696,7 @@
             android:layout_weight="100"
             android:gravity="center"
             android:background="@drawable/square_border"
-            android:tag="93"
+            android:tag="k93"
             android:text="PgDn"/>
     </LinearLayout>
 </LinearLayout>

@@ -16,7 +16,7 @@ import android.widget.Toast;
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.element_card.ButtonCard;
 import com.limelight.binding.input.advance_setting.element_card.ElementCard;
-import com.limelight.binding.input.advance_setting.element_card.PadCard;
+import com.limelight.binding.input.advance_setting.element_card.KPadCard;
 import com.limelight.binding.input.advance_setting.element_card.SwitchCard;
 
 public class EditController {
@@ -278,16 +278,16 @@ public class EditController {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 switch (elementType.getSelectedItem().toString()){
-                    case "BUTTON":
+                    case ElementBean.TYPE_BUTTON:
                         insertCard(new ButtonCard(myself,context));
                         break;
-                    case "SWITCH":
+                    case ElementBean.TYPE_SWITCH:
                         insertCard(new SwitchCard(myself,context));
                         break;
-                    case "PAD":
-                        insertCard(new PadCard(myself,context));
+                    case ElementBean.TYPE_K_PAD:
+                        insertCard(new KPadCard(myself,context));
                         break;
-                    case "K-STICK":
+                    case ElementBean.TYPE_K_STICK:
                         break;
                 }
             }

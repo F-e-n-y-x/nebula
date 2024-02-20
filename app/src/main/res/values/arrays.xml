@@ -11,7 +11,7 @@
     <string-array name="element_type_arrays">
         <item>BUTTON</item>
         <item>SWITCH</item>
-        <item>PAD</item>
+        <item>KPAD</item>
     </string-array>
     <string-array name="element_shape">
         <item>CIRCLE</item>

@@ -138,7 +138,7 @@ public class WindowsController {
                 switchDeviceLayout(gamepadButton,gamepadLayout);
             }
         });
-        View.OnClickListener keyboardListener = new View.OnClickListener() {
+        View.OnClickListener keyListener = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String text = ((TextView)v).getText().toString();
@@ -151,9 +151,16 @@ public class WindowsController {
         for (int i = 0; i < keyboardDrawing.getChildCount(); i++){
             LinearLayout keyboardRow = (LinearLayout) keyboardDrawing.getChildAt(i);
             for (int j = 0; j < keyboardRow.getChildCount(); j++){
-                keyboardRow.getChildAt(j).setOnClickListener(keyboardListener);
+                keyboardRow.getChildAt(j).setOnClickListener(keyListener);
             }
         }
+
+        LinearLayout mouseDrawing = mouseLayout.findViewById(R.id.mouse_drawing);
+        mouseDrawing.findViewById(R.id.mouse_left).setOnClickListener(keyListener);
+        mouseDrawing.findViewById(R.id.mouse_middle).setOnClickListener(keyListener);
+        mouseDrawing.findViewById(R.id.mouse_right).setOnClickListener(keyListener);
+        mouseDrawing.findViewById(R.id.mouse_x1).setOnClickListener(keyListener);
+        mouseDrawing.findViewById(R.id.mouse_x2).setOnClickListener(keyListener);
 
 
 

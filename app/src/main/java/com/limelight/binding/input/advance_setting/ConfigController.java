@@ -146,7 +146,6 @@ public class ConfigController {
     }
 
     public void jumpDeleteWindow(ConfigItem configItem){
-        Map<String,Object> messageContent = new HashMap<>();
         WindowsController.TextWindowListener deleteListener = new WindowsController.TextWindowListener() {
             @Override
             public boolean onConfirmCLick() {

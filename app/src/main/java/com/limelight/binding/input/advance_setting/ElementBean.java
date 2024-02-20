@@ -5,12 +5,13 @@ import java.util.Map;
 public class ElementBean {
     public static final String TYPE_BUTTON = "BUTTON";
     public static final String TYPE_SWITCH = "SWITCH";
-    public static final String TYPE_PAD = "PAD";
-    public static final String TYPE_M_BUTTON = "M-BUTTON";
-    public static final String TYPE_K_STICK = "K-STICK";
-    public static final String TYPE_K_ISTICK = "K-ISTICK";
-    public static final String TYPE_G_STICK = "G-STICK";
-    public static final String TYPE_G_ISTICK = "G-ISTICK";
+    public static final String TYPE_K_PAD = "KPAD";
+    public static final String TYPE_G_PAD = "GPAD";
+    public static final String TYPE_M_BUTTON = "MBUTTON";
+    public static final String TYPE_K_STICK = "KSTICK";
+    public static final String TYPE_K_ISTICK = "KISTICK";
+    public static final String TYPE_G_STICK = "GSTICK";
+    public static final String TYPE_G_ISTICK = "GISTICK";
 
     private String name;
     /*

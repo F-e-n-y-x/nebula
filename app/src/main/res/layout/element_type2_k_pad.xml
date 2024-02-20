@@ -19,12 +19,12 @@
                 android:gravity="center"
                 android:text="上"/>
             <TextView
-                android:id="@+id/element_pad_card_top"
+                android:id="@+id/element_k_pad_card_top"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:gravity="center"
-                android:tag="29"
-                android:text="A"
+                android:tag="k51"
+                android:text="W"
                 android:background="@drawable/enabled_square"/>
             <TextView
                 android:layout_width="0dp"
@@ -33,12 +33,12 @@
                 android:gravity="center"
                 android:text="下"/>
             <TextView
-                android:id="@+id/element_pad_card_down"
+                android:id="@+id/element_k_pad_card_down"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:gravity="center"
-                android:tag="29"
-                android:text="A"
+                android:tag="k47"
+                android:text="S"
                 android:background="@drawable/enabled_square"/>
             <TextView
                 android:layout_width="0dp"
@@ -47,11 +47,11 @@
                 android:gravity="center"
                 android:text="左"/>
             <TextView
-                android:id="@+id/element_pad_card_left"
+                android:id="@+id/element_k_pad_card_left"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:gravity="center"
-                android:tag="29"
+                android:tag="k29"
                 android:text="A"
                 android:background="@drawable/enabled_square"/>
             <TextView
@@ -61,12 +61,12 @@
                 android:gravity="center"
                 android:text="右"/>
             <TextView
-                android:id="@+id/element_pad_card_right"
+                android:id="@+id/element_k_pad_card_right"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:gravity="center"
-                android:tag="29"
-                android:text="A"
+                android:tag="k32"
+                android:text="D"
                 android:background="@drawable/enabled_square"/>
         </LinearLayout>
 

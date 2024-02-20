@@ -9,7 +9,7 @@ import android.view.MotionEvent;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DigitalPad extends Element {
+public class DigitalKPad extends Element {
 
     private String value;
 
@@ -19,20 +19,20 @@ public class DigitalPad extends Element {
     public final static int DIGITAL_PAD_DIRECTION_UP = 2;
     public final static int DIGITAL_PAD_DIRECTION_RIGHT = 4;
     public final static int DIGITAL_PAD_DIRECTION_DOWN = 8;
-    List<DigitalPadListener> listeners = new ArrayList<>();
+    List<DigitalKPadListener> listeners = new ArrayList<>();
 
     private static final int DPAD_MARGIN = 5;
 
     private final Paint paint = new Paint();
 
-    public DigitalPad(ElementController controller, ElementBean elementBean, Context context) {
+    public DigitalKPad(ElementController controller, ElementBean elementBean, Context context) {
         super(controller, elementBean, context);
-        int topValue = Integer.parseInt(elementBean.getTypeAttributes().get("top_value"));
-        int downValue = Integer.parseInt(elementBean.getTypeAttributes().get("down_value"));
-        int leftValue = Integer.parseInt(elementBean.getTypeAttributes().get("left_value"));
-        int rightValue = Integer.parseInt(elementBean.getTypeAttributes().get("right_value"));
+        int topValue = Integer.parseInt(elementBean.getTypeAttributes().get("top_value").substring(1));
+        int downValue = Integer.parseInt(elementBean.getTypeAttributes().get("down_value").substring(1));
+        int leftValue = Integer.parseInt(elementBean.getTypeAttributes().get("left_value").substring(1));
+        int rightValue = Integer.parseInt(elementBean.getTypeAttributes().get("right_value").substring(1));
 
-        addDigitalPadListener(new DigitalPadListener() {
+        addDigitalKPadListener(new DigitalKPadListener() {
             @Override
             public void onDirectionChange(int direction) {
                 if ((direction & DIGITAL_PAD_DIRECTION_LEFT) != 0) {
@@ -64,7 +64,7 @@ public class DigitalPad extends Element {
 
     }
 
-    public void addDigitalPadListener(DigitalPadListener listener) {
+    public void addDigitalKPadListener(DigitalKPadListener listener) {
         listeners.add(listener);
     }
 
@@ -186,7 +186,7 @@ public class DigitalPad extends Element {
         _DBG("direction: " + direction);
 
         // notify listeners
-        for (DigitalPadListener listener : listeners) {
+        for (DigitalKPadListener listener : listeners) {
             listener.onDirectionChange(direction);
         }
     }
@@ -231,7 +231,7 @@ public class DigitalPad extends Element {
         return true;
     }
 
-    public interface DigitalPadListener {
+    public interface DigitalKPadListener {
         void onDirectionChange(int direction);
     }
 }

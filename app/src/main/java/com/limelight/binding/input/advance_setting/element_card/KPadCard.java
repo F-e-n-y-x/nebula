@@ -12,20 +12,20 @@ import com.limelight.binding.input.advance_setting.EditController;
 import java.util.HashMap;
 import java.util.Map;
 
-public class PadCard extends ElementCard{
+public class KPadCard extends ElementCard{
 
-    private LinearLayout padCardLayout;
+    private LinearLayout kPadCardLayout;
     private TextView topValue;
     private TextView downValue;
     private TextView leftValue;
     private TextView rightValue;
 
-    public PadCard(EditController editController, Context context){
-        padCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type2_pad,null);
-        topValue = padCardLayout.findViewById(R.id.element_pad_card_top);
-        downValue = padCardLayout.findViewById(R.id.element_pad_card_down);
-        leftValue = padCardLayout.findViewById(R.id.element_pad_card_left);
-        rightValue = padCardLayout.findViewById(R.id.element_pad_card_right);
+    public KPadCard(EditController editController, Context context){
+        kPadCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type2_k_pad,null);
+        topValue = kPadCardLayout.findViewById(R.id.element_k_pad_card_top);
+        downValue = kPadCardLayout.findViewById(R.id.element_k_pad_card_down);
+        leftValue = kPadCardLayout.findViewById(R.id.element_k_pad_card_left);
+        rightValue = kPadCardLayout.findViewById(R.id.element_k_pad_card_right);
 
         View.OnClickListener jumpDeviceLayout = new View.OnClickListener() {
             @Override
@@ -54,6 +54,6 @@ public class PadCard extends ElementCard{
 
     @Override
     public View getView() {
-        return padCardLayout;
+        return kPadCardLayout;
     }
 }

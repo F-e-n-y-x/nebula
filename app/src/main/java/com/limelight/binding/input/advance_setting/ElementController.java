@@ -4,8 +4,6 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.KeyEvent;
-import android.view.MotionEvent;
-import android.view.View;
 import android.widget.FrameLayout;
 
 import com.limelight.Game;
@@ -28,6 +26,7 @@ public class ElementController {
 
     private final List<Element> elements = new ArrayList<>();
     private Map<Integer, Runnable> keyEventRunnableMap = new HashMap<>();
+    private Map<Integer, Runnable> mouseEventRunnableMap = new HashMap<>();
     private FrameLayout elementsLayout;
     public ElementController(ControllerManager controllerManager, FrameLayout layout, final Context context) {
         this.elementsLayout = layout;
@@ -79,8 +78,8 @@ public class ElementController {
 
 
     public void addElement(ElementBean elementBean){
-        elementPreference.addElement(elementBean);
         addElementToScreen(elementBean);
+        elementPreference.addElement(elementBean);
     }
 
     private void addElementToScreen(ElementBean elementBean){
@@ -94,8 +93,8 @@ public class ElementController {
                 element = new DigitalSwitch(this,elementBean,context);
                 break;
             }
-            case ElementBean.TYPE_PAD:{
-                element = new DigitalPad(this,elementBean,context);
+            case ElementBean.TYPE_K_PAD:{
+                element = new DigitalKPad(this,elementBean,context);
                 break;
             }
             case ElementBean.TYPE_M_BUTTON:{
@@ -186,6 +185,24 @@ public class ElementController {
         };
         //把这个按键的runnable放到map中，以便这个按键重新发送的时候，重置runnable。
         keyEventRunnableMap.put(keyEvent.getKeyCode(),runnable);
+
+        handler.postDelayed(runnable, 25);
+        handler.postDelayed(runnable, 50);
+        handler.postDelayed(runnable, 75);
+    }
+    public void sendMouseEvent(int mouseId, boolean down){
+        game.mouseButtonEvent(mouseId, down);
+        if (mouseEventRunnableMap.containsKey(mouseId)){
+            handler.removeCallbacks(mouseEventRunnableMap.get(mouseId));
+        }
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                game.mouseButtonEvent(mouseId, down);
+            }
+        };
+        //把这个按键的runnable放到map中，以便这个按键重新发送的时候，重置runnable。
+        mouseEventRunnableMap.put(mouseId,runnable);
 
         handler.postDelayed(runnable, 25);
         handler.postDelayed(runnable, 50);

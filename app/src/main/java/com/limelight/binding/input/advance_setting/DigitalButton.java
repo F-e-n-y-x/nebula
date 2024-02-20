@@ -111,23 +111,55 @@ public class DigitalButton extends Element {
         this.layer = elementBean.getLayer();
         this.text = elementBean.getName();
         this.shape = elementBean.getTypeAttributes().get("shape");
-        int keyCode = Integer.parseInt(elementBean.getTypeAttributes().get("value"));
-        addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
-            @Override
-            public void onClick() {
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
+        String keyString = elementBean.getTypeAttributes().get("value");
+        String keyType = keyString.substring(0,1);
+        int keyCode = Integer.parseInt(keyString.substring(1));
+        switch (keyType){
+            case "k":{
+                addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
+                    @Override
+                    public void onClick() {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
+                    }
+
+                    @Override
+                    public void onLongClick() {
+
+                    }
+
+                    @Override
+                    public void onRelease() {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
+                    }
+                });
+                break;
+            }
+            case "m":{
+                addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
+                    @Override
+                    public void onClick() {
+                        controller.sendMouseEvent(keyCode,true);
+                    }
+
+                    @Override
+                    public void onLongClick() {
+
+                    }
+
+                    @Override
+                    public void onRelease() {
+                        controller.sendMouseEvent(keyCode,false);
+                    }
+                });
+                break;
+            }
+            case "g":{
+
+                break;
             }
 
-            @Override
-            public void onLongClick() {
+        }
 
-            }
-
-            @Override
-            public void onRelease() {
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
-            }
-        });
     }
 
     public void addDigitalButtonListener(DigitalButtonListener listener) {

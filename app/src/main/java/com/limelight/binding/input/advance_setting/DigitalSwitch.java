@@ -43,17 +43,36 @@ public class DigitalSwitch extends Element {
 
         this.text = elementBean.getName();
         this.shape = elementBean.getTypeAttributes().get("shape");
-        int keyCode = Integer.parseInt(elementBean.getTypeAttributes().get("value"));
-        addDigitalSwitchListener(new DigitalSwitch.DigitalSwitchListener() {
-            @Override
-            public void onSwitch(boolean wasPressed) {
-                if (wasPressed){
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
-                } else {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
-                }
+        String keyString = elementBean.getTypeAttributes().get("value");
+        String keyType = keyString.substring(0,1);
+        int keyCode = Integer.parseInt(keyString.substring(1));
+        switch (keyType){
+            case "k":{
+                addDigitalSwitchListener(new DigitalSwitch.DigitalSwitchListener() {
+                    @Override
+                    public void onSwitch(boolean wasPressed) {
+                        if (wasPressed){
+                            controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
+                        } else {
+                            controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
+                        }
+                    }
+                });
             }
-        });
+            case "m":{
+                addDigitalSwitchListener(new DigitalSwitch.DigitalSwitchListener() {
+                    @Override
+                    public void onSwitch(boolean wasPressed) {
+                        if (wasPressed){
+                            controller.sendMouseEvent(keyCode,true);;
+                        } else {
+                            controller.sendMouseEvent(keyCode,false);;
+                        }
+                    }
+                });
+            }
+        }
+
     }
 
     public void addDigitalSwitchListener(DigitalSwitchListener listener) {

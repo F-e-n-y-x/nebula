@@ -86,15 +86,17 @@ public class SettingController {
         View.OnTouchListener touchListener = new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
+                String keyString = (String) v.getTag();
+                int keyCode = Integer.parseInt(keyString.substring(1));
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         // 处理按下事件
-                        controllerManager.getElementController().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,Integer.parseInt((String) v.getTag())));
+                        controllerManager.getElementController().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
                         v.setBackgroundResource(R.drawable.confirm_square_border);
                         return true;
                     case MotionEvent.ACTION_UP:
                         // 处理释放事件
-                        controllerManager.getElementController().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,Integer.parseInt((String) v.getTag())));
+                        controllerManager.getElementController().sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
                         v.setBackgroundResource(R.drawable.square_border);
                         return true;
                 }

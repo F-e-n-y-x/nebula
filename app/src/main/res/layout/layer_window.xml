@@ -150,13 +150,15 @@
                 <FrameLayout
                     android:id="@+id/edit_mouse_layout"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
                     <include layout="@layout/layout_mouse"/>
                 </FrameLayout>
                 <FrameLayout
                     android:id="@+id/edit_gamepad_layout"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent">
+                    android:layout_height="match_parent"
+                    android:visibility="gone">
                     <include layout="@layout/layout_gamepad"/>
                 </FrameLayout>
 
