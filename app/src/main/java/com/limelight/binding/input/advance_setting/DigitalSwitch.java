@@ -58,6 +58,7 @@ public class DigitalSwitch extends Element {
                         }
                     }
                 });
+                break;
             }
             case "m":{
                 addDigitalSwitchListener(new DigitalSwitch.DigitalSwitchListener() {
@@ -70,6 +71,7 @@ public class DigitalSwitch extends Element {
                         }
                     }
                 });
+                break;
             }
         }
 
