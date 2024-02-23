@@ -26,7 +26,7 @@ public class SwitchCard extends ElementCard{
         value.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v);
+                editController.jumpDeviceLayout((TextView) v,null);
             }
         });
         shape = switchCardLayout.findViewById(R.id.switch_card_shape);

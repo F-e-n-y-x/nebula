@@ -110,6 +110,7 @@
             android:layout_gravity="center"
             android:background="@color/advance_setting_background">
             <LinearLayout
+                android:id="@+id/switch_device_button_box"
                 android:orientation="horizontal"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

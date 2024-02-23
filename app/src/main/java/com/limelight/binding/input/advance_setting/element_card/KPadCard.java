@@ -30,7 +30,7 @@ public class KPadCard extends ElementCard{
         View.OnClickListener jumpDeviceLayout = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v);
+                editController.jumpDeviceLayout((TextView) v,"keyboard");
             }
         };
 
