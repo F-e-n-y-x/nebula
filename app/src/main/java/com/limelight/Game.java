@@ -77,8 +77,9 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.view.inputmethod.InputMethodManager;
+import android.view.View.OnClickListener;
 import android.widget.TextView;
-import android.widget.Toast;
+import android.widget.Toast; 
 
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
@@ -147,6 +148,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
+    private int requestedPerformanceOverlayVisibility = View.GONE;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -240,6 +242,25 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             }
         }
+
+        // hotkeys funcs
+        findViewById(R.id.btnWin).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_LWIN});
+            }
+        });
+    
+        findViewById(R.id.btnEsc).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_ESCAPE});
+            }
+        });
+
+        findViewById(R.id.btnHDR).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_LWIN, KeyboardTranslator.VK_MENU, KeyboardTranslator.VK_B});
+            }
+        });
 
         // Listen for non-touch events on the game surface
         streamView = findViewById(R.id.surfaceView);
@@ -372,11 +393,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             else {
                 Toast.makeText(this, "HDR requires Android 7.0 or later", Toast.LENGTH_LONG).show();
             }
-        }
-
-        // Check if the user has enabled performance stats overlay
-        if (prefConfig.enablePerfOverlay) {
-            performanceOverlayView.setVisibility(View.VISIBLE);
         }
 
         decoderRenderer = new MediaCodecDecoderRenderer(
@@ -639,10 +655,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     virtualController.show();
                 }
 
-                if (prefConfig.enablePerfOverlay) {
-                    performanceOverlayView.setVisibility(View.VISIBLE);
-                }
-
+                performanceOverlayView.setVisibility(requestedPerformanceOverlayVisibility);
                 notificationOverlayView.setVisibility(requestedNotificationOverlayVisibility);
 
                 // Enable sensors again after exiting PiP
@@ -2698,6 +2711,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     @Override
+    public boolean isPerfOverlayVisible() {
+        return requestedPerformanceOverlayVisibility == View.VISIBLE;
+    }
+
+    @Override
     public void onUsbPermissionPromptStarting() {
         // Disable PiP auto-enter while the USB permission prompt is on-screen. This prevents
         // us from entering PiP while the user is interacting with the OS permission dialog.
@@ -2744,5 +2762,52 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // ensures that Android properly handles the back key when needed and only open the game
         // menu when the activity would be closed.
         showGameMenu(null);
+    }
+
+    public void togglePerformanceOverlay() {
+        if (requestedPerformanceOverlayVisibility == View.VISIBLE) {
+            requestedPerformanceOverlayVisibility = View.GONE;
+        } else {
+            requestedPerformanceOverlayVisibility = View.VISIBLE;
+        }
+        performanceOverlayView.setVisibility(requestedPerformanceOverlayVisibility);
+    }
+
+    private static byte getModifier(short key) {
+        switch (key) {
+            case KeyboardTranslator.VK_LSHIFT:
+                return KeyboardPacket.MODIFIER_SHIFT;
+            case KeyboardTranslator.VK_LCONTROL:
+                return KeyboardPacket.MODIFIER_CTRL;
+            case KeyboardTranslator.VK_LWIN:
+                return KeyboardPacket.MODIFIER_META;
+
+            default:
+                return 0;
+        }
+    }
+
+    private void sendKeys(short[] keys) {
+        final byte[] modifier = {(byte) 0};
+
+        for (short key : keys) {
+            conn.sendKeyboardInput(key, KeyboardPacket.KEY_DOWN, modifier[0], (byte) 0);
+
+            // Apply the modifier of the pressed key, e.g. CTRL first issues a CTRL event (without
+            // modifier) and then sends the following keys with the CTRL modifier applied
+            modifier[0] |= getModifier(key);
+        }
+
+        new Handler().postDelayed((() -> {
+
+            for (int pos = keys.length - 1; pos >= 0; pos--) {
+                short key = keys[pos];
+
+                // Remove the keys modifier before releasing the key
+                modifier[0] &= ~getModifier(key);
+
+                conn.sendKeyboardInput(key, KeyboardPacket.KEY_UP, modifier[0], (byte) 0);
+            }
+        }), 25);
     }
 }

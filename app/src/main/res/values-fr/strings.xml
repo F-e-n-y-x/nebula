@@ -189,9 +189,7 @@
     <string name="title_video_format">Modifier les paramètres de codec</string>
     <string name="summary_video_format">Les nouveaux codecs peuvent réduire la bande passante vidéo requise si votre appareil les prend en charge. Les codecs séléctionnés peuvent être ignorés si ils ne sont pas prises en charge par le logiciel hôte ou le GPU.</string>
     <string name="title_enable_hdr">Activer le HDR (expérimental)</string>
-    <string name="summary_enable_hdr">Streamer en HDR lorsque le jeu et le GPU du PC le prennent en charge. Le HDR nécessite un GPU pouvant encoder en HEVC Main 10.</string>
-    <string name="title_enable_perf_overlay">Afficher les statistiques de peformance lors du stream</string>
-    <string name="summary_enable_perf_overlay">Affiche une superposition à l\'écran avec des informations de performance en temps réel pendant le stream</string>
+    <string name="summary_enable_hdr">Diffuser du HDR lorsque le jeu et le processeur graphique du PC le prennent en charge. HDR nécessite un GPU série GTX 1000 ou une version ultérieure.</string>
     <string name="title_enable_post_stream_toast">Afficher le message de latence après la diffusion en continu</string>
     <string name="summary_enable_post_stream_toast">Afficher un message d’informations de latence après la fin du flux</string>
     <string name="no_video_received_error">Aucune vidéo reçue depuis l\'hôte.</string>

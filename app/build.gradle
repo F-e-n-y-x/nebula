@@ -1,14 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
-    ndkVersion "23.2.8568313"
+    ndkVersion "25.2.9519653"
 
     compileSdk 34
 
     namespace 'com.limelight'
 
     defaultConfig {
-        minSdk 16
+        minSdk 22
         targetSdk 34
 
         versionName "12.0.2"
@@ -119,7 +119,7 @@ android {
             // is to please change the applicationId before you publish.
             //
             // TL;DR: Leave the following line alone!
-            applicationIdSuffix ".unofficial"
+            applicationIdSuffix ".qiin"
             resValue "string", "app_label", "Moonlight"
             resValue "string", "app_label_root", "Moonlight (Root)"
 
@@ -144,4 +144,6 @@ dependencies {
     // 3.5.8 requires minSdk 19, uses StandardCharsets.UTF_8 internally
     implementation 'org.jmdns:jmdns:3.5.7'
     implementation 'com.github.cgutman:ShieldControllerExtensions:1.0.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.github.ZeyuKeithFu:KeyboardHeaderLayout:v1.0'
 }
