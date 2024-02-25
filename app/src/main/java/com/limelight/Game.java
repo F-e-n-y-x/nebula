@@ -127,6 +127,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private int suppressPipRefCount = 0;
     private String pcName;
     private String appName;
+    private NvApp app;
     private float desiredRefreshRate;
 
     private InputCaptureProvider inputCaptureProvider;
@@ -145,8 +146,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
     private TextView performanceOverlayView;
-
-    private ShortcutHelper shortcutHelper;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -318,9 +317,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         int httpsPort = Game.this.getIntent().getIntExtra(EXTRA_HTTPS_PORT, 0); // 0 is treated as unknown
         int appId = Game.this.getIntent().getIntExtra(EXTRA_APP_ID, StreamConfiguration.INVALID_APP_ID);
         String uniqueId = Game.this.getIntent().getStringExtra(EXTRA_UNIQUEID);
-        String uuid = Game.this.getIntent().getStringExtra(EXTRA_PC_UUID);
         boolean appSupportsHdr = Game.this.getIntent().getBooleanExtra(EXTRA_APP_HDR, false);
         byte[] derCertData = Game.this.getIntent().getByteArrayExtra(EXTRA_SERVER_CERT);
+
+        app = new NvApp(appName != null ? appName : "app", appId, appSupportsHdr);
 
         X509Certificate serverCert = null;
         try {
@@ -335,17 +335,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         if (appId == StreamConfiguration.INVALID_APP_ID) {
             finish();
             return;
-        }
-
-        // Report this shortcut being used
-        ComputerDetails computer = new ComputerDetails();
-        computer.name = pcName;
-        computer.uuid = uuid;
-        shortcutHelper = new ShortcutHelper(this);
-        shortcutHelper.reportComputerShortcutUsed(computer);
-        if (appName != null) {
-            // This may be null if launched from the "Resume Session" PC context menu item
-            shortcutHelper.reportGameLaunched(computer, new NvApp(appName, appId, appSupportsHdr));
         }
 
         // Initialize the MediaCodec helper before creating the decoder
@@ -479,19 +468,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 .setResolution(prefConfig.width, prefConfig.height)
                 .setLaunchRefreshRate(prefConfig.fps)
                 .setRefreshRate(chosenFrameRate)
-                .setApp(new NvApp(appName != null ? appName : "app", appId, appSupportsHdr))
+                .setApp(app)
                 .setBitrate(prefConfig.bitrate)
                 .setEnableSops(prefConfig.enableSops)
                 .enableLocalAudioPlayback(prefConfig.playHostAudio)
                 .setMaxPacketSize(1392)
                 .setRemoteConfiguration(StreamConfiguration.STREAM_CFG_AUTO) // NvConnection will perform LAN and VPN detection
-                .setHevcBitratePercentageMultiplier(75)
-                .setAv1BitratePercentageMultiplier(60)
                 .setSupportedVideoFormats(supportedVideoFormats)
                 .setAttachedGamepadMask(gamepadMask)
                 .setClientRefreshRateX100((int)(displayRefreshRate * 100))
                 .setAudioConfiguration(prefConfig.audioConfiguration)
-                .setAudioEncryption(true)
                 .setColorSpace(decoderRenderer.getPreferredColorSpace())
                 .setColorRange(decoderRenderer.getPreferredColorRange())
                 .setPersistGamepadsAfterDisconnect(!prefConfig.multiController)
@@ -506,7 +492,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         keyboardTranslator = new KeyboardTranslator();
 
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
-        inputManager.registerInputDeviceListener(controllerHandler, null);
         inputManager.registerInputDeviceListener(keyboardTranslator, null);
 
         // Initialize touch contexts
@@ -519,12 +504,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
                         streamView, prefConfig);
             }
-        }
-
-        // Use sustained performance mode on N+ to ensure consistent
-        // CPU availability
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            getWindow().setSustainedPerformanceMode(true);
         }
 
         if (prefConfig.onscreenController) {
@@ -1069,16 +1048,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // that case here too.
         if (isInMultiWindowMode) {
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-            // Disable performance optimizations for foreground
-            getWindow().setSustainedPerformanceMode(false);
             decoderRenderer.notifyVideoBackground();
         }
         else {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-            // Enable performance optimizations for foreground
-            getWindow().setSustainedPerformanceMode(true);
             decoderRenderer.notifyVideoForeground();
         }
 
@@ -1090,12 +1063,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     protected void onDestroy() {
         super.onDestroy();
 
-        InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         if (controllerHandler != null) {
-            inputManager.unregisterInputDeviceListener(controllerHandler);
             controllerHandler.destroy();
         }
         if (keyboardTranslator != null) {
+            InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
             inputManager.unregisterInputDeviceListener(keyboardTranslator);
         }
 
@@ -1113,6 +1085,21 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Destroy the capture provider
         inputCaptureProvider.destroy();
+    }
+
+    @Override
+    protected void onPause() {
+        if (isFinishing()) {
+            // Stop any further input device notifications before we lose focus (and pointer capture)
+            if (controllerHandler != null) {
+                controllerHandler.stop();
+            }
+
+            // Ungrab input to prevent further input device notifications
+            setInputGrabState(false);
+        }
+
+        super.onPause();
     }
 
     @Override
@@ -1300,10 +1287,20 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         else if ((modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_ALT | KeyboardPacket.MODIFIER_SHIFT)) ==
                 (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_ALT | KeyboardPacket.MODIFIER_SHIFT) &&
                 (down && nonModifierKeyCode != KeyEvent.KEYCODE_UNKNOWN)) {
-            // Remember that a special key combo was activated, so we can consume all key events until the modifiers come up
-            specialKeyCode = androidKeyCode;
-            waitingForAllModifiersUp = true;
-            return true;
+            switch (androidKeyCode) {
+                case KeyEvent.KEYCODE_Z:
+                case KeyEvent.KEYCODE_Q:
+                case KeyEvent.KEYCODE_C:
+                    // Remember that a special key combo was activated, so we can consume all key
+                    // events until the modifiers come up
+                    specialKeyCode = androidKeyCode;
+                    waitingForAllModifiersUp = true;
+                    return true;
+
+                default:
+                    // This isn't a special combo that we consume on the client side
+                    return false;
+            }
         }
 
         // Not a special combo
@@ -1869,7 +1866,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
                     if (deltaX != 0 || deltaY != 0) {
                         if (prefConfig.absoluteMouseMode) {
-                            conn.sendMouseMoveAsMousePosition(deltaX, deltaY, (short)view.getWidth(), (short)view.getHeight());
+                            // NB: view may be null, but we can unconditionally use streamView because we don't need to adjust
+                            // relative axis deltas for the position of the streamView within the parent's coordinate system.
+                            conn.sendMouseMoveAsMousePosition(deltaX, deltaY, (short)streamView.getWidth(), (short)streamView.getHeight());
                         }
                         else {
                             conn.sendMouseMove(deltaX, deltaY);
@@ -2319,6 +2318,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 // Let the display go to sleep now
                 getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
+                // Stop processing controller input
+                controllerHandler.stop();
+
                 // Ungrab input
                 setInputGrabState(false);
 
@@ -2356,7 +2358,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                                     break;
 
                                 default:
-                                    message = getResources().getString(R.string.conn_terminated_msg);
+                                    String errorCodeString;
+                                    // We'll assume large errors are hex values
+                                    if (Math.abs(errorCode) > 1000) {
+                                        errorCodeString = Integer.toHexString(errorCode);
+                                    }
+                                    else {
+                                        errorCodeString = Integer.toString(errorCode);
+                                    }
+                                    message = getResources().getString(R.string.conn_terminated_msg) + "\n\n" +
+                                            getResources().getString(R.string.error_code_prefix) + " " + errorCodeString;
                                     break;
                             }
                         }
@@ -2443,6 +2454,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 hideSystemUi(1000);
             }
         });
+
+        // Report this shortcut being used (off the main thread to prevent ANRs)
+        ComputerDetails computer = new ComputerDetails();
+        computer.name = pcName;
+        computer.uuid = Game.this.getIntent().getStringExtra(EXTRA_PC_UUID);
+        ShortcutHelper shortcutHelper = new ShortcutHelper(this);
+        shortcutHelper.reportComputerShortcutUsed(computer);
+        if (appName != null) {
+            // This may be null if launched from the "Resume Session" PC context menu item
+            shortcutHelper.reportGameLaunched(computer, app);
+        }
     }
 
     @Override

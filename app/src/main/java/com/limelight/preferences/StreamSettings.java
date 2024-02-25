@@ -190,8 +190,13 @@ public class StreamSettings extends Activity {
         }
 
         private void addNativeFrameRateEntry(float framerate) {
+            int frameRateRounded = Math.round(framerate);
+            if (frameRateRounded == 0) {
+                return;
+            }
+
             ListPreference pref = (ListPreference) findPreference(PreferenceConfiguration.FPS_PREF_STRING);
-            String fpsValue = Integer.toString(Math.round(framerate));
+            String fpsValue = Integer.toString(frameRateRounded);
             String fpsName = getResources().getString(R.string.resolution_prefix_native) +
                     " (" + fpsValue + " " + getResources().getString(R.string.fps_suffix_fps) + ")";
 
@@ -328,26 +333,29 @@ public class StreamSettings extends Activity {
                         (PreferenceCategory) findPreference("category_help");
                 screen.removePreference(category);
             }*/
-
+            PreferenceCategory category_gamepad_settings =
+                    (PreferenceCategory) findPreference("category_gamepad_settings");
             // Remove the vibration options if the device can't vibrate
             if (!((Vibrator)getActivity().getSystemService(Context.VIBRATOR_SERVICE)).hasVibrator()) {
-                PreferenceCategory category =
-                        (PreferenceCategory) findPreference("category_gamepad_settings");
-                category.removePreference(findPreference("checkbox_vibrate_fallback"));
-
+                category_gamepad_settings.removePreference(findPreference("checkbox_vibrate_fallback"));
+                category_gamepad_settings.removePreference(findPreference("seekbar_vibrate_fallback_strength"));
                 // The entire OSC category may have already been removed by the touchscreen check above
-                category = (PreferenceCategory) findPreference("category_onscreen_controls");
+                PreferenceCategory category = (PreferenceCategory) findPreference("category_onscreen_controls");
                 if (category != null) {
                     category.removePreference(findPreference("checkbox_vibrate_osc"));
                 }
             }
+            else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
+                    !((Vibrator)getActivity().getSystemService(Context.VIBRATOR_SERVICE)).hasAmplitudeControl() ) {
+                // Remove the vibration strength selector of the device doesn't have amplitude control
+                category_gamepad_settings.removePreference(findPreference("seekbar_vibrate_fallback_strength"));
+            }
 
-            int maxSupportedFps = 0;
+            Display display = getActivity().getWindowManager().getDefaultDisplay();
+            float maxSupportedFps = display.getRefreshRate();
 
             // Hide non-supported resolution/FPS combinations
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Display display = getActivity().getWindowManager().getDefaultDisplay();
-
                 int maxSupportedResW = 0;
 
                 // Add a native resolution with any insets included for users that don't want content
@@ -415,7 +423,7 @@ public class StreamSettings extends Activity {
                     }
 
                     if (candidate.getRefreshRate() > maxSupportedFps) {
-                        maxSupportedFps = (int)candidate.getRefreshRate();
+                        maxSupportedFps = candidate.getRefreshRate();
                     }
                 }
 
@@ -508,7 +516,7 @@ public class StreamSettings extends Activity {
                 // getRealMetrics() function (unlike the lies that getWidth() and getHeight()
                 // tell to us).
                 DisplayMetrics metrics = new DisplayMetrics();
-                getActivity().getWindowManager().getDefaultDisplay().getRealMetrics(metrics);
+                display.getRealMetrics(metrics);
                 int width = Math.max(metrics.widthPixels, metrics.heightPixels);
                 int height = Math.min(metrics.widthPixels, metrics.heightPixels);
                 addNativeResolutionEntries(width, height, false);
@@ -516,7 +524,6 @@ public class StreamSettings extends Activity {
             else {
                 // On Android 4.1, we have to resort to reflection to invoke hidden APIs
                 // to get the real screen dimensions.
-                Display display = getActivity().getWindowManager().getDefaultDisplay();
                 try {
                     Method getRawHeightFunc = Display.class.getMethod("getRawHeight");
                     Method getRawWidthFunc = Display.class.getMethod("getRawWidth");
@@ -607,7 +614,6 @@ public class StreamSettings extends Activity {
                 category.removePreference(findPreference("checkbox_enable_hdr"));
             }
             else {
-                Display display = getActivity().getWindowManager().getDefaultDisplay();
                 Display.HdrCapabilities hdrCaps = display.getHdrCapabilities();
 
                 // We must now ensure our display is compatible with HDR10
