@@ -77,12 +77,13 @@ public class ElementController {
     }
 
 
-    public void addElement(ElementBean elementBean){
-        addElementToScreen(elementBean);
+    public Element addElement(ElementBean elementBean){
+        Element element = addElementToScreen(elementBean);
         elementPreference.addElement(elementBean);
+        return element;
     }
 
-    private void addElementToScreen(ElementBean elementBean){
+    private Element addElementToScreen(ElementBean elementBean){
         Element element = null;
         switch (elementBean.getType()){
             case ElementBean.TYPE_BUTTON:{
@@ -124,7 +125,7 @@ public class ElementController {
         layoutParams.setMargins(elementBean.getPositionX() - elementBean.getWidth()/2, elementBean.getPositionY() - elementBean.getHeight()/2, 0, 0);
 
         elementsLayout.addView(element, layoutParams);
-
+        return element;
     }
 
     private Element addMButton(ElementBean elementBean){
@@ -155,8 +156,10 @@ public class ElementController {
         elements.clear();
     }
 
+    //倒序选择，不然会先选择下面的按钮
     public Element selectElement(float x, float y){
-        for (Element element : elements) {
+        for (int i = elements.size() - 1;i > -1;i --){
+            Element element = elements.get(i);
             if (element.inRange(x,y)){
                 return element;
             }

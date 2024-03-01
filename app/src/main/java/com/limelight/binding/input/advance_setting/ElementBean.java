@@ -35,9 +35,10 @@ public class ElementBean {
     private int normalColor;
     private int pressedColor;
     private int layer;
+    private long createTime;
     private Map<String,String> otherAttributes;
 
-    public ElementBean(String name, String type, Map<String, String> typeAttributes, int positionX, int positionY, int width, int height, int opacity, int normalColor, int pressedColor,int layer, Map<String, String> otherAttributes) {
+    public ElementBean(String name, String type, Map<String, String> typeAttributes, int positionX, int positionY, int width, int height, int opacity, int normalColor, int pressedColor,int layer, long createTime, Map<String, String> otherAttributes) {
         this.name = name;
         this.type = type;
         this.typeAttributes = typeAttributes;
@@ -50,6 +51,7 @@ public class ElementBean {
         this.pressedColor = pressedColor;
         this.layer = layer;
         this.otherAttributes = otherAttributes;
+        this.createTime = createTime;
     }
 
     public String getName() {
@@ -124,6 +126,10 @@ public class ElementBean {
         this.normalColor = normalColor;
     }
 
+    public int getPressedColor() {
+        return pressedColor;
+    }
+
     public void setPressedColor(int pressedColor) {
         this.pressedColor = pressedColor;
     }
@@ -134,6 +140,14 @@ public class ElementBean {
 
     public void setLayer(int layer) {
         this.layer = layer;
+    }
+
+    public long getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(long createTime) {
+        this.createTime = createTime;
     }
 
     public Map<String,String> getOtherAttributes() {

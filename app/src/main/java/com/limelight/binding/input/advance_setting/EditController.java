@@ -312,22 +312,39 @@ public class EditController {
                     Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
                     return;
                 }
+                int elementCentralX = Integer.parseInt(elementXInput.getText().toString());
+                int elementCentralY = Integer.parseInt(elementYInput.getText().toString());
                 ElementBean elementBean = new ElementBean(
                         name,
                         elementType.getSelectedItem().toString(),
                         elementCard.getTypeAttributes(),
-                        Integer.parseInt(elementXInput.getText().toString()),
-                        Integer.parseInt(elementYInput.getText().toString()),
+                        elementCentralX,
+                        elementCentralY,
                         Integer.parseInt(elementWidthInput.getText().toString()),
                         Integer.parseInt(elementHeightInput.getText().toString()),
                         100,
                         0xF0888888,
                         0xF00000FF,
                         0,
+                        System.currentTimeMillis(),
                         null
                 );
 
-                controllerManager.getElementController().addElement(elementBean);
+                Element element = controllerManager.getElementController().addElement(elementBean);
+
+                //选中刚刚添加的按钮
+                if (element == null){
+                    return;
+                }
+                if (editElement != null){
+                    editElement.setNormalColor(normalColor);
+                }
+                editElement = element;
+                editElement.setNormalColor(editColor);
+                elementXInput.setText(String.valueOf(editElement.getCentralX()));
+                elementYInput.setText(String.valueOf(editElement.getCentralY()));
+                elementWidthInput.setText(String.valueOf(editElement.getParamWidth()));
+                elementHeightInput.setText(String.valueOf(editElement.getParamHeight()));
 
             }
         });

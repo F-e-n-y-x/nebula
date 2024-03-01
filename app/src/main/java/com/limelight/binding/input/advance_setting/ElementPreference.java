@@ -5,8 +5,12 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import com.google.gson.Gson;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ElementPreference {
@@ -71,14 +75,17 @@ public class ElementPreference {
         //wg_debug
         System.out.println("wg_debug elements preference:" + elements);
     }
-    public Collection<ElementBean> getElements() {
-        return elements.values();
+    public List<ElementBean> getElements() {
+        List<ElementBean> list = new ArrayList<>(elements.values());
+        Collections.sort(list, new Comparator<ElementBean>() {
+            @Override
+            public int compare(ElementBean o1, ElementBean o2) {
+                return Long.compare(o1.getCreateTime(), o2.getCreateTime());
+            }
+        });
+        return list;
     }
 
-    public boolean containsElement(String elementName){
-        //新增失败，按钮名称已存在
-        return elements.containsKey(elementName);
-    }
 
     private ElementBean stringToJSON(String element){
         //这个elementBean的原因是因为Gson会报错，无法转换Map，但是新建一个elementBean就可以了，可能是创建之后，这个对象并没有被回收，于是就被gson使用了
@@ -94,6 +101,7 @@ public class ElementPreference {
             0xF0888888,
             0xF00000FF,
             0,
+            System.currentTimeMillis(),
             new HashMap<>());
         return gson.fromJson(element, ElementBean.class);
     }
