@@ -476,13 +476,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 .enableLocalAudioPlayback(prefConfig.playHostAudio)
                 .setMaxPacketSize(1392)
                 .setRemoteConfiguration(StreamConfiguration.STREAM_CFG_AUTO) // NvConnection will perform LAN and VPN detection
-                .setHevcBitratePercentageMultiplier(75)
-                .setAv1BitratePercentageMultiplier(75)
                 .setSupportedVideoFormats(supportedVideoFormats)
                 .setAttachedGamepadMask(gamepadMask)
                 .setClientRefreshRateX100((int)(displayRefreshRate * 100))
                 .setAudioConfiguration(prefConfig.audioConfiguration)
-                .setAudioEncryption(true)
                 .setColorSpace(decoderRenderer.getPreferredColorSpace())
                 .setColorRange(decoderRenderer.getPreferredColorRange())
                 .setPersistGamepadsAfterDisconnect(!prefConfig.multiController)
@@ -509,12 +506,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
                         streamView, prefConfig);
             }
-        }
-
-        // Use sustained performance mode on N+ to ensure consistent
-        // CPU availability
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            getWindow().setSustainedPerformanceMode(true);
         }
 
         if (prefConfig.onscreenController) {
@@ -1070,16 +1061,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // that case here too.
         if (isInMultiWindowMode) {
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-            // Disable performance optimizations for foreground
-            getWindow().setSustainedPerformanceMode(false);
             decoderRenderer.notifyVideoBackground();
         }
         else {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
-            // Enable performance optimizations for foreground
-            getWindow().setSustainedPerformanceMode(true);
             decoderRenderer.notifyVideoForeground();
         }
 
@@ -1315,10 +1300,20 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         else if ((modifierFlags & (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_ALT | KeyboardPacket.MODIFIER_SHIFT)) ==
                 (KeyboardPacket.MODIFIER_CTRL | KeyboardPacket.MODIFIER_ALT | KeyboardPacket.MODIFIER_SHIFT) &&
                 (down && nonModifierKeyCode != KeyEvent.KEYCODE_UNKNOWN)) {
-            // Remember that a special key combo was activated, so we can consume all key events until the modifiers come up
-            specialKeyCode = androidKeyCode;
-            waitingForAllModifiersUp = true;
-            return true;
+            switch (androidKeyCode) {
+                case KeyEvent.KEYCODE_Z:
+                case KeyEvent.KEYCODE_Q:
+                case KeyEvent.KEYCODE_C:
+                    // Remember that a special key combo was activated, so we can consume all key
+                    // events until the modifiers come up
+                    specialKeyCode = androidKeyCode;
+                    waitingForAllModifiersUp = true;
+                    return true;
+
+                default:
+                    // This isn't a special combo that we consume on the client side
+                    return false;
+            }
         }
 
         // Not a special combo
@@ -2376,7 +2371,16 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                                     break;
 
                                 default:
-                                    message = getResources().getString(R.string.conn_terminated_msg);
+                                    String errorCodeString;
+                                    // We'll assume large errors are hex values
+                                    if (Math.abs(errorCode) > 1000) {
+                                        errorCodeString = Integer.toHexString(errorCode);
+                                    }
+                                    else {
+                                        errorCodeString = Integer.toString(errorCode);
+                                    }
+                                    message = getResources().getString(R.string.conn_terminated_msg) + "\n\n" +
+                                            getResources().getString(R.string.error_code_prefix) + " " + errorCodeString;
                                     break;
                             }
                         }
