@@ -22,6 +22,8 @@ public class DigitalKPad extends Element {
     List<DigitalKPadListener> listeners = new ArrayList<>();
 
     private static final int DPAD_MARGIN = 5;
+    //加上这个防止一些无用的按键多次触发，发送大量数据，导致卡顿
+    private int lastDirection = 0;
 
     private final Paint paint = new Paint();
 
@@ -35,30 +37,40 @@ public class DigitalKPad extends Element {
         addDigitalKPadListener(new DigitalKPadListener() {
             @Override
             public void onDirectionChange(int direction) {
-                if ((direction & DIGITAL_PAD_DIRECTION_LEFT) != 0) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,leftValue));
+                int directionChange = lastDirection ^ direction;
+                if ((directionChange & DIGITAL_PAD_DIRECTION_LEFT) != 0 ){
+                    if ((direction & DIGITAL_PAD_DIRECTION_LEFT) != 0) {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,leftValue));
+                    }
+                    else {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,leftValue));
+                    }
                 }
-                else {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,leftValue));
+                if ((directionChange & DIGITAL_PAD_DIRECTION_RIGHT) != 0 ){
+                    if ((direction & DIGITAL_PAD_DIRECTION_RIGHT) != 0) {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,rightValue));
+                    }
+                    else {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,rightValue));
+                    }
                 }
-                if ((direction & DIGITAL_PAD_DIRECTION_RIGHT) != 0) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,rightValue));
+                if ((directionChange & DIGITAL_PAD_DIRECTION_UP) != 0 ){
+                    if ((direction & DIGITAL_PAD_DIRECTION_UP) != 0) {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,topValue));
+                    }
+                    else {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,topValue));
+                    }
                 }
-                else {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,rightValue));
+                if ((directionChange & DIGITAL_PAD_DIRECTION_DOWN) != 0 ){
+                    if ((direction & DIGITAL_PAD_DIRECTION_DOWN) != 0) {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,downValue));
+                    }
+                    else {
+                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,downValue));
+                    }
                 }
-                if ((direction & DIGITAL_PAD_DIRECTION_UP) != 0) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,topValue));
-                }
-                else {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,topValue));
-                }
-                if ((direction & DIGITAL_PAD_DIRECTION_DOWN) != 0) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,downValue));
-                }
-                else {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,downValue));
-                }
+                lastDirection = direction;
             }
         });
 

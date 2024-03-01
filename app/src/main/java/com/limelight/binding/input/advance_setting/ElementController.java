@@ -186,7 +186,7 @@ public class ElementController {
         //把这个按键的runnable放到map中，以便这个按键重新发送的时候，重置runnable。
         keyEventRunnableMap.put(keyEvent.getKeyCode(),runnable);
 
-        handler.postDelayed(runnable, 25);
+
         handler.postDelayed(runnable, 50);
         handler.postDelayed(runnable, 75);
     }
@@ -204,7 +204,6 @@ public class ElementController {
         //把这个按键的runnable放到map中，以便这个按键重新发送的时候，重置runnable。
         mouseEventRunnableMap.put(mouseId,runnable);
 
-        handler.postDelayed(runnable, 25);
         handler.postDelayed(runnable, 50);
         handler.postDelayed(runnable, 75);
     }
