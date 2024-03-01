@@ -10,6 +10,7 @@ import android.widget.TextView;
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.EditController;
 import com.limelight.binding.input.advance_setting.ElementBean;
+import com.limelight.binding.input.advance_setting.WindowsController;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,7 +27,7 @@ public class SwitchCard extends ElementCard{
         value.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v,null);
+                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK | WindowsController.MOUSE_DEVICE_MASK);
             }
         });
         shape = switchCardLayout.findViewById(R.id.switch_card_shape);

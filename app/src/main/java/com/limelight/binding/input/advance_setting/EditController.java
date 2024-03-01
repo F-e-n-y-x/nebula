@@ -402,7 +402,7 @@ public class EditController {
     }
 
 
-    public void jumpDeviceLayout(TextView valueTextView,String device){
+    public void jumpDeviceLayout(TextView valueTextView,int devices){
         WindowsController.DeviceWindowListener keySelectListener = new WindowsController.DeviceWindowListener() {
             @Override
             public void onElementClick(String text, String tag) {
@@ -410,11 +410,8 @@ public class EditController {
                 valueTextView.setText(text);
             }
         };
-        if (device == null){
-            controllerManager.getWindowsController().openDeviceWindow(keySelectListener);
-        } else {
-            controllerManager.getWindowsController().openDeviceWindowsSingle(keySelectListener, device);
-        }
+        controllerManager.getWindowsController().openDeviceWindow(keySelectListener,devices);
+
 
     }
 }

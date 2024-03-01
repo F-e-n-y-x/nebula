@@ -32,6 +32,11 @@ public class WindowsController {
 
     private ControllerManager controllerManager;
     private Context context;
+    private FrameLayout layout;
+    public static int KEYBOARD_DEVICE_MASK = 1;
+    public static int MOUSE_DEVICE_MASK = 2;
+    public static int GAMEPAD_DEVICE_MASK = 4;
+
 
     //text window
     private FrameLayout textWindow;
@@ -56,14 +61,23 @@ public class WindowsController {
     private FrameLayout keyboardLayout;
     private FrameLayout mouseLayout;
     private FrameLayout gamepadLayout;
-    private LinearLayout switchButtonBox;
     private DeviceWindowListener deviceWindowListener;
 
 
 
 
     public WindowsController(ControllerManager controllerManager, FrameLayout layout, Context context){
+        this.controllerManager = controllerManager;
+        this.context = context;
+        this.layout = layout;
 
+
+        initTextWindow();
+        initEditTextWindow();
+        initDeviceWindow();
+    }
+
+    private void initTextWindow(){
         textWindow = layout.findViewById(R.id.text_window);
         textWindowText = layout.findViewById(R.id.text_window_text);
         textWindowConfirmButton = layout.findViewById(R.id.text_window_confirm);
@@ -85,8 +99,8 @@ public class WindowsController {
                 }
             }
         });
-
-
+    }
+    private void initEditTextWindow(){
         editTextWindow = layout.findViewById(R.id.edittext_window);
         editTextWindowTitle = layout.findViewById(R.id.edittext_window_title);
         editTextWindowText = layout.findViewById(R.id.edittext_window_text);
@@ -111,8 +125,8 @@ public class WindowsController {
                 }
             }
         });
-
-        //device views
+    }
+    private void initDeviceWindow(){
         deviceWindow = layout.findViewById(R.id.device_layout_container);
         keyboardButton = layout.findViewById(R.id.keyboard_open_button);
         mouseButton = layout.findViewById(R.id.mouse_open_button);
@@ -120,7 +134,6 @@ public class WindowsController {
         keyboardLayout = layout.findViewById(R.id.edit_keyboard_layout);
         mouseLayout = layout.findViewById(R.id.edit_mouse_layout);
         gamepadLayout = layout.findViewById(R.id.edit_gamepad_layout);
-        switchButtonBox = layout.findViewById(R.id.switch_device_button_box);
 
         keyboardButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -163,11 +176,6 @@ public class WindowsController {
         mouseDrawing.findViewById(R.id.mouse_right).setOnClickListener(keyListener);
         mouseDrawing.findViewById(R.id.mouse_x1).setOnClickListener(keyListener);
         mouseDrawing.findViewById(R.id.mouse_x2).setOnClickListener(keyListener);
-
-
-
-
-
     }
 
     private void switchDeviceLayout(Button button,FrameLayout deviceLayout){
@@ -207,26 +215,25 @@ public class WindowsController {
     }
 
 
-    public void openDeviceWindow(DeviceWindowListener deviceWindowListener){
+    public void openDeviceWindow(DeviceWindowListener deviceWindowListener, int devices){
         this.deviceWindowListener = deviceWindowListener;
         deviceWindow.setVisibility(View.VISIBLE);
-    }
-    public void openDeviceWindowsSingle(DeviceWindowListener deviceWindowListener,String device){
-        this.deviceWindowListener = deviceWindowListener;
-        switchButtonBox.setVisibility(View.GONE);
-        switch (device){
-            case "keyboard":
-                switchDeviceLayout(keyboardButton,keyboardLayout);
-                break;
-            case "mouse":
-                switchDeviceLayout(mouseButton,mouseLayout);
-                break;
-            case "gampad":
-                switchDeviceLayout(gamepadButton,gamepadLayout);
-                break;
-            default:
-                break;
+        keyboardButton.setVisibility(View.GONE);
+        mouseButton.setVisibility(View.GONE);
+        gamepadButton.setVisibility(View.GONE);
+        if ((devices & GAMEPAD_DEVICE_MASK) != 0){
+            gamepadButton.setVisibility(View.VISIBLE);
+            switchDeviceLayout(gamepadButton,gamepadLayout);
         }
-        deviceWindow.setVisibility(View.VISIBLE);
+        if ((devices & MOUSE_DEVICE_MASK) != 0){
+            mouseButton.setVisibility(View.VISIBLE);
+            switchDeviceLayout(mouseButton,mouseLayout);
+        }
+        if ((devices & KEYBOARD_DEVICE_MASK) != 0){
+            keyboardButton.setVisibility(View.VISIBLE);
+            switchDeviceLayout(keyboardButton,keyboardLayout);
+        }
+
+
     }
 }

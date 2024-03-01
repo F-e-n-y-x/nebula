@@ -8,6 +8,7 @@ import android.widget.TextView;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.EditController;
+import com.limelight.binding.input.advance_setting.WindowsController;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +31,7 @@ public class KPadCard extends ElementCard{
         View.OnClickListener jumpDeviceLayout = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v,"keyboard");
+                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK);
             }
         };
 
