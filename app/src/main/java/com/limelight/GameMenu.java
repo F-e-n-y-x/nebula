@@ -62,6 +62,8 @@ public class GameMenu {
                 return KeyboardPacket.MODIFIER_CTRL;
             case KeyboardTranslator.VK_LWIN:
                 return KeyboardPacket.MODIFIER_META;
+            case KeyboardTranslator.VK_MENU:
+                return KeyboardPacket.MODIFIER_ALT;
 
             default:
                 return 0;

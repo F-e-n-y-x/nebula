@@ -815,6 +815,11 @@ public class NvHTTP {
         return true;
     }
 
+    public boolean pcSleep() throws IOException, XmlPullParserException {
+        String xmlStr = openHttpConnectionToString(httpClientLongConnectNoReadTimeout, getHttpsUrl(true), "pcsleep");
+        return !getXmlString(xmlStr, "pcsleep", true).equals("0");
+    }
+
     // Based on example code from https://blog.dev-area.net/2015/08/13/android-4-1-enable-tls-1-1-and-tls-1-2/
     private static class TLSv12SocketFactory extends SSLSocketFactory {
         private SSLSocketFactory internalSSLSocketFactory;

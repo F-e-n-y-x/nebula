@@ -115,6 +115,48 @@ public class ServerHelper {
         }).start();
     }
 
+    public static void pcSleep(final Activity parent, final ComputerDetails computer,
+                                final ComputerManagerService.ComputerManagerBinder managerBinder,
+                                final Runnable onComplete) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                NvHTTP httpConn;
+                String message;
+                try {
+                    httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer), computer.httpsPort,
+                            managerBinder.getUniqueId(), computer.serverCert, PlatformBinding.getCryptoProvider(parent));
+                    if (httpConn.pcSleep()) {
+                        message = parent.getResources().getString(R.string.pcview_menu_sleep_success);
+                    } else {
+                        message = parent.getResources().getString(R.string.pcview_menu_sleep_fail);
+                    }
+                } catch (HostHttpResponseException e) {
+                    message = e.getMessage();
+                } catch (UnknownHostException e) {
+                    message = parent.getResources().getString(R.string.error_unknown_host);
+                } catch (FileNotFoundException e) {
+                    message = parent.getResources().getString(R.string.error_404);
+                } catch (IOException | XmlPullParserException e) {
+                    message = e.getMessage();
+                    e.printStackTrace();
+                } finally {
+                    if (onComplete != null) {
+                        onComplete.run();
+                    }
+                }
+
+                final String toastMessage = message;
+                parent.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(parent, toastMessage, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        }).start();
+    }
+
     public static void doQuit(final Activity parent,
                               final ComputerDetails computer,
                               final NvApp app,

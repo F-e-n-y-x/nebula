@@ -68,29 +68,40 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center"
                 android:orientation="horizontal"
-                android:paddingBottom="16dp"
+                android:paddingBottom="32dp"
                 android:paddingRight="16dp">
 
                 <Button
                     android:id="@+id/btnWin"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="#80000000"
+                    android:drawableStart="@drawable/ic_btn_win"
+                    android:drawablePadding="4dp"
                     android:text="WIN" />
 
                 <Button
                     android:id="@+id/btnEsc"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="#80000000"
+                    android:drawableStart="@drawable/ic_btn_esc"
+                    android:drawablePadding="4dp"
                     android:text="ESC" />
 
                 <Button
                     android:id="@+id/btnHDR"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="#80000000"
+                    android:drawableStart="@drawable/ic_btn_hdr"
+                    android:drawablePadding="4dp"
                     android:text="HDR" />
+
+                <Button
+                    android:id="@+id/btnSleep"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@drawable/ic_btn_sleep"
+                    android:drawablePadding="4dp"
+                    android:text="一键睡眠" />
 
             </LinearLayout>
 

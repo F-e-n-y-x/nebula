@@ -23,6 +23,8 @@
     <string name="pcview_menu_test_network">Test Network Connection</string>
     <string name="pcview_menu_details">View Details</string>
     <string name="pcview_menu_eol">NVIDIA GameStream End-of-Service</string>
+    <string name="pcview_menu_sleep_success">Host sleep success</string>
+    <string name="pcview_menu_sleep_fail">Host sleep failed</string>
 
     <!-- Network test strings -->
     <string name="nettest_title_waiting">Testing Network Connection</string>

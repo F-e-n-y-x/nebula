@@ -243,25 +243,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
 
-        // hotkeys funcs
-        findViewById(R.id.btnWin).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                sendKeys(new short[]{KeyboardTranslator.VK_LWIN});
-            }
-        });
-    
-        findViewById(R.id.btnEsc).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                sendKeys(new short[]{KeyboardTranslator.VK_ESCAPE});
-            }
-        });
-
-        findViewById(R.id.btnHDR).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                sendKeys(new short[]{KeyboardTranslator.VK_LWIN, KeyboardTranslator.VK_MENU, KeyboardTranslator.VK_B});
-            }
-        });
-
         // Listen for non-touch events on the game surface
         streamView = findViewById(R.id.surfaceView);
         streamView.setOnGenericMotionListener(this);
@@ -361,6 +342,34 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             finish();
             return;
         }
+
+        // custom hotkeys
+        findViewById(R.id.btnWin).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_LWIN});
+            }
+        });
+
+        findViewById(R.id.btnEsc).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_ESCAPE});
+            }
+        });
+
+        findViewById(R.id.btnHDR).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_LWIN, KeyboardTranslator.VK_MENU, KeyboardTranslator.VK_B});
+            }
+        });
+
+        findViewById(R.id.btnSleep).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                sendKeys(new short[]{KeyboardTranslator.VK_LWIN, 88});
+                new Handler().postDelayed((() -> {
+                    sendKeys(new short[]{85, 83});
+                }), 200);
+            }
+        });
 
         // Initialize the MediaCodec helper before creating the decoder
         GlPreferences glPrefs = GlPreferences.readPreferences(this);
@@ -2781,6 +2790,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 return KeyboardPacket.MODIFIER_CTRL;
             case KeyboardTranslator.VK_LWIN:
                 return KeyboardPacket.MODIFIER_META;
+            case KeyboardTranslator.VK_MENU:
+                return KeyboardPacket.MODIFIER_ALT;
 
             default:
                 return 0;
