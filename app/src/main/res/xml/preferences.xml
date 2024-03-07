@@ -36,6 +36,18 @@
             android:entryValues="@array/video_frame_pacing_values"
             android:summary="@string/summary_frame_pacing"
             android:defaultValue="latency" />
+        <com.limelight.preferences.SeekBarPreference
+            android:key="seekbar_resolutions_scale"
+            android:dialogMessage="@string/summary_seekbar_scale"
+            seekbar:min="50"
+            android:max="400"
+            android:defaultValue="100"
+            seekbar:step="10"
+            seekbar:keyStep="50"
+            seekbar:divisor="1"
+            android:summary="@string/summary_seekbar_scale"
+            android:text="%"
+            android:title="@string/title_seekbar_scale" />
         <CheckBoxPreference
             android:key="checkbox_stretch_video"
             android:title="@string/title_checkbox_stretch_video"

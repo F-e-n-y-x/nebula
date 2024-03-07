@@ -16,6 +16,7 @@ public class StreamConfiguration {
     private int launchRefreshRate;
     private int clientRefreshRateX100;
     private int bitrate;
+    private int hostResolutionScaleX100;
     private boolean sops;
     private boolean enableAdaptiveResolution;
     private boolean playLocalAudio;
@@ -60,6 +61,11 @@ public class StreamConfiguration {
         
         public StreamConfiguration.Builder setBitrate(int bitrate) {
             config.bitrate = bitrate;
+            return this;
+        }
+
+        public StreamConfiguration.Builder setResolutionScale(int scale) {
+            config.hostResolutionScaleX100 = scale;
             return this;
         }
         
@@ -141,6 +147,7 @@ public class StreamConfiguration {
         this.refreshRate = 60;
         this.launchRefreshRate = 60;
         this.bitrate = 10000;
+        this.hostResolutionScaleX100 = 100;
         this.maxPacketSize = 1024;
         this.remote = STREAM_CFG_AUTO;
         this.sops = true;
@@ -149,13 +156,20 @@ public class StreamConfiguration {
         this.supportedVideoFormats = MoonBridge.VIDEO_FORMAT_H264;
         this.attachedGamepadMask = 0;
     }
-    
     public int getWidth() {
-        return width;
+        return width * hostResolutionScaleX100 / 100;
     }
     
     public int getHeight() {
-        return height;
+        return height * hostResolutionScaleX100 / 100;
+    }
+
+    public int getReqWidth() {
+        return width * hostResolutionScaleX100 / 100;
+    }
+    
+    public int getReqHeight() {
+        return height * hostResolutionScaleX100 / 100;
     }
     
     public int getRefreshRate() {

@@ -255,17 +255,17 @@ public class NvConnection {
         //
         
         // Check for a supported stream resolution
-        if ((context.streamConfig.getWidth() > 4096 || context.streamConfig.getHeight() > 4096) &&
+        if ((context.streamConfig.getReqWidth() > 4096 || context.streamConfig.getReqHeight() > 4096) &&
                 (h.getServerCodecModeSupport(serverInfo) & 0x200) == 0 && context.isNvidiaServerSoftware) {
             context.connListener.displayMessage("Your host PC does not support streaming at resolutions above 4K.");
             return false;
         }
-        else if ((context.streamConfig.getWidth() > 4096 || context.streamConfig.getHeight() > 4096) &&
+        else if ((context.streamConfig.getReqWidth() > 4096 || context.streamConfig.getReqHeight() > 4096) &&
                 (context.streamConfig.getSupportedVideoFormats() & ~MoonBridge.VIDEO_FORMAT_MASK_H264) == 0) {
             context.connListener.displayMessage("Your streaming device must support HEVC or AV1 to stream at resolutions above 4K.");
             return false;
         }
-        else if (context.streamConfig.getHeight() >= 2160 && !h.supports4K(serverInfo)) {
+        else if (context.streamConfig.getReqHeight() >= 2160 && !h.supports4K(serverInfo)) {
             // Client wants 4K but the server can't do it
             context.connListener.displayTransientMessage("You must update GeForce Experience to stream in 4K. The stream will be 1080p.");
             
@@ -275,8 +275,8 @@ public class NvConnection {
         }
         else {
             // Take what the client wanted
-            context.negotiatedWidth = context.streamConfig.getWidth();
-            context.negotiatedHeight = context.streamConfig.getHeight();
+            context.negotiatedWidth = context.streamConfig.getReqWidth();
+            context.negotiatedHeight = context.streamConfig.getReqHeight();
         }
 
         // We will perform some connection type detection if the caller asked for it
