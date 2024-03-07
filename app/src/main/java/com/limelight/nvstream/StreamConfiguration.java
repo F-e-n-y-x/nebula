@@ -156,12 +156,19 @@ public class StreamConfiguration {
         this.supportedVideoFormats = MoonBridge.VIDEO_FORMAT_H264;
         this.attachedGamepadMask = 0;
     }
-    
     public int getWidth() {
-        return width * hostResolutionScaleX100 / 100;
+        return width;
     }
     
     public int getHeight() {
+        return height;
+    }
+
+    public int getReqWidth() {
+        return width * hostResolutionScaleX100 / 100;
+    }
+    
+    public int getReqHeight() {
         return height * hostResolutionScaleX100 / 100;
     }
     

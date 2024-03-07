@@ -41,9 +41,10 @@
             android:dialogMessage="@string/summary_seekbar_scale"
             seekbar:min="50"
             android:max="400"
+            android:defaultValue="100"
             seekbar:step="10"
             seekbar:keyStep="50"
-            seekbar:divisor="10"
+            seekbar:divisor="1"
             android:summary="@string/summary_seekbar_scale"
             android:text="%"
             android:title="@string/title_seekbar_scale" />
