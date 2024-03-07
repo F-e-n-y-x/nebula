@@ -172,6 +172,8 @@
     <string name="title_seekbar_bitrate">Video bitrate</string>
     <string name="summary_seekbar_bitrate">Increase for better image quality. Decrease to improve performance on slower connections.</string>
     <string name="suffix_seekbar_bitrate_mbps">Mbps</string>
+    <string name="title_seekbar_scale">主机分辨率缩放比例</string>
+    <string name="summary_seekbar_scale">请求到主机端的分辨率相当于客户端设定的基础分辨率 * 缩放比例,此时主机端的游戏渲染材质精度将会发生变化(超分辨率串流),降低此比例也可用来减轻主机端GPU压力。 ⚠注意：应用此选项之前需检查主机端是否支持缩放后的分辨率。</string>
     <string name="title_checkbox_stretch_video">Stretch video to full-screen</string>
     <string name="resolution_prefix_native">Native</string>
     <string name="resolution_prefix_native_fullscreen">Native Full-Screen</string>

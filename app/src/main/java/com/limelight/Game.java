@@ -506,6 +506,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 .setRefreshRate(chosenFrameRate)
                 .setApp(app)
                 .setBitrate(prefConfig.bitrate)
+                .setResolutionScale(prefConfig.resolutionScale)
                 .setEnableSops(prefConfig.enableSops)
                 .enableLocalAudioPlayback(prefConfig.playHostAudio)
                 .setMaxPacketSize(1392)
