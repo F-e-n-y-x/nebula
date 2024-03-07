@@ -171,6 +171,10 @@ public class StreamConfiguration {
     public int getReqHeight() {
         return height * hostResolutionScaleX100 / 100;
     }
+
+    public int getResolutionScale() {
+        return hostResolutionScaleX100;
+    }
     
     public int getRefreshRate() {
         return refreshRate;
