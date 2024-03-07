@@ -78,8 +78,13 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.view.inputmethod.InputMethodManager;
 import android.view.View.OnClickListener;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast; 
+import android.widget.Toast;
+import android.widget.ArrayAdapter;
+
+import androidx.interpolator.view.animation.LinearOutSlowInInterpolator;
 
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
@@ -87,6 +92,9 @@ import java.lang.reflect.Method;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Arrays;
 import java.util.Locale;
 
 
@@ -147,7 +155,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private boolean isHidingOverlays;
     private TextView notificationOverlayView;
     private int requestedNotificationOverlayVisibility = View.GONE;
-    private TextView performanceOverlayView;
+    private LinearLayout performanceOverlayView;
     private int requestedPerformanceOverlayVisibility = View.GONE;
 
     private MediaCodecDecoderRenderer decoderRenderer;
@@ -327,7 +335,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         byte[] derCertData = Game.this.getIntent().getByteArrayExtra(EXTRA_SERVER_CERT);
 
         app = new NvApp(appName != null ? appName : "app", appId, appSupportsHdr);
-
         X509Certificate serverCert = null;
         try {
             if (derCertData != null) {
@@ -2711,10 +2718,63 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void onPerfUpdate(final String text) {
+        TextView perfResView = findViewById(R.id.perfRes);
+        TextView perfDecoderView = findViewById(R.id.perfDecoder);
+        TextView perfRenderFpsView = findViewById(R.id.perfRenderFps);
+        TextView networkLatencyView = findViewById(R.id.perfNetworkLatency);
+        TextView decodeLatencyView = findViewById(R.id.perfDecodeLatency);
+        TextView hostLatencyView = findViewById(R.id.perfHostLatency);
+
+        String[] indexes = text.split("\n");
+        List<String> items = new ArrayList<String>();
+        items = Arrays.asList(indexes);
+
+        String resInfo = null;
+        String decoderInfo = null;
+        String renderFpsInfo = null;
+        String networkLatencyInfo = null;
+        String decodeLatencyInfo = null;
+        String hostLatencyInfo = "\uD83C\uDF53 qiin";
+
+        for(String s: items){
+            if (s.contains(getResources().getString(R.string.perf_overlay_streamdetails).substring(0, 5))) {
+                resInfo = s;
+            }
+            if (s.contains(getResources().getString(R.string.perf_overlay_decoder).substring(0, 5))) {
+                decoderInfo = s.toLowerCase().replaceFirst(".*\\.(avc|hevc|av1)\\.decoder", "$1").toUpperCase();
+                decoderInfo += " with HDR ";
+                decoderInfo += prefConfig.enableHdr? "On" : "Off";
+            }
+            if (s.contains(getResources().getString(R.string.perf_overlay_renderingfps).substring(0, 5))) {
+                renderFpsInfo = s;
+            }
+            if (s.contains(getResources().getString(R.string.perf_overlay_netlatency).substring(0, 7))) {
+                networkLatencyInfo = s;
+            }
+            if (s.contains(getResources().getString(R.string.perf_overlay_dectime).substring(0, 7))) {
+                decodeLatencyInfo = s;
+            }
+            if (s.contains(getResources().getString(R.string.perf_overlay_hostprocessinglatency).substring(0, 6))) {
+                hostLatencyInfo = s;
+            }
+        }
+
+        String finalResInfo = resInfo;
+        String finalDecoderInfo = decoderInfo;
+        String finalRenderFpsInfo = renderFpsInfo.replaceFirst(".*\\s(\\d+\\.\\d+)\\sFPS", "$1 fps");
+        String finalDecodeLatencyInfo = decodeLatencyInfo.replaceFirst(".*\\s(\\d+\\.\\d+\\sms)", "$1");
+        String finalNetworkLatencyInfo = networkLatencyInfo.replaceFirst("^.*?\\s(\\d+.*\\))$", "$1");
+        String finalHostLatencyInfo = hostLatencyInfo.replaceFirst("^.*?:", "");
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                performanceOverlayView.setText(text);
+                perfResView.setText(finalResInfo);
+                perfDecoderView.setText(finalDecoderInfo);
+                perfRenderFpsView.setText(finalRenderFpsInfo);
+                networkLatencyView.setText(finalNetworkLatencyInfo);
+                decodeLatencyView.setText(finalDecodeLatencyInfo);
+                hostLatencyView.setText(finalHostLatencyInfo);
+                // performanceOverlayView.setText(text);
             }
         });
     }
