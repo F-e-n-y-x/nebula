@@ -275,8 +275,8 @@ public class NvConnection {
         }
         else {
             // Take what the client wanted
-            context.negotiatedWidth = context.streamConfig.getReqWidth();
-            context.negotiatedHeight = context.streamConfig.getReqHeight();
+            context.negotiatedWidth = context.streamConfig.getWidth();
+            context.negotiatedHeight = context.streamConfig.getHeight();
         }
 
         // We will perform some connection type detection if the caller asked for it
