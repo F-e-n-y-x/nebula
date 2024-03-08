@@ -2742,7 +2742,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 resInfo = s;
             }
             if (s.contains(getResources().getString(R.string.perf_overlay_decoder).substring(0, 5))) {
-                decoderInfo = s.toLowerCase().replaceFirst(".*\\.(avc|hevc|av1)\\.decoder", "$1").toUpperCase();
+                decoderInfo = s.toLowerCase().replaceFirst(".*\\.(avc|hevc|av1).*", "$1").toUpperCase();
                 decoderInfo += " with HDR ";
                 decoderInfo += prefConfig.enableHdr? "On" : "Off";
             }
