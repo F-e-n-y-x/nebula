@@ -41,11 +41,9 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginEnd="10dp"
-            android:drawableStart="@drawable/ic_decode"
-            android:drawableTint="@color/design_default_color_on_primary"
-            android:drawablePadding="2dp"
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:textSize="10sp" />
+
 
         <TextView
             android:id="@+id/perfDecoder"
@@ -61,6 +59,16 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="10dp"
             android:textColor="#0DDAF4"
+            android:textSize="10sp"
+            android:textAppearance="?android:attr/textAppearanceSmall" />
+
+        <TextView
+            android:id="@+id/perfNetworkLatency"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="10dp"
+            android:textColor="#BCEDD385"
+            android:textAppearance="?android:attr/textAppearanceSmall"
             android:textSize="10sp" />
 
         <TextView
@@ -69,15 +77,8 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="10dp"
             android:textColor="#E1D597E3"
-            android:textSize="10sp" />
-
-        <TextView
-            android:id="@+id/perfNetworkLatency"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="10dp"
-            android:textColor="#BCEDD385"
-            android:textSize="10sp" />
+            android:textSize="10sp"
+            android:textAppearance="?android:attr/textAppearanceSmall" />
 
         <TextView
             android:id="@+id/perfHostLatency"
@@ -85,7 +86,8 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="10dp"
             android:textColor="#009688"
-            android:textSize="10sp" />
+            android:textSize="10sp"
+            android:textAppearance="?android:attr/textAppearanceSmall" />
 
     </LinearLayout>
 

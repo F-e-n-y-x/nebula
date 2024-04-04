@@ -57,6 +57,7 @@ import android.hardware.input.InputManager;
 import android.media.AudioManager;
 import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
+import android.net.TrafficStats;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -92,6 +93,7 @@ import java.lang.reflect.Method;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
@@ -103,6 +105,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         OnSystemUiVisibilityChangeListener, GameGestures, StreamView.InputCallbacks,
         PerfOverlayListener, UsbDriverService.UsbDriverStateListener, View.OnKeyListener {
     private int lastButtonState = 0;
+
+    private long lastTotalRxBytes = TrafficStats.getTotalRxBytes();
+    private long lastTimestampMS = System.currentTimeMillis();
 
     // Only 2 touches are supported
     private final TouchContext[] touchContextMap = new TouchContext[2];
@@ -2739,7 +2744,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         for(String s: items){
             if (s.contains(getResources().getString(R.string.perf_overlay_streamdetails).substring(0, 5))) {
-                resInfo = s;
+                resInfo = s.replaceFirst("\\D*[：｜:] (.*) (\\d+.\\d+) FPS", "\uD83C\uDFAC $1@$2");
             }
             if (s.contains(getResources().getString(R.string.perf_overlay_decoder).substring(0, 5))) {
                 decoderInfo = s.toLowerCase().replaceFirst(".*\\.(avc|hevc|av1).*", "$1").toUpperCase();
@@ -2750,7 +2755,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 renderFpsInfo = s;
             }
             if (s.contains(getResources().getString(R.string.perf_overlay_netlatency).substring(0, 7))) {
-                networkLatencyInfo = s;
+                long usedTotalRxBytes = TrafficStats.getTotalRxBytes();
+                long now = System.currentTimeMillis();
+                long timestampDiffMS = now - lastTimestampMS;
+                Number speed = (usedTotalRxBytes - lastTotalRxBytes) / 1024.0 / 1024.0 / timestampDiffMS * 1000;
+                lastTotalRxBytes = usedTotalRxBytes;
+                lastTimestampMS = now;
+                networkLatencyInfo = "\uD83D\uDCF6 "
+                        + new DecimalFormat("##0.00").format(speed)
+                        + " M/s   " + s.replaceFirst("\\D*(\\d+) ms \\(\\D*(\\d+) ms\\)", "$1 ± $2 ms");
             }
             if (s.contains(getResources().getString(R.string.perf_overlay_dectime).substring(0, 7))) {
                 decodeLatencyInfo = s;
@@ -2763,9 +2776,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         String finalResInfo = resInfo;
         String finalDecoderInfo = decoderInfo;
         String finalRenderFpsInfo = renderFpsInfo.replaceFirst(".*\\s(\\d+\\.\\d+)\\sFPS", "$1 fps");
-        String finalDecodeLatencyInfo = decodeLatencyInfo.replaceFirst(".*\\s(\\d+\\.\\d+\\sms)", "$1");
-        String finalNetworkLatencyInfo = networkLatencyInfo.replaceFirst("^.*?\\s(\\d+.*\\))$", "$1");
-        String finalHostLatencyInfo = hostLatencyInfo.replaceFirst("^.*?:", "");
+        String finalDecodeLatencyInfo = decodeLatencyInfo.replaceFirst(".*\\s(\\d+\\.\\d+\\sms)", "\uD83C\uDFAE $1");
+        String finalNetworkLatencyInfo = networkLatencyInfo;
+        String finalHostLatencyInfo = hostLatencyInfo.replaceFirst("^.*?:", "\uD83D\uDDA5\uFE0F ");
         runOnUiThread(new Runnable() {
             @Override
             public void run() {

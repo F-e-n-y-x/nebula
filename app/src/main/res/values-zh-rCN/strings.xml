@@ -97,6 +97,22 @@
     <string name="applist_quit_fail"> 退出串流失败 </string>
     <string name="applist_quit_confirmation">您确定要退出当前游戏？所有未保存的数据将丢失。</string>
     <string name="applist_details_id">App ID：</string>
+    <!-- In Game menu -->
+    <string name="game_menu_toggle_keyboard">屏幕键盘</string>
+    <string name="game_menu_toggle_performance_overlay">性能监控图层</string>
+    <string name="game_menu_toggle_mouse_on">手柄模拟鼠标-打开</string>
+    <string name="game_menu_toggle_mouse_off">手柄模拟鼠标-关闭</string>
+    <string name="game_menu_disconnect">结束串流</string>
+    <string name="game_menu_cancel">取消</string>
+    <string name="game_menu_send_keys">发送特殊按键</string>
+    <string name="game_menu_send_keys_esc">发送 ESC</string>
+    <string name="game_menu_send_keys_f11">发送 F11 (全屏状态切换)</string>
+    <string name="game_menu_send_keys_ctrl_v">发送 CTRL + V (粘贴剪贴板)</string>
+    <string name="game_menu_send_keys_win">发送 WIN (win开始菜单)</string>
+    <string name="game_menu_send_keys_win_d">发送 WIN + D (切到桌面)</string>
+    <string name="game_menu_send_keys_win_g">发送 WIN + G (打开 Xbox Game Bar)</string>
+    <string name="game_menu_send_keys_shift_tab">发送 SHIFT + TAB (打开 Steam 图层)</string>
+    <string name="game_menu_send_keys_alt_home">发送 ALT + HOME (小飞机/RTSS 主机性能监控开关)</string>
     <!-- Add computer manually activity -->
     <string name="title_add_pc"> 手动添加电脑 </string>
     <string name="msg_add_pc"> 正在连接电脑…… </string>

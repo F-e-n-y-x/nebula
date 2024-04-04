@@ -160,6 +160,8 @@ public class GameMenu {
                         () -> sendKeys(new short[]{KeyboardTranslator.VK_LWIN, KeyboardTranslator.VK_D})),
                 new MenuOption(getString(R.string.game_menu_send_keys_win_g),
                         () -> sendKeys(new short[]{KeyboardTranslator.VK_LWIN, KeyboardTranslator.VK_G})),
+                new MenuOption(getString(R.string.game_menu_send_keys_alt_home),
+                        () -> sendKeys(new short[]{KeyboardTranslator.VK_MENU, KeyboardTranslator.VK_HOME})),
                 new MenuOption(getString(R.string.game_menu_send_keys_shift_tab),
                         () -> sendKeys(new short[]{KeyboardTranslator.VK_LSHIFT, KeyboardTranslator.VK_TAB})),
                 new MenuOption(getString(R.string.game_menu_cancel), null),
