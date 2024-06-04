@@ -17,6 +17,7 @@ import com.limelight.R;
 import com.limelight.binding.input.advance_setting.element_card.ButtonCard;
 import com.limelight.binding.input.advance_setting.element_card.ElementCard;
 import com.limelight.binding.input.advance_setting.element_card.KPadCard;
+import com.limelight.binding.input.advance_setting.element_card.KStickCard;
 import com.limelight.binding.input.advance_setting.element_card.SwitchCard;
 
 public class EditController {
@@ -288,6 +289,7 @@ public class EditController {
                         insertCard(new KPadCard(myself,context));
                         break;
                     case ElementBean.TYPE_K_STICK:
+                        insertCard(new KStickCard(myself,context));
                         break;
                 }
             }

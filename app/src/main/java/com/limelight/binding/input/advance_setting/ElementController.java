@@ -103,7 +103,7 @@ public class ElementController {
                 break;
             }
             case ElementBean.TYPE_K_STICK:{
-                element = addKStick(elementBean);
+                element = new AnalogKStick(this,elementBean,context);
                 break;
             }
             case ElementBean.TYPE_K_ISTICK:{

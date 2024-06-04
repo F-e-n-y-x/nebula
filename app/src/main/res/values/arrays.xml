@@ -8,10 +8,22 @@
         <item>@string/resolution_1440p</item>
         <item>@string/resolution_4k</item>
     </string-array>
+
+    <string name="type_button">BUTTON</string>
+    <string name="type_switch">SWITCH</string>
+    <string name="type_movable_button">MBUTTON</string>
+    <string name="type_keyboard_pad">KPAD</string>
+    <string name="type_gamepad_pad">GPAD</string>
+    <string name="type_keyboard_stick">KSTICK</string>
+    <string name="type_gamepad_stick">GSTICK</string>
+    <string name="type_keyboard_invisible_stick">KISTICK</string>
+    <string name="type_gamepad_invisible_stick">GISTICK</string>
+
     <string-array name="element_type_arrays">
-        <item>BUTTON</item>
-        <item>SWITCH</item>
-        <item>KPAD</item>
+        <item>@string/type_button</item>
+        <item>@string/type_switch</item>
+        <item>@string/type_keyboard_pad</item>
+        <item>@string/type_keyboard_stick</item>
     </string-array>
     <string-array name="element_shape">
         <item>CIRCLE</item>
