@@ -2737,4 +2737,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
     }
+
+    public ControllerHandler getControllerHandler() {
+        return controllerHandler;
+    }
 }

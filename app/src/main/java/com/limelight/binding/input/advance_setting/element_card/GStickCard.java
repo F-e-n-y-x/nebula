@@ -9,28 +9,27 @@ import android.widget.TextView;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.EditController;
-import com.limelight.binding.input.advance_setting.ElementBean;
 import com.limelight.binding.input.advance_setting.WindowsController;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class ButtonCard extends ElementCard{
+public class GStickCard extends ElementCard{
 
     private LinearLayout buttonCardLayout;
-    private TextView value;
-    private Spinner shape;
+    private TextView middleValue;
+    private Spinner stick;
 
-    public ButtonCard(EditController editController,Context context){
-        buttonCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type0_button,null);
-        value = buttonCardLayout.findViewById(R.id.button_card_value);
-        value.setOnClickListener(new View.OnClickListener() {
+    public GStickCard(EditController editController, Context context){
+        buttonCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type5_g_stick,null);
+        middleValue = buttonCardLayout.findViewById(R.id.g_stick_card_middle_value);
+        middleValue.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK | WindowsController.MOUSE_DEVICE_MASK | WindowsController.GAMEPAD_DEVICE_MASK);
             }
         });
-        shape = buttonCardLayout.findViewById(R.id.button_card_shape);
+        stick = buttonCardLayout.findViewById(R.id.g_stick_card_stick);
 
     }
 
@@ -38,8 +37,8 @@ public class ButtonCard extends ElementCard{
     @Override
     public Map<String, String> getTypeAttributes() {
         Map<String, String> typeAttributes = new HashMap<>();
-        typeAttributes.put("value",(String) value.getTag());
-        typeAttributes.put("shape",shape.getSelectedItem().toString());
+        typeAttributes.put("middle_value",(String) middleValue.getTag());
+        typeAttributes.put("value",stick.getSelectedItem().toString());
         return typeAttributes;
     }
 

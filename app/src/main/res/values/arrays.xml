@@ -24,10 +24,15 @@
         <item>@string/type_switch</item>
         <item>@string/type_keyboard_pad</item>
         <item>@string/type_keyboard_stick</item>
+        <item>@string/type_gamepad_stick</item>
     </string-array>
     <string-array name="element_shape">
         <item>CIRCLE</item>
         <item>SQUARE</item>
+    </string-array>
+    <string-array name="gamepad_stick">
+        <item>LS</item>
+        <item>RS</item>
     </string-array>
 
     <!-- Keep this in sync with PreferenceConfiguration.isNativeResolution()! -->

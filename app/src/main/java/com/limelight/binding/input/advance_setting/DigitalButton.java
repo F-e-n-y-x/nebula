@@ -55,6 +55,8 @@ public class DigitalButton extends Element {
     private DigitalButton movingButton = null;
     private String shape = "CIRCLE";
 
+    private ElementController.SendEventHandler sendButton;
+
     public boolean checkMovement(float x, float y, DigitalButton movingButton) {
         // check if the movement happened in the same layer
         if (movingButton.layer != this.layer) {
@@ -112,53 +114,24 @@ public class DigitalButton extends Element {
         this.text = elementBean.getName();
         this.shape = elementBean.getTypeAttributes().get("shape");
         String keyString = elementBean.getTypeAttributes().get("value");
-        String keyType = keyString.substring(0,1);
-        int keyCode = Integer.parseInt(keyString.substring(1));
-        switch (keyType){
-            case "k":{
-                addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
-                    @Override
-                    public void onClick() {
-                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
-                    }
+        sendButton = controller.getSendEventHandler(keyString);
 
-                    @Override
-                    public void onLongClick() {
-
-                    }
-
-                    @Override
-                    public void onRelease() {
-                        controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
-                    }
-                });
-                break;
-            }
-            case "m":{
-                addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
-                    @Override
-                    public void onClick() {
-                        controller.sendMouseEvent(keyCode,true);
-                    }
-
-                    @Override
-                    public void onLongClick() {
-
-                    }
-
-                    @Override
-                    public void onRelease() {
-                        controller.sendMouseEvent(keyCode,false);
-                    }
-                });
-                break;
-            }
-            case "g":{
-
-                break;
+        addDigitalButtonListener(new DigitalButton.DigitalButtonListener() {
+            @Override
+            public void onClick() {
+                sendButton.sendEvent(true);
             }
 
-        }
+            @Override
+            public void onLongClick() {
+
+            }
+
+            @Override
+            public void onRelease() {
+                sendButton.sendEvent(false);
+            }
+        });
 
     }
 

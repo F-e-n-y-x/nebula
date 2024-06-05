@@ -5,48 +5,48 @@ import android.view.KeyEvent;
 
 public class AnalogKStick extends AnalogStick {
 
-    boolean upIsPressed = false;
-    boolean downIsPressed = false;
-    boolean leftIsPressed = false;
-    boolean rightIsPressed = false;
+    private boolean upIsPressed = false;
+    private boolean downIsPressed = false;
+    private boolean leftIsPressed = false;
+    private boolean rightIsPressed = false;
     public AnalogKStick(ElementController controller, ElementBean elementBean, Context context){
         super(controller, elementBean, context);
 
-        int topValue = Integer.parseInt(elementBean.getTypeAttributes().get("top_value").substring(1));
-        int downValue = Integer.parseInt(elementBean.getTypeAttributes().get("down_value").substring(1));
-        int leftValue = Integer.parseInt(elementBean.getTypeAttributes().get("left_value").substring(1));
-        int rightValue = Integer.parseInt(elementBean.getTypeAttributes().get("right_value").substring(1));
-        int middleValue = Integer.parseInt(elementBean.getTypeAttributes().get("middle_value").substring(1));
+        ElementController.SendEventHandler topSender = controller.getSendEventHandler(elementBean.getTypeAttributes().get("top_value"));
+        ElementController.SendEventHandler downSender = controller.getSendEventHandler(elementBean.getTypeAttributes().get("down_value"));
+        ElementController.SendEventHandler leftSender = controller.getSendEventHandler(elementBean.getTypeAttributes().get("left_value"));
+        ElementController.SendEventHandler rightSender = controller.getSendEventHandler(elementBean.getTypeAttributes().get("right_value"));
+        ElementController.SendEventHandler middleSender = controller.getSendEventHandler(elementBean.getTypeAttributes().get("middle_value"));
 
         addAnalogStickListener(new AnalogStick.AnalogStickListener() {
             @Override
             public void onMovement(float x, float y) {
                 if (x < -0.4 && !leftIsPressed){
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,leftValue));
+                    leftSender.sendEvent(true);
                     leftIsPressed = true;
                 } else if (x > -0.4 && leftIsPressed) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,leftValue));
+                    leftSender.sendEvent(false);
                     leftIsPressed = false;
                 }
                 if (x > 0.4 && !rightIsPressed){
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,rightValue));
+                    rightSender.sendEvent(true);
                     rightIsPressed = true;
                 } else if (x < 0.4 && rightIsPressed) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,rightValue));
+                    rightSender.sendEvent(false);
                     rightIsPressed = false;
                 }
                 if (y < -0.4 && !downIsPressed){
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,downValue));
+                    downSender.sendEvent(true);
                     downIsPressed = true;
                 } else if (y > -0.4 && downIsPressed) {
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,downValue));
+                    downSender.sendEvent(false);
                     downIsPressed = false;
                 }
                 if (y > 0.4 && !upIsPressed){
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,topValue));
+                    topSender.sendEvent(true);
                     upIsPressed = true;
                 } else if(y < 0.4 && upIsPressed){
-                    controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,topValue));
+                    topSender.sendEvent(false);
                     upIsPressed = false;
                 }
 
@@ -58,17 +58,12 @@ public class AnalogKStick extends AnalogStick {
 
             @Override
             public void onDoubleClick() {
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,middleValue));
+                middleSender.sendEvent(true);
             }
 
             @Override
             public void onRevoke() {
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,middleValue));
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,topValue));
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,downValue));
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,leftValue));
-                controller.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,rightValue));
-
+                middleSender.sendEvent(false);
             }
         });
 

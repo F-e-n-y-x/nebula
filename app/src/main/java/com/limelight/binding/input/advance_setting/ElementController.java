@@ -8,6 +8,8 @@ import android.widget.FrameLayout;
 
 import com.limelight.Game;
 import com.limelight.R;
+import com.limelight.binding.input.ControllerHandler;
+import com.limelight.binding.input.virtual_controller.VirtualController;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,12 +18,32 @@ import java.util.Map;
 
 public class ElementController {
 
+    public abstract class SendEventHandler {
+
+        public abstract void sendEvent(boolean down);
+        public abstract void sendEvent(int analog1, int analog2);
+
+    }
+
+    public static class GamepadInputContext {
+        public short inputMap = 0x0000;
+        public byte leftTrigger = 0x00;
+        public byte rightTrigger = 0x00;
+        public short rightStickX = 0x0000;
+        public short rightStickY = 0x0000;
+        public short leftStickX = 0x0000;
+        public short leftStickY = 0x0000;
+    }
+
     private final Context context;
     private final Game game;
     private final Handler handler;
     private ElementPreference elementPreference;
 
     private final ControllerManager controllerManager;
+    private final ControllerHandler controllerHandler;
+
+    private GamepadInputContext gamepadInputContext = new GamepadInputContext();
 
 
     private final List<Element> elements = new ArrayList<>();
@@ -33,6 +55,7 @@ public class ElementController {
         this.context = context;
         this.game = (Game) context;
         this.controllerManager = controllerManager;
+        this.controllerHandler = game.getControllerHandler();
         layout.findViewById(R.id.element_touch_view).setOnTouchListener(game);
 
         handler = new Handler(Looper.getMainLooper());
@@ -111,7 +134,7 @@ public class ElementController {
                 break;
             }
             case ElementBean.TYPE_G_STICK:{
-                element = addGStick(elementBean);
+                element = new AnalogGStick(this,elementBean,context);
                 break;
             }
             case ElementBean.TYPE_G_ISTICK:{
@@ -173,6 +196,128 @@ public class ElementController {
         }
     }
 
+    public SendEventHandler getSendEventHandler(String key){
+        System.out.println("wg_debug:"+key);
+        if (key.matches("k\\d+")){
+
+            int keyCode = Integer.parseInt(key.substring(1));
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+                    System.out.println("wg_debug sendevent");
+                    if (down){
+                        sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
+                    } else {
+                        sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,keyCode));
+                    }
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+
+                }
+            };
+
+        } else if (key.matches("m\\d+")){
+            int mouseCode = Integer.parseInt(key.substring(1));
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+                    sendMouseEvent(mouseCode,down);
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+
+                }
+            };
+
+        } else if (key.matches("g\\d+")){
+            int padCode = Integer.parseInt(key.substring(1));
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+                    if (down) {
+                        gamepadInputContext.inputMap |= padCode;
+                    } else {
+                        gamepadInputContext.inputMap &= ~padCode;
+                    }
+                    sendGamepadEvent();
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+
+                }
+            };
+
+        } else if (key.equals("LS")){
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+                    gamepadInputContext.leftStickX = (short) analog1;
+                    gamepadInputContext.leftStickY = (short) analog2;
+                    sendGamepadEvent();
+                }
+            };
+        } else if (key.equals("RS")){
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+                    gamepadInputContext.rightStickX = (short) (analog1 * 0x7FFE);
+                    gamepadInputContext.rightStickY = (short) (analog2 * 0x7FFE);
+                    sendGamepadEvent();
+                }
+            };
+        } else if (key.equals("lt")){
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+                    if (down) {
+                        gamepadInputContext.leftTrigger = (byte) 0xFF;
+                    } else {
+                        gamepadInputContext.leftTrigger = (byte) 0;
+                    }
+                    sendGamepadEvent();
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+
+                }
+            };
+        } else if (key.equals("rt")){
+            return new SendEventHandler() {
+                @Override
+                public void sendEvent(boolean down) {
+                    if (down) {
+                        gamepadInputContext.rightTrigger = (byte) 0xFF;
+                    } else {
+                        gamepadInputContext.rightTrigger = (byte) 0;
+                    }
+                    sendGamepadEvent();
+                }
+
+                @Override
+                public void sendEvent(int analog1, int analog2) {
+
+                }
+            };
+        }
+        return null;
+    }
+
+
 
     public void sendKeyEvent(KeyEvent keyEvent) {
         game.onKey(null,keyEvent.getKeyCode(),keyEvent);
@@ -210,6 +355,45 @@ public class ElementController {
         handler.postDelayed(runnable, 50);
         handler.postDelayed(runnable, 75);
     }
+
+    public void sendGamepadEvent(){
+        if (controllerHandler != null) {
+            System.out.println("wg_debug:INPUT_MAP + " + gamepadInputContext.inputMap);
+            System.out.println("wg_debug:LEFT_TRIGGER " + gamepadInputContext.leftTrigger);
+            System.out.println("wg_debug:RIGHT_TRIGGER " + gamepadInputContext.rightTrigger);
+            System.out.println("wg_debug:LEFT STICK X: " + gamepadInputContext.leftStickX + " Y: " + gamepadInputContext.leftStickY);
+            System.out.println("wg_debug:RIGHT STICK X: " + gamepadInputContext.rightStickX + " Y: " + gamepadInputContext.rightStickY);
+            controllerHandler.reportOscState(
+                    gamepadInputContext.inputMap,
+                    gamepadInputContext.leftStickX,
+                    gamepadInputContext.leftStickY,
+                    gamepadInputContext.rightStickX,
+                    gamepadInputContext.rightStickY,
+                    gamepadInputContext.leftTrigger,
+                    gamepadInputContext.rightTrigger
+            );
+
+            Runnable runnable = new Runnable() {
+                @Override
+                public void run() {
+                    controllerHandler.reportOscState(
+                            gamepadInputContext.inputMap,
+                            gamepadInputContext.leftStickX,
+                            gamepadInputContext.leftStickY,
+                            gamepadInputContext.rightStickX,
+                            gamepadInputContext.rightStickY,
+                            gamepadInputContext.leftTrigger,
+                            gamepadInputContext.rightTrigger
+                    );
+                }
+            };
+            handler.postDelayed(runnable, 50);
+            handler.postDelayed(runnable, 75);
+
+        }
+    }
+
+
 
 }
 
