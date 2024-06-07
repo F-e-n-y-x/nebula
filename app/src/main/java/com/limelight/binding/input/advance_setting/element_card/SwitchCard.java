@@ -27,7 +27,7 @@ public class SwitchCard extends ElementCard{
         value.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK | WindowsController.MOUSE_DEVICE_MASK);
+                editController.jumpDeviceLayout((TextView) v);
             }
         });
         shape = switchCardLayout.findViewById(R.id.switch_card_shape);

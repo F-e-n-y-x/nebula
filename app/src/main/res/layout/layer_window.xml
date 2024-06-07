@@ -143,20 +143,20 @@
                 android:layout_weight="1"
                 android:layout_marginTop="10dp">
                 <FrameLayout
-                    android:id="@+id/edit_keyboard_layout"
+                    android:id="@+id/keyboard_device_layout"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent">
                     <include layout="@layout/layout_keyboard"/>
                 </FrameLayout>
                 <FrameLayout
-                    android:id="@+id/edit_mouse_layout"
+                    android:id="@+id/mouse_device_layout"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:visibility="gone">
                     <include layout="@layout/layout_mouse"/>
                 </FrameLayout>
                 <FrameLayout
-                    android:id="@+id/edit_gamepad_layout"
+                    android:id="@+id/gamepad_device_layout"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:visibility="gone">

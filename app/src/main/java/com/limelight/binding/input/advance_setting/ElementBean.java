@@ -5,6 +5,7 @@ import java.util.Map;
 public class ElementBean {
     public static final String TYPE_BUTTON = "BUTTON";
     public static final String TYPE_SWITCH = "SWITCH";
+    public static final String TYPE_PAD = "PAD";
     public static final String TYPE_K_PAD = "KPAD";
     public static final String TYPE_G_PAD = "GPAD";
     public static final String TYPE_M_BUTTON = "MBUTTON";

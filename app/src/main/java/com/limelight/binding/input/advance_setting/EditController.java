@@ -17,7 +17,7 @@ import com.limelight.R;
 import com.limelight.binding.input.advance_setting.element_card.ButtonCard;
 import com.limelight.binding.input.advance_setting.element_card.ElementCard;
 import com.limelight.binding.input.advance_setting.element_card.GStickCard;
-import com.limelight.binding.input.advance_setting.element_card.KPadCard;
+import com.limelight.binding.input.advance_setting.element_card.PadCard;
 import com.limelight.binding.input.advance_setting.element_card.KStickCard;
 import com.limelight.binding.input.advance_setting.element_card.SwitchCard;
 
@@ -287,7 +287,9 @@ public class EditController {
                         insertCard(new SwitchCard(myself,context));
                         break;
                     case ElementBean.TYPE_K_PAD:
-                        insertCard(new KPadCard(myself,context));
+                    case ElementBean.TYPE_G_PAD:
+                    case ElementBean.TYPE_PAD:
+                        insertCard(new PadCard(myself,context));
                         break;
                     case ElementBean.TYPE_K_STICK:
                         insertCard(new KStickCard(myself,context));
@@ -425,15 +427,16 @@ public class EditController {
     }
 
 
-    public void jumpDeviceLayout(TextView valueTextView,int devices){
+    public void jumpDeviceLayout(TextView valueTextView){
         WindowsController.DeviceWindowListener keySelectListener = new WindowsController.DeviceWindowListener() {
             @Override
             public void onElementClick(String text, String tag) {
+                elementName.setText(text);
                 valueTextView.setTag(tag);
                 valueTextView.setText(text);
             }
         };
-        controllerManager.getWindowsController().openDeviceWindow(keySelectListener,devices);
+        controllerManager.getWindowsController().openDeviceWindow(keySelectListener);
 
 
     }

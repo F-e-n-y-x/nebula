@@ -14,7 +14,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content">
             <TextView
-                android:id="@+id/mouse_x1"
                 android:layout_marginTop="40dp"
                 android:layout_width="30dp"
                 android:layout_height="60dp"
@@ -23,7 +22,6 @@
                 android:text="X1"
                 android:background="@drawable/square_border"/>
             <TextView
-                android:id="@+id/mouse_x2"
                 android:layout_width="30dp"
                 android:layout_height="60dp"
                 android:gravity="center"
@@ -41,28 +39,25 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content">
                 <TextView
-                    android:id="@+id/mouse_left"
                     android:layout_width="50dp"
                     android:layout_height="100dp"
                     android:gravity="center"
                     android:tag="m1"
-                    android:text="L"
+                    android:text="ML"
                     android:background="@drawable/mouse_left"/>
                 <TextView
-                    android:id="@+id/mouse_middle"
                     android:layout_width="40dp"
                     android:layout_height="100dp"
                     android:gravity="center"
                     android:tag="m2"
-                    android:text="M"
+                    android:text="MM"
                     android:background="@drawable/square_border"/>
                 <TextView
-                    android:id="@+id/mouse_right"
                     android:layout_width="50dp"
                     android:layout_height="100dp"
                     android:gravity="center"
                     android:tag="m3"
-                    android:text="R"
+                    android:text="MR"
                     android:background="@drawable/mouse_right"/>
             </LinearLayout>
             <View

@@ -27,7 +27,7 @@ public class ButtonCard extends ElementCard{
         value.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK | WindowsController.MOUSE_DEVICE_MASK | WindowsController.GAMEPAD_DEVICE_MASK);
+                editController.jumpDeviceLayout((TextView) v);
             }
         });
         shape = buttonCardLayout.findViewById(R.id.button_card_shape);

@@ -33,7 +33,7 @@ public class KStickCard extends ElementCard{
         View.OnClickListener jumpDeviceLayout = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK);
+                editController.jumpDeviceLayout((TextView) v);
             }
         };
 

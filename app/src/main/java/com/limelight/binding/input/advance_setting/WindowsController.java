@@ -2,6 +2,7 @@ package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -131,9 +132,9 @@ public class WindowsController {
         keyboardButton = layout.findViewById(R.id.keyboard_open_button);
         mouseButton = layout.findViewById(R.id.mouse_open_button);
         gamepadButton = layout.findViewById(R.id.gamepad_open_button);
-        keyboardLayout = layout.findViewById(R.id.edit_keyboard_layout);
-        mouseLayout = layout.findViewById(R.id.edit_mouse_layout);
-        gamepadLayout = layout.findViewById(R.id.edit_gamepad_layout);
+        keyboardLayout = layout.findViewById(R.id.keyboard_device_layout);
+        mouseLayout = layout.findViewById(R.id.mouse_device_layout);
+        gamepadLayout = layout.findViewById(R.id.gamepad_device_layout);
 
         keyboardButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -163,20 +164,27 @@ public class WindowsController {
             }
         };
         LinearLayout keyboardDrawing = keyboardLayout.findViewById(R.id.keyboard_drawing);
-        for (int i = 0; i < keyboardDrawing.getChildCount(); i++){
-            LinearLayout keyboardRow = (LinearLayout) keyboardDrawing.getChildAt(i);
-            for (int j = 0; j < keyboardRow.getChildCount(); j++){
-                keyboardRow.getChildAt(j).setOnClickListener(keyListener);
-            }
-        }
+        setListenersForDevice(keyboardDrawing,keyListener);
 
         LinearLayout mouseDrawing = mouseLayout.findViewById(R.id.mouse_drawing);
-        mouseDrawing.findViewById(R.id.mouse_left).setOnClickListener(keyListener);
-        mouseDrawing.findViewById(R.id.mouse_middle).setOnClickListener(keyListener);
-        mouseDrawing.findViewById(R.id.mouse_right).setOnClickListener(keyListener);
-        mouseDrawing.findViewById(R.id.mouse_x1).setOnClickListener(keyListener);
-        mouseDrawing.findViewById(R.id.mouse_x2).setOnClickListener(keyListener);
+        setListenersForDevice(mouseDrawing,keyListener);
+
+        LinearLayout gamepadDrawing = gamepadLayout.findViewById(R.id.gamepad_drawing);
+        setListenersForDevice(gamepadDrawing,keyListener);
+
     }
+
+    public void setListenersForDevice(ViewGroup viewGroup, View.OnClickListener listener) {
+        for (int i = 0; i < viewGroup.getChildCount(); i++) {
+            View child = viewGroup.getChildAt(i);
+            if (child instanceof TextView) {
+                child.setOnClickListener(listener);
+            } else if (child instanceof ViewGroup) {
+                setListenersForDevice((ViewGroup) child, listener);
+            }
+        }
+    }
+
 
     private void switchDeviceLayout(Button button,FrameLayout deviceLayout){
         keyboardButton.setAlpha(0.4f);
@@ -215,25 +223,12 @@ public class WindowsController {
     }
 
 
-    public void openDeviceWindow(DeviceWindowListener deviceWindowListener, int devices){
+    public void openDeviceWindow(DeviceWindowListener deviceWindowListener){
         this.deviceWindowListener = deviceWindowListener;
         deviceWindow.setVisibility(View.VISIBLE);
-        keyboardButton.setVisibility(View.GONE);
-        mouseButton.setVisibility(View.GONE);
-        gamepadButton.setVisibility(View.GONE);
-        if ((devices & GAMEPAD_DEVICE_MASK) != 0){
-            gamepadButton.setVisibility(View.VISIBLE);
-            switchDeviceLayout(gamepadButton,gamepadLayout);
-        }
-        if ((devices & MOUSE_DEVICE_MASK) != 0){
-            mouseButton.setVisibility(View.VISIBLE);
-            switchDeviceLayout(mouseButton,mouseLayout);
-        }
-        if ((devices & KEYBOARD_DEVICE_MASK) != 0){
-            keyboardButton.setVisibility(View.VISIBLE);
-            switchDeviceLayout(keyboardButton,keyboardLayout);
-        }
-
+        keyboardButton.setVisibility(View.VISIBLE);
+        mouseButton.setVisibility(View.VISIBLE);
+        gamepadButton.setVisibility(View.VISIBLE);
 
     }
 }

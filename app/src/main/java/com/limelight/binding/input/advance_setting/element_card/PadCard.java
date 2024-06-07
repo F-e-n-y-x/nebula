@@ -8,12 +8,11 @@ import android.widget.TextView;
 
 import com.limelight.R;
 import com.limelight.binding.input.advance_setting.EditController;
-import com.limelight.binding.input.advance_setting.WindowsController;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class KPadCard extends ElementCard{
+public class PadCard extends ElementCard{
 
     private LinearLayout kPadCardLayout;
     private TextView topValue;
@@ -21,7 +20,7 @@ public class KPadCard extends ElementCard{
     private TextView leftValue;
     private TextView rightValue;
 
-    public KPadCard(EditController editController, Context context){
+    public PadCard(EditController editController, Context context){
         kPadCardLayout = (LinearLayout) LayoutInflater.from(context).inflate(R.layout.element_type2_k_pad,null);
         topValue = kPadCardLayout.findViewById(R.id.element_k_pad_card_top);
         downValue = kPadCardLayout.findViewById(R.id.element_k_pad_card_down);
@@ -31,7 +30,7 @@ public class KPadCard extends ElementCard{
         View.OnClickListener jumpDeviceLayout = new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK);
+                editController.jumpDeviceLayout((TextView) v);
             }
         };
 

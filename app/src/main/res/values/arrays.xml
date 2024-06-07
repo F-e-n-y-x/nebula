@@ -12,6 +12,7 @@
     <string name="type_button">BUTTON</string>
     <string name="type_switch">SWITCH</string>
     <string name="type_movable_button">MBUTTON</string>
+    <string name="type_pad">PAD</string>
     <string name="type_keyboard_pad">KPAD</string>
     <string name="type_gamepad_pad">GPAD</string>
     <string name="type_keyboard_stick">KSTICK</string>
@@ -22,7 +23,7 @@
     <string-array name="element_type_arrays">
         <item>@string/type_button</item>
         <item>@string/type_switch</item>
-        <item>@string/type_keyboard_pad</item>
+        <item>@string/type_pad</item>
         <item>@string/type_keyboard_stick</item>
         <item>@string/type_gamepad_stick</item>
     </string-array>

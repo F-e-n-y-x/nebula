@@ -26,7 +26,7 @@ public class GStickCard extends ElementCard{
         middleValue.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                editController.jumpDeviceLayout((TextView) v, WindowsController.KEYBOARD_DEVICE_MASK | WindowsController.MOUSE_DEVICE_MASK | WindowsController.GAMEPAD_DEVICE_MASK);
+                editController.jumpDeviceLayout((TextView) v);
             }
         });
         stick = buttonCardLayout.findViewById(R.id.g_stick_card_stick);

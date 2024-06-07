@@ -109,38 +109,40 @@ public class ElementController {
     private Element addElementToScreen(ElementBean elementBean){
         Element element = null;
         switch (elementBean.getType()){
-            case ElementBean.TYPE_BUTTON:{
+            case ElementBean.TYPE_BUTTON:
                 element = new DigitalButton(this,elementBean,context);
                 break;
-            }
-            case ElementBean.TYPE_SWITCH:{
+
+            case ElementBean.TYPE_SWITCH:
                 element = new DigitalSwitch(this,elementBean,context);
                 break;
-            }
-            case ElementBean.TYPE_K_PAD:{
-                element = new DigitalKPad(this,elementBean,context);
+
+            case ElementBean.TYPE_K_PAD:
+            case ElementBean.TYPE_G_PAD:
+            case ElementBean.TYPE_PAD:
+                element = new DigitalPad(this,elementBean,context);
                 break;
-            }
-            case ElementBean.TYPE_M_BUTTON:{
+
+            case ElementBean.TYPE_M_BUTTON:
                 element = addMButton(elementBean);
                 break;
-            }
-            case ElementBean.TYPE_K_STICK:{
+
+            case ElementBean.TYPE_K_STICK:
                 element = new AnalogKStick(this,elementBean,context);
                 break;
-            }
-            case ElementBean.TYPE_K_ISTICK:{
+
+            case ElementBean.TYPE_K_ISTICK:
                 element = addKIStick(elementBean);
                 break;
-            }
-            case ElementBean.TYPE_G_STICK:{
+
+            case ElementBean.TYPE_G_STICK:
                 element = new AnalogGStick(this,elementBean,context);
                 break;
-            }
-            case ElementBean.TYPE_G_ISTICK:{
+
+            case ElementBean.TYPE_G_ISTICK:
                 element = addGIStick(elementBean);
                 break;
-            }
+
 
         }
         elements.add(element);
@@ -197,14 +199,12 @@ public class ElementController {
     }
 
     public SendEventHandler getSendEventHandler(String key){
-        System.out.println("wg_debug:"+key);
         if (key.matches("k\\d+")){
 
             int keyCode = Integer.parseInt(key.substring(1));
             return new SendEventHandler() {
                 @Override
                 public void sendEvent(boolean down) {
-                    System.out.println("wg_debug sendevent");
                     if (down){
                         sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,keyCode));
                     } else {
@@ -357,40 +357,34 @@ public class ElementController {
     }
 
     public void sendGamepadEvent(){
-        if (controllerHandler != null) {
-            System.out.println("wg_debug:INPUT_MAP + " + gamepadInputContext.inputMap);
-            System.out.println("wg_debug:LEFT_TRIGGER " + gamepadInputContext.leftTrigger);
-            System.out.println("wg_debug:RIGHT_TRIGGER " + gamepadInputContext.rightTrigger);
-            System.out.println("wg_debug:LEFT STICK X: " + gamepadInputContext.leftStickX + " Y: " + gamepadInputContext.leftStickY);
-            System.out.println("wg_debug:RIGHT STICK X: " + gamepadInputContext.rightStickX + " Y: " + gamepadInputContext.rightStickY);
-            controllerHandler.reportOscState(
-                    gamepadInputContext.inputMap,
-                    gamepadInputContext.leftStickX,
-                    gamepadInputContext.leftStickY,
-                    gamepadInputContext.rightStickX,
-                    gamepadInputContext.rightStickY,
-                    gamepadInputContext.leftTrigger,
-                    gamepadInputContext.rightTrigger
-            );
+        controllerHandler.reportOscState(
+                gamepadInputContext.inputMap,
+                gamepadInputContext.leftStickX,
+                gamepadInputContext.leftStickY,
+                gamepadInputContext.rightStickX,
+                gamepadInputContext.rightStickY,
+                gamepadInputContext.leftTrigger,
+                gamepadInputContext.rightTrigger
+        );
 
-            Runnable runnable = new Runnable() {
-                @Override
-                public void run() {
-                    controllerHandler.reportOscState(
-                            gamepadInputContext.inputMap,
-                            gamepadInputContext.leftStickX,
-                            gamepadInputContext.leftStickY,
-                            gamepadInputContext.rightStickX,
-                            gamepadInputContext.rightStickY,
-                            gamepadInputContext.leftTrigger,
-                            gamepadInputContext.rightTrigger
-                    );
-                }
-            };
-            handler.postDelayed(runnable, 50);
-            handler.postDelayed(runnable, 75);
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                controllerHandler.reportOscState(
+                        gamepadInputContext.inputMap,
+                        gamepadInputContext.leftStickX,
+                        gamepadInputContext.leftStickY,
+                        gamepadInputContext.rightStickX,
+                        gamepadInputContext.rightStickY,
+                        gamepadInputContext.leftTrigger,
+                        gamepadInputContext.rightTrigger
+                );
+            }
+        };
+        handler.postDelayed(runnable, 50);
+        handler.postDelayed(runnable, 75);
 
-        }
+
     }
 
 
