@@ -25,6 +25,7 @@ public class SettingController {
 
     private static final String KEYBOARD_SETTING = "keyboard_setting";
     private static final String MSENSE = "msense";
+    private static final String ELEMENT_OPACITY = "element_opacity";
 
     private SettingPreference settingPreference;
     private ControllerManager controllerManager;
@@ -33,6 +34,7 @@ public class SettingController {
 
     private Switch floatKeyboardSwitch;
     private TextView msenseTextView;
+    private SeekBar elementOpacitySeekbar;
 
     private Context context;
 
@@ -43,9 +45,11 @@ public class SettingController {
         this.context = context;
         floatKeyboardSwitch = settingLayout.findViewById(R.id.float_keyboard_enable_switch);
         msenseTextView = settingLayout.findViewById(R.id.msense_textview);
+        elementOpacitySeekbar = settingLayout.findViewById(R.id.element_opacity_seekbar);
 
         initFloatKeyboard();
         initMsense();
+        initElementOpacity();
     }
 
     private void initFloatKeyboard(){
@@ -167,6 +171,26 @@ public class SettingController {
             }
         });
     }
+    private void initElementOpacity(){
+        elementOpacitySeekbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                doSetting(ELEMENT_OPACITY,String.valueOf(progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                settingPreference.saveSetting(ELEMENT_OPACITY,String.valueOf(seekBar.getProgress()));
+            }
+        });
+    }
+
+
     public void loadSettingConfig(String configId){
         settingPreference = new SettingPreference(configId,context);
         Map<String, String> map = settingPreference.getSettings();
@@ -186,9 +210,11 @@ public class SettingController {
             case MSENSE:
                 msenseTextView.setText(settingValue);
                 break;
+            case ELEMENT_OPACITY:
+                elementOpacitySeekbar.setProgress(Integer.parseInt(settingValue));
+                break;
         }
     }
-
     private void doSetting(String settingName, String settingValue){
         switch (settingName){
             case KEYBOARD_SETTING:{
@@ -205,6 +231,9 @@ public class SettingController {
                 ((Game)context).adjustMsenseRelative(Integer.parseInt(settingValue));
                 break;
             }
+            case ELEMENT_OPACITY:
+                controllerManager.getElementController().setOpacity(Integer.parseInt(settingValue) * 10);
+                break;
 
         }
     }
