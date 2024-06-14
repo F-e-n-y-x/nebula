@@ -4,10 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
     <LinearLayout
+        android:id="@+id/float_keyboard_box"
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom">
+        android:layout_gravity="bottom"
+        android:visibility="gone">
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="match_parent"
@@ -17,8 +19,7 @@
                 android:layout_width="50dp"
                 android:layout_height="match_parent"
                 android:text="↑"
-                android:alpha="1"
-                android:visibility="gone"/>
+                android:alpha="1" />
             <SeekBar
                 android:id="@+id/float_keyboard_seekbar"
                 android:alpha="1"

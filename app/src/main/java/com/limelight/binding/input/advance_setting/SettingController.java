@@ -218,12 +218,12 @@ public class SettingController {
     private void doSetting(String settingName, String settingValue){
         switch (settingName){
             case KEYBOARD_SETTING:{
-                Button floatKeyboardDisplayButton = floatLayout.findViewById(R.id.float_keyboard_display_button);
+                LinearLayout floatKeyboardBox = floatLayout.findViewById(R.id.float_keyboard_box);
                 boolean isDisplay = Boolean.valueOf(settingValue);
                 if (isDisplay){
-                    floatKeyboardDisplayButton.setVisibility(View.VISIBLE);
+                    floatKeyboardBox.setVisibility(View.VISIBLE);
                 } else {
-                    floatKeyboardDisplayButton.setVisibility(View.GONE);
+                    floatKeyboardBox.setVisibility(View.GONE);
                 }
                 break;
             }
