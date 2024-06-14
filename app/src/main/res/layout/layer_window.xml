@@ -8,7 +8,7 @@
         android:id="@+id/edittext_window"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#C0303030"
+        android:background="@color/window_background"
         android:clickable="true"
         android:visibility="gone">
         <!--   浮动窗口   -->
@@ -16,7 +16,7 @@
             android:layout_width="300dp"
             android:layout_height="200dp"
             android:layout_gravity="center"
-            android:background="#202020">
+            android:background="@color/window_box_background">
             <LinearLayout
                 android:orientation="vertical"
                 android:layout_width="wrap_content"
@@ -56,7 +56,7 @@
         android:id="@+id/text_window"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#C0303030"
+        android:background="@color/window_background"
         android:clickable="true"
         android:visibility="gone">
         <!--   浮动窗口   -->
@@ -64,7 +64,7 @@
             android:layout_width="300dp"
             android:layout_height="200dp"
             android:layout_gravity="center"
-            android:background="#202020">
+            android:background="@color/window_box_background">
             <LinearLayout
                 android:orientation="vertical"
                 android:layout_width="wrap_content"
@@ -100,7 +100,7 @@
         android:id="@+id/device_layout_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#C0303030"
+        android:background="@color/window_background"
         android:clickable="true"
         android:visibility="gone">
         <LinearLayout

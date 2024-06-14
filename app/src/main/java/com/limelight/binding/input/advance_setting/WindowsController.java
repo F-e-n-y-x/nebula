@@ -1,6 +1,7 @@
 package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -10,6 +11,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.limelight.R;
+
+import java.util.List;
 
 public class WindowsController {
 
@@ -101,6 +104,7 @@ public class WindowsController {
             }
         });
     }
+
     private void initEditTextWindow(){
         editTextWindow = layout.findViewById(R.id.edittext_window);
         editTextWindowTitle = layout.findViewById(R.id.edittext_window_title);
@@ -127,6 +131,7 @@ public class WindowsController {
             }
         });
     }
+
     private void initDeviceWindow(){
         deviceWindow = layout.findViewById(R.id.device_layout_container);
         keyboardButton = layout.findViewById(R.id.keyboard_open_button);
@@ -173,8 +178,7 @@ public class WindowsController {
         setListenersForDevice(gamepadDrawing,keyListener);
 
     }
-
-    public void setListenersForDevice(ViewGroup viewGroup, View.OnClickListener listener) {
+    private void setListenersForDevice(ViewGroup viewGroup, View.OnClickListener listener) {
         for (int i = 0; i < viewGroup.getChildCount(); i++) {
             View child = viewGroup.getChildAt(i);
             if (child instanceof TextView) {

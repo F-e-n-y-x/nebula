@@ -9,11 +9,9 @@ import android.widget.Toast;
 
 import com.limelight.R;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
-
 public class ConfigController {
+
+
 
     private FrameLayout layerConfig;
     private ConfigListPreference configListPreference;
@@ -23,6 +21,7 @@ public class ConfigController {
     private ControllerManager controllerManager;
 
     private LinearLayout configItemContainer;
+
 
 
     public ConfigController(ControllerManager controllerManager,FrameLayout layout, Context context){
@@ -43,13 +42,7 @@ public class ConfigController {
     private void loadConfigs(){
         String currentConfigName = configListPreference.getCurrentConfigName();
 
-        Map<Long, String> idNameMap = new HashMap<>();
-        for (String name : configListPreference.getConfigurationNames()){
-            idNameMap.put(Long.parseLong(configListPreference.getConfigId(name)),name);
-        }
-        Map<Long, String> sortedMap = new TreeMap<>(idNameMap);
-        for (Map.Entry<Long, String> entry : sortedMap.entrySet()) {
-            String name = entry.getValue();
+        for (String name : configListPreference.getSortedConfigurationNames()){
             ConfigItem item = addConfigItem(name);
             if (name.equals(currentConfigName)){
                 currentSelectItem = item;
@@ -109,6 +102,8 @@ public class ConfigController {
         controllerManager.getWindowsController().openEditTextWindow(addListener,"","","", InputType.TYPE_CLASS_TEXT);
     }
 
+
+
     public void jumpRenameWindow(ConfigItem configItem){
         WindowsController.EditTextWindowListener renameListener = new WindowsController.EditTextWindowListener() {
             @Override
@@ -149,10 +144,13 @@ public class ConfigController {
         WindowsController.TextWindowListener deleteListener = new WindowsController.TextWindowListener() {
             @Override
             public boolean onConfirmCLick() {
-                String configId = configListPreference.getConfigId(configItem.getText());
-                controllerManager.getElementController().deleteElementConfig(configId);
-                controllerManager.getSettingController().deleteSettingConfig(configId);
-                configListPreference.deleteConfig(configItem.getText());
+                String configName = configItem.getText();
+                //1.先把element的preference删除
+                new ElementPreference(configListPreference.getConfigId(configName), context).delete();
+                //2.再把setting的preference删除
+                new SettingPreference(configListPreference.getConfigId(configName),context).delete();
+                //3.删除配置列表中的名字
+                configListPreference.deleteConfig(configName);
                 configItemContainer.removeView(configItem.getView());
 
                 return true;
@@ -175,6 +173,8 @@ public class ConfigController {
     public void close(){
         layerConfig.setVisibility(View.GONE);
     }
+
+
 
 
 }

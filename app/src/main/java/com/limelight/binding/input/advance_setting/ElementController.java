@@ -85,9 +85,6 @@ public class ElementController {
         }
     }
 
-    public void deleteElementConfig(String configId){
-        new ElementPreference(configId,context).clear();
-    }
 
     public void deleteElement(Element element){
         elementsLayout.removeView(element);

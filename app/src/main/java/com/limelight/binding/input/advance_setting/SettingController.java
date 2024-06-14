@@ -26,7 +26,7 @@ public class SettingController {
     private static final String KEYBOARD_SETTING = "keyboard_setting";
     private static final String MSENSE = "msense";
 
-    private SharedPreferences sharedPreferences;
+    private SettingPreference settingPreference;
     private ControllerManager controllerManager;
     private FrameLayout settingLayout;
     private FrameLayout floatLayout;
@@ -124,7 +124,7 @@ public class SettingController {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 doSetting(KEYBOARD_SETTING,String.valueOf(isChecked));
-                saveSetting(KEYBOARD_SETTING, String.valueOf(isChecked));
+                settingPreference.saveSetting(KEYBOARD_SETTING, String.valueOf(isChecked));
             }
         });
 
@@ -149,7 +149,7 @@ public class SettingController {
                 String sense = String.valueOf(value);
                 msenseTextView.setText(sense);
                 doSetting(MSENSE, sense);
-                saveSetting(MSENSE, sense);
+                settingPreference.saveSetting(MSENSE, sense);
 
                 return true;
             }
@@ -168,8 +168,8 @@ public class SettingController {
         });
     }
     public void loadSettingConfig(String configId){
-        sharedPreferences = context.getSharedPreferences(configId, Activity.MODE_PRIVATE);
-        Map<String, String> map = (Map<String, String>) sharedPreferences.getAll();
+        settingPreference = new SettingPreference(configId,context);
+        Map<String, String> map = settingPreference.getSettings();
         for (Map.Entry<String, String> entry : map.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
@@ -178,12 +178,6 @@ public class SettingController {
         }
 
     }
-    public void deleteSettingConfig(String configId){
-        SharedPreferences.Editor editor = context.getSharedPreferences(configId,Activity.MODE_PRIVATE).edit();
-        editor.clear();
-        editor.apply();
-    }
-
     private void disPlaySetting(String settingName, String settingValue){
         switch (settingName){
             case KEYBOARD_SETTING:
@@ -215,11 +209,6 @@ public class SettingController {
         }
     }
 
-    private void saveSetting(String name, String value){
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(name,value);
-        editor.apply();
-    }
 
     public void open(){
         settingLayout.setVisibility(View.VISIBLE);

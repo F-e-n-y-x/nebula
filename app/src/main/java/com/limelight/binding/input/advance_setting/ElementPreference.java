@@ -5,8 +5,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import com.google.gson.Gson;
 
+import java.io.File;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -15,68 +15,57 @@ import java.util.Map;
 
 public class ElementPreference {
 
-    final private static String ELEMENT_TABLE_PREFIX = "element_";
+    private final static String ELEMENT_TABLE_PREFIX = "element_";
 
-    private final String elementLayoutName;
-    private final Map<String, ElementBean> elements = new HashMap<>();
+    private final String elementPreferenceName;
+    //private final Map<String, ElementBean> elements = new HashMap<>();
     private final Context context;
     private final Gson gson = new Gson();
+    private final SharedPreferences preferences;
+    private final SharedPreferences.Editor editor;
 
     public ElementPreference(String configId, Context context){
         this.context = context;
-        this.elementLayoutName = ELEMENT_TABLE_PREFIX + configId;
+        this.elementPreferenceName = getElementLayoutName(configId);
 
         // 对象创建的时候读取按钮信息
-        SharedPreferences preferences = context.getSharedPreferences(elementLayoutName,Activity.MODE_PRIVATE);
+        preferences = context.getSharedPreferences(elementPreferenceName,Activity.MODE_PRIVATE);
+        editor = preferences.edit();
+    }
+
+    private static String getElementLayoutName(String configId){
+        return ELEMENT_TABLE_PREFIX + configId;
+    }
+
+    public int addElement(ElementBean element){
+        String elementName = element.getName();
+        String elementString = JSONToString(element);
+        editor.putString(elementName, elementString);
+        editor.apply();
+        //新增成功
+
+        return 0;
+
+    }
+
+    public void deleteElement(String elementId){
+        editor.remove(elementId);
+        editor.apply();
+
+    }
+    public List<ElementBean> getElements() {
+        List<ElementBean> list = new ArrayList<>();
+
         // 从SharePreference中获取Map<String, String>格式的Element信息
         Map<String, String> elementsString = (Map<String, String>) preferences.getAll();
         // 将Map<String, String>格式转换为Map<String, KeyboardBean>
         for (Map.Entry<String, String> entry: elementsString.entrySet()){
             ElementBean elementBean = stringToJSON(entry.getValue());
-            // 转换完成后放到Map<String, KeyboardBean>中
-            elements.put(entry.getKey(), elementBean);
+            // 转换完成后放到List<ElementBean>中
+            list.add(elementBean);
         }
 
-        //wg_debug
-        System.out.println("wg_debug elements preference:" + elements);
-    }
-
-    public int addElement(ElementBean element){
-        String elementName = element.getName();
-        /*
-         * 两步操作：
-         * 1.加入MAP中
-         * 2.加入SharedPreference
-         * */
-        elements.put(elementName, element);
-        String elementString = JSONToString(element);
-        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
-        editor.putString(elementName, elementString);
-        editor.apply();
-        //新增成功
-
-        //wg_debug
-        System.out.println("wg_debug elements preference:" + elements);
-        return 0;
-
-    }
-    public void deleteElement(String elementId){
-
-        /*
-         * 两步操作：
-         * 1.从SharedPreference中删除
-         * 2.从MAP中删除
-         * */
-        elements.remove(elementId);
-        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
-        editor.remove(elementId);
-        editor.apply();
-
-        //wg_debug
-        System.out.println("wg_debug elements preference:" + elements);
-    }
-    public List<ElementBean> getElements() {
-        List<ElementBean> list = new ArrayList<>(elements.values());
+        //对element根据创建时间进行排序
         Collections.sort(list, new Comparator<ElementBean>() {
             @Override
             public int compare(ElementBean o1, ElementBean o2) {
@@ -110,9 +99,21 @@ public class ElementPreference {
         return gson.toJson(element);
     }
 
-    public void clear(){
-        SharedPreferences.Editor editor = context.getSharedPreferences(elementLayoutName, Activity.MODE_PRIVATE).edit();
+    public void delete(){
         editor.clear();
         editor.apply();
+        new File(context.getFilesDir().getParent() + "/shared_prefs/" + elementPreferenceName + ".xml").delete();
     }
+
+    public void importPreference(Map<String, String> elements){
+        for (Map.Entry<String, String> entry: elements.entrySet()){
+            editor.putString(entry.getKey(),entry.getValue());
+            editor.apply();
+        }
+    }
+
+    public Map<String, String> exportPreference(){
+        return (Map<String, String>) preferences.getAll();
+    }
+
 }

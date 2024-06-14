@@ -9,12 +9,16 @@ import android.widget.LinearLayout;
 
 import com.limelight.R;
 
+import java.util.Map;
+
 public class ConfigItem {
+
+
+
     private LinearLayout configItemLayout;
     private CheckBox configItemCheckBox;
     private Button configItemRenameButton;
     private Button configItemDeleteButton;
-    private Button configItemExportButton;
     private ConfigItem myself;
     private ConfigController configController;
 
@@ -27,10 +31,9 @@ public class ConfigItem {
         configItemCheckBox = (CheckBox) configItemLayout.getChildAt(0);
         configItemRenameButton = (Button) ((LinearLayout) configItemLayout.getChildAt(1)).getChildAt(0);
         configItemDeleteButton = (Button) ((LinearLayout) configItemLayout.getChildAt(1)).getChildAt(1);
-        configItemExportButton = (Button) ((LinearLayout) configItemLayout.getChildAt(1)).getChildAt(2);
         setText(configName);
         if (configName.equals(ConfigListPreference.DEFAULT_CONFIG_NAME)){
-            (configItemLayout.getChildAt(1)).setVisibility(View.GONE);
+            (configItemLayout.getChildAt(1)).setVisibility(View.INVISIBLE);
         }
         configItemCheckBox.setOnClickListener(new View.OnClickListener() {
             @Override
