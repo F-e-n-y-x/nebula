@@ -166,4 +166,13 @@ public abstract class Element extends View {
     protected final int getCorrectWidth() {
         return getWidth() > getHeight() ? getHeight() : getWidth();
     }
+
+    @Override
+    public String toString() {
+        return "Name:" + elementBean.getName() + "," +
+                "X:" + getCentralX() + "," +
+                "Y:" + getCentralY() + "," +
+                "W:" + getParamWidth() + "," +
+                "H:" + getParamHeight();
+    }
 }

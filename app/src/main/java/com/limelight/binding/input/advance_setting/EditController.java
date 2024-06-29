@@ -178,15 +178,23 @@ public class EditController {
                         break;
 
                     case MotionEvent.ACTION_MOVE:
+                        float moveX = event.getX() - lastX;
+                        float moveY = event.getY() - lastY;
+                        // 计算移动距离,小距离不算做移动，跳过
+                        float distance = (float) Math.sqrt(moveX * moveX + moveY * moveY);
+                        if (distance < 2){
+                            break;
+                        }
+                        if (twoToOne){
+                            lastX = (int) event.getX();
+                            lastY = (int) event.getY();
+                            twoToOne = false;
+                            break;
+                        }
                         isSelect = false;
                         isHideAction = false;
                         // 单指移动时移动按钮
                         if (pointerCount == 1 && editElement != null) {
-                            if (twoToOne){
-                                lastX = (int) event.getX();
-                                lastY = (int) event.getY();
-                                twoToOne = false;
-                            }
                             int x = (int) event.getX();
                             int y = (int) event.getY();
                             int dx = x - lastX;
@@ -232,7 +240,6 @@ public class EditController {
 
                     case MotionEvent.ACTION_UP:
                         if (isSelect){
-
                             Element element = controllerManager.getElementController().selectElement(lastX,lastY);
                             if (element == null){
                                 return true;
