@@ -56,7 +56,7 @@ public class ElementController {
         this.game = (Game) context;
         this.controllerManager = controllerManager;
         this.controllerHandler = game.getControllerHandler();
-        layout.findViewById(R.id.element_touch_view).setOnTouchListener(game);
+
 
         handler = new Handler(Looper.getMainLooper());
     }

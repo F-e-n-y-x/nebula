@@ -2,8 +2,10 @@ package com.limelight.binding.input.advance_setting;
 
 import android.content.Context;
 import android.view.LayoutInflater;
+import android.view.View;
 import android.widget.FrameLayout;
 
+import com.limelight.Game;
 import com.limelight.R;
 
 public class ControllerManager {
@@ -15,6 +17,7 @@ public class ControllerManager {
     private EditController editController;
     private SettingController settingController;
     private ElementController elementController;
+    private TouchController touchController;
     private WindowsController windowsController;
     private Context context;
 
@@ -43,8 +46,8 @@ public class ControllerManager {
         FrameLayout layerEdit = advanceSettingView.findViewById(R.id.layer_edit);
         editController = new EditController(this,layerEdit,context);
 
-
-
+        View touchView = layerElement.findViewById(R.id.element_touch_view);
+        touchController = new TouchController((Game) context,this,touchView);
 
         //window controller
         FrameLayout layerWindows = advanceSettingView.findViewById(R.id.layer_windows);
@@ -78,8 +81,9 @@ public class ControllerManager {
         return windowsController;
     }
 
-
-
+    public TouchController getTouchController() {
+        return touchController;
+    }
 
     public void refreshLayout(){
         fatherLayout.removeView(advanceSettingView);

@@ -93,9 +93,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         OnSystemUiVisibilityChangeListener, GameGestures, StreamView.InputCallbacks,
         PerfOverlayListener, UsbDriverService.UsbDriverStateListener, View.OnKeyListener {
     private int lastButtonState = 0;
+    private static final int TOUCH_CONTEXT_LENGTH = 2;
 
     // Only 2 touches are supported
-    private final TouchContext[] touchContextMap = new TouchContext[2];
+    private TouchContext[] touchContextMap = new TouchContext[TOUCH_CONTEXT_LENGTH];
+    private final TouchContext[] absoluteTouchContextMap = new TouchContext[TOUCH_CONTEXT_LENGTH];
+    private final TouchContext[] relativeTouchContextMap = new TouchContext[TOUCH_CONTEXT_LENGTH];
     private long threeFingerDownTime = 0;
 
     private static final int REFERENCE_HORIZ_RES = 1280;
@@ -496,16 +499,19 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         InputManager inputManager = (InputManager) getSystemService(Context.INPUT_SERVICE);
         inputManager.registerInputDeviceListener(keyboardTranslator, null);
 
+
         // Initialize touch contexts
-        for (int i = 0; i < touchContextMap.length; i++) {
-            if (!prefConfig.touchscreenTrackpad) {
-                touchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
-            }
-            else {
-                touchContextMap[i] = new RelativeTouchContext(conn, i,
-                        REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
-                        streamView, prefConfig);
-            }
+        for (int i = 0; i < TOUCH_CONTEXT_LENGTH; i++) {
+            absoluteTouchContextMap[i] = new AbsoluteTouchContext(conn, i, streamView);
+            relativeTouchContextMap[i] = new RelativeTouchContext(conn, i,
+                    REFERENCE_HORIZ_RES, REFERENCE_VERT_RES,
+                    streamView, prefConfig);
+        }
+        if (!prefConfig.touchscreenTrackpad) {
+            touchContextMap = absoluteTouchContextMap;
+        }
+        else {
+            touchContextMap = relativeTouchContextMap;
         }
 
         if (prefConfig.onscreenController) {
@@ -1522,6 +1528,27 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
         else {
             return null;
+        }
+    }
+
+    public TouchContext[] getTouchContextMap() {
+        return touchContextMap;
+    }
+
+    /**
+     * false : RelativeTouchContext
+     * true : AbsoluteTouchContext
+     */
+    public void setTouchMode(boolean enableRelativeTouch){
+        for (int i = 0; i < touchContextMap.length; i++) {
+            if (enableRelativeTouch) {
+                prefConfig.touchscreenTrackpad = true;
+                touchContextMap = relativeTouchContextMap;
+            }
+            else {
+                prefConfig.touchscreenTrackpad = false;
+                touchContextMap = absoluteTouchContextMap;
+            }
         }
     }
 
@@ -2730,13 +2757,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
     }
 
-    public void adjustMsenseRelative(int sense){
-        for (TouchContext aTouchContext : touchContextMap) {
-            if (aTouchContext instanceof RelativeTouchContext){
-                ((RelativeTouchContext) aTouchContext).adjustMsense(sense * 0.01);
-            }
-        }
-    }
+
 
     public ControllerHandler getControllerHandler() {
         return controllerHandler;
