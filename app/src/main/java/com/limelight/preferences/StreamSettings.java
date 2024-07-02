@@ -159,7 +159,7 @@ public class StreamSettings extends Activity {
             }
         }
 
-        public static final int CONFIG_MAJOR_VERSION = 1;
+        public static final int CONFIG_MAJOR_VERSION = 2;
         public static final int CONFIG_MINOR_VERSION = 0;
         public static final int CONFIG_PATCH_VERSION = 0;
         private int nativeResolutionStartIndex = Integer.MAX_VALUE;

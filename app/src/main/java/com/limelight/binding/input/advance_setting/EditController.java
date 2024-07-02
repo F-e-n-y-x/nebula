@@ -87,7 +87,7 @@ public class EditController {
 
                 };
 
-                controllerManager.getWindowsController().openTextWindow(deleteListener, "是否删除:" + editElement.getElementId());
+                controllerManager.getWindowsController().openTextWindow(deleteListener, "是否删除:" + editElement.getElementName());
             }
         });
         layout.findViewById(R.id.add_element_button).setOnClickListener(new View.OnClickListener() {
@@ -319,17 +319,16 @@ public class EditController {
             public void onClick(View v) {
                 String name = elementName.getText().toString();
 
-                if (controllerManager.getElementController().isContainedElement(name)){
-                    Toast.makeText(context,"按键名字已存在",Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if (!name.matches("^[a-zA-Z0-9]{1,10}$")){
+
+                if (!name.matches("^.{1,10}$")){
                     Toast.makeText(context,"名称只能由1-10个数字、小写字母组成",Toast.LENGTH_SHORT).show();
                     return;
                 }
                 int elementCentralX = Integer.parseInt(elementXInput.getText().toString());
                 int elementCentralY = Integer.parseInt(elementYInput.getText().toString());
+                Long birthTime = System.currentTimeMillis();
                 ElementBean elementBean = new ElementBean(
+                        String.valueOf(birthTime),
                         name,
                         elementType.getSelectedItem().toString(),
                         elementCard.getTypeAttributes(),
@@ -341,7 +340,7 @@ public class EditController {
                         0xF0888888,
                         0xF00000FF,
                         0,
-                        System.currentTimeMillis(),
+                        birthTime,
                         null
                 );
 

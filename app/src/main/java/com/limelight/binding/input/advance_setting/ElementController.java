@@ -68,15 +68,6 @@ public class ElementController {
 
 
 
-    public boolean isContainedElement(String name){
-        for (Element element : elements) {
-            if (element.getElementId().equals(name)){
-                return true;
-            }
-        }
-        return false;
-    }
-
     public void loadElementConfig(String configId){
         removeElementsFromScreen();
         elementPreference = new ElementPreference(configId,context);
