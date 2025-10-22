@@ -1262,15 +1262,15 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
                 view.setOnFocusChangeListener((v, hasFocus) -> {
                     if (!hasFocus) return;
 
-                    int pos = rv.getChildAdapterPosition(v);
-                    if (pos < 0 || pos >= appGridAdapter.getCount()) return;
-
-                    AppObject app = (AppObject) appGridAdapter.getItem(pos);
                     // 延迟处理焦点变化，确保点击事件优先处理
                     v.post(() -> {
-                        if (v.hasFocus()) {
-                            handleSelectionChange(pos, app);
-                        }
+                        if (!v.hasFocus()) return;
+                        
+                        int pos = rv.getChildAdapterPosition(v);
+                        if (pos < 0 || pos >= appGridAdapter.getCount()) return;
+
+                        AppObject app = (AppObject) appGridAdapter.getItem(pos);
+                        handleSelectionChange(pos, app);
                     });
                 });
             }
