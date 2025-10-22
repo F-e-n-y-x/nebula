@@ -516,6 +516,11 @@
             android:title="@string/title_enable_post_stream_toast"
             android:summary="@string/summary_enable_post_stream_toast"
             android:defaultValue="false"/>
+        <CheckBoxPreference
+            android:key="checkbox_enable_stun"
+            android:title="获取公网 IP"
+            android:summary="这会尝试利用 STUN 服务器获取被控端的公网访问方式，以便在离开局域网环境后继续连接。但此功能可能会导致无公网 IP 用户扫描变慢"
+            android:defaultValue="false"/>
 
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_help"
