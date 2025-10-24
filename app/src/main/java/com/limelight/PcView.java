@@ -1085,7 +1085,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
     
     /**
      * 一键恢复上一次会话
-     * 默认选择第一个在线且有运行游戏的主机
+     * 持续查找主机直到找到有运行游戏的主机为止
      */
     private void restoreLastSession() {
         if (managerBinder == null) {
@@ -1093,36 +1093,32 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
             return;
         }
 
-        // 查找第一个在线的主机
-        ComputerDetails onlineComputer = null;
+        // 持续查找有运行游戏的在线主机
+        ComputerDetails targetComputer = null;
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
             if (computer.details.state == ComputerDetails.State.ONLINE && 
-                computer.details.pairState == PairState.PAIRED) {
-                onlineComputer = computer.details;
-                break;
+                computer.details.pairState == PairState.PAIRED &&
+                computer.details.runningGameId != 0) {
+                targetComputer = computer.details;
+                break; // 找到有运行游戏的主机就停止查找
             }
         }
 
-        if (onlineComputer == null) {
-            Toast.makeText(this, "no online computer", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (onlineComputer.runningGameId == 0) {
-            Toast.makeText(this, "Host " + onlineComputer.name + " has no running game", Toast.LENGTH_SHORT).show();
+        if (targetComputer == null) {
+            Toast.makeText(this, "No online computer with running game found", Toast.LENGTH_SHORT).show();
             return;
         }
 
         // 恢复会话
-        NvApp actualApp = getNvAppById(onlineComputer.runningGameId, onlineComputer.uuid);
+        NvApp actualApp = getNvAppById(targetComputer.runningGameId, targetComputer.uuid);
         if (actualApp != null) {
-            Toast.makeText(this, "Restoring session: " + onlineComputer.name, Toast.LENGTH_SHORT).show();
-            ServerHelper.doStart(this, actualApp, onlineComputer, managerBinder);
+            Toast.makeText(this, "Restoring session: " + targetComputer.name, Toast.LENGTH_SHORT).show();
+            ServerHelper.doStart(this, actualApp, targetComputer, managerBinder);
         } else {
             // 使用基本的NvApp对象作为备用
-            Toast.makeText(this, "Restoring session: " + onlineComputer.name, Toast.LENGTH_SHORT).show();
-            ServerHelper.doStart(this, new NvApp("app", onlineComputer.runningGameId, false), onlineComputer, managerBinder);
+            Toast.makeText(this, "Restoring session: " + targetComputer.name, Toast.LENGTH_SHORT).show();
+            ServerHelper.doStart(this, new NvApp("app", targetComputer.runningGameId, false), targetComputer, managerBinder);
         }
     }
 
