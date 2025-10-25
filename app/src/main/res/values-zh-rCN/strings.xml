@@ -576,4 +576,32 @@
     <string name="time_days_ago">%1$d天前</string>
     <string name="time_unknown">未知时间</string>
 
+    <!-- PcView hardcoded strings - Chinese translations -->
+    <string name="storage_permission_required">需要存储权限才能保存图片，请在设置中授予权限</string>
+    <string name="downloading_image_please_wait">正在重新下载图片，请稍候...</string>
+    <string name="image_download_failed_retry">图片下载失败，请重试</string>
+    <string name="image_download_failed_with_error">图片下载失败: %1$s</string>
+    <string name="image_not_loaded_please_retry">图片未加载，请稍后再试</string>
+    <string name="image_invalid">图片无效</string>
+    <string name="image_saved_successfully">涩图成功保存到了系统目录(Picture/setu)</string>
+    <string name="image_save_failed_with_error">涩图保存失败: %1$s</string>
+    <string name="config_save_failed">配置保存失败</string>
+    <string name="scene_config_applied">已应用场景%1$d配置：%2$dx%3$d@%4$dFPS %.2fMbps %5$s HDR %6$s</string>
+    <string name="scene_not_configured">场景%1$d未配置</string>
+    <string name="config_apply_failed">配置应用失败</string>
+    <string name="save_to_scene">保存到场景%1$d</string>
+    <string name="overwrite_current_config">是否覆盖当前配置？</string>
+    <string name="scene_saved_successfully">场景%1$d保存成功</string>
+    <string name="unable_to_get_pc_address">无法获取PC地址: %1$s</string>
+    <string name="send_sleep_command">发送睡眠指令</string>
+    <string name="network_bandwidth_test">网络带宽测试 (iPerf3)</string>
+    <string name="no_online_computer_with_running_game">没有找到运行游戏的在线电脑</string>
+    <string name="restoring_session">恢复会话: %1$s</string>
+    <string name="please_wait_seconds">请等待 %1$d 秒</string>
+    <string name="daily_limit_reached">每日限制已达到 (5/5)。请明天再试！</string>
+    <string name="refreshing_with_remaining">刷新中... (今日剩余 %1$d 次)</string>
+    <string name="background_refreshed_with_remaining">背景刷新成功！(今日剩余 %1$d 次)</string>
+    <string name="refresh_failed_please_retry">刷新失败，请重试</string>
+    <string name="refresh_failed_with_error">刷新失败: %1$s</string>
+
 </resources>

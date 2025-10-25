@@ -614,4 +614,32 @@
     <string name="time_days_ago">%1$d days ago</string>
     <string name="time_unknown">Unknown time</string>
 
+    <!-- PcView hardcoded strings -->
+    <string name="storage_permission_required">Storage permission required to save images, please grant permission in settings</string>
+    <string name="downloading_image_please_wait">Re-downloading image, please wait...</string>
+    <string name="image_download_failed_retry">Image download failed, please retry</string>
+    <string name="image_download_failed_with_error">Image download failed: %1$s</string>
+    <string name="image_not_loaded_please_retry">Image not loaded, please try again later</string>
+    <string name="image_invalid">Invalid image</string>
+    <string name="image_saved_successfully">Image successfully saved to system directory (Picture/setu)</string>
+    <string name="image_save_failed_with_error">Image save failed: %1$s</string>
+    <string name="config_save_failed">Configuration save failed</string>
+    <string name="scene_config_applied">Applied scene %1$d configuration: %2$dx%3$d@%4$dFPS %.2fMbps %5$s HDR %6$s</string>
+    <string name="scene_not_configured">Scene %1$d not configured</string>
+    <string name="config_apply_failed">Configuration apply failed</string>
+    <string name="save_to_scene">Save to Scene %1$d</string>
+    <string name="overwrite_current_config">Overwrite current configuration?</string>
+    <string name="scene_saved_successfully">Scene %1$d saved successfully</string>
+    <string name="unable_to_get_pc_address">Unable to get PC address: %1$s</string>
+    <string name="send_sleep_command">Send Sleep Command</string>
+    <string name="network_bandwidth_test">Network Bandwidth Test (iPerf3)</string>
+    <string name="no_online_computer_with_running_game">No online computer with running game found</string>
+    <string name="restoring_session">Restoring session: %1$s</string>
+    <string name="please_wait_seconds">Please wait %1$ds</string>
+    <string name="daily_limit_reached">Daily limit reached (5/5). Try again tomorrow!</string>
+    <string name="refreshing_with_remaining">Refreshing... (%1$d left today)</string>
+    <string name="background_refreshed_with_remaining">Background refreshed! (%1$d left today)</string>
+    <string name="refresh_failed_please_retry">Refresh failed, please retry</string>
+    <string name="refresh_failed_with_error">Refresh failed: %1$s</string>
+
 </resources>
