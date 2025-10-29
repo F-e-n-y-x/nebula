@@ -197,13 +197,13 @@
 
     <!-- 通用弹窗样式 -->
     <style name="AppDialogStyle" parent="Theme.AppCompat.Light.Dialog.Alert">
-        <item name="android:windowBackground">@drawable/game_menu_dialog_bg</item>
+        <item name="android:windowBackground">@drawable/app_dialog_bg_cute</item>
         <item name="android:windowMinWidthMajor">60%</item>
         <item name="android:windowMinWidthMinor">80%</item>
         <item name="android:windowIsFloating">true</item>
         <item name="android:windowAnimationStyle">@style/AppDialogAnimation</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
-        <item name="android:textColorPrimary">@color/theme_pink_primary</item>
+        <item name="android:textColorPrimary">@color/game_menu_text_primary</item>
         <item name="android:textColorSecondary">@color/game_menu_text_secondary</item>
         <item name="android:colorAccent">@color/theme_pink_primary</item>
         <item name="android:listDivider">@color/theme_pink_primary</item>

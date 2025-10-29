@@ -323,6 +323,8 @@
     <string name="category_ui_settings">🎨 UI Settings</string>
     <string name="title_checkbox_enable_pip">Enable Picture-in-Picture observer mode</string>
     <string name="summary_checkbox_enable_pip">Allows the stream to be viewed (but not controlled) while multitasking</string>
+    <string name="title_checkbox_enable_background_audio">Background Audio Mode</string>
+    <string name="summary_checkbox_enable_background_audio">Hide the entire window and play audio in background, allowing you to use other apps while listening</string>
     <string name="title_language_list">Language</string>
     <string name="summary_language_list">Language to use for Moonlight</string>
     <string name="title_checkbox_small_icon_mode">Use small box art</string>
@@ -431,7 +433,7 @@
     <string name="mic_permission_required">Microphone permission required</string>
     
     <!-- Screen position settings -->
-    <string name="category_screen_position_settings">📱 Screen Position Settings</string>
+    <string name="category_screen_position_settings">📱 Screen Settings</string>
     <string name="title_screen_position">Screen Position</string>
     <string name="summary_screen_position">Choose the position of the screen when using non-fullscreen resolution</string>
     <string name="title_screen_offset_x">Horizontal Offset</string>

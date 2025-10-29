@@ -8,7 +8,6 @@ import com.limelight.binding.input.ControllerHandler;
 import com.limelight.binding.input.GameInputDevice;
 import com.limelight.binding.input.KeyboardTranslator;
 import com.limelight.binding.input.advance_setting.ControllerManager;
-import com.limelight.binding.input.advance_setting.TouchController;
 import com.limelight.binding.input.capture.InputCaptureManager;
 import com.limelight.binding.input.capture.InputCaptureProvider;
 import com.limelight.binding.input.touch.AbsoluteTouchContext;

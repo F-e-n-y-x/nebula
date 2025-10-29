@@ -75,6 +75,16 @@
         android:title="@string/category_screen_position_settings"
         android:icon="@drawable/ic_screen_position"
         android:layout="@layout/preference_category_material">
+        <CheckBoxPreference
+            android:key="checkbox_enable_pip"
+            android:title="@string/title_checkbox_enable_pip"
+            android:summary="@string/summary_checkbox_enable_pip"
+            android:defaultValue="false" />
+        <com.limelight.preferences.ExternalDisplayPreference
+            android:key="use_external_display"
+            android:title="@string/title_use_external_display"
+            android:summary="@string/summary_use_external_display"
+            android:defaultValue="false" />
         <com.limelight.preferences.IconListPreference
             android:key="list_screen_position"
             android:title="@string/title_screen_position"
@@ -413,16 +423,6 @@
     <PreferenceCategory android:title="@string/category_ui_settings"
         android:key="category_ui_settings"
         android:layout="@layout/preference_category_material">
-        <CheckBoxPreference
-            android:key="checkbox_enable_pip"
-            android:title="@string/title_checkbox_enable_pip"
-            android:summary="@string/summary_checkbox_enable_pip"
-            android:defaultValue="false" />
-        <com.limelight.preferences.ExternalDisplayPreference
-            android:key="use_external_display"
-            android:title="@string/title_use_external_display"
-            android:summary="@string/summary_use_external_display"
-            android:defaultValue="false" />
         <com.limelight.preferences.LanguagePreference
             android:key="list_languages"
             android:title="@string/title_language_list"

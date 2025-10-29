@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    
+    <!-- 可爱的粉色渐变背景 -->
+    <gradient
+        android:type="linear"
+        android:angle="135"
+        android:startColor="#FFF8F5FC"
+        android:centerColor="#FFFEF7FB"
+        android:endColor="#FFFFF0F8" />
+    
+    <!-- 圆角，更柔和可爱 -->
+    <corners android:radius="24dp" />
+    
+    <!-- 粉色边框，更柔和 -->
+    <stroke
+        android:width="2dp"
+        android:color="#40FF6B9D" />
+    
+    <!-- 阴影效果，让对话框更有层次感 -->
+    <padding
+        android:left="2dp"
+        android:top="2dp"
+        android:right="2dp"
+        android:bottom="2dp" />
+</shape>
+
+

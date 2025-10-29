@@ -462,7 +462,7 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         }
     }
 
-    @SuppressLint("DefaultLocale")
+    @SuppressLint({"DefaultLocale", "StringFormatMatches"})
     private void applySceneConfiguration(int sceneNumber) {
         try {
             SharedPreferences prefs = getSharedPreferences(SCENE_PREF_NAME, MODE_PRIVATE);
