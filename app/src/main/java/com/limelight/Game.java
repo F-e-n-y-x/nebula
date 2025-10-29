@@ -3277,8 +3277,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         LimeLog.info("Display HDR mode: " + (enabled ? "enabled" : "disabled"));
         decoderRenderer.setHdrMode(enabled, hdrMetadata);
 
-        // 通知系统HDR内容状态，特别是对ColorOS系统
-        if (UiHelper.isColorOS()) {
+        // 通知系统 HDR 内容状态（在 Android Q+ 上切换 Window color mode）
+        // 这有助于部分 OEM（例如小米的 MIUI）在进入 HDR 时启用正确的色彩/亮度路径。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             notifySystemHdrStatus(enabled);
         }
     }
@@ -3286,8 +3287,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private void notifySystemHdrStatus(boolean hdrEnabled) {
         runOnUiThread(() -> {
             try {
-                // 通过Window设置色彩模式
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // 通过 Window 设置色彩模式（该 API 在 Android Q/API29 引入）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     if (hdrEnabled) {
                         getWindow().setColorMode(ActivityInfo.COLOR_MODE_HDR);
                     } else {
