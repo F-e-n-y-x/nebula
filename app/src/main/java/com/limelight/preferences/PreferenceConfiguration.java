@@ -982,6 +982,7 @@ public class PreferenceConfiguration {
         copy.enableNativeMousePointer = this.enableNativeMousePointer;
         copy.gyroToRightStick = this.gyroToRightStick;
         copy.gyroFullDeflectionDps = this.gyroFullDeflectionDps;
+        copy.gyroSensitivityMultiplier = this.gyroSensitivityMultiplier;
         copy.gyroActivationKeyCode = this.gyroActivationKeyCode;
         copy.gyroInvertXAxis = this.gyroInvertXAxis;
         copy.gyroInvertYAxis = this.gyroInvertYAxis;
