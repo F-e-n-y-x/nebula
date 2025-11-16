@@ -52,6 +52,7 @@ import android.view.ContextMenu.ContextMenuInfo;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -389,6 +390,13 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         TextView label = findViewById(R.id.appListText);
         setTitle(computerName);
         label.setText(computerName);
+
+        // Setup settings button
+        ImageButton settingsButton = findViewById(R.id.settingsButton);
+        settingsButton.setOnClickListener(v -> {
+            Intent intent = new Intent(AppView.this, com.limelight.preferences.StreamSettings.class);
+            startActivity(intent);
+        });
 
         // Bind to the computer manager service
         bindService(new Intent(this, ComputerManagerService.class), serviceConnection,
