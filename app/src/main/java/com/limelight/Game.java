@@ -2893,12 +2893,33 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
 
-        // We may get values slightly outside our view region on ACTION_HOVER_ENTER and ACTION_HOVER_EXIT.
-        // Normalize these to the view size. We can't just drop them because we won't always get an event
-        // right at the boundary of the view, so dropping them would result in our cursor never really
-        // reaching the sides of the screen.
-        eventX = Math.min(Math.max(eventX, 0), activeStreamView.getWidth());
-        eventY = Math.min(Math.max(eventY, 0), activeStreamView.getHeight());
+        if (externalDisplayManager != null && externalDisplayManager.isUsingExternalDisplay()) {
+            int streamViewWidth = activeStreamView.getWidth();
+            int streamViewHeight = activeStreamView.getHeight();
+        
+            // 获取设备的分辨率
+            Point size = new Point();
+            Display display = getWindowManager().getDefaultDisplay();
+            display.getRealSize(size);
+            int deviceWidth = size.x;
+            int deviceHeight = size.y;
+
+            float scaleX = (float) streamViewWidth / deviceWidth;
+            float scaleY = (float) streamViewHeight / deviceHeight;
+
+            float scaledX = eventX * scaleX;
+            float scaledY = eventY * scaleY;
+
+            eventX = Math.max(0, Math.min(scaledX, streamViewWidth));
+            eventY = Math.max(0, Math.min(scaledY, streamViewHeight));
+        } else {
+            // We may get values slightly outside our view region on ACTION_HOVER_ENTER and ACTION_HOVER_EXIT.
+            // Normalize these to the view size. We can't just drop them because we won't always get an event
+            // right at the boundary of the view, so dropping them would result in our cursor never really
+            // reaching the sides of the screen.
+            eventX = Math.min(Math.max(eventX, 0), activeStreamView.getWidth());
+            eventY = Math.min(Math.max(eventY, 0), activeStreamView.getHeight());
+        }
 
         conn.sendMousePosition((short)eventX, (short)eventY, (short)activeStreamView.getWidth(), (short)activeStreamView.getHeight());
     }
