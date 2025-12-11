@@ -37,6 +37,12 @@ import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
 import android.widget.ListView;
 import android.preference.PreferenceGroup;
+import android.widget.HorizontalScrollView;
+import android.widget.ScrollView;
+import com.google.android.flexbox.FlexboxLayout;
+import com.google.android.flexbox.FlexWrap;
+import com.google.android.flexbox.FlexDirection;
+import com.google.android.flexbox.JustifyContent;
 
 import androidx.annotation.NonNull;
 
@@ -411,20 +417,63 @@ public class StreamSettings extends Activity {
                 return;
             }
 
+            // 1. 获取视图组件
             LinearLayout navContainer = activity.findViewById(R.id.settings_nav_container);
-            if (navContainer == null) {
+            FlexboxLayout navGridContainer = activity.findViewById(R.id.settings_nav_grid_container);
+            HorizontalScrollView navScroll = activity.findViewById(R.id.settings_nav_scroll);
+            ScrollView navGridScroll = activity.findViewById(R.id.settings_nav_grid_scroll);
+            ImageView toggleButton = activity.findViewById(R.id.settings_nav_toggle);
+
+            // 2. 安全检查
+            if (navContainer == null || navGridContainer == null || navScroll == null || 
+                navGridScroll == null || toggleButton == null) {
                 return;
             }
 
-            // 清空旧导航
+            // 3. 配置 Flexbox 自动换行
+            navGridContainer.setFlexWrap(FlexWrap.WRAP);
+            navGridContainer.setFlexDirection(FlexDirection.ROW);
+            navGridContainer.setJustifyContent(JustifyContent.FLEX_START);
+
+            // 4. 清空视图
             navContainer.removeAllViews();
+            navGridContainer.removeAllViews();
 
             PreferenceScreen screen = getPreferenceScreen();
             if (screen == null) {
                 return;
             }
 
-            // 构建分类列表并生成导航按钮
+            final ImageView collapseBtn = new ImageView(activity);
+            collapseBtn.setImageResource(R.drawable.ic_list_view);
+            collapseBtn.setPadding(dpToPx(12), dpToPx(6), dpToPx(12), dpToPx(6));
+            collapseBtn.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            collapseBtn.setMinimumHeight(dpToPx(28));
+
+            GradientDrawable bgCollapse = new GradientDrawable();
+            bgCollapse.setColor(Color.parseColor("#33FFFFFF"));
+            bgCollapse.setCornerRadius(dpToPx(16));
+            collapseBtn.setBackground(bgCollapse);
+
+            FlexboxLayout.LayoutParams lpCollapse = new FlexboxLayout.LayoutParams(
+                    FlexboxLayout.LayoutParams.WRAP_CONTENT,
+                    FlexboxLayout.LayoutParams.WRAP_CONTENT
+            );
+            int margin = dpToPx(6);
+            lpCollapse.setMargins(margin, margin, margin, margin);
+            collapseBtn.setLayoutParams(lpCollapse);
+
+            // 点击内部收起按钮 -> 切换回水平模式
+            collapseBtn.setOnClickListener(v -> {
+                navScroll.setVisibility(View.VISIBLE);
+                toggleButton.setVisibility(View.VISIBLE);
+                navGridScroll.setVisibility(View.GONE);
+            });
+
+            // 添加到网格的第一个位置
+            navGridContainer.addView(collapseBtn);
+
+            // 5. 循环添加普通分类按钮
             for (int i = 0; i < screen.getPreferenceCount(); i++) {
                 Preference pref = screen.getPreference(i);
                 if (pref instanceof PreferenceCategory) {
@@ -433,43 +482,71 @@ public class StreamSettings extends Activity {
                         continue;
                     }
 
-                    final TextView tab = new TextView(activity);
-                    tab.setText(category.getTitle());
-                    tab.setTextColor(Color.WHITE);
-                    tab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-                    tab.setSingleLine(true);
-                    tab.setPadding(dpToPx(12), dpToPx(6), dpToPx(12), dpToPx(6));
-
-                    GradientDrawable bg = new GradientDrawable();
-                    bg.setColor(Color.parseColor("#33FFFFFF"));
-                    bg.setCornerRadius(dpToPx(16));
-                    tab.setBackground(bg);
-
-                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    // --- 水平模式 Tab ---
+                    final TextView tabHorizontal = createTab(activity, category.getTitle().toString());
+                    LinearLayout.LayoutParams lpHorizontal = new LinearLayout.LayoutParams(
                             LinearLayout.LayoutParams.WRAP_CONTENT,
                             LinearLayout.LayoutParams.WRAP_CONTENT
                     );
-                    lp.rightMargin = dpToPx(12);
-                    tab.setLayoutParams(lp);
+                    lpHorizontal.rightMargin = dpToPx(12);
+                    tabHorizontal.setLayoutParams(lpHorizontal);
+                    tabHorizontal.setOnClickListener(v -> scrollToCategory(category));
+                    navContainer.addView(tabHorizontal);
 
-                    tab.setOnClickListener(v -> {
-                        int position = findAdapterPositionForPreference(category);
-                        if (position >= 0) {
-							ListView listView = null;
-							View fragmentView = getView();
-							if (fragmentView != null) {
-								listView = fragmentView.findViewById(android.R.id.list);
-							}
-							else {
-								listView = activity.findViewById(android.R.id.list);
-							}
-							if (listView != null) {
-                                listView.smoothScrollToPositionFromTop(position, dpToPx(8));
-                            }
-                        }
-                    });
+                    // --- 网格模式 Tab ---
+                    final TextView tabGrid = createTab(activity, category.getTitle().toString());
+                    FlexboxLayout.LayoutParams lpFlex = new FlexboxLayout.LayoutParams(
+                            FlexboxLayout.LayoutParams.WRAP_CONTENT,
+                            FlexboxLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    lpFlex.setMargins(margin, margin, margin, margin);
+                    tabGrid.setLayoutParams(lpFlex);
+                    tabGrid.setOnClickListener(v -> scrollToCategory(category));
+                    navGridContainer.addView(tabGrid);
+                }
+            }
 
-                    navContainer.addView(tab);
+            // 6. 左侧固定按钮点击事件（只负责展开）
+            toggleButton.setOnClickListener(v -> {
+                // 切换到网格模式
+                navScroll.setVisibility(View.GONE);
+                toggleButton.setVisibility(View.GONE);
+                navGridScroll.setVisibility(View.VISIBLE);
+            });
+        }
+
+        // 辅助方法：创建统一样式的 Tab (避免代码重复)
+        private TextView createTab(Activity activity, String text) {
+            TextView tab = new TextView(activity);
+            tab.setText(text);
+            tab.setTextColor(Color.WHITE);
+            tab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            tab.setSingleLine(true);
+            tab.setPadding(dpToPx(12), dpToPx(6), dpToPx(12), dpToPx(6));
+
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(Color.parseColor("#33FFFFFF"));
+            bg.setCornerRadius(dpToPx(16));
+            tab.setBackground(bg);
+            return tab;
+        }
+
+        // 辅助方法：跳转
+        private void scrollToCategory(PreferenceCategory category) {
+            int position = findAdapterPositionForPreference(category);
+            if (position >= 0) {
+                ListView listView = null;
+                View fragmentView = getView();
+                if (fragmentView != null) {
+                    listView = fragmentView.findViewById(android.R.id.list);
+                } else {
+                    Activity act = getActivity();
+                    if (act != null) {
+                        listView = act.findViewById(android.R.id.list);
+                    }
+                }
+                if (listView != null) {
+                    listView.smoothScrollToPositionFromTop(position, dpToPx(8));
                 }
             }
         }
@@ -1183,3 +1260,5 @@ public class StreamSettings extends Activity {
             .into(imageView));
     }
 }
+
+
