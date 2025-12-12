@@ -31,4 +31,9 @@ public class ConnectionContext {
     public int negotiatedPacketSize;
 
     public int videoCapabilities;
+    
+    // 设备亮度范围
+    public int minBrightness;
+    public int maxBrightness;
+    public int maxAverageBrightness;
 }
