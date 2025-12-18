@@ -334,6 +334,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public static final String EXTRA_SERVER_CERT = "ServerCert";
     public static final String EXTRA_PC_USEVDD = "usevdd";
     public static final String EXTRA_APP_CMD = "CmdList";
+    public static final String EXTRA_DISPLAY_NAME = "DisplayName";
 
     private ExternalDisplayManager externalDisplayManager;
 
@@ -523,6 +524,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         boolean pcUseVdd = Game.this.getIntent().getBooleanExtra(EXTRA_PC_USEVDD, false);
         byte[] derCertData = Game.this.getIntent().getByteArrayExtra(EXTRA_SERVER_CERT);
         String cmdList = Game.this.getIntent().getStringExtra(EXTRA_APP_CMD);
+        String displayName = Game.this.getIntent().getStringExtra(EXTRA_DISPLAY_NAME);
 
         app = new NvApp(appName != null ? appName : "app", appId, appSupportsHdr);
         if (cmdList != null) {
@@ -706,13 +708,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 .setUseVdd(pcUseVdd)
                 .setEnableMic(prefConfig.enableMic)
                 .setControlOnly(prefConfig.controlOnly)
+                .setCustomScreenMode(prefConfig.screenCombinationMode)
                 .build();
 
         // Initialize the connection
         conn = new NvConnection(getApplicationContext(),
                 new ComputerDetails.AddressTuple(host, port),
                 httpsPort, uniqueId, pairName, config,
-                PlatformBinding.getCryptoProvider(this), serverCert);
+                PlatformBinding.getCryptoProvider(this), serverCert, displayName);
         controllerHandler = new ControllerHandler(this, conn, this, prefConfig);
         keyboardTranslator = new KeyboardTranslator();
 
