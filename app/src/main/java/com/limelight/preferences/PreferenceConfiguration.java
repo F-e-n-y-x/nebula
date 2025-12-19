@@ -47,6 +47,7 @@ public class PreferenceConfiguration {
     }
 
     private static final String ENABLE_DOUBLE_CLICK_DRAG_PREF_STRING = "pref_enable_double_click_drag";
+    private static final String DOUBLE_TAP_TIME_THRESHOLD_PREF_STRING = "seekbar_double_tap_time_threshold";
     private static final String ENABLE_LOCAL_CURSOR_RENDERING_PREF_STRING = "pref_enable_local_cursor_rendering";
 
     private static final String LEGACY_RES_FPS_PREF_STRING = "list_resolution_fps";
@@ -213,11 +214,12 @@ public class PreferenceConfiguration {
     private static final boolean DEFAULT_CONTROL_ONLY = false;
 
     private static final boolean DEFAULT_ENABLE_DOUBLE_CLICK_DRAG = false;
+    private static final int DEFAULT_DOUBLE_TAP_TIME_THRESHOLD = 125; // 默认125ms
     public boolean enableDoubleClickDrag;
+    public int doubleTapTimeThreshold;
     
     private static final boolean DEFAULT_ENABLE_LOCAL_CURSOR_RENDERING = true;
     public boolean enableLocalCursorRendering;
-    
     public static final int FRAME_PACING_MIN_LATENCY = 0;
     public static final int FRAME_PACING_BALANCED = 1;
     public static final int FRAME_PACING_CAP_FPS = 2;
@@ -760,6 +762,7 @@ public class PreferenceConfiguration {
         // Checkbox preferences
         config.disableWarnings = prefs.getBoolean(DISABLE_TOASTS_PREF_STRING, DEFAULT_DISABLE_TOASTS);
         config.enableDoubleClickDrag = prefs.getBoolean(ENABLE_DOUBLE_CLICK_DRAG_PREF_STRING, DEFAULT_ENABLE_DOUBLE_CLICK_DRAG);
+        config.doubleTapTimeThreshold = prefs.getInt(DOUBLE_TAP_TIME_THRESHOLD_PREF_STRING, DEFAULT_DOUBLE_TAP_TIME_THRESHOLD);
         config.enableLocalCursorRendering = prefs.getBoolean(ENABLE_LOCAL_CURSOR_RENDERING_PREF_STRING, DEFAULT_ENABLE_LOCAL_CURSOR_RENDERING);
         config.enableSops = prefs.getBoolean(SOPS_PREF_STRING, DEFAULT_SOPS);
         config.stretchVideo = prefs.getBoolean(STRETCH_PREF_STRING, DEFAULT_STRETCH);

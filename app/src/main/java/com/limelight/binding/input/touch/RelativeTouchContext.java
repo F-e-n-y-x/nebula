@@ -33,9 +33,9 @@ public class RelativeTouchContext implements TouchContext {
     private int lastTapUpX = 0;
     /** 记录上一次成功单击的结束位置Y */
     private int lastTapUpY = 0;
-    /** 标志位，表示当前是否处于“双击并按住”触发的拖拽模式 */
+    /** 标志位，表示当前是否处于"双击并按住"触发的拖拽模式 */
     private boolean isDoubleClickDrag = false;
-    /** 标志位，表示当前手势可能是双击的第二次点击，处于“待定”状态 */
+    /** 标志位，表示当前手势可能是双击的第二次点击，处于"待定"状态 */
     private boolean isPotentialDoubleClick = false;
 
     private final NvConnection conn;
@@ -81,7 +81,7 @@ public class RelativeTouchContext implements TouchContext {
     private static final int DRAG_TIME_THRESHOLD = 650;
     private static final int DRAG_START_THRESHOLD = 10;
     // 定义2次点击的间隔小于多久才为双击按住
-    private static final int DOUBLE_TAP_TIME_THRESHOLD = 100;
+    private final int DOUBLE_TAP_TIME_THRESHOLD;
     //  定义双击后按住多久确认为拖拽
     private static final int DOUBLE_TAP_HOLD_TO_DRAG_THRESHOLD = 200;
     /** 定义双击时，两次点击位置的最大允许偏差 */
@@ -97,6 +97,10 @@ public class RelativeTouchContext implements TouchContext {
         this.targetView = view;
         this.prefConfig = prefConfig;
         this.handler = new Handler(Looper.getMainLooper());
+        
+        // 从配置中读取双击时间阈值
+        this.DOUBLE_TAP_TIME_THRESHOLD = prefConfig.doubleTapTimeThreshold;
+        
         this.buttonUpRunnables = new Runnable[] {
                 () -> conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_LEFT),
                 () -> conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_MIDDLE),
@@ -267,6 +271,8 @@ public class RelativeTouchContext implements TouchContext {
 
         if (confirmedDrag) {
             conn.sendMouseButtonUp(buttonIndex);
+            // 拖动结束后重置点击时间，避免影响后续的双指右键
+            lastTapUpTime = 0;
         }
         else if (isTap(eventTime))
         {
@@ -347,7 +353,7 @@ public class RelativeTouchContext implements TouchContext {
                     }
                 } else if (confirmedMove || isDoubleClickDrag || confirmedDrag) {
 
-                    if (localCursorRenderer != null) {
+                    if (localCursorRenderer != null && this.enableLocalCursorRendering) {
                         // 1. 本地模式：更新本地光标
                         localCursorRenderer.updateCursorPosition(deltaX, deltaY);
                         // 2. 获取绝对坐标并发送给服务器 (保持同步)
