@@ -495,6 +495,10 @@
             android:key="local_image_picker"
             android:title="@string/title_local_image_picker"
             android:summary="@string/summary_local_image_picker" />
+        <com.limelight.preferences.ResetBackgroundImagePreference
+            android:key="reset_background_image"
+            android:title="@string/title_reset_background_image"
+            android:summary="@string/summary_reset_background_image" />
         <CheckBoxPreference
             android:key="checkbox_enable_analytics"
             android:title="@string/title_enable_analytics"

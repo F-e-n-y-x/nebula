@@ -466,6 +466,10 @@
     <string name="title_local_image_picker">选择本地图片</string>
     <string name="summary_local_image_picker">从本地相册中选择一张图片作为背景</string>
     
+    <!-- Reset background image -->
+    <string name="title_reset_background_image">恢复默认背景</string>
+    <string name="summary_reset_background_image">清除自定义设置，恢复为默认的随机背景图片</string>
+    
     <!-- Reverse resolution -->
     <string name="title_checkbox_reverse_resolution">反转分辨率</string>
     <string name="summary_checkbox_reverse_resolution">交换宽度和高度值，用于特殊显示需求</string>

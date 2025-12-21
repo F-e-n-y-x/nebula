@@ -212,14 +212,18 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                 // 将 imageUrl 转换为可被 Glide 正确识别的对象
                 Object glideLoadTarget;
                 if (imageUrl.startsWith("http")) {
-                    // URL 直接使用
+                    // HTTP/HTTPS URL 直接使用
                     glideLoadTarget = imageUrl;
-                } else if (new File(imageUrl).exists()) {
-                    // 本地文件路径，转换为 File 对象
-                    glideLoadTarget = new File(imageUrl);
                 } else {
-                    // 文件不存在或无效，使用默认 URL
-                    glideLoadTarget = "https://img-api.pipw.top";
+                    // 本地文件路径，转换为 File 对象
+                    File localFile = new File(imageUrl);
+                    if (localFile.exists()) {
+                        glideLoadTarget = localFile;
+                    } else {
+                        // 文件不存在（理论上不应该发生，因为 getBackgroundImageUrl() 已检查）
+                        // 但为了安全，回退到默认 URL
+                        glideLoadTarget = getDefaultApiUrl();
+                    }
                 }
 
                 final Bitmap bitmap = Glide.with(PcView.this)
@@ -316,21 +320,52 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         pcGridAdapter.notifyDataSetChanged();
     }
 
+    /**
+     * 获取背景图片URL或文件路径
+     * 支持三种类型：默认API、自定义API URL、本地文件
+     */
     private @NonNull String getBackgroundImageUrl() {
-        // 获取用户自定义的图片API地址
-        String customUrl = PreferenceManager.getDefaultSharedPreferences(this)
-            .getString("background_image_url", null);
-            
-        // 如果没有自定义地址，使用默认地址
-        if (customUrl == null || customUrl.isEmpty()) {
-            int deviceRotation = this.getWindowManager().getDefaultDisplay().getRotation();
-            return deviceRotation == Configuration.ORIENTATION_PORTRAIT ? 
-                "https://img-api.pipw.top" : 
-                "https://img-api.pipw.top/?phone=true";
-        }
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String type = prefs.getString("background_image_type", "default");
         
-        // 使用自定义地址
-        return customUrl;
+        switch (type) {
+            case "api":
+                // 自定义API URL
+                String apiUrl = prefs.getString("background_image_url", null);
+                if (apiUrl != null && !apiUrl.isEmpty()) {
+                    return apiUrl;
+                }
+                // API URL为空，回退到默认
+                prefs.edit().putString("background_image_type", "default").apply();
+                return getDefaultApiUrl();
+                
+            case "local":
+                // 本地文件路径
+                String localPath = prefs.getString("background_image_local_path", null);
+                if (localPath != null && new File(localPath).exists()) {
+                    return localPath;
+                }
+                // 文件不存在，回退到默认并清理配置
+                prefs.edit()
+                    .putString("background_image_type", "default")
+                    .remove("background_image_local_path")
+                    .apply();
+                return getDefaultApiUrl();
+                
+            default:
+                // 默认API图片
+                return getDefaultApiUrl();
+        }
+    }
+    
+    /**
+     * 获取默认的API URL（根据屏幕方向）
+     */
+    private String getDefaultApiUrl() {
+        int deviceRotation = this.getWindowManager().getDefaultDisplay().getRotation();
+        return deviceRotation == Configuration.ORIENTATION_PORTRAIT ? 
+            "https://img-api.pipw.top" : 
+            "https://img-api.pipw.top/?phone=true";
     }
 
     private void saveImage() {
@@ -351,14 +386,18 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                         // 将 imageUrl 转换为可被 Glide 正确识别的对象
                         Object glideLoadTarget;
                         if (imageUrl.startsWith("http")) {
-                            // URL 直接使用
+                            // HTTP/HTTPS URL 直接使用
                             glideLoadTarget = imageUrl;
-                        } else if (new File(imageUrl).exists()) {
-                            // 本地文件路径，转换为 File 对象
-                            glideLoadTarget = new File(imageUrl);
                         } else {
-                            // 文件不存在或无效，使用默认 URL
-                            glideLoadTarget = "https://img-api.pipw.top";
+                            // 本地文件路径，转换为 File 对象
+                            File localFile = new File(imageUrl);
+                            if (localFile.exists()) {
+                                glideLoadTarget = localFile;
+                            } else {
+                                // 文件不存在（理论上不应该发生，因为 getBackgroundImageUrl() 已检查）
+                                // 但为了安全，回退到默认 URL
+                                glideLoadTarget = getDefaultApiUrl();
+                            }
                         }
 
                         Bitmap downloadedBitmap = Glide.with(PcView.this)
@@ -1480,14 +1519,18 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                 // 将 imageUrl 转换为可被 Glide 正确识别的对象
                 Object glideLoadTarget;
                 if (imageUrl.startsWith("http")) {
-                    // URL 直接使用
+                    // HTTP/HTTPS URL 直接使用
                     glideLoadTarget = imageUrl;
-                } else if (new File(imageUrl).exists()) {
-                    // 本地文件路径，转换为 File 对象
-                    glideLoadTarget = new File(imageUrl);
                 } else {
-                    // 文件不存在或无效，使用默认 URL
-                    glideLoadTarget = "https://img-api.pipw.top";
+                    // 本地文件路径，转换为 File 对象
+                    File localFile = new File(imageUrl);
+                    if (localFile.exists()) {
+                        glideLoadTarget = localFile;
+                    } else {
+                        // 文件不存在（理论上不应该发生，因为 getBackgroundImageUrl() 已检查）
+                        // 但为了安全，回退到默认 URL
+                        glideLoadTarget = getDefaultApiUrl();
+                    }
                 }
 
                 final Bitmap bitmap = Glide.with(PcView.this)

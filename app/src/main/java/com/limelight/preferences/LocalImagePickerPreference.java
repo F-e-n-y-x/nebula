@@ -101,10 +101,13 @@ public class LocalImagePickerPreference extends Preference {
             String internalPath = copyImageToInternalStorage(getContext(), imageUri);
 
             if (internalPath != null) {
-                // 保存私有文件的路径到偏好设置
+                // 保存私有文件的路径到偏好设置，并设置类型为本地文件
                 SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
                 prefs.edit()
-                        .putString("background_image_url", internalPath)
+                        .putString("background_image_type", "local")
+                        .putString("background_image_local_path", internalPath)
+                        // 清除API URL配置，避免冲突
+                        .remove("background_image_url")
                         .apply();
 
                 Toast.makeText(getContext(), "背景图片设置成功", Toast.LENGTH_SHORT).show();

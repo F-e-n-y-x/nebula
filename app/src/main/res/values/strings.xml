@@ -502,6 +502,10 @@
     <string name="title_local_image_picker">Select Local Image</string>
     <string name="summary_local_image_picker">Choose an image from your gallery as the background</string>
     
+    <!-- Reset background image -->
+    <string name="title_reset_background_image">Reset Background Image</string>
+    <string name="summary_reset_background_image">Restore default background image (API random image)</string>
+    
     <!-- Reverse resolution -->
     <string name="title_checkbox_reverse_resolution">Reverse Resolution</string>
     <string name="summary_checkbox_reverse_resolution">Swap width and height values for special display requirements</string>
