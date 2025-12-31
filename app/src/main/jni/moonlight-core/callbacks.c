@@ -480,7 +480,7 @@ Java_com_limelight_nvstream_jni_MoonBridge_startConnection(JNIEnv *env, jclass c
             .audioConfiguration = audioConfiguration,
             .supportedVideoFormats = supportedVideoFormats,
             .clientRefreshRateX100 = clientRefreshRateX100,
-            .encryptionFlags = ENCFLG_AUDIO,
+            .encryptionFlags = ENCFLG_AUDIO | ENCFLG_MICROPHONE,
             .colorSpace = colorSpace,
             .colorRange = colorRange,
             .enableMic = enableMic,

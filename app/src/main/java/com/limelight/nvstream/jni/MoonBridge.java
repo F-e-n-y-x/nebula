@@ -422,9 +422,11 @@ public class MoonBridge {
     // This function returns any extended feature flags supported by the host.
     public static native int getHostFeatureFlags();
     
-    // 获取麦克风端口号
     public static native int getMicPortNumber();
     
-    // 检查主机是否请求麦克风输入
     public static native boolean isMicrophoneRequested();
+    
+    public static native int sendMicrophoneOpusData(byte[] opusData);
+    
+    public static native boolean isMicrophoneEncryptionEnabled();
 }
