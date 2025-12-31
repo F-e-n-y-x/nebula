@@ -75,6 +75,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.widget.AbsListView;
+import android.widget.GridView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -283,7 +284,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
 
         // Setup the list view
         ImageButton settingsButton = findViewById(R.id.settingsButton);
-        ImageButton addComputerButton = findViewById(R.id.manuallyAddPc);
         ImageButton restoreSessionButton = findViewById(R.id.restoreSessionButton);
         ImageButton aboutButton = findViewById(R.id.aboutButton);
 
@@ -293,10 +293,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         }
 
         settingsButton.setOnClickListener(v -> startActivity(new Intent(PcView.this, StreamSettings.class)));
-        addComputerButton.setOnClickListener(v -> {
-            Intent i = new Intent(PcView.this, AddComputerManually.class);
-            startActivity(i);
-        });
         restoreSessionButton.setOnClickListener(v -> restoreLastSession());
         if (aboutButton != null) {
             aboutButton.setOnClickListener(v -> showAboutDialog());
@@ -307,7 +303,12 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
             .commitAllowingStateLoss();
 
         noPcFoundLayout = findViewById(R.id.no_pc_found_layout);
-        if (pcGridAdapter.getCount() == 0) {
+        
+        // 确保添加卡片存在
+        addAddComputerCard();
+        
+        if (pcGridAdapter.getCount() == 0 || pcGridAdapter.getCount() == 1 && 
+            PcGridAdapter.isAddComputerCard((ComputerObject) pcGridAdapter.getItem(0))) {
             noPcFoundLayout.setVisibility(View.VISIBLE);
         }
         else {
@@ -816,6 +817,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         if (position < 0) return;
 
         ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(position);
+        
+        // 添加卡片不显示上下文菜单
+        if (PcGridAdapter.isAddComputerCard(computer)) {
+            return;
+        }
 
         // Add a header with PC status details
         menu.clearHeader();
@@ -1104,6 +1110,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         if (position < 0) return super.onContextItemSelected(item);
 
         final ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(position);
+        
+        // 添加卡片不显示上下文菜单
+        if (PcGridAdapter.isAddComputerCard(computer)) {
+            return super.onContextItemSelected(item);
+        }
         switch (item.getItemId()) {
             case PAIR_ID:
                 doPair(computer.details);
@@ -1279,6 +1290,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
     }
 
     private void removeComputer(ComputerDetails details) {
+        // 不允许删除添加卡片
+        if (PcGridAdapter.ADD_COMPUTER_UUID.equals(details.uuid)) {
+            return;
+        }
+        
         managerBinder.removeComputer(details);
 
         new DiskAssetLoader(this).deleteAssetsForComputer(details.uuid);
@@ -1291,6 +1307,11 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
 
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
+            
+            // 跳过添加卡片
+            if (PcGridAdapter.isAddComputerCard(computer)) {
+                continue;
+            }
 
             if (details.equals(computer.details)) {
                 // Disable or delete shortcuts referencing this PC
@@ -1300,7 +1321,14 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                 pcGridAdapter.removeComputer(computer);
                 pcGridAdapter.notifyDataSetChanged();
 
-                if (pcGridAdapter.getCount() == 0) {
+                // 检查是否只剩下添加卡片
+                int realCount = 0;
+                for (int j = 0; j < pcGridAdapter.getCount(); j++) {
+                    if (!PcGridAdapter.isAddComputerCard((ComputerObject) pcGridAdapter.getItem(j))) {
+                        realCount++;
+                    }
+                }
+                if (realCount == 0) {
                     // Show the "Discovery in progress" view
                     noPcFoundLayout.setVisibility(View.VISIBLE);
                 }
@@ -1310,14 +1338,56 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         }
     }
     
+    /**
+     * 创建并添加"添加电脑"卡片
+     */
+    private void addAddComputerCard() {
+        // 检查是否已经存在添加卡片
+        for (int i = 0; i < pcGridAdapter.getCount(); i++) {
+            ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
+            if (PcGridAdapter.isAddComputerCard(computer)) {
+                // 已经存在，不需要重复添加
+                return;
+            }
+        }
+        
+        // 创建添加卡片
+        ComputerDetails addDetails = new ComputerDetails();
+        addDetails.uuid = PcGridAdapter.ADD_COMPUTER_UUID;
+        try {
+            addDetails.name = getString(R.string.title_add_pc);
+        } catch (Exception e) {
+            addDetails.name = "添加电脑";
+        }
+        addDetails.state = ComputerDetails.State.UNKNOWN;
+        
+        pcGridAdapter.addComputer(new ComputerObject(addDetails));
+        pcGridAdapter.notifyDataSetChanged();
+        
+        // 移除"未找到PC"视图
+        if (noPcFoundLayout != null) {
+            noPcFoundLayout.setVisibility(View.INVISIBLE);
+        }
+    }
+    
     private void updateComputer(ComputerDetails details) {
+        // 忽略添加卡片
+        if (PcGridAdapter.ADD_COMPUTER_UUID.equals(details.uuid)) {
+            return;
+        }
+        
         ComputerObject existingEntry = null;
 
         for (int i = 0; i < pcGridAdapter.getCount(); i++) {
             ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(i);
+            
+            // 跳过添加卡片
+            if (PcGridAdapter.isAddComputerCard(computer)) {
+                continue;
+            }
 
             // Check if this is the same computer
-            if (details.uuid.equals(computer.details.uuid)) {
+            if (details.uuid != null && details.uuid.equals(computer.details.uuid)) {
                 existingEntry = computer;
                 break;
             }
@@ -1356,9 +1426,18 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         }
         else if (view instanceof AbsListView) {
             AbsListView listView = (AbsListView) view;
+            // 移除系统默认的选择背景，使用自定义的 selector
+            listView.setSelector(android.R.color.transparent);
             listView.setAdapter(pcGridAdapter);
             listView.setOnItemClickListener((arg0, arg1, pos, id) -> {
                 ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(pos);
+                
+                if (PcGridAdapter.isAddComputerCard(computer)) {
+                    Intent i = new Intent(PcView.this, AddComputerManually.class);
+                    startActivity(i);
+                    return;
+                }
+                
                 if (computer.details.state == ComputerDetails.State.UNKNOWN ||
                     computer.details.state == ComputerDetails.State.OFFLINE) {
                     // Open the context menu if a PC is offline or refreshing
@@ -1375,9 +1454,39 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                     }
                 }
             });
+            
+            // 如果是GridView，动态计算列宽以保持固定间距
+            if (view instanceof GridView) {
+                calculateDynamicColumnWidth((GridView) view);
+            }
+            
             UiHelper.applyStatusBarPadding(listView);
             registerForContextMenu(listView);
         }
+    }
+    
+    /**
+     * 动态计算GridView的列宽，确保卡片间距保持不变
+     * 根据屏幕宽度和固定间距自动调整列宽
+     */
+    private void calculateDynamicColumnWidth(GridView gridView) {
+        float density = getResources().getDisplayMetrics().density;
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        
+        // 获取可用宽度（扣除左右padding）
+        int availableWidth = screenWidth - gridView.getPaddingStart() - gridView.getPaddingEnd();
+        
+        // 固定参数（dp转px）
+        int horizontalSpacingPx = (int) (15f * density);
+        int minColumnWidthPx = (int) (180f * density);
+        
+        // 计算列数: numColumns = (availableWidth + spacing) / (minWidth + spacing)
+        int numColumns = Math.max(1, (availableWidth + horizontalSpacingPx) / (minColumnWidthPx + horizontalSpacingPx));
+        
+        // 计算实际列宽: columnWidth = (availableWidth - (numColumns - 1) * spacing) / numColumns
+        int columnWidth = (availableWidth - (numColumns - 1) * horizontalSpacingPx) / numColumns;
+        
+        gridView.setColumnWidth(columnWidth);
     }
 
     public static class ComputerObject {
