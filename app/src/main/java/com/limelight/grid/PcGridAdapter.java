@@ -218,29 +218,28 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
     @Override
     public void populateView(View parentView, ImageView imgView, View spinnerView, TextView txtView, ImageView overlayView, PcView.ComputerObject obj) {
         if (isAddComputerCard(obj)) {
-            imgView.setImageResource(R.drawable.ic_add);
-            imgView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            imgView.setAlpha(0.7f);
-            
-            // 设置背景
-            parentView.setBackgroundResource(R.drawable.pc_item_selector);
-            
-            // 隐藏加载动画和覆盖图标
-            spinnerView.setVisibility(View.INVISIBLE);
-            overlayView.setVisibility(View.GONE);
-            
-            // 设置文本
-            try {
-                txtView.setText(context.getString(R.string.title_add_pc));
-            } catch (Exception e) {
-                txtView.setText("添加电脑");
-            }
-            txtView.setAlpha(0.7f);
-            txtView.setTextColor(ONLINE_TEXT_COLOR);
+            populateAddComputerCard(parentView, imgView, spinnerView, txtView, overlayView);
             return;
         }
         
-        ComputerDetails details = obj.details;
+        populateComputerCard(parentView, imgView, spinnerView, txtView, overlayView, obj.details);
+    }
+    
+    private void populateAddComputerCard(View parentView, ImageView imgView, View spinnerView, TextView txtView, ImageView overlayView) {
+        imgView.setImageResource(R.drawable.ic_add);
+        imgView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        imgView.setAlpha(0.7f);
+        
+        parentView.setBackgroundResource(R.drawable.pc_item_selector);
+        spinnerView.setVisibility(View.INVISIBLE);
+        overlayView.setVisibility(View.GONE);
+        
+        txtView.setText(context.getString(R.string.title_add_pc));
+        txtView.setAlpha(0.7f);
+        txtView.setTextColor(ONLINE_TEXT_COLOR);
+    }
+    
+    private void populateComputerCard(View parentView, ImageView imgView, View spinnerView, TextView txtView, ImageView overlayView, ComputerDetails details) {
         boolean isOnline = details.state == ComputerDetails.State.ONLINE;
         boolean isUnknown = details.state == ComputerDetails.State.UNKNOWN;
         boolean isOffline = details.state == ComputerDetails.State.OFFLINE;
@@ -251,10 +250,7 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
             imgView.setImageResource(R.drawable.ic_computer);
             imgView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         }
-
-        // 设置透明度
-        float alpha = isOnline ? ONLINE_ALPHA : OFFLINE_ALPHA;
-        imgView.setAlpha(alpha);
+        imgView.setAlpha(isOffline ? OFFLINE_ALPHA : ONLINE_ALPHA);
 
         // 设置背景
         int bgRes = (isOnline && details.hasMultipleAddresses())
@@ -262,23 +258,26 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
                 : R.drawable.pc_item_selector;
         parentView.setBackgroundResource(bgRes);
 
-        // 处理加载动画
-        updateSpinner((ImageView) spinnerView, isUnknown);
+        // 处理加载动画：状态未知或正在加载 box art 时显示
+        // 注意：刚打开时电脑状态通常是 UNKNOWN，此时应该显示 spinner
+        boolean isLoadingBoxArt = details.uuid != null && loadingUuids.contains(details.uuid);
+        boolean shouldShowSpinner = isUnknown || isLoadingBoxArt;
+        updateSpinner((ImageView) spinnerView, shouldShowSpinner);
 
         // 设置文本
         txtView.setText(details.name);
-        txtView.setAlpha(isOnline ? 1.0f : 0.55f);
-        txtView.setTextColor(isOnline ? ONLINE_TEXT_COLOR : OFFLINE_TEXT_COLOR);
+        txtView.setAlpha(isOffline ? 0.5f : 1.0f);
+        txtView.setTextColor(isOffline ? OFFLINE_TEXT_COLOR : ONLINE_TEXT_COLOR);
 
         // 设置覆盖图标
         updateOverlay(overlayView, details, isOnline, isOffline);
     }
 
-    private void updateSpinner(ImageView spinnerView, boolean isUnknown) {
-        spinnerView.setVisibility(isUnknown ? View.VISIBLE : View.INVISIBLE);
+    private void updateSpinner(ImageView spinnerView, boolean shouldShow) {
+        spinnerView.setVisibility(shouldShow ? View.VISIBLE : View.INVISIBLE);
         if (spinnerView.getDrawable() instanceof AnimatedVectorDrawable) {
             AnimatedVectorDrawable animatedDrawable = (AnimatedVectorDrawable) spinnerView.getDrawable();
-            if (isUnknown) {
+            if (shouldShow) {
                 animatedDrawable.start();
             } else {
                 animatedDrawable.stop();
@@ -289,7 +288,7 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
     private void updateOverlay(ImageView overlayView, ComputerDetails details, boolean isOnline, boolean isOffline) {
         if (isOffline) {
             overlayView.setImageResource(R.drawable.ic_pc_offline);
-            overlayView.setAlpha(0.3f);
+            overlayView.setAlpha(0.35f);
             overlayView.setVisibility(View.VISIBLE);
             overlayView.setPadding(0, 0, 10, 12);
             overlayView.setScaleX(1.4f);
@@ -301,6 +300,8 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
             overlayView.setPadding(0, 0, 0, 0);
             overlayView.setScaleX(1.0f);
             overlayView.setScaleY(1.0f);
+            // 确保状态图标在最上层显示
+            overlayView.bringToFront();
         } else {
             overlayView.setVisibility(View.GONE);
         }

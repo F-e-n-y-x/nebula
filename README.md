@@ -3,7 +3,7 @@
   
   # Moonlight V+ 威力加强版
   
-  [![Version](https://img.shields.io/badge/version-12.5.3-blue.svg)](https://github.com/qiin2333/moonlight-android/releases/tag/shortcut)
+  [![Version](https://img.shields.io/badge/version-12.6.0-blue.svg)](https://github.com/qiin2333/moonlight-android/releases/tag/shortcut)
   [![Android](https://img.shields.io/badge/Android-5.0+-green.svg)](https://developer.android.com/about/versions)
   [![License](https://img.shields.io/badge/license-GPL%20v3-orange.svg)](LICENSE.txt)
   [![Stars](https://img.shields.io/github/stars/qiin2333/moonlight-android?style=social)](https://github.com/qiin2333/moonlight-android)
@@ -111,7 +111,7 @@ cd moonlight-android
   - 支持自定义应用排序、分组管理，让您的游戏和应用库更加美观整洁
 
 - **💻 主机自动优化**
-  - 自动检测客户端硬件能力，创建最佳串流环境
+  - 自动检测客户端硬件能力，创建最佳串流环境，无缝使用Windows触屏键盘
   - 双端屏幕策略协商，客户端设置优先，移动设备显示与交互完美适配
   - 客户端状态记忆，告别桌面 DPI 与图标错乱的烦恼
 
