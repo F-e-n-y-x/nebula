@@ -11,6 +11,7 @@
   **基于 Moonlight 的增强版 Android 串流客户端** 🎮
   
   *让您的 Android 设备成为强大的游戏串流终端！Gawr！* ✨
+
 </div>
 
 ## 📱 应用截图展示
@@ -19,7 +20,7 @@
   <img src="https://github.com/user-attachments/assets/bb174547-9b0d-4827-81cf-59308f3cfa9e" width="640" alt="主界面">
   <div align="center">
     <img src="https://github.com/user-attachments/assets/5e227bab-afaa-4452-ae38-ac2cc9d22988" width="240" alt="游戏列表">
-    <img src="https://github.com/user-attachments/assets/c755d228-d9f5-4068-ae6c-c3f8ea0a0f2f" width="240" alt="串流界面">
+    <img src="https://github.com/user-attachments/assets/9101bf19-782e-4c6f-977f-34b138b93990" width="240" alt="串流界面">
     <img src="https://github.com/user-attachments/assets/5046dd58-7013-494e-9f17-26e4de56a7dd" width="240" alt="设置界面">
   </div>
 </div>
