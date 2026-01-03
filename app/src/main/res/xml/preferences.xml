@@ -543,6 +543,18 @@
             android:entryValues="@array/video_format_values"
             android:summary="@string/summary_video_format"
             android:defaultValue="auto" />
+        <com.limelight.preferences.SeekBarPreference
+            android:key="seekbar_output_buffer_queue_limit"
+            android:dialogMessage="@string/summary_seekbar_output_buffer_queue_limit"
+            seekbar:min="1"
+            android:max="5"
+            seekbar:step="1"
+            seekbar:keyStep="1"
+            seekbar:divisor="1"
+            android:defaultValue="2"
+            android:summary="@string/summary_seekbar_output_buffer_queue_limit"
+            android:text="@string/suffix_seekbar_output_buffer_queue_limit"
+            android:title="@string/title_seekbar_output_buffer_queue_limit" />
         <CheckBoxPreference
             android:key="checkbox_enable_hdr"
             android:title="@string/title_enable_hdr"

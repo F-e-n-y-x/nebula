@@ -36,7 +36,7 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
     public static final String ADD_COMPUTER_UUID = "__ADD_COMPUTER__";
     
     private static final int TARGET_SIZE = 128;
-    private static final float ONLINE_ALPHA = 0.85f;
+    private static final float ONLINE_ALPHA = 0.95f;
     private static final float OFFLINE_ALPHA = 0.45f;
     private static final int ONLINE_TEXT_COLOR = 0xFF1C1C1E;
     private static final int OFFLINE_TEXT_COLOR = 0xFF8E8E93;

@@ -129,12 +129,11 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
     private final Map<Long, Long> timestampToEnqueueTime = new HashMap<>();
 
     private LinkedBlockingQueue<Integer> outputBufferQueue = new LinkedBlockingQueue<>();
-    private static final int OUTPUT_BUFFER_QUEUE_LIMIT = 2;
     private long lastRenderedFrameTimeNanos;
     private HandlerThread choreographerHandlerThread;
     private Handler choreographerHandler;
 
-    // Surface Flinger Raw模式相关变量
+    // 精确同步模式相关变量
     private Thread surfaceFlingerThread;
     private volatile boolean surfaceFlingerActive;
     private long surfaceFlingerLastFrameTime;
@@ -1016,9 +1015,9 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         if (actualFrameTimeDeltaNs >= expectedFrameTimeDeltaNs) {
             // Render up to one frame when in frame pacing mode.
             //
-            // NB: Since the queue limit is 2, we won't starve the decoder of output buffers
-            // by holding onto them for too long. This also ensures we will have that 1 extra
-            // frame of buffer to smooth over network/rendering jitter.
+            // NB: The queue limit is configurable via preferences, which prevents starving
+            // the decoder of output buffers by holding onto them for too long. This also ensures
+            // we will have that extra frame of buffer to smooth over network/rendering jitter.
             Integer nextOutputBuffer = outputBufferQueue.poll();
             if (nextOutputBuffer != null) {
                 if (prefs.framePacing == PreferenceConfiguration.FRAME_PACING_EXPERIMENTAL_LOW_LATENCY) {
@@ -1071,11 +1070,11 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
     }
 
     private void startSurfaceFlingerThread() {
-        if (prefs.framePacing != PreferenceConfiguration.FRAME_PACING_SURFACE_FLINGER_RAW) {
+        if (prefs.framePacing != PreferenceConfiguration.FRAME_PACING_PRECISE_SYNC) {
             return;
         }
 
-        LimeLog.info("启动Surface Flinger Raw模式");
+        LimeLog.info("启动精确同步模式");
 
         surfaceFlingerActive = true;
         surfaceFlingerFrameInterval = (long) (1000000000.0 / refreshRate);
@@ -1107,12 +1106,12 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
         final long finalPresentationDeadlineNs = presentationDeadlineNs;
 
         surfaceFlingerThread = new Thread(() -> {
-            Thread.currentThread().setName("Video - Surface Flinger Raw");
+            Thread.currentThread().setName("Video - Precise Sync");
             setThreadPrioritySafely(Thread.currentThread(), Process.THREAD_PRIORITY_URGENT_DISPLAY);
 
             runSurfaceFlingerLoop(finalVsyncOffsetNs, finalPresentationDeadlineNs);
 
-            LimeLog.info("Surface Flinger Raw线程结束");
+            LimeLog.info("精确同步模式线程结束");
         });
 
         surfaceFlingerThread.start();
@@ -1153,7 +1152,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
             updateTimingStats(currentTime);
 
         } catch (IllegalStateException e) {
-            LimeLog.warning("Surface Flinger Raw渲染异常: " + e.getMessage());
+            LimeLog.warning("精确同步模式渲染异常: " + e.getMessage());
             handleDecoderException(e);
         }
     }
@@ -1202,7 +1201,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
 
         if (surfaceFlingerFrameCount % 100 == 0) {
             float avgError = surfaceFlingerTimingError / 1000000.0f / surfaceFlingerFrameCount;
-            LimeLog.info(String.format("SF Raw: %d帧, 跳帧: %d, 平均误差: %.3fms",
+            LimeLog.info(String.format("精确同步: %d帧, 跳帧: %d, 平均误差: %.3fms",
                     surfaceFlingerFrameCount, surfaceFlingerSkippedFrames, avgError));
         }
     }
@@ -1212,7 +1211,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
 
         long timeDrift = Math.abs(currentTime - surfaceFlingerTargetTime);
         if (timeDrift > surfaceFlingerFrameInterval * 2) {
-            LimeLog.warning("SF Raw: 时间漂移过大 (" + (timeDrift / 1000000) + "ms)，重新同步");
+            LimeLog.warning("精确同步: 时间漂移过大 (" + (timeDrift / 1000000) + "ms)，重新同步");
             surfaceFlingerTargetTime = currentTime + surfaceFlingerFrameInterval;
             surfaceFlingerTimingError = 0;
         }
@@ -1255,7 +1254,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
                             // Render the latest frame now if frame pacing isn't in balanced mode or Surface Flinger mode
                             if (prefs.framePacing != PreferenceConfiguration.FRAME_PACING_BALANCED &&
                                     prefs.framePacing != PreferenceConfiguration.FRAME_PACING_EXPERIMENTAL_LOW_LATENCY &&
-                                    prefs.framePacing != PreferenceConfiguration.FRAME_PACING_SURFACE_FLINGER_RAW) {
+                                    prefs.framePacing != PreferenceConfiguration.FRAME_PACING_PRECISE_SYNC) {
                                 // Get the last output buffer in the queue
                                 while ((outIndex = videoDecoder.dequeueOutputBuffer(info, 0)) >= 0) {
                                     videoDecoder.releaseOutputBuffer(lastIndex, false);
@@ -1288,7 +1287,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
                                 // NB: We have to do this on the producer side because the consumer may not
                                 // run for a while (if there is a huge mismatch between stream FPS and display
                                 // refresh rate).
-                                if (outputBufferQueue.size() == OUTPUT_BUFFER_QUEUE_LIMIT) {
+                                if (outputBufferQueue.size() == prefs.outputBufferQueueLimit) {
                                     try {
                                         videoDecoder.releaseOutputBuffer(outputBufferQueue.take(), false);
                                     } catch (InterruptedException e) {
@@ -2024,7 +2023,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
 
     @SuppressLint("DefaultLocale")
     public String getSurfaceFlingerStats() {
-        if (prefs.framePacing != PreferenceConfiguration.FRAME_PACING_SURFACE_FLINGER_RAW) {
+        if (prefs.framePacing != PreferenceConfiguration.FRAME_PACING_PRECISE_SYNC) {
             return null;
         }
 
@@ -2042,7 +2041,7 @@ public class MediaCodecDecoderRenderer extends VideoDecoderRenderer implements C
             skipRate = (float) surfaceFlingerSkippedFrames / totalFramesExpected * 100f;
         }
 
-        return String.format("[SF Raw: %d渲染/%d接收, 跳帧率: %.1f%%]",
+        return String.format("[精确同步: %d渲染/%d接收, 跳帧率: %.1f%%]",
                 globalVideoStats.totalFramesRendered,
                 globalVideoStats.totalFramesReceived,
                 skipRate);

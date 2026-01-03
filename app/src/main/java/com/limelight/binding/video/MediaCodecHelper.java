@@ -44,6 +44,7 @@ public class MediaCodecHelper {
     private static final List<String> kirinDecoderPrefixes;
     private static final List<String> exynosDecoderPrefixes;
     private static final List<String> amlogicDecoderPrefixes;
+    private static final List<String> tegraDecoderPrefixes;
     private static final List<String> knownVendorLowLatencyOptions;
 
     public static final boolean SHOULD_BYPASS_SOFTWARE_BLOCK =
@@ -259,6 +260,13 @@ public class MediaCodecHelper {
 
         amlogicDecoderPrefixes.add("omx.amlogic");
         amlogicDecoderPrefixes.add("c2.amlogic"); // Unconfirmed
+    }
+
+    static {
+        tegraDecoderPrefixes = new LinkedList<>();
+
+        tegraDecoderPrefixes.add("omx.nvidia");
+        tegraDecoderPrefixes.add("c2.nvidia"); // Unconfirmed
     }
 
     private static boolean isPowerVR(String glRenderer) {
@@ -594,6 +602,17 @@ public class MediaCodecHelper {
                     videoFormat.setInteger("vendor.qti-ext-output-sw-fence-enable.value", 1); // Snapdragon 8 gen 2
                     videoFormat.setInteger("vendor.qti-ext-output-fence.enable", 1); // Snapdragon 8s Gen 3 and Elite
                     videoFormat.setInteger("vendor.qti-ext-output-fence.fence_type", 1); // Snapdragon 8s Gen 3 and ELite / 0 = none, 1 = sw, 2 = hw, 3 = hybrid. Best option = 1
+                    
+                    // Additional Qualcomm optimizations
+                    // Disable frame reordering for lower latency
+                    videoFormat.setInteger("vendor.qti-ext-dec-info-misr.disable", 1);
+                    // Enable instant decode for I-frames
+                    videoFormat.setInteger("vendor.qti-ext-dec-instant-decode.enable", 1);
+                    // Conceal corrupted frames instead of dropping
+                    videoFormat.setInteger("vendor.qti-ext-dec-error-correction.conceal", 1);
+                    // Disable timestamp reordering
+                    videoFormat.setInteger("vendor.qti-ext-extradata-enable.types", 0);
+                    
                     setNewOption = true;
                 }
             }
@@ -629,6 +648,14 @@ public class MediaCodecHelper {
                         videoFormat.setInteger("vendor.mtk.vdec.preload.frame.count", 1); // Light prebuffering
                     } catch (Throwable ignored) {}
 
+                    // Additional MediaTek optimizations
+                    try {
+                        videoFormat.setInteger("vendor.mtk.vdec.realtime.priority", 1);   // Real-time priority
+                        videoFormat.setInteger("vendor.mtk.vdec.no-reorder", 1);          // Disable frame reordering
+                        videoFormat.setInteger("vendor.mtk.vdec.decode-immediately", 1);  // Immediate decode mode
+                        videoFormat.setInteger("vendor.mtk.vdec.force-max-freq", 1);      // Force max frequency
+                    } catch (Throwable ignored) {}
+
                     setNewOption = true;
                 }
             }
@@ -638,6 +665,14 @@ public class MediaCodecHelper {
                     // https://developer.huawei.com/consumer/cn/forum/topic/0202325564295980115
                     videoFormat.setInteger("vendor.hisi-ext-low-latency-video-dec.video-scene-for-low-latency-req", 1);
                     videoFormat.setInteger("vendor.hisi-ext-low-latency-video-dec.video-scene-for-low-latency-rdy", -1);
+                    
+                    // Additional Kirin/HiSilicon optimizations
+                    try {
+                        videoFormat.setInteger("vendor.hisi-ext-dec-low-latency.enable", 1);
+                        videoFormat.setInteger("vendor.hisi-ext-dec-output-order.enable", 1);  // Display order output
+                        videoFormat.setInteger("vendor.hisi-ext-dec-realtime.enable", 1);      // Real-time mode
+                    } catch (Throwable ignored) {}
+                    
                     setNewOption = true;
                 }
             }
@@ -645,6 +680,14 @@ public class MediaCodecHelper {
                 if (tryNumber < 4) {
                     // Exynos low latency option for H.264 decoder
                     videoFormat.setInteger("vendor.rtc-ext-dec-low-latency.enable", 1);
+                    
+                    // Additional Exynos/Samsung optimizations
+                    try {
+                        videoFormat.setInteger("vendor.sec.dec.low-latency.enable", 1);       // Samsung low latency
+                        videoFormat.setInteger("vendor.sec.dec.realtime.enable", 1);          // Real-time priority
+                        videoFormat.setInteger("vendor.sec.dec.output-order.enable", 1);      // Display order output
+                    } catch (Throwable ignored) {}
+                    
                     setNewOption = true;
                 }
             }
@@ -653,6 +696,25 @@ public class MediaCodecHelper {
                     // Amlogic low latency vendor extension
                     // https://github.com/codewalkerster/android_vendor_amlogic_common_prebuilt_libstagefrighthw/commit/41fefc4e035c476d58491324a5fe7666bfc2989e
                     videoFormat.setInteger("vendor.low-latency.enable", 1);
+                    
+                    // Additional Amlogic optimizations
+                    try {
+                        videoFormat.setInteger("vendor.amlogic.lowlatency.mode", 1);          // Alternative low latency key
+                        videoFormat.setInteger("vendor.amlogic.tunnel.mode", 0);              // Disable tunnel mode for lower latency
+                        videoFormat.setInteger("vendor.amlogic.frame-skip.enable", 0);        // Disable frame skip
+                    } catch (Throwable ignored) {}
+                    
+                    setNewOption = true;
+                }
+            }
+            // NVIDIA Tegra decoders
+            else if (isDecoderInList(tegraDecoderPrefixes, decoderInfo.getName())) {
+                if (tryNumber < 4) {
+                    try {
+                        videoFormat.setInteger("vendor.nvidia.low-latency.enable", 1);
+                        videoFormat.setInteger("vendor.nvidia.realtime.enable", 1);
+                        videoFormat.setInteger("vendor.nvidia.game-streaming.enable", 1);     // Game streaming optimization
+                    } catch (Throwable ignored) {}
                     setNewOption = true;
                 }
             }

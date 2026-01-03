@@ -89,6 +89,9 @@ public class PerformanceOverlayManager {
 
     // 当前性能信息缓存
     private PerformanceInfo currentPerformanceInfo;
+    
+    // 实际设备刷新率（从 Game 传递）
+    private float actualDisplayRefreshRate = 0.0f;
 
     /**
      * 性能项目枚举 - 统一管理所有性能指标
@@ -346,6 +349,14 @@ public class PerformanceOverlayManager {
             // 单独更新电量信息（不需要performanceInfo参数）
             updateBatteryDisplay();
         });
+    }
+    
+    /**
+     * 设置实际设备刷新率
+     * @param refreshRate 实际设备刷新率（Hz）
+     */
+    public void setActualDisplayRefreshRate(float refreshRate) {
+        this.actualDisplayRefreshRate = refreshRate;
     }
 
     /**
@@ -1152,6 +1163,10 @@ public class PerformanceOverlayManager {
         resolutionInfo.append("Target FPS: ").append(prefConfig.fps).append(" FPS\n");
         resolutionInfo.append("Current FPS: ").append(String.format("%.0f", currentPerformanceInfo.totalFps)).append(" FPS\n");
         resolutionInfo.append("Device Refresh Rate: ").append(String.format("%.0f", deviceRefreshRate)).append(" Hz\n");
+        
+        if (actualDisplayRefreshRate > 0) {
+            resolutionInfo.append("Actual Display Refresh Rate: ").append(String.format("%.2f", actualDisplayRefreshRate)).append(" Hz\n");
+        }
         
         showInfoDialog(
                 "📱 Resolution Information",

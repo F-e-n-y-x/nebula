@@ -143,6 +143,9 @@ public class PreferenceConfiguration {
     // 控制流only模式设置
     private static final String CONTROL_ONLY_PREF_STRING = "checkbox_control_only";
 
+    // 输出缓冲区队列大小设置
+    private static final String OUTPUT_BUFFER_QUEUE_LIMIT_PREF_STRING = "seekbar_output_buffer_queue_limit";
+
     //wg
     private static final String ONSCREEN_CONTROLLER_PREF_STRING = "checkbox_show_onscreen_controls";
     static final String IMPORT_CONFIG_STRING = "import_super_config";
@@ -215,6 +218,9 @@ public class PreferenceConfiguration {
     // 控制流only模式默认值
     private static final boolean DEFAULT_CONTROL_ONLY = false;
 
+    // 输出缓冲区队列大小默认值
+    private static final int DEFAULT_OUTPUT_BUFFER_QUEUE_LIMIT = 2;
+
     private static final boolean DEFAULT_ENABLE_DOUBLE_CLICK_DRAG = false;
     private static final int DEFAULT_DOUBLE_TAP_TIME_THRESHOLD = 125; // 默认125ms
     public boolean enableDoubleClickDrag;
@@ -227,7 +233,7 @@ public class PreferenceConfiguration {
     public static final int FRAME_PACING_CAP_FPS = 2;
     public static final int FRAME_PACING_MAX_SMOOTHNESS = 3;
     public static final int FRAME_PACING_EXPERIMENTAL_LOW_LATENCY = 4;
-    public static final int FRAME_PACING_SURFACE_FLINGER_RAW = 5;
+    public static final int FRAME_PACING_PRECISE_SYNC = 5;
 
     public static final String RES_360P = "640x360";
     public static final String RES_480P = "854x480";
@@ -361,6 +367,9 @@ public class PreferenceConfiguration {
     
     // 控制流only模式设置
     public boolean controlOnly;
+
+    // 输出缓冲区队列大小
+    public int outputBufferQueueLimit;
 
     public ScreenPosition screenPosition;
     public int screenOffsetX;
@@ -601,8 +610,8 @@ public class PreferenceConfiguration {
         else if (str.equals("experimental-low-latency")) {
             return FRAME_PACING_EXPERIMENTAL_LOW_LATENCY;
         }
-        else if (str.equals("surface-flinger-raw")) {
-            return FRAME_PACING_SURFACE_FLINGER_RAW;
+        else if (str.equals("precise-sync")) {
+            return FRAME_PACING_PRECISE_SYNC;
         }
         else {
             // Should never get here
@@ -887,6 +896,15 @@ public class PreferenceConfiguration {
         // 读取控制流only模式设置
         config.controlOnly = prefs.getBoolean(CONTROL_ONLY_PREF_STRING, DEFAULT_CONTROL_ONLY);
 
+        // 读取输出缓冲区队列大小设置
+        config.outputBufferQueueLimit = prefs.getInt(OUTPUT_BUFFER_QUEUE_LIMIT_PREF_STRING, DEFAULT_OUTPUT_BUFFER_QUEUE_LIMIT);
+        // 确保值在合理范围内 (1-5)
+        if (config.outputBufferQueueLimit < 1) {
+            config.outputBufferQueueLimit = 1;
+        } else if (config.outputBufferQueueLimit > 5) {
+            config.outputBufferQueueLimit = 5;
+        }
+
         config.reverseResolution = prefs.getBoolean(REVERSE_RESOLUTION_PREF_STRING, DEFAULT_REVERSE_RESOLUTION);
         config.rotableScreen = prefs.getBoolean(ROTABLE_SCREEN_PREF_STRING, DEFAULT_ROTABLE_SCREEN);
 
@@ -1054,6 +1072,7 @@ public class PreferenceConfiguration {
         copy.useExternalDisplay = this.useExternalDisplay;
         copy.enableMic = this.enableMic;
         copy.controlOnly = this.controlOnly;
+        copy.outputBufferQueueLimit = this.outputBufferQueueLimit;
         copy.micBitrate = this.micBitrate;
         copy.micIconColor = this.micIconColor;
         copy.enableEscMenu = this.enableEscMenu;
