@@ -925,6 +925,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         String uniqueId = Game.this.getIntent().getStringExtra(EXTRA_UNIQUEID);
         String pairName = Game.this.getIntent().getStringExtra(EXTRA_PAIR_NAME);
         boolean pcUseVdd = Game.this.getIntent().getBooleanExtra(EXTRA_PC_USEVDD, false);
+        String displayName = Game.this.getIntent().getStringExtra(EXTRA_DISPLAY_NAME);
         byte[] derCertData = Game.this.getIntent().getByteArrayExtra(EXTRA_SERVER_CERT);
 
         X509Certificate serverCert = null;
@@ -951,14 +952,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // 构建流配置（包含解码器初始化、刷新率计算等共同逻辑）
         StreamConfigResult streamConfigResult = buildStreamConfiguration(
-                host, port, httpsPort, uniqueId, pairName, pcUseVdd, serverCert, null);
+                host, port, httpsPort, uniqueId, pairName, pcUseVdd, serverCert, displayName);
         StreamConfiguration config = streamConfigResult.config;
 
         // Initialize the connection
         conn = new NvConnection(getApplicationContext(),
                 new ComputerDetails.AddressTuple(host, port),
                 httpsPort, uniqueId, pairName, config,
-                PlatformBinding.getCryptoProvider(this), serverCert);
+                PlatformBinding.getCryptoProvider(this), serverCert, displayName);
         controllerHandler = new ControllerHandler(this, conn, this, prefConfig);
 
         // 重新创建 ControllerHandler
