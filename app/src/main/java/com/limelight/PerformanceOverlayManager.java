@@ -89,9 +89,17 @@ public class PerformanceOverlayManager {
 
     // 当前性能信息缓存
     private PerformanceInfo currentPerformanceInfo;
-    
+
     // 实际设备刷新率（从 Game 传递）
     private float actualDisplayRefreshRate = 0.0f;
+
+    // 电量更新相关
+    private static final long BATTERY_UPDATE_INTERVAL_MS = 15000; // 15秒更新一次
+    private long lastBatteryUpdateTime = 0;
+
+    // 串流电量统计
+    private int streamStartBatteryLevel = -1; // 串流开始时的电量
+    private long streamStartTime = -1; // 串流开始时间
 
     /**
      * 性能项目枚举 - 统一管理所有性能指标
@@ -196,6 +204,9 @@ public class PerformanceOverlayManager {
 
         // 强制应用一次当前的配置（为了处理初始就是 锁定 的情况）
         setupPerformanceOverlayDragging();
+
+        // 记录串流开始时的电量信息
+        recordStreamStart();
     }
 
     /**
@@ -203,12 +214,12 @@ public class PerformanceOverlayManager {
      */
     private void initializePerformanceItems() {
         performanceItems = new PerformanceItemInfo[PerformanceItem.values().length];
-        
+
         for (int i = 0; i < PerformanceItem.values().length; i++) {
             PerformanceItem item = PerformanceItem.values()[i];
             TextView view = activity.findViewById(item.viewId);
             Runnable infoMethod = getInfoMethodForItem(item);
-            
+
             performanceItems[i] = new PerformanceItemInfo(item, view, infoMethod);
         }
     }
@@ -338,7 +349,7 @@ public class PerformanceOverlayManager {
     public void updatePerformanceInfo(final PerformanceInfo performanceInfo) {
         // 保存当前性能信息，用于弹窗显示
         currentPerformanceInfo = performanceInfo;
-        
+
         // 计算带宽信息
         updateBandwidthInfo(performanceInfo);
 
@@ -346,11 +357,11 @@ public class PerformanceOverlayManager {
         activity.runOnUiThread(() -> {
             showOverlayIfNeeded();
             updatePerformanceViewsWithStyledText(performanceInfo);
-            // 单独更新电量信息（不需要performanceInfo参数）
-            updateBatteryDisplay();
+            // 检查是否需要更新电量（每15秒更新一次）
+            updateBatteryDisplayIfNeeded();
         });
     }
-    
+
     /**
      * 设置实际设备刷新率
      * @param refreshRate 实际设备刷新率（Hz）
@@ -360,9 +371,28 @@ public class PerformanceOverlayManager {
     }
 
     /**
-     * 更新电量显示（定时调用）
+     * 记录串流开始时的电量和时间
      */
-    private void updateBatteryDisplay() {
+    public void recordStreamStart() {
+        streamStartBatteryLevel = UiHelper.getBatteryLevel(activity);
+        streamStartTime = System.currentTimeMillis();
+        lastBatteryUpdateTime = streamStartTime;
+        // 立即更新一次电量显示
+        activity.runOnUiThread(this::updateBatteryViewIfVisible);
+    }
+
+    /**
+     * 检查并更新电量显示（如果距离上次更新超过15秒）
+     */
+    private void updateBatteryDisplayIfNeeded() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastBatteryUpdateTime >= BATTERY_UPDATE_INTERVAL_MS) {
+            lastBatteryUpdateTime = currentTime;
+            updateBatteryViewIfVisible();
+        }
+    }
+
+    private void updateBatteryViewIfVisible() {
         TextView batteryView = getPerformanceItemView(PerformanceItem.BATTERY);
         if (batteryView != null && batteryView.getVisibility() == View.VISIBLE) {
             updateBatteryText(batteryView);
@@ -378,7 +408,7 @@ public class PerformanceOverlayManager {
         long timeMillisInterval = timeMillis - previousTimeMillis;
 
         String calculatedBandwidth = NetHelper.calculateBandwidth(currentRxBytes, previousRxBytes, timeMillisInterval);
-        
+
         // 如果时间间隔过长，使用上次有效带宽
         if (timeMillisInterval > 5000) {
             performanceInfo.bandWidth = lastValidBandwidth != null ? lastValidBandwidth : "N/A";
@@ -408,7 +438,7 @@ public class PerformanceOverlayManager {
     private String buildDecoderInfo(PerformanceInfo performanceInfo) {
         DecoderTypeInfo decoderTypeInfo = getDecoderTypeInfo(performanceInfo.decoder);
         String decoderInfo = decoderTypeInfo.shortName;
-        
+
         // 基于实际HDR激活状态而不是配置
         if (performanceInfo.isHdrActive) {
             decoderInfo += " HDR";
@@ -453,7 +483,7 @@ public class PerformanceOverlayManager {
 
     private SpannableString createStyledText(String icon, String value, String unit, Integer valueColor) {
         SpannableStringBuilder builder = new SpannableStringBuilder();
-        
+
         // 添加图标（使用标题样式）
         if (icon != null && !icon.isEmpty()) {
             int iconStart = builder.length();
@@ -462,7 +492,7 @@ public class PerformanceOverlayManager {
             builder.setSpan(new RelativeSizeSpan(1.1f), iconStart, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             builder.append(" ");
         }
-        
+
         // 添加数值（使用中等粗细样式）
         if (value != null && !value.isEmpty()) {
             int valueStart = builder.length();
@@ -473,7 +503,7 @@ public class PerformanceOverlayManager {
                 builder.setSpan(new ForegroundColorSpan(valueColor), valueStart, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
-        
+
         // 添加单位（使用细体样式）
         if (unit != null && !unit.isEmpty()) {
             builder.append(" ");
@@ -483,7 +513,7 @@ public class PerformanceOverlayManager {
             builder.setSpan(new RelativeSizeSpan(0.9f), unitStart, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             builder.setSpan(new ForegroundColorSpan(0xCCFFFFFF), unitStart, builder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
-        
+
         return new SpannableString(builder);
     }
 
@@ -544,7 +574,7 @@ public class PerformanceOverlayManager {
     }
 
     private void updateRenderFpsText(TextView view, PerformanceInfo performanceInfo) {
-        @SuppressLint("DefaultLocale") String fpsValue = String.format("Rx %.0f / Rd %.0f", 
+        @SuppressLint("DefaultLocale") String fpsValue = String.format("Rx %.0f / Rd %.0f",
             performanceInfo.receivedFps, performanceInfo.renderedFps);
         view.setText(createStyledText("", fpsValue, "FPS", 0xFF0DDAF4));
     }
@@ -556,7 +586,7 @@ public class PerformanceOverlayManager {
     }
 
     private void updateNetworkLatencyText(TextView view, PerformanceInfo performanceInfo) {
-        boolean showPacketLoss = getPerformanceItemView(PerformanceItem.PACKET_LOSS) != null && 
+        boolean showPacketLoss = getPerformanceItemView(PerformanceItem.PACKET_LOSS) != null &&
                                 getPerformanceItemView(PerformanceItem.PACKET_LOSS).getVisibility() == View.VISIBLE;
         String icon = showPacketLoss ? "" : "🌐";
         @SuppressLint("DefaultLocale") String bandwidthAndLatency = String.format("%s   %d ± %d",
@@ -585,7 +615,7 @@ public class PerformanceOverlayManager {
         int batteryLevel = UiHelper.getBatteryLevel(activity);
         String batteryText;
         int batteryColor;
-        
+
         if (batteryLevel > 50) {
             batteryText = String.valueOf(batteryLevel);
             batteryColor = 0xFF90EE90; // 浅绿色 - 电量充足
@@ -596,7 +626,7 @@ public class PerformanceOverlayManager {
             batteryText = String.valueOf(batteryLevel);
             batteryColor = 0xFFFF6B6B; // 红色 - 电量严重不足
         }
-        
+
         view.setText(createStyledText("🔋", batteryText, "%", batteryColor));
     }
 
@@ -605,22 +635,57 @@ public class PerformanceOverlayManager {
      */
     private void showBatteryInfo() {
         int batteryLevel = UiHelper.getBatteryLevel(activity);
-        String batteryStatus;
-        int statusResId;
+        boolean isCharging = UiHelper.isCharging(activity);
+        String status = activity.getString(batteryLevel > 50 ? R.string.perf_battery_status_sufficient
+                : batteryLevel > 20 ? R.string.perf_battery_status_low
+                : R.string.perf_battery_status_critical);
 
-        if (batteryLevel > 50) {
-            statusResId = R.string.perf_battery_status_sufficient;
-        } else if (batteryLevel > 20) {
-            statusResId = R.string.perf_battery_status_low;
-        } else {
-            statusResId = R.string.perf_battery_status_critical;
+        StringBuilder info = new StringBuilder();
+        info.append(activity.getString(R.string.perf_battery_info_content, batteryLevel, status));
+
+        boolean hasStreamData = streamStartBatteryLevel >= 0 && streamStartTime > 0;
+        long streamDurationSeconds = hasStreamData ? (System.currentTimeMillis() - streamStartTime) / 1000 : 0;
+
+        if (isCharging) {
+            info.append("\n\n⚡ 设备正在充电中");
+            if (hasStreamData) {
+                info.append("\n串流时长: ").append(formatDuration(streamDurationSeconds));
+            }
+        } else if (hasStreamData) {
+            int batteryConsumed = streamStartBatteryLevel - batteryLevel;
+            info.append("\n\n本次串流已消耗电量: ")
+                .append(batteryConsumed > 0 ? batteryConsumed + "%" : "0%")
+                .append("\n串流时长: ")
+                .append(formatDuration(streamDurationSeconds));
+
+            if (batteryConsumed > 0 && streamDurationSeconds > 0) {
+                double consumedPerMinute = (double) batteryConsumed / (streamDurationSeconds / 60.0);
+                if (consumedPerMinute > 0) {
+                    long remainingMinutes = (long) (batteryLevel / consumedPerMinute);
+                    info.append("\n预计还可续航: ").append(formatDuration(remainingMinutes * 60));
+                }
+            }
         }
 
-        batteryStatus = activity.getString(statusResId);
+        showInfoDialog(activity.getString(R.string.perf_battery_info_title), info.toString());
+    }
 
-        String batteryInfo = activity.getString(R.string.perf_battery_info_content, batteryLevel, batteryStatus);
+    /**
+     * 格式化时长（秒）为可读字符串
+     */
+    private String formatDuration(long seconds) {
+        if (seconds < 60) {
+            return seconds + "秒";
+        }
 
-        showInfoDialog(activity.getString(R.string.perf_battery_info_title), batteryInfo);
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long remainingSeconds = seconds % 60;
+
+        if (hours > 0) {
+            return minutes > 0 ? hours + "小时" + minutes + "分钟" : hours + "小时";
+        }
+        return remainingSeconds > 0 ? minutes + "分" + remainingSeconds + "秒" : minutes + "分钟";
     }
 
     /**
@@ -724,8 +789,8 @@ public class PerformanceOverlayManager {
 
         // 只在垂直布局且位置在右侧时，将文字设置为右对齐
         // 注意：需要保持 center_vertical 以确保文字垂直居中
-        int gravity = (isVertical && isRightSide) ? 
-            (android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END) : 
+        int gravity = (isVertical && isRightSide) ?
+            (android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.END) :
             (android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START);
 
         for (PerformanceItemInfo itemInfo : performanceItems) {
@@ -1032,7 +1097,7 @@ public class PerformanceOverlayManager {
 
         // 使用实际View边界进行点击检测
         int clickedItemIndex = findClickedItemByBoundaries();
-        
+
         // 根据索引显示对应信息
         showInfoByIndex(clickedItemIndex);
     }
@@ -1047,24 +1112,24 @@ public class PerformanceOverlayManager {
                 // 获取View在父容器中的位置
                 int[] viewLocation = new int[2];
                 itemInfo.view.getLocationInWindow(viewLocation);
-                
+
                 // 获取覆盖层在父容器中的位置
                 int[] overlayLocation = new int[2];
                 performanceOverlayView.getLocationInWindow(overlayLocation);
-                
+
                 // 计算View相对于覆盖层的边界
                 int viewLeft = viewLocation[0] - overlayLocation[0];
                 int viewRight = viewLeft + itemInfo.view.getWidth();
-                
+
                 // 检查点击位置是否在此View的边界内
                 if (clickStartX >= viewLeft && clickStartX <= viewRight) {
                     return currentIndex;
                 }
-                
+
                 currentIndex++;
             }
         }
-        
+
         return -1;
     }
 
@@ -1095,7 +1160,7 @@ public class PerformanceOverlayManager {
                 currentIndex++;
             }
         }
-        
+
         showMoonPhaseInfo();
     }
 
@@ -1142,14 +1207,14 @@ public class PerformanceOverlayManager {
             showMoonPhaseInfo(); // 如果没有性能信息，显示月相信息
             return;
         }
-        
+
         // 计算主机端分辨率（客户端分辨率 * 缩放比例）
         // 从设置中获取缩放比例，默认为100（即1.0）
         int scalePercent = prefConfig.resolutionScale;
         float scaleFactor = scalePercent / 100.0f;
         int hostWidth = (int) (currentPerformanceInfo.initialWidth * scaleFactor);
         int hostHeight = (int) (currentPerformanceInfo.initialHeight * scaleFactor);
-        
+
         // 创建分辨率信息文本
         StringBuilder resolutionInfo = new StringBuilder();
         resolutionInfo.append("Client Resolution: ").append(currentPerformanceInfo.initialWidth)
@@ -1159,15 +1224,15 @@ public class PerformanceOverlayManager {
         resolutionInfo.append("Scale Factor: ").append(String.format("%.2f", scaleFactor)).append(" (").append(scalePercent).append("%)\n");
         // 获取设备支持的刷新率
         float deviceRefreshRate = UiHelper.getDeviceRefreshRate(activity);
-        
+
         resolutionInfo.append("Target FPS: ").append(prefConfig.fps).append(" FPS\n");
         resolutionInfo.append("Current FPS: ").append(String.format("%.0f", currentPerformanceInfo.totalFps)).append(" FPS\n");
         resolutionInfo.append("Device Refresh Rate: ").append(String.format("%.0f", deviceRefreshRate)).append(" Hz\n");
-        
+
         if (actualDisplayRefreshRate > 0) {
             resolutionInfo.append("Actual Display Refresh Rate: ").append(String.format("%.2f", actualDisplayRefreshRate)).append(" Hz\n");
         }
-        
+
         showInfoDialog(
                 "📱 Resolution Information",
                 resolutionInfo.toString()
@@ -1180,7 +1245,7 @@ public class PerformanceOverlayManager {
     private void showDecoderInfo() {
         // 获取当前性能信息中的完整解码器信息
         String fullDecoderInfo = getCurrentDecoderInfo();
-        
+
         showInfoDialog(
                 activity.getString(R.string.perf_decoder_title),
                 fullDecoderInfo

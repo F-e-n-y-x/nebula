@@ -319,6 +319,26 @@ public class UiHelper {
         return level;
     }
 
+    /**
+     * 检测设备是否正在充电
+     * @param context 上下文
+     * @return true 如果正在充电，false 否则
+     */
+    public static boolean isCharging(Context context) {
+        try {
+            IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+            Intent batteryStatus = context.registerReceiver(null, ifilter);
+            if (batteryStatus != null) {
+                int status = batteryStatus.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                return status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                       status == BatteryManager.BATTERY_STATUS_FULL;
+            }
+        } catch (Exception e) {
+            LimeLog.warning("Error checking charging status: " + e.getMessage());
+        }
+        return false;
+    }
+
     public static boolean isColorOS() {
         String manufacturer = android.os.Build.MANUFACTURER.toLowerCase();
         String model = android.os.Build.MODEL.toLowerCase();
