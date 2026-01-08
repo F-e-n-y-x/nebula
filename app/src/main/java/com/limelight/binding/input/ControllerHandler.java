@@ -231,10 +231,30 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
                 LimeLog.info("controller0 has no sensormanager, fallback to device gyro");
             }
             
+            // 立即注册传感器，不等待延迟，以确保陀螺仪功能能够立即生效
+            // 先取消任何待处理的延迟启用
+            if (defaultContext != null) {
+                backgroundThreadHandler.removeCallbacks(defaultContext.enableSensorRunnable);
+            }
+            
             // 强制重新启用传感器以确保陀螺仪功能正常工作
             enableSensors();
             
+            // 立即尝试注册陀螺仪传感器，不等待延迟
+            // 这样可以避免传感器休眠导致的无法激活问题
             handleSetMotionEventState((short) 0, MoonBridge.LI_MOTION_TYPE_GYRO, (short) 120);
+            
+            // 如果传感器注册失败，延迟重试一次（处理传感器休眠情况）
+            if (defaultContext != null) {
+                backgroundThreadHandler.postDelayed(() -> {
+                    // 检查传感器是否已成功注册
+                    if (defaultContext.gyroListener == null && defaultContext.gyroReportRateHz != 0) {
+                        LimeLog.info("Gyro sensor not registered, retrying...");
+                        handleSetMotionEventState((short) 0, MoonBridge.LI_MOTION_TYPE_GYRO, (short) 120);
+                    }
+                }, 500);
+            }
+            
             recomputeGyroHoldForAllContexts();
         } else {
             handleSetMotionEventState((short) 0, MoonBridge.LI_MOTION_TYPE_GYRO, (short) 0);
