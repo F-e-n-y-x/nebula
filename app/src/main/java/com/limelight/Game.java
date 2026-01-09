@@ -3737,25 +3737,45 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     @Override
     public void onResolutionChanged(int width, int height) {
+        // 确保输入是偶数
+        final int alignedWidth = width & ~1;
+        final int alignedHeight = height & ~1;
+        
+        // 计算基础分辨率（如果有缩放）
+        final int baseWidth;
+        final int baseHeight;
+        
+        if (prefConfig.resolutionScale != 100) {
+            // 基础分辨率 = 实际分辨率 * 100 / resolutionScale
+            baseWidth = (alignedWidth * 100 / prefConfig.resolutionScale) & ~1;
+            baseHeight = (alignedHeight * 100 / prefConfig.resolutionScale) & ~1;
+            
+            LimeLog.info("Resolution scale conversion: actual=" + alignedWidth + "x" + alignedHeight + 
+                    ", base=" + baseWidth + "x" + baseHeight + ", scale=" + prefConfig.resolutionScale + "%");
+        } else {
+            baseWidth = alignedWidth;
+            baseHeight = alignedHeight;
+        }
+        
         // 跳过相同分辨率的重复通知
-        if (prefConfig.width == width && prefConfig.height == height) {
+        if (prefConfig.width == baseWidth && prefConfig.height == baseHeight) {
             return;
         }
-        
-        LimeLog.info("Resolution changed from " + prefConfig.width + "x" + prefConfig.height + " to " + width + "x" + height);
 
-        // 更新内存中的串流分辨率（不写入持久化配置，避免影响下次连接）
-        prefConfig.width = width;
-        prefConfig.height = height;
+        LimeLog.info("Resolution changed from " + prefConfig.width + "x" + prefConfig.height + 
+                " to " + baseWidth + "x" + baseHeight + " (actual: " + alignedWidth + "x" + alignedHeight + ")");
+
+        // 更新内存中的串流基础分辨率
+        prefConfig.width = baseWidth;
+        prefConfig.height = baseHeight;
         
-        // 通知解码器分辨率变更（在UI更新之前，确保解码器准备好）
+        // 通知解码器分辨率变更
         if (connected && decoderRenderer != null) {
-            decoderRenderer.onResolutionChanged(width, height);
+            decoderRenderer.onResolutionChanged(baseWidth, baseHeight);
         }
         
-        // 在UI线程更新界面
         runOnUiThread(() -> {
-            Toast.makeText(this, getString(R.string.host_resolution_changed, width, height), 
+            Toast.makeText(this, getString(R.string.host_resolution_changed, baseWidth, baseHeight), 
                     Toast.LENGTH_SHORT).show();
 
             // 根据新的宽高比重新决定横竖屏
@@ -3763,13 +3783,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
             // rotableScreen 模式下强制切换方向以匹配主机分辨率
             if (prefConfig.rotableScreen) {
-                setRequestedOrientation(width > height ?
-                        ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE :
-                        ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
+                setRequestedOrientation(baseWidth > baseHeight 
+                        ? ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE 
+                        : ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
             }
 
             // 刷新视频视图的比例/尺寸
-            updateStreamViewSize(width, height);
+            updateStreamViewSize(baseWidth, baseHeight);
         });
     }
     
