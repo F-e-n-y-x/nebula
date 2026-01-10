@@ -19,8 +19,8 @@ import com.limelight.R;
 
 public class AboutDialogPreference extends Preference {
     
-    private static final String GITHUB_REPO_URL = "https://github.com/qiin2333/moonlight-android";
-    private static final String GITHUB_STAR_URL = "https://github.com/qiin2333/moonlight-android/stargazers";
+    private static final String GITHUB_REPO_URL = "https://github.com/qiin2333/moonlight-vplus";
+    private static final String GITHUB_STAR_URL = "https://github.com/qiin2333/moonlight-vplus/stargazers";
 
     public AboutDialogPreference(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);

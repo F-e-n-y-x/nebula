@@ -38,8 +38,8 @@ import java.util.regex.Pattern;
 
 public class UpdateManager {
 	private static final String TAG = "UpdateManager";
-	private static final String GITHUB_API_URL = "https://api.github.com/repos/qiin2333/moonlight-android/releases/latest";
-	private static final String GITHUB_RELEASE_PAGE = "https://github.com/qiin2333/moonlight-android/releases/latest";
+	private static final String GITHUB_API_URL = "https://api.github.com/repos/qiin2333/moonlight-vplus/releases/latest";
+	private static final String GITHUB_RELEASE_PAGE = "https://github.com/qiin2333/moonlight-vplus/releases/latest";
 	private static final long UPDATE_CHECK_INTERVAL = 4 * 60 * 60 * 1000;
 
 	// 代理发现地址
@@ -424,8 +424,11 @@ public class UpdateManager {
 					// 移除引号获取纯URL
 					String url = match.replaceAll("[\"']", "");
 					
-					// 确保URL格式正确
-					if (url.startsWith("https://") && url.endsWith("/")) {
+					// 确保URL格式正确，自动补上末尾的斜杠
+					if (url.startsWith("https://")) {
+						if (!url.endsWith("/")) {
+							url = url + "/";
+						}
 						// 过滤掉明显不是代理的地址
 						if (isValidProxyUrl(url)) {
 							proxies.add(url);
@@ -488,45 +491,46 @@ public class UpdateManager {
 	private static boolean detectRedirectToGhproxyLink(String proxyUrl) {
 		HttpURLConnection conn = null;
 		try {
-			// 测试访问一个简单的GitHub API
 			String testUrl = proxyUrl + "https://api.github.com/zen";
-			URL url = new URL(testUrl);
-			conn = (HttpURLConnection) url.openConnection();
+			conn = (HttpURLConnection) new URL(testUrl).openConnection();
 			conn.setRequestMethod("HEAD");
-			conn.setInstanceFollowRedirects(false); // 不自动跟随重定向
+			conn.setInstanceFollowRedirects(false);
 			conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:40.0)");
-			conn.setConnectTimeout(1000); // 进一步缩短超时时间
-			conn.setReadTimeout(1000);
+			conn.setConnectTimeout(2000);
+			conn.setReadTimeout(2000);
 			
 			int responseCode = conn.getResponseCode();
 			
-			// 检查重定向
+			// 检查重定向到 ghproxy.link
 			if (responseCode >= 300 && responseCode < 400) {
 				String location = conn.getHeaderField("Location");
 				if (location != null && location.contains("ghproxy.link")) {
-					return true; // 重定向回 ghproxy.link，说明代理失效
+					Log.d(TAG, "代理重定向回 ghproxy.link，排除: " + proxyUrl);
+					return true;
 				}
 			}
 			
-			// 检查最终URL（即使没有重定向状态码，有些服务器可能直接返回ghproxy.link内容）
-			String finalUrl = conn.getURL().toString();
-			if (finalUrl.contains("ghproxy.link")) {
+			// 检查最终URL和服务器信息
+			if (conn.getURL().toString().contains("ghproxy.link")) {
+				Log.d(TAG, "代理最终URL包含 ghproxy.link，排除: " + proxyUrl);
 				return true;
 			}
 			
-			// 检查响应头中的服务器信息
 			String server = conn.getHeaderField("Server");
 			if (server != null && server.toLowerCase().contains("ghproxy")) {
+				Log.d(TAG, "代理服务器信息包含 ghproxy，排除: " + proxyUrl);
 				return true;
 			}
 			
-			// 代理检测成功，没有重定向问题
+			Log.d(TAG, "代理检测通过: " + proxyUrl + " (响应码: " + responseCode + ")");
 			return false;
 			
+		} catch (java.net.SocketTimeoutException | java.net.ConnectException e) {
+			Log.w(TAG, "代理连接失败，排除: " + proxyUrl + " - " + e.getMessage());
+			return true;
 		} catch (Exception e) {
-			// 网络错误或异常情况，认为代理不可靠，排除
-			Log.w(TAG, "代理检测异常，排除不可靠代理: " + proxyUrl + " - " + e.getMessage());
-			return true; // 返回true表示有问题，应该排除
+			Log.d(TAG, "代理检测异常但不排除: " + proxyUrl + " - " + e.getMessage());
+			return false;
 		} finally {
 			if (conn != null) {
 				conn.disconnect();
