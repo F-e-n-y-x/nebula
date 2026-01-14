@@ -18,7 +18,6 @@
         
         <!-- 图标容器 - 右侧（先定义，在底层） -->
         <RelativeLayout
-            android:id="@+id/grid_image_layout"
             android:layout_width="140dp"
             android:layout_height="140dp"
             android:layout_alignParentEnd="true"

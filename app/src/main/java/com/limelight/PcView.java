@@ -1171,14 +1171,13 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
 
     /**
      * 处理头像点击事件
-     * 当PC状态稳定后，直接启动第一个app的串流
+     * 当PC状态稳定后，优先启动正在串流的app，否则启动第一个app
      * 当PC未就绪时，显示context menu
      */
     private void handleAvatarClick(ComputerDetails computer, View itemView) {
         // 检查PC状态是否稳定（ONLINE + PAIRED）
         if (computer.state != ComputerDetails.State.ONLINE ||
                 computer.pairState != PairState.PAIRED) {
-            // PC未就绪，显示context menu
             openContextMenu(itemView);
             return;
         }
@@ -1189,8 +1188,16 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         }
 
         new Thread(() -> {
-            NvApp firstApp = getFirstAppFromCache(computer.uuid);
-            if (firstApp == null) {
+            // 优先检查正在运行的游戏，否则使用第一个APP
+            NvApp targetApp = computer.runningGameId != 0
+                    ? getNvAppById(computer.runningGameId, computer.uuid)
+                    : null;
+            
+            if (targetApp == null) {
+                targetApp = getFirstAppFromCache(computer.uuid);
+            }
+            
+            if (targetApp == null) {
                 fallbackToAppList(computer);
                 return;
             }
@@ -1208,7 +1215,8 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                 return;
             }
 
-            runOnUiThread(() -> ServerHelper.doStart(this, firstApp, targetComputer, managerBinder));
+            final NvApp appToStart = targetApp;
+            runOnUiThread(() -> ServerHelper.doStart(this, appToStart, targetComputer, managerBinder));
         }).start();
     }
 

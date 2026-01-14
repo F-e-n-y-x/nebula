@@ -399,19 +399,18 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         PcView.ComputerObject computer = filtered.get(i);
         populateView(convertView, imgView, spinnerView, txtView, overlayView, computer);
         
-        // 为头像容器设置触摸监听器（仅对非添加卡片）
-        View imageLayout = convertView.findViewById(R.id.grid_image_layout);
-        if (imageLayout != null) {
-            setupImageLayoutTouchListener(imageLayout, convertView, computer);
+        // 为可见的头像图片设置触摸监听器（仅对非添加卡片）
+        if (imgView != null) {
+            setupImageTouchListener(imgView, convertView, computer);
         }
 
         return convertView;
     }
     
-    private void setupImageLayoutTouchListener(View imageLayout, View itemView, PcView.ComputerObject computer) {
+    private void setupImageTouchListener(ImageView imageView, View itemView, PcView.ComputerObject computer) {
         if (isAddComputerCard(computer) || avatarClickListener == null || computer.details == null) {
-            imageLayout.setOnTouchListener(null);
-            imageLayout.setClickable(false);
+            imageView.setOnTouchListener(null);
+            imageView.setClickable(false);
             return;
         }
         
@@ -432,9 +431,9 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
             }
         });
         
-        imageLayout.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
-        imageLayout.setClickable(true);
-        imageLayout.setFocusable(false);
+        imageView.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+        imageView.setClickable(true);
+        imageView.setFocusable(false);
     }
 
     @SuppressLint("SetTextI18n")
