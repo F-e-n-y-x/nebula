@@ -8,7 +8,9 @@ import android.graphics.BitmapFactory;
 import android.graphics.drawable.AnimatedVectorDrawable;
 import android.os.AsyncTask;
 import android.preference.PreferenceManager;
+import android.view.GestureDetector;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -397,21 +399,42 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         PcView.ComputerObject computer = filtered.get(i);
         populateView(convertView, imgView, spinnerView, txtView, overlayView, computer);
         
-        // 为头像容器设置点击监听器（仅对非添加卡片）
+        // 为头像容器设置触摸监听器（仅对非添加卡片）
         View imageLayout = convertView.findViewById(R.id.grid_image_layout);
         if (imageLayout != null) {
-            if (!isAddComputerCard(computer) && avatarClickListener != null && computer.details != null) {
-                final View itemView = convertView;
-                imageLayout.setOnClickListener(v -> avatarClickListener.onAvatarClick(computer.details, itemView));
-                imageLayout.setClickable(true);
-                imageLayout.setFocusable(false);
-            } else {
-                imageLayout.setOnClickListener(null);
-                imageLayout.setClickable(false);
-            }
+            setupImageLayoutTouchListener(imageLayout, convertView, computer);
         }
 
         return convertView;
+    }
+    
+    private void setupImageLayoutTouchListener(View imageLayout, View itemView, PcView.ComputerObject computer) {
+        if (isAddComputerCard(computer) || avatarClickListener == null || computer.details == null) {
+            imageLayout.setOnTouchListener(null);
+            imageLayout.setClickable(false);
+            return;
+        }
+        
+        final ComputerDetails computerDetails = computer.details;
+        
+        GestureDetector gestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onSingleTapUp(MotionEvent e) {
+                if (avatarClickListener != null) {
+                    avatarClickListener.onAvatarClick(computerDetails, itemView);
+                }
+                return true;
+            }
+            
+            @Override
+            public void onLongPress(MotionEvent e) {
+                itemView.performLongClick();
+            }
+        });
+        
+        imageLayout.setOnTouchListener((v, event) -> gestureDetector.onTouchEvent(event));
+        imageLayout.setClickable(true);
+        imageLayout.setFocusable(false);
     }
 
     @SuppressLint("SetTextI18n")
@@ -507,4 +530,3 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         }
     }
 }
-

@@ -1270,25 +1270,32 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         // 应用UI配置
         UiHelper.applyStatusBarPadding(rv);
         registerForContextMenu(rv);
-
-        // 延迟聚焦到第一个应用，避免默认聚焦到设置按钮
-        focusFirstApp(rv);
     }
 
     /**
      * 将焦点设置到第一个应用上
      */
     private void focusFirstApp(RecyclerView rv) {
+        // 确保布局完成后再设置焦点
         rv.post(() -> {
-            if (appGridAdapter != null && appGridAdapter.getCount() > 0) {
-                RecyclerView.ViewHolder holder = rv.findViewHolderForAdapterPosition(0);
-                if (holder != null) {
-                    holder.itemView.requestFocus();
-                    // 触发选中状态变化
-                    AppObject app = (AppObject) appGridAdapter.getItem(0);
-                    handleSelectionChange(0, app);
+            // 再次延迟，确保所有布局计算都已完成
+            rv.postDelayed(() -> {
+                if (appGridAdapter != null && appGridAdapter.getCount() > 0) {
+                    RecyclerView.ViewHolder holder = rv.findViewHolderForAdapterPosition(0);
+                    if (holder != null && holder.itemView != null) {
+                        // 确保itemView已经完成布局测量
+                        if (holder.itemView.getWidth() > 0 && holder.itemView.getHeight() > 0) {
+                            holder.itemView.requestFocus();
+                            // 触发选中状态变化
+                            AppObject app = (AppObject) appGridAdapter.getItem(0);
+                            handleSelectionChange(0, app);
+                        } else {
+                            // 如果布局还未完成，再次延迟
+                            rv.postDelayed(() -> focusFirstApp(rv), 50);
+                        }
+                    }
                 }
-            }
+            }, 100);
         });
     }
 
@@ -1321,14 +1328,24 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         // 设置预加载
         glm.setInitialPrefetchItemCount(4);
         
-        // 设置居中布局
-        setupCenterAlignment(rv, spanCount);
+        // 设置居中布局，并标记需要在布局完成后聚焦第一个应用
+        setupCenterAlignment(rv, spanCount, true);
     }
 
     /**
      * 设置RecyclerView的居中对齐
      */
     private void setupCenterAlignment(RecyclerView rv, int spanCount) {
+        setupCenterAlignment(rv, spanCount, false);
+    }
+
+    /**
+     * 设置RecyclerView的居中对齐
+     * @param rv RecyclerView
+     * @param spanCount 列数
+     * @param shouldFocusFirstApp 是否在布局完成后聚焦第一个应用
+     */
+    private void setupCenterAlignment(RecyclerView rv, int spanCount, boolean shouldFocusFirstApp) {
         rv.post(() -> {
             if (appGridAdapter == null) {
                 return;
@@ -1351,6 +1368,18 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
             int totalWidth = actualItemSize * totalRows;
             int horizontalPadding = totalWidth < screenWidth ? (screenWidth - totalWidth) / 2 : 0;
             rv.setPadding(horizontalPadding, rv.getPaddingTop(), horizontalPadding, rv.getPaddingBottom());
+            
+            // 如果需要聚焦第一个应用，等待布局完成后再设置焦点和聚焦框位置
+            if (shouldFocusFirstApp) {
+                rv.post(() -> {
+                    // 再次延迟，确保padding生效后布局完全完成
+                    rv.postDelayed(() -> {
+                        if (isFirstFocus && appGridAdapter != null && appGridAdapter.getCount() > 0) {
+                            focusFirstApp(rv);
+                        }
+                    }, 50);
+                });
+            }
         });
     }
 
