@@ -81,6 +81,7 @@ public class ComputerDetails {
     public String rawAppList;
     public boolean nvidiaServer;
     public boolean useVdd;
+    public String sunshineVersion; // Sunshine version from serverinfo
 
     public ComputerDetails() {
         state = State.UNKNOWN;
@@ -149,6 +150,9 @@ public class ComputerDetails {
         this.nvidiaServer = details.nvidiaServer;
         this.useVdd = details.useVdd;
         this.rawAppList = details.rawAppList;
+        if (details.sunshineVersion != null) {
+            this.sunshineVersion = details.sunshineVersion;
+        }
         
         if (details.availableAddresses != null) {
             this.availableAddresses = new ArrayList<>(details.availableAddresses);
@@ -316,6 +320,13 @@ public class ComputerDetails {
         return prefs.getString(uuid, "");
     }
 
+    public String getSunshineVersionDisplay() {
+        if (sunshineVersion != null && !sunshineVersion.isEmpty()) {
+            return sunshineVersion;
+        }
+        return "Unknown";
+    }
+
     @Override
     public String toString() {
         StringBuilder str = new StringBuilder();
@@ -331,6 +342,7 @@ public class ComputerDetails {
         str.append("Pair State: ").append(pairState).append("\n");
         str.append("Running Game ID: ").append(runningGameId).append("\n");
         str.append("HTTPS Port: ").append(httpsPort).append("\n");
+        str.append("Sunshine Version: ").append(getSunshineVersionDisplay()).append("\n");
         return str.toString();
     }
 }

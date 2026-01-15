@@ -202,6 +202,8 @@ public class StreamSettings extends Activity {
         // 保存导航滚动视图的引用
         private HorizontalScrollView navScrollView = null;
         private ScrollView navGridScrollView = null;
+        // 标记是否正在手动滚动（点击 Tab 触发的滚动）
+        private boolean isManualScrolling = false;
 
         /**
          * 获取目标显示器（优先使用外接显示器）
@@ -461,9 +463,10 @@ public class StreamSettings extends Activity {
                 if (category.getTitle() == null) continue;
 
                 String title = category.getTitle().toString();
+                String emojiOnly = extractEmoji(title);
 
-                // 水平模式 Tab
-                TextView tabHorizontal = createTab(activity, title);
+                // 水平模式 Tab（只显示 emoji）
+                TextView tabHorizontal = createTab(activity, emojiOnly);
                 LinearLayout.LayoutParams lpHorizontal = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.WRAP_CONTENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
@@ -474,7 +477,7 @@ public class StreamSettings extends Activity {
                 navContainer.addView(tabHorizontal);
                 categoryTabMap.put(category, tabHorizontal);
 
-                // 网格模式 Tab
+                // 网格模式 Tab（显示完整文字）
                 TextView tabGrid = createTab(activity, title);
                 FlexboxLayout.LayoutParams lpFlex = new FlexboxLayout.LayoutParams(
                         FlexboxLayout.LayoutParams.WRAP_CONTENT,
@@ -541,6 +544,8 @@ public class StreamSettings extends Activity {
                 @Override
                 public void onScrollStateChanged(android.widget.AbsListView view, int scrollState) {
                     if (scrollState == android.widget.AbsListView.OnScrollListener.SCROLL_STATE_IDLE) {
+                        // 滚动停止后，恢复自动更新
+                        isManualScrolling = false;
                         updateVisibleCategory((ListView) view);
                     }
                 }
@@ -548,7 +553,10 @@ public class StreamSettings extends Activity {
                 @Override
                 public void onScroll(android.widget.AbsListView view, int firstVisibleItem, 
                                     int visibleItemCount, int totalItemCount) {
-                    updateVisibleCategory((ListView) view);
+                    // 如果正在手动滚动，暂时不更新（避免定位到相邻 item）
+                    if (!isManualScrolling) {
+                        updateVisibleCategory((ListView) view);
+                    }
                 }
             });
             updateVisibleCategory(listView);
@@ -653,6 +661,16 @@ public class StreamSettings extends Activity {
             });
         }
 
+        // 辅助方法：提取字符串开头的 emoji
+        private String extractEmoji(String text) {
+            if (text == null || text.isEmpty()) {
+                return "";
+            }
+            
+            int spaceIndex = text.indexOf(' ');
+            return spaceIndex > 0 ? text.substring(0, spaceIndex) : text.substring(0, 1);
+        }
+
         // 辅助方法：创建统一样式的 Tab (避免代码重复)
         private TextView createTab(Activity activity, String text) {
             TextView tab = new TextView(activity);
@@ -673,6 +691,16 @@ public class StreamSettings extends Activity {
         private void scrollToCategory(PreferenceCategory category) {
             int position = findAdapterPositionForPreference(category);
             if (position >= 0) {
+                // 立即高亮目标分类的 Tab
+                if (currentVisibleCategory != null) {
+                    updateTabHighlight(currentVisibleCategory, false);
+                }
+                currentVisibleCategory = category;
+                updateTabHighlight(category, true);
+                
+                // 设置手动滚动标志，防止滚动过程中自动更新导致定位到相邻 item
+                isManualScrolling = true;
+                
                 ListView listView = null;
                 View fragmentView = getView();
                 if (fragmentView != null) {

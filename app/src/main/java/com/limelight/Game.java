@@ -68,6 +68,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.util.Rational;
 import android.view.Display;
@@ -217,6 +218,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private final Map<Integer, NativeTouchContext.Pointer> nativeTouchPointerMap = new HashMap<>();
     private String currentHostAddress; // 保存当前连接的IP
     private boolean shouldResumeSession = false;
+    
+    // 记录上次的旋转角度，用于检测旋转变化
+    private int lastRotation = -1;
+    
+    // 标记当前是否是服务端主动旋转导致的客户端方向切换
+    // 如果是，则不应该再通知服务端旋转，避免死循环
+    private boolean isServerInitiatedRotation = false;
 
     public enum BackKeyMenuMode {
         GAME_MENU,     // 游戏菜单模式
@@ -342,6 +350,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public static final String EXTRA_PC_USEVDD = "usevdd";
     public static final String EXTRA_APP_CMD = "CmdList";
     public static final String EXTRA_DISPLAY_NAME = "DisplayName";
+    public static final String EXTRA_SCREEN_COMBINATION_MODE = "Screen combination mode";
 
     private ExternalDisplayManager externalDisplayManager;
 
@@ -380,7 +389,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Read the stream preferences
         prefConfig = PreferenceConfiguration.readPreferences(this);
-        tombstonePrefs = Game.this.getSharedPreferences("DecoderTombstone", 0);
+        tombstonePrefs = Game.this.getSharedPreferences("解码器墓碑", 0);
 
         // Initialize app settings manager
         appSettingsManager = new AppSettingsManager(this);
@@ -390,6 +399,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // 检查是否使用上一次设置并应用（不覆盖全局配置）
         applyLastSettingsToCurrentSession();
+        
+        // 检查是否有自定义的屏幕组合模式设置（通过 Intent 传递）
+        int customScreenMode = getIntent().getIntExtra(EXTRA_SCREEN_COMBINATION_MODE, -1);
+        if (customScreenMode != -1) {
+            prefConfig.screenCombinationMode = customScreenMode;
+        }
 
         // Set flat region size for long press jitter elimination.
         NativeTouchContext.INTIAL_ZONE_PIXELS = prefConfig.longPressflatRegionPixels;
@@ -896,6 +911,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         });
         // 重置状态变量
         requestedNotificationOverlayVisibility = View.GONE;
+        
+        // 重置旋转状态，以便重新检测初始方向
+        lastRotation = -1;
+        isServerInitiatedRotation = false;
+        // 取消所有待处理的旋转任务
+        if (pendingRotationRunnable != null) {
+            rotationHandler.removeCallbacks(pendingRotationRunnable);
+            pendingRotationRunnable = null;
+        }
 
         // 2. 获取 Intent 参数
         String host = Game.this.getIntent().getStringExtra(EXTRA_HOST);
@@ -1167,7 +1191,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         super.onConfigurationChanged(newConfig);
 
         // Set requested orientation for possible new screen size
-        setPreferredOrientationForCurrentDisplay();
+        // 但如果当前旋转是由服务端主动旋转导致的，则跳过，避免覆盖我们设置的方向
+        if (!isServerInitiatedRotation) {
+            setPreferredOrientationForCurrentDisplay();
+        } else {
+            LimeLog.info("onConfigurationChanged: skipping setPreferredOrientationForCurrentDisplay due to server-initiated rotation");
+        }
 
         if (virtualController != null) {
             // Refresh layout of OSC for possible new screen size
@@ -1242,6 +1271,99 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // Re-apply display position
         refreshDisplayPosition();
+        
+        // 检测旋转变化并通知服务端（仅在自动旋转模式下）
+        // 但如果当前旋转是由服务端主动旋转导致的，则不应该再通知服务端，避免死循环
+        if (prefConfig.rotableScreen && conn != null && !isServerInitiatedRotation) {
+            handleRotationChange();
+        } else if (isServerInitiatedRotation) {
+            LimeLog.info("onConfigurationChanged: rotation is server-initiated, skipping notification to server");
+            // 重置标志，因为方向切换已经完成
+            isServerInitiatedRotation = false;
+        }
+    }
+
+    private void checkAndSyncOrientation(int width, int height) {
+        Display display = externalDisplayManager != null ?
+                externalDisplayManager.getTargetDisplay() : getWindowManager().getDefaultDisplay();
+        if (display == null) {
+            LimeLog.warning("checkAndSyncOrientation: display is null");
+            return;
+        }
+        
+        android.graphics.Point size = new android.graphics.Point();
+        display.getRealSize(size);
+        
+        boolean clientIsLandscape = size.x > size.y;
+        boolean serverIsLandscape = width > height;
+        
+        LimeLog.info("checkAndSyncOrientation: client=" + size.x + "x" + size.y + 
+                " (" + (clientIsLandscape ? "landscape" : "portrait") + ")" +
+                ", server=" + width + "x" + height + 
+                " (" + (serverIsLandscape ? "landscape" : "portrait") + ")");
+        
+        if (clientIsLandscape != serverIsLandscape) {
+            LimeLog.info("checkAndSyncOrientation: mismatch detected, notifying server");
+            handleRotationChange();
+        } else {
+            LimeLog.info("checkAndSyncOrientation: orientation matches");
+            if (lastRotation == -1) {
+                lastRotation = clientIsLandscape ? 1 : 0;
+            }
+        }
+    }
+    
+    /**
+     * 处理旋转变化，通知服务端同步修改分辨率
+     */
+    private final Handler rotationHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingRotationRunnable = null;
+    private static final long ROTATION_DEBOUNCE_MS = 3000;
+    
+    private void handleRotationChange() {
+        int orientation = getResources().getConfiguration().orientation;
+        boolean isLandscape = (orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE);
+        int currentOrientation = isLandscape ? 1 : 0;
+        
+        LimeLog.info("处理旋转变化：isLandscape=" + isLandscape + ", 最后旋转=" + lastRotation);
+        
+        if (conn == null || !connected) {
+            LimeLog.warning("handleRotationChange：连接未准备好");
+            return;
+        }
+        
+        if (lastRotation == -1) {
+            lastRotation = currentOrientation;
+            LimeLog.info("handleRotationChange：第一次调用，orientation=" + currentOrientation);
+        } else if (currentOrientation == lastRotation) {
+            return;
+        } else {
+            lastRotation = currentOrientation;
+        }
+        
+        int angle = isLandscape ? 0 : 90;
+        
+        if (pendingRotationRunnable != null) {
+            rotationHandler.removeCallbacks(pendingRotationRunnable);
+        }
+        
+        pendingRotationRunnable = () -> {
+            LimeLog.info("handleRotationChange：通知服务器，angle=" + angle);
+            conn.rotateDisplay(angle, new NvConnection.DisplayRotationCallback() {
+                @Override
+                public void onSuccess(int angle) {
+                    LimeLog.info("显示旋转至 " + angle + " 度数");
+                }
+
+                @Override
+                public void onFailure(String errorMessage) {
+                    LimeLog.warning("无法旋转显示： " + errorMessage);
+                }
+            });
+            pendingRotationRunnable = null;
+        };
+        
+        rotationHandler.postDelayed(pendingRotationRunnable, ROTATION_DEBOUNCE_MS);
     }
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.O)
@@ -3695,15 +3817,19 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         final int baseHeight;
         
         if (prefConfig.resolutionScale != 100) {
-            // 基础分辨率 = 实际分辨率 * 100 / resolutionScale
             baseWidth = (alignedWidth * 100 / prefConfig.resolutionScale) & ~1;
             baseHeight = (alignedHeight * 100 / prefConfig.resolutionScale) & ~1;
-            
             LimeLog.info("Resolution scale conversion: actual=" + alignedWidth + "x" + alignedHeight + 
                     ", base=" + baseWidth + "x" + baseHeight + ", scale=" + prefConfig.resolutionScale + "%");
         } else {
             baseWidth = alignedWidth;
             baseHeight = alignedHeight;
+        }
+
+        // 首次收到分辨率时，检查并同步方向（仅在 rotableScreen 模式下）
+        if (prefConfig.rotableScreen && lastRotation == -1 && connected && conn != null) {
+            LimeLog.info("onResolutionChanged: First resolution received, checking orientation " + baseWidth + "x" + baseHeight);
+            checkAndSyncOrientation(baseWidth, baseHeight);
         }
         
         // 跳过相同分辨率的重复通知
@@ -3711,8 +3837,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return;
         }
 
-        LimeLog.info("Resolution changed from " + prefConfig.width + "x" + prefConfig.height + 
-                " to " + baseWidth + "x" + baseHeight + " (actual: " + alignedWidth + "x" + alignedHeight + ")");
+        LimeLog.info("Resolution changed: " + prefConfig.width + "x" + prefConfig.height + 
+                " -> " + baseWidth + "x" + baseHeight);
 
         // 更新内存中的串流基础分辨率
         prefConfig.width = baseWidth;
@@ -3723,21 +3849,23 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             decoderRenderer.onResolutionChanged(baseWidth, baseHeight);
         }
         
+        final boolean isLandscape = baseWidth > baseHeight;
+        
         runOnUiThread(() -> {
             Toast.makeText(this, getString(R.string.host_resolution_changed, baseWidth, baseHeight), 
                     Toast.LENGTH_SHORT).show();
 
-            // 根据新的宽高比重新决定横竖屏
-            setPreferredOrientationForCurrentDisplay();
-
             // rotableScreen 模式下强制切换方向以匹配主机分辨率
             if (prefConfig.rotableScreen) {
-                setRequestedOrientation(baseWidth > baseHeight 
+                isServerInitiatedRotation = true;
+                setRequestedOrientation(isLandscape 
                         ? ActivityInfo.SCREEN_ORIENTATION_USER_LANDSCAPE 
                         : ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
+                rotationHandler.postDelayed(() -> isServerInitiatedRotation = false, 1000);
+            } else {
+                setPreferredOrientationForCurrentDisplay();
             }
 
-            // 刷新视频视图的比例/尺寸
             updateStreamViewSize(baseWidth, baseHeight);
         });
     }
@@ -3754,9 +3882,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             return;
         }
         
-        // 获取屏幕物理尺寸（像素）
+        // 获取屏幕真实物理尺寸（像素），使用 getRealSize 而不是 getSize
+        // getSize 返回的是可用区域（去掉了状态栏和导航栏），getRealSize 返回真实屏幕尺寸
+        Display display = externalDisplayManager != null ?
+                externalDisplayManager.getTargetDisplay() : getWindowManager().getDefaultDisplay();
         Point screenSize = new Point();
-        getWindowManager().getDefaultDisplay().getSize(screenSize);
+        display.getRealSize(screenSize);
         
         // 检查主机分辨率是否超过屏幕物理尺寸
         boolean exceedsScreenSize = width > screenSize.x || height > screenSize.y;
@@ -3780,6 +3911,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                         " exceeds screen size " + screenSize.x + "x" + screenSize.y + 
                         ", using aspect ratio scaling");
             }
+            // 清除之前的固定尺寸设置，确保宽高比缩放正常工作
+            streamView.getHolder().setSizeFromLayout();
             streamView.setDesiredAspectRatio((double) width / height);
             streamView.requestLayout();
         }

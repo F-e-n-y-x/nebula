@@ -1,16 +1,24 @@
 package com.limelight;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.StringReader;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutionException;
 
+import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.bumptech.glide.request.RequestOptions;
 import com.limelight.binding.PlatformBinding;
 import com.limelight.binding.crypto.AndroidCryptoProvider;
 import com.limelight.computers.ComputerManagerService;
+import com.limelight.dialogs.AddressSelectionDialog;
 import com.limelight.grid.PcGridAdapter;
 import com.limelight.grid.assets.DiskAssetLoader;
 import com.limelight.nvstream.http.ComputerDetails;
@@ -26,6 +34,9 @@ import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.preferences.StreamSettings;
 import com.limelight.ui.AdapterFragment;
 import com.limelight.ui.AdapterFragmentCallbacks;
+import com.limelight.utils.AnalyticsManager;
+import com.limelight.utils.AppCacheManager;
+import com.limelight.utils.CacheHelper;
 import com.limelight.utils.Dialog;
 import com.limelight.utils.EasyTierController;
 import com.limelight.utils.HelpLauncher;
@@ -33,22 +44,17 @@ import com.limelight.utils.Iperf3Tester;
 import com.limelight.utils.ServerHelper;
 import com.limelight.utils.ShortcutHelper;
 import com.limelight.utils.UiHelper;
-import com.limelight.utils.AnalyticsManager;
 import com.limelight.utils.UpdateManager;
-import com.limelight.utils.AppCacheManager;
-import com.limelight.utils.CacheHelper;
-import com.limelight.dialogs.AddressSelectionDialog;
+import com.squareup.seismic.ShakeDetector;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.xmlpull.v1.XmlPullParserException;
-
-import java.io.StringReader;
-import java.util.List;
-
-import com.bumptech.glide.Glide;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AlertDialog;
 import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
@@ -56,44 +62,45 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.hardware.SensorManager;
 import android.net.Uri;
 import android.net.VpnService;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.util.LruCache;
 import android.view.ContextMenu;
+import android.view.ContextMenu.ContextMenuInfo;
+import android.view.GestureDetector;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
-import android.view.ContextMenu.ContextMenuInfo;
+import android.view.animation.AnimationUtils;
+import android.view.animation.LayoutAnimationController;
 import android.widget.AbsListView;
+import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.GridView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
-import android.widget.Toast;
 import android.widget.TextView;
-import android.widget.AdapterView.AdapterContextMenuInfo;
-import android.view.LayoutInflater;
-import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
-import android.view.animation.AnimationUtils;
-import android.view.animation.LayoutAnimationController;
-import android.os.Handler;
-import android.os.Looper;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -101,296 +108,385 @@ import javax.microedition.khronos.opengles.GL10;
 import jp.wasabeef.glide.transformations.BlurTransformation;
 import jp.wasabeef.glide.transformations.ColorFilterTransformation;
 
-import android.app.AlertDialog;
-import android.content.SharedPreferences;
-import android.hardware.SensorManager;
-
-import com.squareup.seismic.ShakeDetector;
-
 public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeDetector.Listener, EasyTierController.VpnPermissionCallback {
-    private RelativeLayout noPcFoundLayout;
-    private PcGridAdapter pcGridAdapter;
-    private AbsListView pcListView;
-    private boolean isFirstLoad = true;
-    private ShortcutHelper shortcutHelper;
 
-    // 防抖机制：合并短时间内的多次刷新请求
-    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
-    private Runnable pendingRefreshRunnable;
-    private static final long REFRESH_DEBOUNCE_DELAY = 150; // 150ms 防抖延迟
-    private ComputerManagerService.ComputerManagerBinder managerBinder;
-    private boolean freezeUpdates, runningPolling, inForeground, completeOnCreateCalled;
+    // Constants
+    private static final long REFRESH_DEBOUNCE_DELAY = 150;
+    private static final long SHAKE_DEBOUNCE_INTERVAL = 3000;
+    private static final int MAX_DAILY_REFRESH = 7;
+    private static final int VPN_PERMISSION_REQUEST_CODE = 101;
 
-    private EasyTierController easyTierController;
-
-    private AddressSelectionDialog currentAddressDialog;
-
-    private ShakeDetector shakeDetector;
-    private long lastShakeTime = 0;
-    private static final long SHAKE_DEBOUNCE_INTERVAL = 3000; // 3 seconds debounce
-    private static final int MAX_DAILY_REFRESH = 7; // Maximum 7 refreshes per day
     private static final String REFRESH_PREF_NAME = "RefreshLimit";
     private static final String REFRESH_COUNT_KEY = "refresh_count";
     private static final String REFRESH_DATE_KEY = "refresh_date";
+    private static final String SCENE_PREF_NAME = "SceneConfigs";
+    private static final String SCENE_KEY_PREFIX = "scene_";
 
-    // 背景图片刷新广播接收器
+    // Menu item IDs
+    private static final int PAIR_ID = 2;
+    private static final int UNPAIR_ID = 3;
+    private static final int WOL_ID = 4;
+    private static final int DELETE_ID = 5;
+    private static final int RESUME_ID = 6;
+    private static final int QUIT_ID = 7;
+    private static final int VIEW_DETAILS_ID = 8;
+    private static final int FULL_APP_LIST_ID = 9;
+    private static final int TEST_NETWORK_ID = 10;
+    private static final int GAMESTREAM_EOL_ID = 11;
+    private static final int SLEEP_ID = 12;
+    private static final int IPERF3_TEST_ID = 13;
+    private static final int SECONDARY_SCREEN_ID = 14;
+
+    // UI Components
+    private RelativeLayout noPcFoundLayout;
+    private PcGridAdapter pcGridAdapter;
+    private AbsListView pcListView;
+    private ImageView backgroundImageView;
+
+    // State
+    private boolean isFirstLoad = true;
+    private boolean freezeUpdates;
+    private boolean runningPolling;
+    private boolean inForeground;
+    private boolean completeOnCreateCalled;
+    private long lastShakeTime;
+
+    // Helpers
+    private ShortcutHelper shortcutHelper;
+    private EasyTierController easyTierController;
+    private AnalyticsManager analyticsManager;
+    private ShakeDetector shakeDetector;
+    private AddressSelectionDialog currentAddressDialog;
     private BroadcastReceiver backgroundImageRefreshReceiver;
 
+    // Managers
+    private ComputerManagerService.ComputerManagerBinder managerBinder;
+    private LruCache<String, Bitmap> bitmapLruCache;
+
+    // Handlers
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingRefreshRunnable;
+
+    public String clientName;
+
     private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
         public void onServiceConnected(ComponentName className, IBinder binder) {
             final ComputerManagerService.ComputerManagerBinder localBinder =
-                    ((ComputerManagerService.ComputerManagerBinder) binder);
+                    (ComputerManagerService.ComputerManagerBinder) binder;
 
-            // Wait in a separate thread to avoid stalling the UI
-            new Thread() {
-                @Override
-                public void run() {
-                    // Wait for the binder to be ready
-                    localBinder.waitForReady();
-
-                    // Now make the binder visible
-                    managerBinder = localBinder;
-
-                    // Start updates
-                    startComputerUpdates();
-
-                    // Force a keypair to be generated early to avoid discovery delays
-                    new AndroidCryptoProvider(PcView.this).getClientCertificate();
-                }
-            }.start();
+            new Thread(() -> {
+                localBinder.waitForReady();
+                managerBinder = localBinder;
+                startComputerUpdates();
+                new AndroidCryptoProvider(PcView.this).getClientCertificate();
+            }).start();
         }
 
+        @Override
         public void onServiceDisconnected(ComponentName className) {
             managerBinder = null;
         }
     };
 
+    // Lifecycle Methods
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        easyTierController = new EasyTierController(this, this);
+        inForeground = true;
+        initBitmapCache();
+
+        final GlPreferences glPrefs = GlPreferences.readPreferences(this);
+        if (!glPrefs.savedFingerprint.equals(Build.FINGERPRINT) || glPrefs.glRenderer.isEmpty()) {
+            initGlRenderer(glPrefs);
+        } else {
+            LimeLog.info("Cached GL Renderer: " + glPrefs.glRenderer);
+            completeOnCreate();
+        }
+    }
+
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-
-        // Only reinitialize views if completeOnCreate() was called
-        // before this callback. If it was not, completeOnCreate() will
-        // handle initializing views with the config change accounted for.
-        // This is not prone to races because both callbacks are invoked
-        // in the main thread.
         if (completeOnCreateCalled) {
-            // Reinitialize views just in case orientation changed
             initializeViews();
         }
     }
 
-    private final static int PAIR_ID = 2;
-    private final static int UNPAIR_ID = 3;
-    private final static int WOL_ID = 4;
-    private final static int DELETE_ID = 5;
-    private final static int RESUME_ID = 6;
-    private final static int QUIT_ID = 7;
-    private final static int VIEW_DETAILS_ID = 8;
-    private final static int FULL_APP_LIST_ID = 9;
-    private final static int TEST_NETWORK_ID = 10;
-    private final static int GAMESTREAM_EOL_ID = 11;
-    private final static int SLEEP_ID = 12;
-    private final static int IPERF3_TEST_ID = 13;
+    @Override
+    protected void onResume() {
+        super.onResume();
+        UiHelper.showDecoderCrashDialog(this);
+        inForeground = true;
+        startComputerUpdates();
 
-    public String clientName;
-    private LruCache<String, Bitmap> bitmapLruCache;
-    private AnalyticsManager analyticsManager;
-    private static final int VPN_PERMISSION_REQUEST_CODE = 101;
+        if (analyticsManager != null) {
+            analyticsManager.startUsageTracking();
+        }
+        startShakeDetector();
+    }
 
-    // 添加场景配置相关常量
-    private static final String SCENE_PREF_NAME = "SceneConfigs";
-    private static final String SCENE_KEY_PREFIX = "scene_";
+    @Override
+    protected void onPause() {
+        super.onPause();
+        inForeground = false;
+        stopComputerUpdates(false);
+
+        if (analyticsManager != null) {
+            analyticsManager.stopUsageTracking();
+        }
+        stopShakeDetector();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Dialog.closeDialogs();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+
+        if (easyTierController != null) {
+            easyTierController.onDestroy();
+        }
+        if (managerBinder != null) {
+            unbindService(serviceConnection);
+        }
+        if (currentAddressDialog != null) {
+            currentAddressDialog.dismiss();
+            currentAddressDialog = null;
+        }
+        unregisterBackgroundReceiver();
+
+        if (analyticsManager != null) {
+            analyticsManager.cleanup();
+        }
+        if (pendingRefreshRunnable != null) {
+            refreshHandler.removeCallbacks(pendingRefreshRunnable);
+            pendingRefreshRunnable = null;
+        }
+    }
+
+    // Initialization Methods
+
+    private void initBitmapCache() {
+        int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+        int cacheSize = maxMemory / 8;
+        bitmapLruCache = new LruCache<String, Bitmap>(cacheSize) {
+            @Override
+            protected int sizeOf(String key, Bitmap value) {
+                return value.getByteCount() / 1024;
+            }
+        };
+    }
+
+    private void initGlRenderer(GlPreferences glPrefs) {
+        GLSurfaceView surfaceView = new GLSurfaceView(this);
+        surfaceView.setRenderer(new GLSurfaceView.Renderer() {
+            @Override
+            public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
+                glPrefs.glRenderer = gl10.glGetString(GL10.GL_RENDERER);
+                glPrefs.savedFingerprint = Build.FINGERPRINT;
+                glPrefs.writePreferences();
+                LimeLog.info("Fetched GL Renderer: " + glPrefs.glRenderer);
+                runOnUiThread(PcView.this::completeOnCreate);
+            }
+
+            @Override
+            public void onSurfaceChanged(GL10 gl10, int i, int i1) {
+            }
+
+            @Override
+            public void onDrawFrame(GL10 gl10) {
+            }
+        });
+        setContentView(surfaceView);
+    }
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    private void completeOnCreate() {
+        completeOnCreateCalled = true;
+        shortcutHelper = new ShortcutHelper(this);
+        UiHelper.setLocale(this);
+
+        analyticsManager = AnalyticsManager.getInstance(this);
+        analyticsManager.logAppLaunch();
+        UpdateManager.checkForUpdatesOnStartup(this);
+
+        bindService(new Intent(this, ComputerManagerService.class), serviceConnection, Service.BIND_AUTO_CREATE);
+
+        pcGridAdapter = new PcGridAdapter(this, PreferenceConfiguration.readPreferences(this));
+        pcGridAdapter.setAvatarClickListener(this::handleAvatarClick);
+
+        initShakeDetector();
+        registerBackgroundReceiver();
+        initializeViews();
+    }
 
     private void initializeViews() {
         setContentView(R.layout.activity_pc_view);
-
         UiHelper.notifyNewRootView(this);
 
-        // Allow floating expanded PiP overlays while browsing PCs
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             setShouldDockBigOverlays(false);
         }
 
-        clientName = Settings.Global.getString(this.getContentResolver(), "device_name");
+        clientName = Settings.Global.getString(getContentResolver(), "device_name");
+        backgroundImageView = findViewById(R.id.pcBackgroundImage);
 
-        ImageView imageView = findViewById(R.id.pcBackgroundImage);
-        String imageUrl = getBackgroundImageUrl();
+        loadBackgroundImage();
+        setupBackgroundImageLongPress();
+        initSceneButtons();
 
-        // set background image
-        new Thread(() -> {
-            try {
-                // 将 imageUrl 转换为可被 Glide 正确识别的对象
-                Object glideLoadTarget;
-                if (imageUrl.startsWith("http")) {
-                    // HTTP/HTTPS URL 直接使用
-                    glideLoadTarget = imageUrl;
-                } else {
-                    // 本地文件路径，转换为 File 对象
-                    File localFile = new File(imageUrl);
-                    if (localFile.exists()) {
-                        glideLoadTarget = localFile;
-                    } else {
-                        // 文件不存在（理论上不应该发生，因为 getBackgroundImageUrl() 已检查）
-                        // 但为了安全，回退到默认 URL
-                        glideLoadTarget = getDefaultApiUrl();
-                    }
-                }
-
-                final Bitmap bitmap = Glide.with(PcView.this)
-                        .asBitmap()
-                        .load(glideLoadTarget)
-                        .skipMemoryCache(true).diskCacheStrategy(DiskCacheStrategy.NONE)
-                        .submit()
-                        .get();
-                if (bitmap != null) {
-                    bitmapLruCache.put(imageUrl, bitmap);
-                    runOnUiThread(() -> Glide.with(PcView.this)
-                            .load(bitmap)
-                            .apply(RequestOptions.bitmapTransform(new BlurTransformation(2, 3)))
-                            .transform(new ColorFilterTransformation(Color.argb(120, 0, 0, 0)))
-                            .into(imageView));
-                }
-            } catch (java.util.concurrent.ExecutionException e) {
-                // Glide error wrapping
-                Throwable cause = e.getCause();
-                if (cause != null) {
-                    String msg = cause.getMessage();
-                    if (msg != null && (msg.contains("HttpException") || msg.contains("SocketException") || msg.contains("MiediaMetadataRetriever"))) {
-                        LimeLog.warning("Background image download failed: " + msg);
-                    } else {
-                        e.printStackTrace();
-                    }
-                } else {
-                    e.printStackTrace();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-
-        // 在背景图片上设置长按监听器
-        if (imageView != null) {
-            imageView.setOnLongClickListener(v -> {
-                saveImageWithPermissionCheck();
-                return true;
-            });
-        }
-
-        if (getWindow().getDecorView().getRootView() != null) {
-            initSceneButtons();
-        }
-
-        // Set the correct layout for the PC grid
         pcGridAdapter.updateLayoutWithPreferences(this, PreferenceConfiguration.readPreferences(this));
+        setupButtons();
+        setupAdapterFragment();
 
-        // Setup the list view
+        noPcFoundLayout = findViewById(R.id.no_pc_found_layout);
+        addAddComputerCard();
+        updateNoPcFoundVisibility();
+        handleInitialLoad();
+    }
+
+    private void setupButtons() {
         ImageButton settingsButton = findViewById(R.id.settingsButton);
         ImageButton restoreSessionButton = findViewById(R.id.restoreSessionButton);
         ImageButton aboutButton = findViewById(R.id.aboutButton);
-
         ImageButton easyTierButton = findViewById(R.id.easyTierControlButton);
-        if (easyTierButton != null) {
-            easyTierButton.setOnClickListener(v -> showEasyTierControlDialog());
-        }
-
-        // 眼睛图标按钮：控制是否显示未配对设备
         ImageButton toggleUnpairedButton = findViewById(R.id.toggleUnpairedButton);
-        if (toggleUnpairedButton != null) {
-            // 初始化图标状态
-            updateToggleUnpairedButtonIcon(toggleUnpairedButton);
-            toggleUnpairedButton.setOnClickListener(v -> {
-                boolean newState = !pcGridAdapter.isShowUnpairedDevices();
-                pcGridAdapter.setShowUnpairedDevices(newState);
-                updateToggleUnpairedButtonIcon(toggleUnpairedButton);
 
-                // 显示提示
-                String message = newState
-                        ? getString(R.string.unpaired_devices_shown)
-                        : getString(R.string.unpaired_devices_hidden);
-                Toast.makeText(PcView.this, message, Toast.LENGTH_SHORT).show();
-            });
-        }
-
-        settingsButton.setOnClickListener(v -> startActivity(new Intent(PcView.this, StreamSettings.class)));
+        settingsButton.setOnClickListener(v -> startActivity(new Intent(this, StreamSettings.class)));
         restoreSessionButton.setOnClickListener(v -> restoreLastSession());
+
         if (aboutButton != null) {
             aboutButton.setOnClickListener(v -> showAboutDialog());
         }
+        if (easyTierButton != null) {
+            easyTierButton.setOnClickListener(v -> showEasyTierControlDialog());
+        }
+        if (toggleUnpairedButton != null) {
+            updateToggleUnpairedButtonIcon(toggleUnpairedButton);
+            toggleUnpairedButton.setOnClickListener(v -> toggleUnpairedDevices(toggleUnpairedButton));
+        }
+    }
 
+    private void setupAdapterFragment() {
         getFragmentManager().beginTransaction()
                 .replace(R.id.pcFragmentContainer, new AdapterFragment())
                 .commitAllowingStateLoss();
+    }
 
-        noPcFoundLayout = findViewById(R.id.no_pc_found_layout);
+    private void updateNoPcFoundVisibility() {
+        boolean isEmpty = pcGridAdapter.getCount() == 0 ||
+                (pcGridAdapter.getCount() == 1 && PcGridAdapter.isAddComputerCard((ComputerObject) pcGridAdapter.getItem(0)));
+        noPcFoundLayout.setVisibility(isEmpty ? View.VISIBLE : View.INVISIBLE);
+    }
 
-        // 确保添加卡片存在
-        addAddComputerCard();
-
-        if (pcGridAdapter.getCount() == 0 || pcGridAdapter.getCount() == 1 &&
-                PcGridAdapter.isAddComputerCard((ComputerObject) pcGridAdapter.getItem(0))) {
-            noPcFoundLayout.setVisibility(View.VISIBLE);
-        } else {
-            noPcFoundLayout.setVisibility(View.INVISIBLE);
-        }
-
-        // 刷新数据（首次加载时不使用防抖）
+    private void handleInitialLoad() {
         if (isFirstLoad) {
-            // 取消任何待处理的防抖刷新
             if (pendingRefreshRunnable != null) {
                 refreshHandler.removeCallbacks(pendingRefreshRunnable);
                 pendingRefreshRunnable = null;
             }
-            // 首次加载时不直接刷新，等 receiveAdapterView 设置好 adapter 后再统一触发动画
-            // 如果 pcListView 已经存在（配置变化重建），则直接刷新
             if (pcListView != null) {
                 pcGridAdapter.notifyDataSetChanged();
             }
         } else {
-            // 非首次加载，使用防抖刷新
             debouncedNotifyDataSetChanged();
         }
     }
 
-    /**
-     * 更新眼睛图标按钮图标
-     */
-    private void updateToggleUnpairedButtonIcon(ImageButton button) {
-        if (button == null || pcGridAdapter == null) return;
+    // Background Image Methods
 
-        if (pcGridAdapter.isShowUnpairedDevices()) {
-            button.setImageResource(R.drawable.ic_visibility);
-        } else {
-            button.setImageResource(R.drawable.ic_visibility_off);
+    private void loadBackgroundImage() {
+        if (backgroundImageView == null) return;
+
+        String imageUrl = getBackgroundImageUrl();
+        new Thread(() -> {
+            try {
+                Object glideTarget = resolveGlideTarget(imageUrl);
+                Bitmap bitmap = Glide.with(this)
+                        .asBitmap()
+                        .load(glideTarget)
+                        .skipMemoryCache(true)
+                        .diskCacheStrategy(DiskCacheStrategy.NONE)
+                        .submit()
+                        .get();
+
+                if (bitmap != null) {
+                    bitmapLruCache.put(imageUrl, bitmap);
+                    runOnUiThread(() -> applyBlurredBackground(bitmap));
+                }
+            } catch (ExecutionException e) {
+                handleGlideException(e);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private Object resolveGlideTarget(String imageUrl) {
+        if (imageUrl.startsWith("http")) {
+            return imageUrl;
+        }
+        File localFile = new File(imageUrl);
+        return localFile.exists() ? localFile : getDefaultApiUrl();
+    }
+
+    private void applyBlurredBackground(Bitmap bitmap) {
+        if (backgroundImageView == null) return;
+        Glide.with(this)
+                .load(bitmap)
+                .apply(RequestOptions.bitmapTransform(new BlurTransformation(2, 3)))
+                .transform(new ColorFilterTransformation(Color.argb(120, 0, 0, 0)))
+                .into(backgroundImageView);
+    }
+
+    private void handleGlideException(ExecutionException e) {
+        Throwable cause = e.getCause();
+        if (cause != null) {
+            String msg = cause.getMessage();
+            if (msg != null && (msg.contains("HttpException") || msg.contains("SocketException") || msg.contains("MediaMetadataRetriever"))) {
+                LimeLog.warning("Background image download failed: " + msg);
+                return;
+            }
+        }
+        e.printStackTrace();
+    }
+
+    private void setupBackgroundImageLongPress() {
+        if (backgroundImageView != null) {
+            backgroundImageView.setOnLongClickListener(v -> {
+                saveImageWithPermissionCheck();
+                return true;
+            });
         }
     }
 
-    /**
-     * 获取背景图片URL或文件路径
-     * 支持三种类型：默认API、自定义API URL、本地文件
-     */
-    private @NonNull String getBackgroundImageUrl() {
+    @NonNull
+    private String getBackgroundImageUrl() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String type = prefs.getString("background_image_type", "default");
 
         switch (type) {
             case "api":
-                // 自定义API URL
                 String apiUrl = prefs.getString("background_image_url", null);
                 if (apiUrl != null && !apiUrl.isEmpty()) {
                     return apiUrl;
                 }
-                // API URL为空，回退到默认
                 prefs.edit().putString("background_image_type", "default").apply();
                 return getDefaultApiUrl();
 
             case "local":
-                // 本地文件路径
                 String localPath = prefs.getString("background_image_local_path", null);
                 if (localPath != null && new File(localPath).exists()) {
                     return localPath;
                 }
-                // 文件不存在，回退到默认并清理配置
                 prefs.edit()
                         .putString("background_image_type", "default")
                         .remove("background_image_local_path")
@@ -398,363 +494,273 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
                 return getDefaultApiUrl();
 
             default:
-                // 默认API图片
                 return getDefaultApiUrl();
         }
     }
 
-    /**
-     * 获取默认的API URL（根据屏幕方向）
-     */
     private String getDefaultApiUrl() {
-        int deviceRotation = this.getWindowManager().getDefaultDisplay().getRotation();
-        return deviceRotation == Configuration.ORIENTATION_PORTRAIT ?
-                "https://img-api.pipw.top" :
-                "https://img-api.pipw.top/?phone=true";
+        int rotation = getWindowManager().getDefaultDisplay().getRotation();
+        return rotation == Configuration.ORIENTATION_PORTRAIT
+                ? "https://img-api.pipw.top"
+                : "https://img-api.pipw.top/?phone=true";
     }
 
-    /**
-     * 带权限检查的保存图片方法
-     */
-    private void saveImageWithPermissionCheck() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Environment.isExternalStorageManager()) {
-                saveImage();
-            } else {
-                Toast.makeText(this, getResources().getString(R.string.storage_permission_required), Toast.LENGTH_LONG).show();
-                try {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                    intent.setData(Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                } catch (Exception e) {
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
-                    startActivity(intent);
+    private void refreshBackgroundImage(boolean isFromShake) {
+        if (backgroundImageView == null) return;
+
+        String imageUrl = getBackgroundImageUrl();
+        bitmapLruCache.remove(imageUrl);
+
+        new Thread(() -> {
+            try {
+                Object glideTarget = resolveGlideTarget(imageUrl);
+                Bitmap bitmap = Glide.with(this)
+                        .asBitmap()
+                        .load(glideTarget)
+                        .skipMemoryCache(true)
+                        .diskCacheStrategy(DiskCacheStrategy.NONE)
+                        .submit()
+                        .get();
+
+                if (bitmap != null) {
+                    bitmapLruCache.put(imageUrl, bitmap);
+                    runOnUiThread(() -> {
+                        applyBlurredBackground(bitmap);
+                        if (isFromShake) {
+                            showToast(getString(R.string.background_refreshed_with_remaining, getRemainingRefreshCount()));
+                        }
+                    });
+                } else {
+                    runOnUiThread(() -> showToast(getString(R.string.refresh_failed_please_retry)));
                 }
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> showToast(getString(R.string.refresh_failed_with_error, e.getMessage())));
             }
-        } else {
-            saveImage();
+        }).start();
+    }
+
+    // Image Save Methods
+
+    private void saveImageWithPermissionCheck() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+            showToast(getString(R.string.storage_permission_required));
+            requestStoragePermission();
+            return;
+        }
+        saveImage();
+    }
+
+    private void requestStoragePermission() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+            intent.setData(Uri.parse("package:" + getPackageName()));
+            startActivity(intent);
+        } catch (Exception e) {
+            startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
         }
     }
 
     private void saveImage() {
-        // 先尝试从缓存获取
         Bitmap bitmap = bitmapLruCache.get(getBackgroundImageUrl());
 
         if (bitmap == null) {
-            // 如果缓存中没有，尝试从ImageView获取
-            ImageView imageView = findViewById(R.id.pcBackgroundImage);
-            if (imageView != null && imageView.getDrawable() != null) {
-                Toast.makeText(this, getResources().getString(R.string.downloading_image_please_wait), Toast.LENGTH_SHORT).show();
-
-                // 在后台线程重新下载原图
-                new Thread(() -> {
-                    try {
-                        String imageUrl = getBackgroundImageUrl();
-
-                        // 将 imageUrl 转换为可被 Glide 正确识别的对象
-                        Object glideLoadTarget;
-                        if (imageUrl.startsWith("http")) {
-                            // HTTP/HTTPS URL 直接使用
-                            glideLoadTarget = imageUrl;
-                        } else {
-                            // 本地文件路径，转换为 File 对象
-                            File localFile = new File(imageUrl);
-                            if (localFile.exists()) {
-                                glideLoadTarget = localFile;
-                            } else {
-                                // 文件不存在（理论上不应该发生，因为 getBackgroundImageUrl() 已检查）
-                                // 但为了安全，回退到默认 URL
-                                glideLoadTarget = getDefaultApiUrl();
-                            }
-                        }
-
-                        Bitmap downloadedBitmap = Glide.with(PcView.this)
-                                .asBitmap()
-                                .load(glideLoadTarget)
-                                .submit()
-                                .get();
-
-                        if (downloadedBitmap != null) {
-                            // 重新放入缓存
-                            bitmapLruCache.put(imageUrl, downloadedBitmap);
-                            // 保存图片
-                            runOnUiThread(() -> saveBitmapToFile(downloadedBitmap));
-                        } else {
-                            runOnUiThread(() -> Toast.makeText(PcView.this, getResources().getString(R.string.image_download_failed_retry), Toast.LENGTH_SHORT).show());
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        runOnUiThread(() -> Toast.makeText(PcView.this, getResources().getString(R.string.image_download_failed_with_error, e.getMessage()), Toast.LENGTH_SHORT).show());
-                    }
-                }).start();
-                return;
+            if (backgroundImageView != null && backgroundImageView.getDrawable() != null) {
+                showToast(getString(R.string.downloading_image_please_wait));
+                downloadAndSaveImage();
             } else {
-                Toast.makeText(this, getResources().getString(R.string.image_not_loaded_please_retry), Toast.LENGTH_SHORT).show();
-                return;
+                showToast(getString(R.string.image_not_loaded_please_retry));
             }
+            return;
         }
-
-        // 如果缓存中有图片，直接保存
         saveBitmapToFile(bitmap);
+    }
+
+    private void downloadAndSaveImage() {
+        new Thread(() -> {
+            try {
+                Object glideTarget = resolveGlideTarget(getBackgroundImageUrl());
+                Bitmap bitmap = Glide.with(this)
+                        .asBitmap()
+                        .load(glideTarget)
+                        .submit()
+                        .get();
+
+                if (bitmap != null) {
+                    bitmapLruCache.put(getBackgroundImageUrl(), bitmap);
+                    runOnUiThread(() -> saveBitmapToFile(bitmap));
+                } else {
+                    runOnUiThread(() -> showToast(getString(R.string.image_download_failed_retry)));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                runOnUiThread(() -> showToast(getString(R.string.image_download_failed_with_error, e.getMessage())));
+            }
+        }).start();
     }
 
     private void saveBitmapToFile(Bitmap bitmap) {
         if (bitmap == null) {
-            Toast.makeText(this, getResources().getString(R.string.image_invalid), Toast.LENGTH_SHORT).show();
+            showToast(getString(R.string.image_invalid));
             return;
         }
 
-        // 图片保存路径，这里保存到外部存储的Pictures目录下，可根据需求调整
-        String root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString();
-        File myDir = new File(root + "/setu");
-        myDir.mkdirs();
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "setu");
+        if (!dir.exists() && !dir.mkdirs()) {
+            showToast(getString(R.string.image_save_failed_with_error, "Failed to create directory"));
+            return;
+        }
 
-        // 文件名设置
         String fileName = "pipw-" + System.currentTimeMillis() + ".png";
-        File file = new File(myDir, fileName);
+        File file = new File(dir, fileName);
 
-        try {
-            FileOutputStream outputStream = new FileOutputStream(file);
+        try (FileOutputStream outputStream = new FileOutputStream(file)) {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
             outputStream.flush();
-            outputStream.close();
-            refreshSystemPic(PcView.this, file);
-            Toast.makeText(this, getResources().getString(R.string.image_saved_successfully), Toast.LENGTH_SHORT).show();
+            refreshSystemPic(file);
+            showToast(getString(R.string.image_saved_successfully));
         } catch (IOException e) {
             e.printStackTrace();
-            Toast.makeText(this, getResources().getString(R.string.image_save_failed_with_error, e.getMessage()), Toast.LENGTH_SHORT).show();
+            showToast(getString(R.string.image_save_failed_with_error, e.getMessage()));
         }
-        // 不再清空所有缓存，只移除当前图片（可选）
-        // bitmapLruCache.remove(getBackgroundImageUrl());
     }
 
-    // 刷新图库的方法
-    private void refreshSystemPic(Context context, File file) {
+    private void refreshSystemPic(File file) {
         Intent intent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-        Uri contentUri = Uri.fromFile(file);
-        intent.setData(contentUri);
-        context.sendBroadcast(intent);
+        intent.setData(Uri.fromFile(file));
+        sendBroadcast(intent);
+    }
+
+    // Shake Detection Methods
+
+    private void initShakeDetector() {
+        shakeDetector = new ShakeDetector(this);
+        shakeDetector.setSensitivity(ShakeDetector.SENSITIVITY_MEDIUM);
+    }
+
+    private void startShakeDetector() {
+        if (shakeDetector == null) return;
+        try {
+            shakeDetector.start((SensorManager) getSystemService(SENSOR_SERVICE));
+        } catch (Exception e) {
+            LimeLog.warning("shakeDetector start failed: " + e.getMessage());
+        }
+    }
+
+    private void stopShakeDetector() {
+        if (shakeDetector == null) return;
+        try {
+            shakeDetector.stop();
+        } catch (Exception e) {
+            LimeLog.warning("shakeDetector stop failed: " + e.getMessage());
+        }
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    public void hearShake() {
+        long currentTime = System.currentTimeMillis();
 
-        easyTierController = new EasyTierController(this, this);
-
-        // Assume we're in the foreground when created to avoid a race
-        // between binding to CMS and onResume()
-        inForeground = true;
-
-        // Create cache for images
-        int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
-        int cacheSize = maxMemory / 8;
-        bitmapLruCache = new LruCache<>(cacheSize) {
-            @Override
-            protected int sizeOf(String key, Bitmap value) {
-                // 计算每个Bitmap占用的内存大小（以KB为单位）
-                return value.getByteCount() / 1024;
-            }
-        };
-
-        // Create a GLSurfaceView to fetch GLRenderer unless we have
-        // a cached result already.
-        final GlPreferences glPrefs = GlPreferences.readPreferences(this);
-        if (!glPrefs.savedFingerprint.equals(Build.FINGERPRINT) || glPrefs.glRenderer.isEmpty()) {
-            GLSurfaceView surfaceView = new GLSurfaceView(this);
-            surfaceView.setRenderer(new GLSurfaceView.Renderer() {
-                @Override
-                public void onSurfaceCreated(GL10 gl10, EGLConfig eglConfig) {
-                    // Save the GLRenderer string so we don't need to do this next time
-                    glPrefs.glRenderer = gl10.glGetString(GL10.GL_RENDERER);
-                    glPrefs.savedFingerprint = Build.FINGERPRINT;
-                    glPrefs.writePreferences();
-
-                    LimeLog.info("Fetched GL Renderer: " + glPrefs.glRenderer);
-
-                    runOnUiThread(() -> completeOnCreate());
-                }
-
-                @Override
-                public void onSurfaceChanged(GL10 gl10, int i, int i1) {
-                }
-
-                @Override
-                public void onDrawFrame(GL10 gl10) {
-                }
-            });
-            setContentView(surfaceView);
-        } else {
-            LimeLog.info("Cached GL Renderer: " + glPrefs.glRenderer);
-            completeOnCreate();
+        if (currentTime - lastShakeTime < SHAKE_DEBOUNCE_INTERVAL) {
+            long remaining = (SHAKE_DEBOUNCE_INTERVAL - (currentTime - lastShakeTime)) / 1000;
+            runOnUiThread(() -> showToast(getString(R.string.please_wait_seconds, remaining)));
+            return;
         }
-    }
 
-    private void initSceneButtons() {
-        try {
-            int[] sceneButtonIds = {
-                    R.id.scene1Btn, R.id.scene2Btn,
-                    R.id.scene3Btn, R.id.scene4Btn, R.id.scene5Btn
-            };
-
-            for (int i = 0; i < sceneButtonIds.length; i++) {
-                final int sceneNumber = i + 1;
-                ImageButton btn = findViewById(sceneButtonIds[i]);
-
-                if (btn == null) {
-                    LimeLog.warning("Scene button " + sceneNumber + " (ID: " + getResources().getResourceName(sceneButtonIds[i]) + ") not found!");
-                    continue;
-                }
-
-                btn.setOnClickListener(v -> applySceneConfiguration(sceneNumber));
-                btn.setOnLongClickListener(v -> {
-                    showSaveConfirmationDialog(sceneNumber);
-                    return true;
-                });
-            }
-        } catch (Exception e) {
-            LimeLog.warning("Scene init failed: " + e);
-            e.printStackTrace();
+        if (!canRefreshToday()) {
+            runOnUiThread(() -> showToast(getString(R.string.daily_limit_reached)));
+            return;
         }
+
+        lastShakeTime = currentTime;
+        incrementRefreshCount();
+        int remaining = getRemainingRefreshCount();
+
+        runOnUiThread(() -> {
+            showToast(getString(R.string.refreshing_with_remaining, remaining));
+            refreshBackgroundImage(true);
+        });
     }
 
-    @SuppressLint({"DefaultLocale", "StringFormatMatches"})
-    private void applySceneConfiguration(int sceneNumber) {
-        try {
-            SharedPreferences prefs = getSharedPreferences(SCENE_PREF_NAME, MODE_PRIVATE);
-            String configJson = prefs.getString(SCENE_KEY_PREFIX + sceneNumber, null);
-
-            if (configJson != null) {
-                JSONObject config = new JSONObject(configJson);
-                // 解析配置参数
-                int width = config.optInt("width", 1920);
-                int height = config.optInt("height", 1080);
-                int fps = config.optInt("fps", 60);
-                int bitrate = config.optInt("bitrate", 10000);
-                String videoFormat = config.optString("videoFormat", "auto");
-                boolean enableHdr = config.optBoolean("enableHdr", false);
-                boolean enablePerfOverlay = config.optBoolean("enablePerfOverlay", false);
-
-                // 使用副本配置进行操作
-                PreferenceConfiguration configPrefs = PreferenceConfiguration.readPreferences(this).copy();
-                configPrefs.width = width;
-                configPrefs.height = height;
-                configPrefs.fps = fps;
-                configPrefs.bitrate = bitrate;
-                configPrefs.videoFormat = PreferenceConfiguration.FormatOption.valueOf(videoFormat);
-                configPrefs.enableHdr = enableHdr;
-                configPrefs.enablePerfOverlay = enablePerfOverlay;
-
-                // 保存并检查结果
-                if (!configPrefs.writePreferences(this)) {
-                    Toast.makeText(this, getResources().getString(R.string.config_save_failed), Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                pcGridAdapter.updateLayoutWithPreferences(this, configPrefs);
-
-                Toast.makeText(this, getResources().getString(R.string.scene_config_applied,
-                        sceneNumber, width, height, fps, bitrate / 1000.0, videoFormat, enableHdr ? "On" : "Off"), Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, getResources().getString(R.string.scene_not_configured, sceneNumber), Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            LimeLog.warning("Scene apply failed: " + e);
-            runOnUiThread(() -> Toast.makeText(PcView.this, getResources().getString(R.string.config_apply_failed), Toast.LENGTH_SHORT).show());
-        }
+    private String getTodayDateString() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
     }
 
-    private void showSaveConfirmationDialog(int sceneNumber) {
-        new AlertDialog.Builder(this, R.style.AppDialogStyle)
-                .setTitle(getResources().getString(R.string.save_to_scene, sceneNumber))
-                .setMessage(getResources().getString(R.string.overwrite_current_config))
-                .setPositiveButton(getResources().getString(R.string.dialog_button_save), (dialog, which) -> saveCurrentConfiguration(sceneNumber))
-                .setNegativeButton(getResources().getString(R.string.dialog_button_cancel), null)
-                .show();
-    }
+    private boolean canRefreshToday() {
+        SharedPreferences prefs = getSharedPreferences(REFRESH_PREF_NAME, MODE_PRIVATE);
+        String today = getTodayDateString();
+        String savedDate = prefs.getString(REFRESH_DATE_KEY, "");
+        int count = prefs.getInt(REFRESH_COUNT_KEY, 0);
 
-    private void saveCurrentConfiguration(int sceneNumber) {
-        try {
-            PreferenceConfiguration configPrefs = PreferenceConfiguration.readPreferences(this);
-            JSONObject config = new JSONObject();
-            config.put("width", configPrefs.width);
-            config.put("height", configPrefs.height);
-            config.put("fps", configPrefs.fps);
-            config.put("bitrate", configPrefs.bitrate);
-            config.put("videoFormat", configPrefs.videoFormat.toString());
-            config.put("enableHdr", configPrefs.enableHdr);
-            config.put("enablePerfOverlay", configPrefs.enablePerfOverlay);
-
-            // 保存到SharedPreferences
-            getSharedPreferences(SCENE_PREF_NAME, MODE_PRIVATE)
-                    .edit()
-                    .putString(SCENE_KEY_PREFIX + sceneNumber, config.toString())
+        if (!today.equals(savedDate)) {
+            prefs.edit()
+                    .putString(REFRESH_DATE_KEY, today)
+                    .putInt(REFRESH_COUNT_KEY, 0)
                     .apply();
-
-            Toast.makeText(this, getResources().getString(R.string.scene_saved_successfully, sceneNumber), Toast.LENGTH_SHORT).show();
-        } catch (JSONException e) {
-            Toast.makeText(this, getResources().getString(R.string.config_save_failed), Toast.LENGTH_SHORT).show();
+            return true;
         }
+        return count < MAX_DAILY_REFRESH;
     }
+
+    private int getRemainingRefreshCount() {
+        SharedPreferences prefs = getSharedPreferences(REFRESH_PREF_NAME, MODE_PRIVATE);
+        String today = getTodayDateString();
+        String savedDate = prefs.getString(REFRESH_DATE_KEY, "");
+        int count = prefs.getInt(REFRESH_COUNT_KEY, 0);
+
+        return today.equals(savedDate) ? Math.max(0, MAX_DAILY_REFRESH - count) : MAX_DAILY_REFRESH;
+    }
+
+    private void incrementRefreshCount() {
+        SharedPreferences prefs = getSharedPreferences(REFRESH_PREF_NAME, MODE_PRIVATE);
+        String today = getTodayDateString();
+        String savedDate = prefs.getString(REFRESH_DATE_KEY, "");
+        int count = today.equals(savedDate) ? prefs.getInt(REFRESH_COUNT_KEY, 0) : 0;
+
+        prefs.edit()
+                .putString(REFRESH_DATE_KEY, today)
+                .putInt(REFRESH_COUNT_KEY, count + 1)
+                .apply();
+    }
+
+    // Background Receiver Methods
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void completeOnCreate() {
-        completeOnCreateCalled = true;
-
-        shortcutHelper = new ShortcutHelper(this);
-
-        UiHelper.setLocale(this);
-
-        // 初始化统计分析管理器
-        analyticsManager = AnalyticsManager.getInstance(this);
-        analyticsManager.logAppLaunch();
-
-        // 检查应用更新
-        UpdateManager.checkForUpdatesOnStartup(this);
-
-        // Bind to the computer manager service
-        bindService(new Intent(PcView.this, ComputerManagerService.class), serviceConnection,
-                Service.BIND_AUTO_CREATE);
-
-        pcGridAdapter = new PcGridAdapter(this, PreferenceConfiguration.readPreferences(this));
-
-        // 设置头像点击监听器
-        pcGridAdapter.setAvatarClickListener(this::handleAvatarClick);
-
-        SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        shakeDetector = new ShakeDetector(this);
-        shakeDetector.setSensitivity(ShakeDetector.SENSITIVITY_MEDIUM); // 设置中等灵敏度
-
-        // 注册背景图片刷新广播接收器
+    private void registerBackgroundReceiver() {
         backgroundImageRefreshReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if ("com.limelight.REFRESH_BACKGROUND_IMAGE".equals(intent.getAction())) {
-                    // 传入 false，表示这不是通过摇一摇触发的，不需要显示每日限制提示
                     refreshBackgroundImage(false);
                 }
             }
         };
+
         IntentFilter filter = new IntentFilter("com.limelight.REFRESH_BACKGROUND_IMAGE");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(backgroundImageRefreshReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             registerReceiver(backgroundImageRefreshReceiver, filter);
         }
-
-        initializeViews();
     }
 
+    private void unregisterBackgroundReceiver() {
+        if (backgroundImageRefreshReceiver != null) {
+            try {
+                unregisterReceiver(backgroundImageRefreshReceiver);
+            } catch (IllegalArgumentException e) {
+                LimeLog.warning("Failed to unregister background receiver: " + e.getMessage());
+            }
+        }
+    }
+
+    // Computer Manager Methods
+
     private void startComputerUpdates() {
-        // Only allow polling to start if we're bound to CMS, polling is not already running,
-        // and our activity is in the foreground.
         if (managerBinder != null && !runningPolling && inForeground) {
             freezeUpdates = false;
             managerBinder.startPolling(details -> {
                 if (!freezeUpdates) {
-                    PcView.this.runOnUiThread(() -> updateComputer(details));
-
-                    // Add a launcher shortcut for this PC (off the main thread to prevent ANRs)
+                    runOnUiThread(() -> updateComputer(details));
                     if (details.pairState == PairState.PAIRED) {
                         shortcutHelper.createAppViewShortcutForOnlineHost(details);
                     }
@@ -765,764 +771,118 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
     }
 
     private void stopComputerUpdates(boolean wait) {
-        if (managerBinder != null) {
-            if (!runningPolling) {
-                return;
-            }
+        if (managerBinder == null || !runningPolling) return;
 
-            freezeUpdates = true;
+        freezeUpdates = true;
+        managerBinder.stopPolling();
 
-            managerBinder.stopPolling();
-
-            if (wait) {
-                managerBinder.waitForPollingStopped();
-            }
-
-            runningPolling = false;
+        if (wait) {
+            managerBinder.waitForPollingStopped();
         }
+        runningPolling = false;
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-
-        if (easyTierController != null) {
-            easyTierController.onDestroy();
-        }
-
-        if (managerBinder != null) {
-            unbindService(serviceConnection);
-        }
-
-        // 关闭地址选择对话框
-        if (currentAddressDialog != null) {
-            currentAddressDialog.dismiss();
-            currentAddressDialog = null;
-        }
-
-        // 注销背景图片刷新广播接收器
-        if (backgroundImageRefreshReceiver != null) {
-            try {
-                unregisterReceiver(backgroundImageRefreshReceiver);
-            } catch (IllegalArgumentException e) {
-                LimeLog.warning("Failed to unregister background image refresh receiver: " + e.getMessage());
-            }
-        }
-
-        // 清理统计分析资源
-        if (analyticsManager != null) {
-            analyticsManager.cleanup();
-        }
-
-        // 清理防抖刷新 Handler
+    private void debouncedNotifyDataSetChanged() {
         if (pendingRefreshRunnable != null) {
             refreshHandler.removeCallbacks(pendingRefreshRunnable);
+        }
+
+        pendingRefreshRunnable = () -> {
+            pcGridAdapter.notifyDataSetChanged();
             pendingRefreshRunnable = null;
-        }
+        };
+
+        refreshHandler.postDelayed(pendingRefreshRunnable, REFRESH_DEBOUNCE_DELAY);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
+    private void updateComputer(ComputerDetails details) {
+        if (PcGridAdapter.ADD_COMPUTER_UUID.equals(details.uuid)) return;
 
-        // Display a decoder crash notification if we've returned after a crash
-        UiHelper.showDecoderCrashDialog(this);
+        ComputerObject existingEntry = findComputerByUuid(details.uuid);
 
-        inForeground = true;
-        startComputerUpdates();
-
-        // 开始记录使用时长
-        if (analyticsManager != null) {
-            analyticsManager.startUsageTracking();
-        }
-
-        if (shakeDetector != null) {
-            try {
-                shakeDetector.start((SensorManager) getSystemService(SENSOR_SERVICE));
-            } catch (SecurityException e) {
-                // Android 12+ 需要 HIGH_SAMPLING_RATE_SENSORS 权限
-                LimeLog.warning("shakeDetector start failed: " + e.getMessage());
-                // 不显示错误，静默失败即可
-            } catch (Exception e) {
-                LimeLog.warning("shakeDetector start failed: " + e.getMessage());
-            }
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-
-        inForeground = false;
-        stopComputerUpdates(false);
-
-        // 停止记录使用时长
-        if (analyticsManager != null) {
-            analyticsManager.stopUsageTracking();
-        }
-
-        if (shakeDetector != null) {
-            try {
-                shakeDetector.stop();
-            } catch (Exception e) {
-                LimeLog.warning("shakeDetector stop failed: " + e.getMessage());
-            }
-        }
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-
-        Dialog.closeDialogs();
-    }
-
-    @Override
-    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-        stopComputerUpdates(false);
-
-        // Call superclass
-        super.onCreateContextMenu(menu, v, menuInfo);
-
-        int position = -1;
-        if (menuInfo instanceof AdapterContextMenuInfo) {
-            position = ((AdapterContextMenuInfo) menuInfo).position;
-        } else if (v != null && v.getTag() instanceof Integer) {
-            position = (Integer) v.getTag();
-        }
-
-        if (position < 0) return;
-
-        ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(position);
-
-        // 添加卡片不显示上下文菜单
-        if (PcGridAdapter.isAddComputerCard(computer)) {
-            return;
-        }
-
-        // Add a header with PC status details
-        menu.clearHeader();
-        String headerTitle = computer.details.name + " - ";
-        switch (computer.details.state) {
-            case ONLINE:
-                headerTitle += getResources().getString(R.string.pcview_menu_header_online);
-                break;
-            case OFFLINE:
-                menu.setHeaderIcon(R.drawable.ic_pc_offline);
-                headerTitle += getResources().getString(R.string.pcview_menu_header_offline);
-                break;
-            case UNKNOWN:
-                headerTitle += getResources().getString(R.string.pcview_menu_header_unknown);
-                break;
-        }
-
-        menu.setHeaderTitle(headerTitle);
-
-        // Inflate the context menu
-        if (computer.details.state == ComputerDetails.State.OFFLINE ||
-                computer.details.state == ComputerDetails.State.UNKNOWN) {
-            menu.add(Menu.NONE, WOL_ID, 1, getResources().getString(R.string.pcview_menu_send_wol));
-        } else if (computer.details.pairState != PairState.PAIRED) {
-            menu.add(Menu.NONE, PAIR_ID, 1, getResources().getString(R.string.pcview_menu_pair_pc));
-            if (computer.details.nvidiaServer) {
-                menu.add(Menu.NONE, GAMESTREAM_EOL_ID, 2, getResources().getString(R.string.pcview_menu_eol));
-            }
+        if (existingEntry != null) {
+            existingEntry.details = details;
+            pcGridAdapter.resort();
         } else {
-            if (computer.details.runningGameId != 0) {
-                menu.add(Menu.NONE, RESUME_ID, 1, getResources().getString(R.string.applist_menu_resume));
-                menu.add(Menu.NONE, QUIT_ID, 2, getResources().getString(R.string.applist_menu_quit));
-            }
-
-            if (computer.details.nvidiaServer) {
-                menu.add(Menu.NONE, GAMESTREAM_EOL_ID, 3, getResources().getString(R.string.pcview_menu_eol));
-            }
-
-            menu.add(Menu.NONE, FULL_APP_LIST_ID, 4, getResources().getString(R.string.pcview_menu_app_list));
-            menu.add(Menu.NONE, SLEEP_ID, 8, getResources().getString(R.string.send_sleep_command));
+            addNewComputer(details);
         }
 
-        menu.add(Menu.NONE, TEST_NETWORK_ID, 5, getResources().getString(R.string.pcview_menu_test_network));
-        menu.add(Menu.NONE, IPERF3_TEST_ID, 6, getResources().getString(R.string.network_bandwidth_test));
-        menu.add(Menu.NONE, DELETE_ID, 6, getResources().getString(R.string.pcview_menu_delete_pc));
-        menu.add(Menu.NONE, VIEW_DETAILS_ID, 7, getResources().getString(R.string.pcview_menu_details));
+        debouncedNotifyDataSetChanged();
     }
 
-    @Override
-    public void onContextMenuClosed(Menu menu) {
-        // For some reason, this gets called again _after_ onPause() is called on this activity.
-        // startComputerUpdates() manages this and won't actual start polling until the activity
-        // returns to the foreground.
-        startComputerUpdates();
-    }
-
-    private void doPair(final ComputerDetails computer) {
-        if (computer.state == ComputerDetails.State.OFFLINE || computer.activeAddress == null) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.pair_pc_offline), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (managerBinder == null) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        Toast.makeText(PcView.this, getResources().getString(R.string.pairing), Toast.LENGTH_SHORT).show();
-        new Thread(() -> {
-            String message = null;
-            boolean success = false;
-
-            try {
-                // Stop updates and wait while pairing
-                stopComputerUpdates(true);
-
-                NvHTTP httpConn = new NvHTTP(
-                        ServerHelper.getCurrentAddressFromComputer(computer),
-                        computer.httpsPort,
-                        managerBinder.getUniqueId(),
-                        clientName,
-                        computer.serverCert,
-                        PlatformBinding.getCryptoProvider(PcView.this)
-                );
-
-                if (httpConn.getPairState() == PairState.PAIRED) {
-                    // Already paired, open the app list directly
-                    success = true;
-                } else {
-                    // Generate PIN and show pairing dialog
-                    final String pinStr = PairingManager.generatePinString();
-                    Dialog.displayDialog(
-                            PcView.this,
-                            getResources().getString(R.string.pair_pairing_title),
-                            getResources().getString(R.string.pair_pairing_msg) + " " + pinStr + "\n\n" +
-                                    getResources().getString(R.string.pair_pairing_help),
-                            false
-                    );
-
-                    PairingManager pm = httpConn.getPairingManager();
-                    PairResult pairResult = pm.pair(httpConn.getServerInfo(true), pinStr);
-                    PairState pairState = pairResult.state;
-
-                    switch (pairState) {
-                        case PIN_WRONG:
-                            message = getResources().getString(R.string.pair_incorrect_pin);
-                            break;
-                        case FAILED:
-                            message = computer.runningGameId != 0
-                                    ? getResources().getString(R.string.pair_pc_ingame)
-                                    : getResources().getString(R.string.pair_fail);
-                            break;
-                        case ALREADY_IN_PROGRESS:
-                            message = getResources().getString(R.string.pair_already_in_progress);
-                            break;
-                        case PAIRED:
-                            success = true;
-                            // Pin this certificate for later HTTPS use
-                            managerBinder.getComputer(computer.uuid).serverCert = pm.getPairedCert();
-
-                            // Save pair name using SharedPreferences
-                            SharedPreferences sharedPreferences = getSharedPreferences("pair_name_map", MODE_PRIVATE);
-                            sharedPreferences.edit().putString(computer.uuid, pairResult.pairName).apply();
-
-                            // Invalidate reachability information after pairing
-                            managerBinder.invalidateStateForComputer(computer.uuid);
-                            break;
-                    }
-                }
-            } catch (UnknownHostException e) {
-                message = getResources().getString(R.string.error_unknown_host);
-            } catch (FileNotFoundException e) {
-                message = getResources().getString(R.string.error_404);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // Restore interrupt status
-                message = getResources().getString(R.string.pair_fail);
-            } catch (XmlPullParserException | IOException e) {
-                e.printStackTrace();
-                message = e.getMessage();
-            } finally {
-                Dialog.closeDialogs();
-            }
-
-            final String toastMessage = message;
-            final boolean toastSuccess = success;
-            runOnUiThread(() -> {
-                if (toastMessage != null) {
-                    Toast.makeText(PcView.this, toastMessage, Toast.LENGTH_LONG).show();
-                }
-
-                if (toastSuccess) {
-                    // Open the app list after a successful pairing attempt
-                    doAppList(computer, true, false);
-                } else {
-                    // Start polling again if we're still in the foreground
-                    startComputerUpdates();
-                }
-            });
-        }).start();
-    }
-
-    private void doWakeOnLan(final ComputerDetails computer) {
-        if (computer.state == ComputerDetails.State.ONLINE) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.wol_pc_online), Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        if (computer.macAddress == null) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.wol_no_mac), Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        new Thread(() -> {
-            String message;
-            try {
-                WakeOnLanSender.sendWolPacket(computer);
-                message = getResources().getString(R.string.wol_waking_msg);
-            } catch (IOException e) {
-                message = getResources().getString(R.string.wol_fail);
-            }
-
-            final String toastMessage = message;
-            runOnUiThread(() -> Toast.makeText(PcView.this, toastMessage, Toast.LENGTH_LONG).show());
-        }).start();
-    }
-
-    private void doUnpair(final ComputerDetails computer) {
-        if (computer.state == ComputerDetails.State.OFFLINE || computer.activeAddress == null) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.error_pc_offline), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (managerBinder == null) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        Toast.makeText(PcView.this, getResources().getString(R.string.unpairing), Toast.LENGTH_SHORT).show();
-        new Thread(() -> {
-            String message;
-            try {
-                NvHTTP httpConn = new NvHTTP(ServerHelper.getCurrentAddressFromComputer(computer),
-                        computer.httpsPort, managerBinder.getUniqueId(), clientName, computer.serverCert,
-                        PlatformBinding.getCryptoProvider(PcView.this));
-
-                PairState pairState = httpConn.getPairState();
-                if (pairState == PairState.PAIRED) {
-                    httpConn.unpair();
-                    message = httpConn.getPairState() == PairState.NOT_PAIRED
-                            ? getResources().getString(R.string.unpair_success)
-                            : getResources().getString(R.string.unpair_fail);
-                } else {
-                    message = getResources().getString(R.string.unpair_error);
-                }
-            } catch (UnknownHostException e) {
-                message = getResources().getString(R.string.error_unknown_host);
-            } catch (FileNotFoundException e) {
-                message = getResources().getString(R.string.error_404);
-            } catch (XmlPullParserException | IOException e) {
-                message = e.getMessage();
-                e.printStackTrace();
-            } catch (InterruptedException e) {
-                // Thread was interrupted during unpair
-                message = getResources().getString(R.string.error_interrupted);
-            }
-
-            final String toastMessage = message;
-            runOnUiThread(() -> Toast.makeText(PcView.this, toastMessage, Toast.LENGTH_LONG).show());
-        }).start();
-    }
-
-    private void doAppList(ComputerDetails computer, boolean newlyPaired, boolean showHiddenGames) {
-        if (computer.state == ComputerDetails.State.OFFLINE) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.error_pc_offline), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (managerBinder == null) {
-            Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        Intent i = new Intent(this, AppView.class);
-        i.putExtra(AppView.NAME_EXTRA, computer.name);
-        i.putExtra(AppView.UUID_EXTRA, computer.uuid);
-        i.putExtra(AppView.NEW_PAIR_EXTRA, newlyPaired);
-        i.putExtra(AppView.SHOW_HIDDEN_APPS_EXTRA, showHiddenGames);
-
-        // 如果activeAddress与默认地址不同，说明用户选择了特定地址，需要传递这个信息
-        if (computer.activeAddress != null) {
-            i.putExtra(AppView.SELECTED_ADDRESS_EXTRA, computer.activeAddress.address);
-            i.putExtra(AppView.SELECTED_PORT_EXTRA, computer.activeAddress.port);
-        }
-
-        startActivity(i);
-    }
-
-    /**
-     * 显示地址选择对话框
-     */
-    private void showAddressSelectionDialog(ComputerDetails computer) {
-        AddressSelectionDialog dialog = new AddressSelectionDialog(this, computer, address -> {
-            // 使用选中的地址创建临时ComputerDetails对象
-            ComputerDetails tempComputer = new ComputerDetails(computer);
-            tempComputer.activeAddress = address;
-
-            // 使用选中的地址进入应用列表
-            doAppList(tempComputer, false, false);
-        });
-
-        dialog.show();
-    }
-
-    /**
-     * 处理头像点击事件
-     * 当PC状态稳定后，优先启动正在串流的app，否则启动第一个app
-     * 当PC未就绪时，显示context menu
-     */
-    private void handleAvatarClick(ComputerDetails computer, View itemView) {
-        // 检查PC状态是否稳定（ONLINE + PAIRED）
-        if (computer.state != ComputerDetails.State.ONLINE ||
-                computer.pairState != PairState.PAIRED) {
-            openContextMenu(itemView);
-            return;
-        }
-
-        if (managerBinder == null) {
-            Toast.makeText(this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        new Thread(() -> {
-            // 优先检查正在运行的游戏，否则使用第一个APP
-            NvApp targetApp = computer.runningGameId != 0
-                    ? getNvAppById(computer.runningGameId, computer.uuid)
-                    : null;
-            
-            if (targetApp == null) {
-                targetApp = getFirstAppFromCache(computer.uuid);
-            }
-            
-            if (targetApp == null) {
-                fallbackToAppList(computer);
-                return;
-            }
-
-            ComputerDetails targetComputer = prepareComputerWithAddress(computer);
-            if (targetComputer == null) {
-                runOnUiThread(() ->
-                        Toast.makeText(this, getResources().getString(R.string.error_pc_offline), Toast.LENGTH_SHORT).show()
-                );
-                return;
-            }
-
-            if (targetComputer.hasMultipleLanAddresses()) {
-                runOnUiThread(() -> showAddressSelectionDialog(targetComputer));
-                return;
-            }
-
-            final NvApp appToStart = targetApp;
-            runOnUiThread(() -> ServerHelper.doStart(this, appToStart, targetComputer, managerBinder));
-        }).start();
-    }
-
-    /**
-     * 从缓存中读取并解析应用列表
-     *
-     * @param uuid PC的UUID
-     * @return 应用列表，如果读取失败或为空则返回null
-     */
-    private List<NvApp> getAppListFromCache(String uuid) {
-        try {
-            String rawAppList = CacheHelper.readInputStreamToString(
-                    CacheHelper.openCacheFileForInput(getCacheDir(), "applist", uuid));
-
-            if (rawAppList.isEmpty()) {
-                return null;
-            }
-
-            return NvHTTP.getAppListByReader(new StringReader(rawAppList));
-        } catch (IOException | XmlPullParserException e) {
-            LimeLog.warning("Failed to read app list from cache: " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * 从缓存中获取第一个应用
-     *
-     * @param uuid PC的UUID
-     * @return 第一个NvApp对象，如果读取失败或列表为空则返回null
-     */
-    private NvApp getFirstAppFromCache(String uuid) {
-        List<NvApp> appList = getAppListFromCache(uuid);
-        return (appList != null && !appList.isEmpty()) ? appList.get(0) : null;
-    }
-
-    private ComputerDetails prepareComputerWithAddress(ComputerDetails computer) {
-        ComputerDetails tempComputer = new ComputerDetails(computer);
-        if (tempComputer.activeAddress == null) {
-            ComputerDetails.AddressTuple bestAddress = tempComputer.selectBestAddress();
-            if (bestAddress == null) {
-                return null;
-            }
-            tempComputer.activeAddress = bestAddress;
-        }
-        return tempComputer;
-    }
-
-    private void fallbackToAppList(ComputerDetails computer) {
-        runOnUiThread(() -> {
-            ComputerDetails targetComputer = prepareComputerWithAddress(computer);
-            doAppList(targetComputer != null ? targetComputer : computer, false, false);
-        });
-    }
-
-    @Override
-    public boolean onContextItemSelected(MenuItem item) {
-        int position = -1;
-        ContextMenuInfo menuInfo = item.getMenuInfo();
-        if (menuInfo instanceof AdapterContextMenuInfo) {
-            position = ((AdapterContextMenuInfo) menuInfo).position;
-        }
-
-        if (position < 0) {
-            position = -1;
-        }
-
-        if (position < 0) return super.onContextItemSelected(item);
-
-        final ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(position);
-
-        // 添加卡片不显示上下文菜单
-        if (PcGridAdapter.isAddComputerCard(computer)) {
-            return super.onContextItemSelected(item);
-        }
-        switch (item.getItemId()) {
-            case PAIR_ID:
-                doPair(computer.details);
-                return true;
-
-            case UNPAIR_ID:
-                doUnpair(computer.details);
-                return true;
-
-            case WOL_ID:
-                doWakeOnLan(computer.details);
-                return true;
-
-            case DELETE_ID:
-                if (ActivityManager.isUserAMonkey()) {
-                    LimeLog.info("Ignoring delete PC request from monkey");
-                    return true;
-                }
-                UiHelper.displayDeletePcConfirmationDialog(this, computer.details, () -> {
-                    if (managerBinder == null) {
-                        Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    removeComputer(computer.details);
-                }, null);
-                return true;
-
-            case FULL_APP_LIST_ID:
-                doAppList(computer.details, false, true);
-                return true;
-
-            case RESUME_ID:
-                if (managerBinder == null) {
-                    Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-                    return true;
-                }
-
-                // 尝试获取完整的NvApp对象（包括cmdList）
-                NvApp actualApp = getNvAppById(computer.details.runningGameId, computer.details.uuid);
-                if (actualApp != null) {
-                    ServerHelper.doStart(this, actualApp, computer.details, managerBinder);
-                } else {
-                    // 如果找不到完整的应用信息，使用基本的NvApp对象作为备用
-                    ServerHelper.doStart(this, new NvApp("app", computer.details.runningGameId, false), computer.details, managerBinder);
-                }
-                return true;
-
-            case QUIT_ID:
-                if (managerBinder == null) {
-                    Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-                    return true;
-                }
-
-                // Display a confirmation dialog first
-                UiHelper.displayQuitConfirmationDialog(this, () -> ServerHelper.doQuit(PcView.this, computer.details,
-                        new NvApp("app", 0, false), managerBinder, null), null);
-                return true;
-
-            case SLEEP_ID:
-                if (managerBinder == null) {
-                    Toast.makeText(PcView.this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-                    return true;
-                }
-
-                ServerHelper.pcSleep(PcView.this, computer.details, managerBinder, null);
-                return true;
-
-            case VIEW_DETAILS_ID:
-                Dialog.displayDetailsDialog(PcView.this, getResources().getString(R.string.title_details), computer.details.toString(), false);
-                return true;
-
-            case TEST_NETWORK_ID:
-                ServerHelper.doNetworkTest(PcView.this);
-                return true;
-
-            case IPERF3_TEST_ID:
-                try {
-                    // 1. 直接在UI线程获取地址对象 (因为此操作不耗时)
-                    ComputerDetails.AddressTuple addressTuple = ServerHelper.getCurrentAddressFromComputer(computer.details);
-
-                    // 2. 从对象中提取IP地址字符串
-                    String currentIp = addressTuple.address;
-
-                    // 3. 直接创建并显示对话框
-                    new Iperf3Tester(PcView.this, currentIp).show();
-
-                } catch (IOException e) {
-                    // 捕获因 activeAddress 为 null 导致的异常
-                    e.printStackTrace();
-                    Toast.makeText(this, getResources().getString(R.string.unable_to_get_pc_address, e.getMessage()), Toast.LENGTH_LONG).show();
-                }
-                return true;
-
-            case GAMESTREAM_EOL_ID:
-                HelpLauncher.launchGameStreamEolFaq(PcView.this);
-                return true;
-
-            default:
-                return super.onContextItemSelected(item);
-        }
-    }
-
-    /**
-     * 一键恢复上一次会话
-     * 持续查找主机直到找到有运行游戏的主机为止
-     */
-    private void restoreLastSession() {
-        if (managerBinder == null) {
-            Toast.makeText(this, getResources().getString(R.string.error_manager_not_running), Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        // 持续查找有运行游戏的在线主机（使用原始列表，查找所有主机）
-        ComputerDetails targetComputer = null;
+    private ComputerObject findComputerByUuid(String uuid) {
         for (int i = 0; i < pcGridAdapter.getRawCount(); i++) {
             ComputerObject computer = pcGridAdapter.getRawItem(i);
-            if (computer.details.state == ComputerDetails.State.ONLINE &&
-                    computer.details.pairState == PairState.PAIRED &&
-                    computer.details.runningGameId != 0) {
-                targetComputer = computer.details;
-                break; // 找到有运行游戏的主机就停止查找
+            if (!PcGridAdapter.isAddComputerCard(computer) && uuid != null && uuid.equals(computer.details.uuid)) {
+                return computer;
             }
         }
-
-        if (targetComputer == null) {
-            Toast.makeText(this, getResources().getString(R.string.no_online_computer_with_running_game), Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // 恢复会话
-        NvApp actualApp = getNvAppById(targetComputer.runningGameId, targetComputer.uuid);
-        if (actualApp != null) {
-            Toast.makeText(this, getResources().getString(R.string.restoring_session, targetComputer.name), Toast.LENGTH_SHORT).show();
-            ServerHelper.doStart(this, actualApp, targetComputer, managerBinder);
-        } else {
-            // 使用基本的NvApp对象作为备用
-            Toast.makeText(this, getResources().getString(R.string.restoring_session, targetComputer.name), Toast.LENGTH_SHORT).show();
-            ServerHelper.doStart(this, new NvApp("app", targetComputer.runningGameId, false), targetComputer, managerBinder);
-        }
+        return null;
     }
 
-    /**
-     * 根据应用ID获取完整的NvApp对象（包括cmdList）
-     *
-     * @param appId      应用ID
-     * @param uuidString PC的UUID
-     * @return 完整的NvApp对象，如果找不到则返回null
-     */
-    private NvApp getNvAppById(int appId, String uuidString) {
-        // 首先尝试从缓存的应用列表中获取
-        List<NvApp> appList = getAppListFromCache(uuidString);
-        if (appList != null) {
-            for (NvApp app : appList) {
-                if (app.getAppId() == appId) {
-                    // 保存这个应用信息到SharedPreferences，供下次使用
-                    AppCacheManager cacheManager = new AppCacheManager(this);
-                    cacheManager.saveAppInfo(uuidString, app);
-                    return app;
-                }
-            }
+    private void addNewComputer(ComputerDetails details) {
+        ComputerObject newComputer = new ComputerObject(details);
+        pcGridAdapter.addComputer(newComputer);
+
+        boolean isUnpaired = details.state == ComputerDetails.State.ONLINE
+                && details.pairState == PairState.NOT_PAIRED;
+
+        if (isUnpaired && !pcGridAdapter.isShowUnpairedDevices()) {
+            pcGridAdapter.setShowUnpairedDevices(true);
+            updateToggleUnpairedButtonIcon(findViewById(R.id.toggleUnpairedButton));
+            showToast(getString(R.string.new_unpaired_device_shown));
         }
 
-        // 如果在应用列表中找不到，尝试从SharedPreferences获取
-        AppCacheManager cacheManager = new AppCacheManager(this);
-        return cacheManager.getAppInfo(uuidString, appId);
+        noPcFoundLayout.setVisibility(View.INVISIBLE);
+
+        if (pcListView != null && !isFirstLoad) {
+            pcListView.scheduleLayoutAnimation();
+        }
     }
 
     private void removeComputer(ComputerDetails details) {
-        // 不允许删除添加卡片
-        if (PcGridAdapter.ADD_COMPUTER_UUID.equals(details.uuid)) {
-            return;
-        }
+        if (PcGridAdapter.ADD_COMPUTER_UUID.equals(details.uuid)) return;
 
         managerBinder.removeComputer(details);
-
         new DiskAssetLoader(this).deleteAssetsForComputer(details.uuid);
 
-        // Delete hidden games preference value
         getSharedPreferences(AppView.HIDDEN_APPS_PREF_FILENAME, MODE_PRIVATE)
                 .edit()
                 .remove(details.uuid)
                 .apply();
 
-        // 使用原始列表查找要删除的电脑（不管是否隐藏）
         for (int i = 0; i < pcGridAdapter.getRawCount(); i++) {
             ComputerObject computer = pcGridAdapter.getRawItem(i);
-
-            // 跳过添加卡片
-            if (PcGridAdapter.isAddComputerCard(computer)) {
-                continue;
-            }
-
-            if (details.equals(computer.details)) {
-                // Disable or delete shortcuts referencing this PC
-                shortcutHelper.disableComputerShortcut(details,
-                        getResources().getString(R.string.scut_deleted_pc));
-
+            if (!PcGridAdapter.isAddComputerCard(computer) && details.equals(computer.details)) {
+                shortcutHelper.disableComputerShortcut(details, getString(R.string.scut_deleted_pc));
                 pcGridAdapter.removeComputer(computer);
                 pcGridAdapter.notifyDataSetChanged();
 
-                // 检查是否只剩下添加卡片（使用原始列表）
-                int realCount = 0;
-                for (int j = 0; j < pcGridAdapter.getRawCount(); j++) {
-                    if (!PcGridAdapter.isAddComputerCard(pcGridAdapter.getRawItem(j))) {
-                        realCount++;
-                    }
-                }
-                if (realCount == 0) {
-                    // Show the "Discovery in progress" view
+                if (countRealComputers() == 0) {
                     noPcFoundLayout.setVisibility(View.VISIBLE);
                 }
-
                 break;
             }
         }
     }
 
-    /**
-     * 创建并添加"添加电脑"卡片
-     */
-    private void addAddComputerCard() {
-        // 检查是否已经存在添加卡片（使用原始列表，避免过滤问题）
+    private int countRealComputers() {
+        int count = 0;
         for (int i = 0; i < pcGridAdapter.getRawCount(); i++) {
-            ComputerObject computer = pcGridAdapter.getRawItem(i);
-            if (PcGridAdapter.isAddComputerCard(computer)) {
-                // 已经存在，不需要重复添加
+            if (!PcGridAdapter.isAddComputerCard(pcGridAdapter.getRawItem(i))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void addAddComputerCard() {
+        for (int i = 0; i < pcGridAdapter.getRawCount(); i++) {
+            if (PcGridAdapter.isAddComputerCard(pcGridAdapter.getRawItem(i))) {
                 return;
             }
         }
 
-        // 创建添加卡片
         ComputerDetails addDetails = new ComputerDetails();
         addDetails.uuid = PcGridAdapter.ADD_COMPUTER_UUID;
         try {
@@ -1535,94 +895,693 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         pcGridAdapter.addComputer(new ComputerObject(addDetails));
         pcGridAdapter.notifyDataSetChanged();
 
-        // 移除"未找到PC"视图
         if (noPcFoundLayout != null) {
             noPcFoundLayout.setVisibility(View.INVISIBLE);
         }
     }
 
-    /**
-     * 防抖刷新：合并短时间内的多次刷新请求
-     */
-    private void debouncedNotifyDataSetChanged() {
-        // 取消之前的刷新请求
-        if (pendingRefreshRunnable != null) {
-            refreshHandler.removeCallbacks(pendingRefreshRunnable);
-        }
+    // Toggle Unpaired Button
 
-        // 创建新的刷新请求
-        pendingRefreshRunnable = () -> {
-            pcGridAdapter.notifyDataSetChanged();
-            pendingRefreshRunnable = null;
-        };
-
-        // 延迟执行刷新
-        refreshHandler.postDelayed(pendingRefreshRunnable, REFRESH_DEBOUNCE_DELAY);
+    private void toggleUnpairedDevices(ImageButton button) {
+        boolean newState = !pcGridAdapter.isShowUnpairedDevices();
+        pcGridAdapter.setShowUnpairedDevices(newState);
+        updateToggleUnpairedButtonIcon(button);
+        showToast(newState ? getString(R.string.unpaired_devices_shown) : getString(R.string.unpaired_devices_hidden));
     }
 
-    private void updateComputer(ComputerDetails details) {
-        // 忽略添加卡片
-        if (PcGridAdapter.ADD_COMPUTER_UUID.equals(details.uuid)) {
+    private void updateToggleUnpairedButtonIcon(ImageButton button) {
+        if (button == null || pcGridAdapter == null) return;
+        button.setImageResource(pcGridAdapter.isShowUnpairedDevices()
+                ? R.drawable.ic_visibility
+                : R.drawable.ic_visibility_off);
+    }
+
+    // Scene Configuration Methods
+
+    private void initSceneButtons() {
+        try {
+            int[] sceneButtonIds = {R.id.scene1Btn, R.id.scene2Btn, R.id.scene3Btn, R.id.scene4Btn, R.id.scene5Btn};
+
+            for (int i = 0; i < sceneButtonIds.length; i++) {
+                final int sceneNumber = i + 1;
+                ImageButton btn = findViewById(sceneButtonIds[i]);
+
+                if (btn == null) {
+                    LimeLog.warning("Scene button " + sceneNumber + " not found!");
+                    continue;
+                }
+
+                btn.setOnClickListener(v -> applySceneConfiguration(sceneNumber));
+                btn.setOnLongClickListener(v -> {
+                    showSaveConfirmationDialog(sceneNumber);
+                    return true;
+                });
+            }
+        } catch (Exception e) {
+            LimeLog.warning("Scene init failed: " + e);
+        }
+    }
+
+    @SuppressLint("DefaultLocale")
+    private void applySceneConfiguration(int sceneNumber) {
+        try {
+            SharedPreferences prefs = getSharedPreferences(SCENE_PREF_NAME, MODE_PRIVATE);
+            String configJson = prefs.getString(SCENE_KEY_PREFIX + sceneNumber, null);
+
+            if (configJson == null) {
+                showToast(getString(R.string.scene_not_configured, sceneNumber));
+                return;
+            }
+
+            JSONObject config = new JSONObject(configJson);
+            PreferenceConfiguration configPrefs = PreferenceConfiguration.readPreferences(this).copy();
+
+            configPrefs.width = config.optInt("width", 1920);
+            configPrefs.height = config.optInt("height", 1080);
+            configPrefs.fps = config.optInt("fps", 60);
+            configPrefs.bitrate = config.optInt("bitrate", 10000);
+            configPrefs.videoFormat = PreferenceConfiguration.FormatOption.valueOf(config.optString("videoFormat", "auto"));
+            configPrefs.enableHdr = config.optBoolean("enableHdr", false);
+            configPrefs.enablePerfOverlay = config.optBoolean("enablePerfOverlay", false);
+
+            if (!configPrefs.writePreferences(this)) {
+                showToast(getString(R.string.config_save_failed));
+                return;
+            }
+
+            pcGridAdapter.updateLayoutWithPreferences(this, configPrefs);
+            showToast(getString(R.string.scene_config_applied, sceneNumber, configPrefs.width, configPrefs.height,
+                    configPrefs.fps, configPrefs.bitrate / 1000.0, configPrefs.videoFormat.toString(),
+                    configPrefs.enableHdr ? "On" : "Off"));
+
+        } catch (Exception e) {
+            LimeLog.warning("Scene apply failed: " + e);
+            showToast(getString(R.string.config_apply_failed));
+        }
+    }
+
+    private void showSaveConfirmationDialog(int sceneNumber) {
+        new AlertDialog.Builder(this, R.style.AppDialogStyle)
+                .setTitle(getString(R.string.save_to_scene, sceneNumber))
+                .setMessage(getString(R.string.overwrite_current_config))
+                .setPositiveButton(R.string.dialog_button_save, (d, w) -> saveCurrentConfiguration(sceneNumber))
+                .setNegativeButton(R.string.dialog_button_cancel, null)
+                .show();
+    }
+
+    private void saveCurrentConfiguration(int sceneNumber) {
+        try {
+            PreferenceConfiguration prefs = PreferenceConfiguration.readPreferences(this);
+            JSONObject config = new JSONObject();
+            config.put("width", prefs.width);
+            config.put("height", prefs.height);
+            config.put("fps", prefs.fps);
+            config.put("bitrate", prefs.bitrate);
+            config.put("videoFormat", prefs.videoFormat.toString());
+            config.put("enableHdr", prefs.enableHdr);
+            config.put("enablePerfOverlay", prefs.enablePerfOverlay);
+
+            getSharedPreferences(SCENE_PREF_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString(SCENE_KEY_PREFIX + sceneNumber, config.toString())
+                    .apply();
+
+            showToast(getString(R.string.scene_saved_successfully, sceneNumber));
+        } catch (JSONException e) {
+            showToast(getString(R.string.config_save_failed));
+        }
+    }
+
+    // PC Actions
+
+    private void doPair(ComputerDetails computer) {
+        if (computer.state == ComputerDetails.State.OFFLINE || computer.activeAddress == null) {
+            showToast(getString(R.string.pair_pc_offline));
+            return;
+        }
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
             return;
         }
 
-        ComputerObject existingEntry = null;
+        showToast(getString(R.string.pairing));
+        new Thread(() -> {
+            String message = null;
+            boolean success = false;
 
-        // 使用原始列表查找，避免过滤导致的重复添加问题
-        for (int i = 0; i < pcGridAdapter.getRawCount(); i++) {
-            ComputerObject computer = pcGridAdapter.getRawItem(i);
+            try {
+                stopComputerUpdates(true);
 
-            // 跳过添加卡片
-            if (PcGridAdapter.isAddComputerCard(computer)) {
-                continue;
+                NvHTTP httpConn = new NvHTTP(
+                        ServerHelper.getCurrentAddressFromComputer(computer),
+                        computer.httpsPort,
+                        managerBinder.getUniqueId(),
+                        clientName,
+                        computer.serverCert,
+                        PlatformBinding.getCryptoProvider(this)
+                );
+
+                if (httpConn.getPairState() == PairState.PAIRED) {
+                    success = true;
+                } else {
+                    String pinStr = PairingManager.generatePinString();
+                    Dialog.displayDialog(this,
+                            getString(R.string.pair_pairing_title),
+                            getString(R.string.pair_pairing_msg) + " " + pinStr + "\n\n" + getString(R.string.pair_pairing_help),
+                            false);
+
+                    PairingManager pm = httpConn.getPairingManager();
+                    PairResult result = pm.pair(httpConn.getServerInfo(true), pinStr);
+
+                    switch (result.state) {
+                        case PIN_WRONG:
+                            message = getString(R.string.pair_incorrect_pin);
+                            break;
+                        case FAILED:
+                            message = computer.runningGameId != 0 ? getString(R.string.pair_pc_ingame) : getString(R.string.pair_fail);
+                            break;
+                        case ALREADY_IN_PROGRESS:
+                            message = getString(R.string.pair_already_in_progress);
+                            break;
+                        case PAIRED:
+                            success = true;
+                            managerBinder.getComputer(computer.uuid).serverCert = pm.getPairedCert();
+                            getSharedPreferences("pair_name_map", MODE_PRIVATE)
+                                    .edit()
+                                    .putString(computer.uuid, result.pairName)
+                                    .apply();
+                            managerBinder.invalidateStateForComputer(computer.uuid);
+                            break;
+                    }
+                }
+            } catch (UnknownHostException e) {
+                message = getString(R.string.error_unknown_host);
+            } catch (FileNotFoundException e) {
+                message = getString(R.string.error_404);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                message = getString(R.string.pair_fail);
+            } catch (XmlPullParserException | IOException e) {
+                message = e.getMessage();
+            } finally {
+                Dialog.closeDialogs();
             }
 
-            // Check if this is the same computer
-            if (details.uuid != null && details.uuid.equals(computer.details.uuid)) {
-                existingEntry = computer;
+            String finalMessage = message;
+            boolean finalSuccess = success;
+            runOnUiThread(() -> {
+                if (finalMessage != null) {
+                    showToast(finalMessage);
+                }
+                if (finalSuccess) {
+                    doAppList(computer, true, false);
+                } else {
+                    startComputerUpdates();
+                }
+            });
+        }).start();
+    }
+
+    private void doWakeOnLan(ComputerDetails computer) {
+        if (computer.state == ComputerDetails.State.ONLINE) {
+            showToast(getString(R.string.wol_pc_online));
+            return;
+        }
+        if (computer.macAddress == null) {
+            showToast(getString(R.string.wol_no_mac));
+            return;
+        }
+
+        new Thread(() -> {
+            String message;
+            try {
+                WakeOnLanSender.sendWolPacket(computer);
+                message = getString(R.string.wol_waking_msg);
+            } catch (IOException e) {
+                message = getString(R.string.wol_fail);
+            }
+            String finalMessage = message;
+            runOnUiThread(() -> showToast(finalMessage));
+        }).start();
+    }
+
+    private void doUnpair(ComputerDetails computer) {
+        if (computer.state == ComputerDetails.State.OFFLINE || computer.activeAddress == null) {
+            showToast(getString(R.string.error_pc_offline));
+            return;
+        }
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+
+        showToast(getString(R.string.unpairing));
+        new Thread(() -> {
+            String message;
+            try {
+                NvHTTP httpConn = new NvHTTP(
+                        ServerHelper.getCurrentAddressFromComputer(computer),
+                        computer.httpsPort,
+                        managerBinder.getUniqueId(),
+                        clientName,
+                        computer.serverCert,
+                        PlatformBinding.getCryptoProvider(this)
+                );
+
+                if (httpConn.getPairState() == PairState.PAIRED) {
+                    httpConn.unpair();
+                    message = httpConn.getPairState() == PairState.NOT_PAIRED
+                            ? getString(R.string.unpair_success)
+                            : getString(R.string.unpair_fail);
+                } else {
+                    message = getString(R.string.unpair_error);
+                }
+            } catch (UnknownHostException e) {
+                message = getString(R.string.error_unknown_host);
+            } catch (FileNotFoundException e) {
+                message = getString(R.string.error_404);
+            } catch (XmlPullParserException | IOException e) {
+                message = e.getMessage();
+            } catch (InterruptedException e) {
+                message = getString(R.string.error_interrupted);
+            }
+
+            String finalMessage = message;
+            runOnUiThread(() -> showToast(finalMessage));
+        }).start();
+    }
+
+    private void doAppList(ComputerDetails computer, boolean newlyPaired, boolean showHiddenGames) {
+        if (computer.state == ComputerDetails.State.OFFLINE) {
+            showToast(getString(R.string.error_pc_offline));
+            return;
+        }
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+
+        Intent i = new Intent(this, AppView.class);
+        i.putExtra(AppView.NAME_EXTRA, computer.name);
+        i.putExtra(AppView.UUID_EXTRA, computer.uuid);
+        i.putExtra(AppView.NEW_PAIR_EXTRA, newlyPaired);
+        i.putExtra(AppView.SHOW_HIDDEN_APPS_EXTRA, showHiddenGames);
+
+        if (computer.activeAddress != null) {
+            i.putExtra(AppView.SELECTED_ADDRESS_EXTRA, computer.activeAddress.address);
+            i.putExtra(AppView.SELECTED_PORT_EXTRA, computer.activeAddress.port);
+        }
+
+        startActivity(i);
+    }
+
+    private void doSecondaryScreenStream(ComputerDetails computer) {
+        if (computer.state == ComputerDetails.State.OFFLINE || computer.activeAddress == null) {
+            showToast(getString(R.string.error_pc_offline));
+            return;
+        }
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+
+        computer.useVdd = true;
+        quickStartStreamWithScreenMode(computer, null, true, 1);
+    }
+
+    // Quick Start Stream Methods
+
+    private void handleAvatarClick(ComputerDetails computer, View itemView) {
+        quickStartStream(computer, itemView, false);
+    }
+
+    private void quickStartStream(ComputerDetails computer, View itemView, boolean isSecondaryScreen) {
+        if (computer.state != ComputerDetails.State.ONLINE || computer.pairState != PairState.PAIRED) {
+            if (itemView != null) {
+                openContextMenu(itemView);
+            }
+            return;
+        }
+
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+
+        new Thread(() -> {
+            NvApp targetApp = computer.runningGameId != 0
+                    ? getNvAppById(computer.runningGameId, computer.uuid)
+                    : getFirstAppFromCache(computer.uuid);
+
+            if (targetApp == null) {
+                fallbackToAppList(computer);
+                return;
+            }
+
+            ComputerDetails targetComputer = prepareComputerWithAddress(computer);
+            if (targetComputer == null) {
+                runOnUiThread(() -> showToast(getString(R.string.error_pc_offline)));
+                return;
+            }
+
+            if (targetComputer.hasMultipleLanAddresses()) {
+                runOnUiThread(() -> showAddressSelectionDialog(targetComputer));
+                return;
+            }
+
+            NvApp appToStart = targetApp;
+            runOnUiThread(() -> ServerHelper.doStart(this, appToStart, targetComputer, managerBinder));
+        }).start();
+    }
+
+    private void quickStartStreamWithScreenMode(ComputerDetails computer, View itemView, boolean isSecondaryScreen, int screenMode) {
+        if (computer.state != ComputerDetails.State.ONLINE || computer.pairState != PairState.PAIRED) {
+            if (itemView != null) {
+                openContextMenu(itemView);
+            }
+            return;
+        }
+
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+
+        new Thread(() -> {
+            NvApp targetApp = computer.runningGameId != 0
+                    ? getNvAppById(computer.runningGameId, computer.uuid)
+                    : getFirstAppFromCache(computer.uuid);
+
+            if (targetApp == null) {
+                fallbackToAppList(computer);
+                return;
+            }
+
+            ComputerDetails targetComputer = prepareComputerWithAddress(computer);
+            if (targetComputer == null) {
+                runOnUiThread(() -> showToast(getString(R.string.error_pc_offline)));
+                return;
+            }
+
+            if (targetComputer.hasMultipleLanAddresses()) {
+                runOnUiThread(() -> showAddressSelectionDialog(targetComputer));
+                return;
+            }
+
+            runOnUiThread(() -> {
+                Intent intent = ServerHelper.createStartIntent(this, targetApp, targetComputer, managerBinder, null, screenMode);
+                startActivity(intent);
+            });
+        }).start();
+    }
+
+    private ComputerDetails prepareComputerWithAddress(ComputerDetails computer) {
+        ComputerDetails temp = new ComputerDetails(computer);
+        if (temp.activeAddress == null) {
+            ComputerDetails.AddressTuple best = temp.selectBestAddress();
+            if (best == null) return null;
+            temp.activeAddress = best;
+        }
+        return temp;
+    }
+
+    private void fallbackToAppList(ComputerDetails computer) {
+        runOnUiThread(() -> {
+            ComputerDetails target = prepareComputerWithAddress(computer);
+            doAppList(target != null ? target : computer, false, false);
+        });
+    }
+
+    // App Cache Methods
+
+    private List<NvApp> getAppListFromCache(String uuid) {
+        try {
+            String rawAppList = CacheHelper.readInputStreamToString(
+                    CacheHelper.openCacheFileForInput(getCacheDir(), "applist", uuid));
+            return rawAppList.isEmpty() ? null : NvHTTP.getAppListByReader(new StringReader(rawAppList));
+        } catch (IOException | XmlPullParserException e) {
+            LimeLog.warning("Failed to read app list from cache: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private NvApp getFirstAppFromCache(String uuid) {
+        List<NvApp> appList = getAppListFromCache(uuid);
+        return (appList != null && !appList.isEmpty()) ? appList.get(0) : null;
+    }
+
+    private NvApp getNvAppById(int appId, String uuid) {
+        List<NvApp> appList = getAppListFromCache(uuid);
+        if (appList != null) {
+            for (NvApp app : appList) {
+                if (app.getAppId() == appId) {
+                    new AppCacheManager(this).saveAppInfo(uuid, app);
+                    return app;
+                }
+            }
+        }
+        return new AppCacheManager(this).getAppInfo(uuid, appId);
+    }
+
+    private void restoreLastSession() {
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+
+        ComputerDetails target = null;
+        for (int i = 0; i < pcGridAdapter.getRawCount(); i++) {
+            ComputerObject computer = pcGridAdapter.getRawItem(i);
+            if (computer.details.state == ComputerDetails.State.ONLINE
+                    && computer.details.pairState == PairState.PAIRED
+                    && computer.details.runningGameId != 0) {
+                target = computer.details;
                 break;
             }
         }
 
-        if (existingEntry != null) {
-            // Replace the information in the existing entry
-            existingEntry.details = details;
-            // 重新排序，因为状态可能改变（如从未配对变为已配对）
-            pcGridAdapter.resort();
-        } else {
-            // Add a new entry
-            ComputerObject newComputer = new ComputerObject(details);
-            pcGridAdapter.addComputer(newComputer);
-
-            // 检查新添加的设备是否是未配对的
-            boolean isUnpaired = details.state == ComputerDetails.State.ONLINE
-                    && details.pairState == PairingManager.PairState.NOT_PAIRED;
-
-            // 如果当前隐藏了未配对设备，且新设备是未配对的，自动显示未配对设备
-            if (isUnpaired && !pcGridAdapter.isShowUnpairedDevices()) {
-                pcGridAdapter.setShowUnpairedDevices(true);
-
-                // 更新按钮图标
-                ImageButton toggleUnpairedButton = findViewById(R.id.toggleUnpairedButton);
-                if (toggleUnpairedButton != null) {
-                    updateToggleUnpairedButtonIcon(toggleUnpairedButton);
-                }
-
-                // 显示提示信息
-                Toast.makeText(this, getString(R.string.new_unpaired_device_shown), Toast.LENGTH_LONG).show();
-            }
-
-            // Remove the "Discovery in progress" view
-            noPcFoundLayout.setVisibility(View.INVISIBLE);
-            // 添加新条目时触发动画（但第一次加载时不触发，避免重复）
-            if (pcListView != null && !isFirstLoad) {
-                pcListView.scheduleLayoutAnimation();
-            }
+        if (target == null) {
+            showToast(getString(R.string.no_online_computer_with_running_game));
+            return;
         }
 
-        // 使用防抖刷新，避免频繁刷新
-        debouncedNotifyDataSetChanged();
+        NvApp app = getNvAppById(target.runningGameId, target.uuid);
+        if (app == null) {
+            app = new NvApp("app", target.runningGameId, false);
+        }
+
+        showToast(getString(R.string.restoring_session, target.name));
+        ServerHelper.doStart(this, app, target, managerBinder);
     }
+
+    private void showAddressSelectionDialog(ComputerDetails computer) {
+        AddressSelectionDialog dialog = new AddressSelectionDialog(this, computer, address -> {
+            ComputerDetails temp = new ComputerDetails(computer);
+            temp.activeAddress = address;
+            doAppList(temp, false, false);
+        });
+        dialog.show();
+    }
+
+    // Context Menu
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
+        stopComputerUpdates(false);
+        super.onCreateContextMenu(menu, v, menuInfo);
+
+        int position = getContextMenuPosition(menuInfo, v);
+        if (position < 0) return;
+
+        ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(position);
+        if (PcGridAdapter.isAddComputerCard(computer)) return;
+
+        setupContextMenuHeader(menu, computer);
+        addContextMenuItems(menu, computer);
+    }
+
+    private int getContextMenuPosition(ContextMenuInfo menuInfo, View v) {
+        if (menuInfo instanceof AdapterContextMenuInfo) {
+            return ((AdapterContextMenuInfo) menuInfo).position;
+        }
+        if (v != null && v.getTag() instanceof Integer) {
+            return (Integer) v.getTag();
+        }
+        return -1;
+    }
+
+    private void setupContextMenuHeader(ContextMenu menu, ComputerObject computer) {
+        menu.clearHeader();
+        String status;
+        switch (computer.details.state) {
+            case ONLINE:
+                status = getString(R.string.pcview_menu_header_online);
+                break;
+            case OFFLINE:
+                menu.setHeaderIcon(R.drawable.ic_pc_offline);
+                status = getString(R.string.pcview_menu_header_offline);
+                break;
+            default:
+                status = getString(R.string.pcview_menu_header_unknown);
+        }
+        menu.setHeaderTitle(computer.details.name + " - " + status);
+    }
+
+    private void addContextMenuItems(ContextMenu menu, ComputerObject computer) {
+        ComputerDetails details = computer.details;
+
+        if (details.state == ComputerDetails.State.OFFLINE || details.state == ComputerDetails.State.UNKNOWN) {
+            menu.add(Menu.NONE, WOL_ID, 1, R.string.pcview_menu_send_wol);
+        } else if (details.pairState != PairState.PAIRED) {
+            menu.add(Menu.NONE, PAIR_ID, 1, R.string.pcview_menu_pair_pc);
+            if (details.nvidiaServer) {
+                menu.add(Menu.NONE, GAMESTREAM_EOL_ID, 2, R.string.pcview_menu_eol);
+            }
+        } else {
+            if (details.runningGameId != 0) {
+                menu.add(Menu.NONE, RESUME_ID, 1, R.string.applist_menu_resume);
+                menu.add(Menu.NONE, QUIT_ID, 2, R.string.applist_menu_quit);
+            }
+            if (details.nvidiaServer) {
+                menu.add(Menu.NONE, GAMESTREAM_EOL_ID, 3, R.string.pcview_menu_eol);
+            }
+            menu.add(Menu.NONE, FULL_APP_LIST_ID, 4, R.string.pcview_menu_app_list);
+            menu.add(Menu.NONE, SECONDARY_SCREEN_ID, 5, R.string.pcview_menu_secondary_screen);
+            menu.add(Menu.NONE, SLEEP_ID, 8, R.string.send_sleep_command);
+        }
+
+        menu.add(Menu.NONE, TEST_NETWORK_ID, 5, R.string.pcview_menu_test_network);
+        menu.add(Menu.NONE, IPERF3_TEST_ID, 6, R.string.network_bandwidth_test);
+        menu.add(Menu.NONE, DELETE_ID, 6, R.string.pcview_menu_delete_pc);
+        menu.add(Menu.NONE, VIEW_DETAILS_ID, 7, R.string.pcview_menu_details);
+    }
+
+    @Override
+    public void onContextMenuClosed(Menu menu) {
+        startComputerUpdates();
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        int position = getContextMenuPosition(item.getMenuInfo(), null);
+        if (position < 0) return super.onContextItemSelected(item);
+
+        ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(position);
+        if (PcGridAdapter.isAddComputerCard(computer)) return super.onContextItemSelected(item);
+
+        return handleContextMenuAction(item.getItemId(), computer);
+    }
+
+    private boolean handleContextMenuAction(int itemId, ComputerObject computer) {
+        ComputerDetails details = computer.details;
+
+        switch (itemId) {
+            case PAIR_ID:
+                doPair(details);
+                return true;
+            case UNPAIR_ID:
+                doUnpair(details);
+                return true;
+            case WOL_ID:
+                doWakeOnLan(details);
+                return true;
+            case DELETE_ID:
+                handleDeletePc(details);
+                return true;
+            case FULL_APP_LIST_ID:
+                doAppList(details, false, true);
+                return true;
+            case RESUME_ID:
+                handleResume(details);
+                return true;
+            case QUIT_ID:
+                handleQuit(details);
+                return true;
+            case SLEEP_ID:
+                handleSleep(details);
+                return true;
+            case VIEW_DETAILS_ID:
+                Dialog.displayDetailsDialog(this, getString(R.string.title_details), details.toString(), false);
+                return true;
+            case TEST_NETWORK_ID:
+                ServerHelper.doNetworkTest(this);
+                return true;
+            case IPERF3_TEST_ID:
+                handleIperf3Test(details);
+                return true;
+            case SECONDARY_SCREEN_ID:
+                handleSecondaryScreen(details);
+                return true;
+            case GAMESTREAM_EOL_ID:
+                HelpLauncher.launchGameStreamEolFaq(this);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void handleDeletePc(ComputerDetails details) {
+        if (ActivityManager.isUserAMonkey()) {
+            LimeLog.info("Ignoring delete PC request from monkey");
+            return;
+        }
+        UiHelper.displayDeletePcConfirmationDialog(this, details, () -> {
+            if (managerBinder == null) {
+                showToast(getString(R.string.error_manager_not_running));
+                return;
+            }
+            removeComputer(details);
+        }, null);
+    }
+
+    private void handleResume(ComputerDetails details) {
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+        NvApp app = getNvAppById(details.runningGameId, details.uuid);
+        if (app == null) {
+            app = new NvApp("app", details.runningGameId, false);
+        }
+        ServerHelper.doStart(this, app, details, managerBinder);
+    }
+
+    private void handleQuit(ComputerDetails details) {
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+        UiHelper.displayQuitConfirmationDialog(this,
+                () -> ServerHelper.doQuit(this, details, new NvApp("app", 0, false), managerBinder, null),
+                null);
+    }
+
+    private void handleSleep(ComputerDetails details) {
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+        ServerHelper.pcSleep(this, details, managerBinder, null);
+    }
+
+    private void handleIperf3Test(ComputerDetails details) {
+        try {
+            String ip = ServerHelper.getCurrentAddressFromComputer(details).address;
+            new Iperf3Tester(this, ip).show();
+        } catch (IOException e) {
+            showToast(getString(R.string.unable_to_get_pc_address, e.getMessage()));
+        }
+    }
+
+    private void handleSecondaryScreen(ComputerDetails details) {
+        if (managerBinder == null) {
+            showToast(getString(R.string.error_manager_not_running));
+            return;
+        }
+        doSecondaryScreenStream(details);
+    }
+
+    // Adapter Fragment Callbacks
 
     @Override
     public int getAdapterFragmentLayoutId() {
@@ -1631,139 +1590,208 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
 
     @Override
     public void receiveAbsListView(View view) {
-        // Generalized interface implementation
         receiveAdapterView(view);
     }
 
     @SuppressLint("ClickableViewAccessibility")
     public void receiveAdapterView(View view) {
-        if (view instanceof androidx.recyclerview.widget.RecyclerView) {
-            // Update selectionAnimator's RecyclerView and Adapter references
-        } else if (view instanceof AbsListView) {
-            AbsListView listView = (AbsListView) view;
-            // 保存引用以便后续触发动画
-            pcListView = listView;
-            // 移除系统默认的选择背景，使用自定义的 selector
-            listView.setSelector(android.R.color.transparent);
-            listView.setAdapter(pcGridAdapter);
+        if (!(view instanceof AbsListView)) return;
 
-            // 设置排序动画
-            android.view.animation.Animation animation = AnimationUtils.loadAnimation(this, R.anim.pc_grid_item_sort);
-            LayoutAnimationController controller = new LayoutAnimationController(animation, 0.12f);
-            controller.setOrder(LayoutAnimationController.ORDER_NORMAL);
-            listView.setLayoutAnimation(controller);
+        AbsListView listView = (AbsListView) view;
+        pcListView = listView;
+        listView.setSelector(android.R.color.transparent);
+        listView.setAdapter(pcGridAdapter);
 
-            // 第一次进入时，先隐藏列表，然后延迟触发动画
-            if (isFirstLoad) {
-                listView.setAlpha(0f);
-                // 延迟触发动画，等待数据准备完成
-                listView.postDelayed(() -> {
-                    if (isFirstLoad && pcListView != null && pcListView.getAlpha() == 0f) {
-                        // 确保数据已刷新
-                        pcGridAdapter.notifyDataSetChanged();
-                        // 触发动画
-                        pcListView.scheduleLayoutAnimation();
-                        pcListView.animate()
-                                .alpha(1f)
-                                .setDuration(200)
-                                .start();
-                        isFirstLoad = false;
-                    }
-                }, 250); // 延迟250ms，确保数据已准备好
+        setupListAnimation(listView);
+        handleFirstLoadAnimation(listView);
+        setupListItemClick(listView);
+        setupGridColumnWidth(view);
+        setupEmptyAreaLongPress(listView);
+
+        UiHelper.applyStatusBarPadding(listView);
+        registerForContextMenu(listView);
+    }
+
+    private void setupListAnimation(AbsListView listView) {
+        LayoutAnimationController controller = new LayoutAnimationController(
+                AnimationUtils.loadAnimation(this, R.anim.pc_grid_item_sort), 0.12f);
+        controller.setOrder(LayoutAnimationController.ORDER_NORMAL);
+        listView.setLayoutAnimation(controller);
+    }
+
+    private void handleFirstLoadAnimation(AbsListView listView) {
+        if (!isFirstLoad) return;
+
+        listView.setAlpha(0f);
+        listView.postDelayed(() -> {
+            if (isFirstLoad && pcListView != null && pcListView.getAlpha() == 0f) {
+                pcGridAdapter.notifyDataSetChanged();
+                pcListView.scheduleLayoutAnimation();
+                pcListView.animate().alpha(1f).setDuration(200).start();
+                isFirstLoad = false;
+            }
+        }, 250);
+    }
+
+    private void setupListItemClick(AbsListView listView) {
+        listView.setOnItemClickListener((parent, view, pos, id) -> {
+            ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(pos);
+
+            if (PcGridAdapter.isAddComputerCard(computer)) {
+                startActivity(new Intent(this, AddComputerManually.class));
+                return;
             }
 
-            listView.setOnItemClickListener((arg0, arg1, pos, id) -> {
-                ComputerObject computer = (ComputerObject) pcGridAdapter.getItem(pos);
-
-                if (PcGridAdapter.isAddComputerCard(computer)) {
-                    Intent i = new Intent(PcView.this, AddComputerManually.class);
-                    startActivity(i);
-                    return;
-                }
-
-                if (computer.details.state == ComputerDetails.State.UNKNOWN ||
-                        computer.details.state == ComputerDetails.State.OFFLINE) {
-                    // Open the context menu if a PC is offline or refreshing
-                    openContextMenu(arg1);
-                } else if (computer.details.pairState != PairState.PAIRED) {
-                    // Pair an unpaired machine by default
-                    doPair(computer.details);
+            if (computer.details.state == ComputerDetails.State.UNKNOWN
+                    || computer.details.state == ComputerDetails.State.OFFLINE) {
+                openContextMenu(view);
+            } else if (computer.details.pairState != PairState.PAIRED) {
+                doPair(computer.details);
+            } else if (computer.details.hasMultipleLanAddresses()) {
+                showAddressSelectionDialog(computer.details);
+            } else {
+                ComputerDetails temp = prepareComputerWithAddress(computer.details);
+                if (temp != null) {
+                    doAppList(temp, false, false);
                 } else {
-                    // 检查是否有多个LAN地址（组网环境）
-                    if (computer.details.hasMultipleLanAddresses()) {
-                        // 只有在组网环境下有多个LAN地址时才让用户选择
-                        showAddressSelectionDialog(computer.details);
-                    } else {
-                        // 自动选择最佳地址：优先LAN IPv4，其次IPv6，最后公网
-                        ComputerDetails tempComputer = prepareComputerWithAddress(computer.details);
-                        if (tempComputer != null) {
-                            doAppList(tempComputer, false, false);
-                        } else {
-                            Toast.makeText(PcView.this, getResources().getString(R.string.error_pc_offline), Toast.LENGTH_SHORT).show();
-                        }
-                    }
+                    showToast(getString(R.string.error_pc_offline));
                 }
-            });
-
-            // 如果是GridView，动态计算列宽以保持固定间距
-            if (view instanceof GridView) {
-                calculateDynamicColumnWidth((GridView) view);
             }
+        });
+    }
 
-            // 使用GestureDetector检测GridView空白区域的长按
-            // 注意：只在空白区域处理，不影响项目上的context menu
-            android.view.GestureDetector gestureDetector = new android.view.GestureDetector(this, 
-                new android.view.GestureDetector.SimpleOnGestureListener() {
-                    @Override
-                    public void onLongPress(android.view.MotionEvent e) {
-                        // 检查是否点击在项目上
-                        int position = listView.pointToPosition((int) e.getX(), (int) e.getY());
-                        if (position == android.widget.AdapterView.INVALID_POSITION) {
-                            // 空白区域，触发下载
-                            saveImageWithPermissionCheck();
-                        }
-                        // 如果点击在项目上，不处理，让原有的context menu正常工作
-                    }
-                });
-            listView.setOnTouchListener((v, event) -> {
-                // 先检查是否点击在项目上
-                int position = listView.pointToPosition((int) event.getX(), (int) event.getY());
-                if (position == android.widget.AdapterView.INVALID_POSITION) {
-                    // 空白区域，使用GestureDetector处理
-                    gestureDetector.onTouchEvent(event);
-                }
-                // 如果点击在项目上，不处理，让GridView正常处理（触发context menu）
-                return false; // 不拦截，让GridView正常处理
-            });
-
-            UiHelper.applyStatusBarPadding(listView);
-            registerForContextMenu(listView);
+    private void setupGridColumnWidth(View view) {
+        if (view instanceof GridView) {
+            calculateDynamicColumnWidth((GridView) view);
         }
     }
 
-    /**
-     * 动态计算GridView的列宽，确保卡片间距保持不变
-     * 根据屏幕宽度和固定间距自动调整列宽
-     */
+    @SuppressLint("ClickableViewAccessibility")
+    private void setupEmptyAreaLongPress(AbsListView listView) {
+        GestureDetector detector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public void onLongPress(MotionEvent e) {
+                if (listView.pointToPosition((int) e.getX(), (int) e.getY()) == android.widget.AdapterView.INVALID_POSITION) {
+                    saveImageWithPermissionCheck();
+                }
+            }
+        });
+
+        listView.setOnTouchListener((v, event) -> {
+            if (listView.pointToPosition((int) event.getX(), (int) event.getY()) == android.widget.AdapterView.INVALID_POSITION) {
+                detector.onTouchEvent(event);
+            }
+            return false;
+        });
+    }
+
     private void calculateDynamicColumnWidth(GridView gridView) {
         float density = getResources().getDisplayMetrics().density;
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
-
-        // 获取可用宽度（扣除左右padding）
         int availableWidth = screenWidth - gridView.getPaddingStart() - gridView.getPaddingEnd();
+        int spacingPx = (int) (15f * density);
+        int minColumnPx = (int) (180f * density);
 
-        // 固定参数（dp转px）
-        int horizontalSpacingPx = (int) (15f * density);
-        int minColumnWidthPx = (int) (180f * density);
-
-        // 计算列数: numColumns = (availableWidth + spacing) / (minWidth + spacing)
-        int numColumns = Math.max(1, (availableWidth + horizontalSpacingPx) / (minColumnWidthPx + horizontalSpacingPx));
-
-        // 计算实际列宽: columnWidth = (availableWidth - (numColumns - 1) * spacing) / numColumns
-        int columnWidth = (availableWidth - (numColumns - 1) * horizontalSpacingPx) / numColumns;
+        int numColumns = Math.max(1, (availableWidth + spacingPx) / (minColumnPx + spacingPx));
+        int columnWidth = (availableWidth - (numColumns - 1) * spacingPx) / numColumns;
 
         gridView.setColumnWidth(columnWidth);
     }
+
+    // Dialogs
+
+    private void showEasyTierControlDialog() {
+        if (easyTierController != null) {
+            easyTierController.showControlDialog();
+        }
+    }
+
+    private void showAboutDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_about, null);
+
+        TextView versionText = dialogView.findViewById(R.id.text_version);
+        versionText.setText(getVersionInfo());
+
+        TextView appNameText = dialogView.findViewById(R.id.text_app_name);
+        appNameText.setText(getAppName());
+
+        TextView descriptionText = dialogView.findViewById(R.id.text_description);
+        descriptionText.setText(R.string.about_dialog_description);
+
+        new AlertDialog.Builder(this, R.style.AppDialogStyle)
+                .setView(dialogView)
+                .setPositiveButton(R.string.about_dialog_github, (d, w) -> openUrl("https://github.com/qiin2333/moonlight-vplus"))
+                .setNeutralButton(R.string.about_dialog_qq, (d, w) -> joinQQGroup("LlbLDIF_YolaM4HZyLx0xAXXo04ZmoBM"))
+                .setNegativeButton(R.string.about_dialog_close, (d, w) -> d.dismiss())
+                .show();
+    }
+
+    @SuppressLint("DefaultLocale")
+    private String getVersionInfo() {
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return String.format("Version %s (Build %d)", info.versionName, info.versionCode);
+        } catch (PackageManager.NameNotFoundException e) {
+            return "Version Unknown";
+        }
+    }
+
+    private String getAppName() {
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            if (info.applicationInfo != null) {
+                return info.applicationInfo.loadLabel(getPackageManager()).toString();
+            }
+        } catch (PackageManager.NameNotFoundException ignored) {
+        }
+        return "Moonlight V+";
+    }
+
+    private void openUrl(String url) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+        } catch (Exception ignored) {
+        }
+    }
+
+    public void joinQQGroup(String key) {
+        try {
+            Intent intent = new Intent();
+            intent.setData(Uri.parse("mqqopensdkapi://bizAgent/qm/qr?url=http%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Ffrom%3Dapp%26p%3Dandroid%26jump_from%3Dwebapi%26k%3D" + key));
+            startActivity(intent);
+        } catch (Exception ignored) {
+        }
+    }
+
+    // VPN Permission
+
+    @Override
+    public void requestVpnPermission() {
+        Intent intent = VpnService.prepare(this);
+        if (intent != null) {
+            startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE);
+        } else {
+            onActivityResult(VPN_PERMISSION_REQUEST_CODE, RESULT_OK, null);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == VPN_PERMISSION_REQUEST_CODE && easyTierController != null) {
+            easyTierController.handleVpnPermissionResult(resultCode);
+        }
+    }
+
+    // Utility
+
+    private void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    // Inner Classes
 
     public static class ComputerObject {
         public ComputerDetails details;
@@ -1778,297 +1806,6 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
         @Override
         public String toString() {
             return details.name;
-        }
-    }
-
-    @Override
-    public void hearShake() {
-        long currentTime = System.currentTimeMillis();
-
-        // Debounce: Check if enough time has passed since last shake
-        if (currentTime - lastShakeTime < SHAKE_DEBOUNCE_INTERVAL) {
-            long remainingSeconds = (SHAKE_DEBOUNCE_INTERVAL - (currentTime - lastShakeTime)) / 1000;
-            runOnUiThread(() ->
-                    Toast.makeText(PcView.this, getResources().getString(R.string.please_wait_seconds, remainingSeconds), Toast.LENGTH_SHORT).show()
-            );
-            return;
-        }
-
-        // Check daily limit
-        if (!canRefreshToday()) {
-            runOnUiThread(() ->
-                    Toast.makeText(PcView.this, getResources().getString(R.string.daily_limit_reached), Toast.LENGTH_LONG).show()
-            );
-            return;
-        }
-
-        lastShakeTime = currentTime;
-
-        // Increment counter and get remaining
-        incrementRefreshCount();
-        int remaining = getRemainingRefreshCount();
-
-        runOnUiThread(() -> {
-            String message = getResources().getString(R.string.refreshing_with_remaining, remaining);
-            Toast.makeText(PcView.this, message, Toast.LENGTH_SHORT).show();
-            refreshBackgroundImage(true);
-        });
-    }
-
-    /**
-     * Get today's date string (YYYY-MM-DD)
-     */
-    private String getTodayDateString() {
-        return new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                .format(new java.util.Date());
-    }
-
-    /**
-     * Check if user can refresh (within daily limit)
-     *
-     * @return true if can refresh, false if limit reached
-     */
-    private boolean canRefreshToday() {
-        SharedPreferences prefs = getSharedPreferences(REFRESH_PREF_NAME, MODE_PRIVATE);
-        String today = getTodayDateString();
-        String savedDate = prefs.getString(REFRESH_DATE_KEY, "");
-        int count = prefs.getInt(REFRESH_COUNT_KEY, 0);
-
-        // New day, reset counter
-        if (!today.equals(savedDate)) {
-            prefs.edit()
-                    .putString(REFRESH_DATE_KEY, today)
-                    .putInt(REFRESH_COUNT_KEY, 0)
-                    .apply();
-            return true;
-        }
-
-        // Check if within limit
-        return count < MAX_DAILY_REFRESH;
-    }
-
-    /**
-     * Get remaining refresh count for today
-     */
-    private int getRemainingRefreshCount() {
-        SharedPreferences prefs = getSharedPreferences(REFRESH_PREF_NAME, MODE_PRIVATE);
-        String today = getTodayDateString();
-        String savedDate = prefs.getString(REFRESH_DATE_KEY, "");
-        int count = prefs.getInt(REFRESH_COUNT_KEY, 0);
-
-        // New day
-        if (!today.equals(savedDate)) {
-            return MAX_DAILY_REFRESH;
-        }
-
-        return Math.max(0, MAX_DAILY_REFRESH - count);
-    }
-
-    /**
-     * Increment refresh count
-     */
-    private void incrementRefreshCount() {
-        SharedPreferences prefs = getSharedPreferences(REFRESH_PREF_NAME, MODE_PRIVATE);
-        String today = getTodayDateString();
-        String savedDate = prefs.getString(REFRESH_DATE_KEY, "");
-        int count = prefs.getInt(REFRESH_COUNT_KEY, 0);
-
-        // Ensure date is today
-        if (!today.equals(savedDate)) {
-            count = 0;
-        }
-
-        prefs.edit()
-                .putString(REFRESH_DATE_KEY, today)
-                .putInt(REFRESH_COUNT_KEY, count + 1)
-                .apply();
-    }
-
-    /**
-     * Refresh background image
-     */
-    private void refreshBackgroundImage(boolean isFromShake) {
-        ImageView imageView = findViewById(R.id.pcBackgroundImage);
-        if (imageView == null) return;
-
-        String imageUrl = getBackgroundImageUrl();
-
-        bitmapLruCache.remove(imageUrl);
-
-        // Reload the image in a background thread
-        new Thread(() -> {
-            try {
-                // 将 imageUrl 转换为可被 Glide 正确识别的对象
-                Object glideLoadTarget;
-                if (imageUrl.startsWith("http")) {
-                    // HTTP/HTTPS URL 直接使用
-                    glideLoadTarget = imageUrl;
-                } else {
-                    // 本地文件路径，转换为 File 对象
-                    File localFile = new File(imageUrl);
-                    if (localFile.exists()) {
-                        glideLoadTarget = localFile;
-                    } else {
-                        // 文件不存在（理论上不应该发生，因为 getBackgroundImageUrl() 已检查）
-                        // 但为了安全，回退到默认 URL
-                        glideLoadTarget = getDefaultApiUrl();
-                    }
-                }
-
-                final Bitmap bitmap = Glide.with(PcView.this)
-                        .asBitmap()
-                        .load(glideLoadTarget)
-                        .skipMemoryCache(true)
-                        .diskCacheStrategy(DiskCacheStrategy.NONE)
-                        .submit()
-                        .get();
-
-                if (bitmap != null) {
-                    bitmapLruCache.put(imageUrl, bitmap);
-                    runOnUiThread(() -> {
-                        Glide.with(PcView.this)
-                                .load(bitmap)
-                                .apply(RequestOptions.bitmapTransform(new BlurTransformation(2, 3)))
-                                .transform(new ColorFilterTransformation(Color.argb(120, 0, 0, 0)))
-                                .into(imageView);
-                        if (isFromShake) {
-                            int remaining = getRemainingRefreshCount();
-                            String message = getResources().getString(R.string.background_refreshed_with_remaining, remaining);
-                            Toast.makeText(PcView.this, message, Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                } else {
-                    runOnUiThread(() -> Toast.makeText(PcView.this, getResources().getString(R.string.refresh_failed_please_retry), Toast.LENGTH_SHORT).show());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                runOnUiThread(() -> Toast.makeText(PcView.this, getResources().getString(R.string.refresh_failed_with_error, e.getMessage()), Toast.LENGTH_SHORT).show());
-            }
-        }).start();
-    }
-
-    /****************
-     * <p>
-     * 发起添加群流程。群号：第四串流基地(460965258) 的 key 为： JfhuyTDZFsHrOXaWEEX6YGH9FHh3xGzR
-     * 调用 joinQQGroup(JfhuyTDZFsHrOXaWEEX6YGH9FHh3xGzR) 即可发起手Q客户端申请加群 第四串流基地(460965258)
-     *
-     * @param key 由官网生成的key
-     ******************/
-    public void joinQQGroup(String key) {
-        Intent intent = new Intent();
-        intent.setData(Uri.parse("mqqopensdkapi://bizAgent/qm/qr?url=http%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Ffrom%3Dapp%26p%3Dandroid%26jump_from%3Dwebapi%26k%3D" + key));
-        // 此Flag可根据具体产品需要自定义，如设置，则在加群界面按返回，返回手Q主界面，不设置，按返回会返回到呼起产品界面    //intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        try {
-            startActivity(intent);
-        } catch (Exception e) {
-            // 未安装手Q或安装的版本不支持
-        }
-    }
-
-    /**
-     * 显示集成了状态显示和配置编辑的 EasyTier 控制面板。
-     */
-    private void showEasyTierControlDialog() {
-        if (easyTierController != null) {
-            easyTierController.showControlDialog();
-        }
-    }
-
-    private void showAboutDialog() {
-        // 创建自定义布局
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_about, null);
-
-        // 设置版本信息
-        TextView versionText = dialogView.findViewById(R.id.text_version);
-        String versionInfo = getVersionInfo();
-        versionText.setText(versionInfo);
-
-        // 设置应用名称
-        TextView appNameText = dialogView.findViewById(R.id.text_app_name);
-        String appName = getAppName();
-        appNameText.setText(appName);
-
-        // 设置描述信息
-        TextView descriptionText = dialogView.findViewById(R.id.text_description);
-        descriptionText.setText(R.string.about_dialog_description);
-
-        // 创建对话框，使用优雅的样式
-        AlertDialog.Builder builder = new AlertDialog.Builder(this, R.style.AppDialogStyle);
-        builder.setView(dialogView);
-
-        // 设置按钮
-        builder.setPositiveButton(R.string.about_dialog_github, (dialog, which) -> {
-            // 打开项目仓库
-            openUrl("https://github.com/qiin2333/moonlight-vplus");
-        });
-
-        builder.setNeutralButton(R.string.about_dialog_qq, (dialog, which) -> {
-            // 加入QQ群
-            joinQQGroup("LlbLDIF_YolaM4HZyLx0xAXXo04ZmoBM");
-        });
-
-        builder.setNegativeButton(R.string.about_dialog_close, (dialog, which) -> dialog.dismiss());
-
-        // 显示对话框
-        AlertDialog dialog = builder.create();
-        dialog.show();
-    }
-
-    @SuppressLint("DefaultLocale")
-    private String getVersionInfo() {
-        try {
-            PackageInfo packageInfo = getPackageManager()
-                    .getPackageInfo(getPackageName(), 0);
-            return String.format("Version %s (Build %d)",
-                    packageInfo.versionName,
-                    packageInfo.versionCode);
-        } catch (PackageManager.NameNotFoundException e) {
-            return "Version Unknown";
-        }
-    }
-
-    private String getAppName() {
-        try {
-            PackageInfo packageInfo = getPackageManager()
-                    .getPackageInfo(getPackageName(), 0);
-            return packageInfo.applicationInfo.loadLabel(getPackageManager()).toString();
-        } catch (PackageManager.NameNotFoundException e) {
-            return "Moonlight V+";
-        }
-    }
-
-    private void openUrl(String url) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-        } catch (Exception e) {
-            // 如果无法打开链接，忽略错误
-        }
-    }
-
-    //  VPN 权限请求和结果处理逻辑
-
-    /**
-     * 检查并请求 VPN 权限。
-     */
-    @Override
-    public void requestVpnPermission() {
-        Intent intent = VpnService.prepare(this);
-        if (intent != null) {
-            startActivityForResult(intent, VPN_PERMISSION_REQUEST_CODE);
-        } else {
-            onActivityResult(VPN_PERMISSION_REQUEST_CODE, RESULT_OK, null);
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == VPN_PERMISSION_REQUEST_CODE) {
-            if (easyTierController != null) {
-                easyTierController.handleVpnPermissionResult(resultCode);
-            }
         }
     }
 }

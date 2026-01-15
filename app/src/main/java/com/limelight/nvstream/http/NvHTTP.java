@@ -394,6 +394,14 @@ public class NvHTTP {
         // The MJOLNIR codename was used by GFE but never by any third-party server
         details.nvidiaServer = getXmlString(serverInfo, "state", true).contains("MJOLNIR");
 
+        // Get Sunshine version from serverinfo
+        try {
+            details.sunshineVersion = getSunshineVersion(serverInfo);
+        } catch (Exception e) {
+            // SunshineVersion parsing failed, leave it null
+            details.sunshineVersion = null;
+        }
+
         // We could reach it so it's online
         details.state = ComputerDetails.State.ONLINE;
 
@@ -595,6 +603,11 @@ public class NvHTTP {
     public String getGfeVersion(String serverInfo) throws XmlPullParserException, IOException {
         // ServerCodecModeSupport wasn't present on old GFE versions
         return getXmlString(serverInfo, "GfeVersion", false);
+    }
+
+    public String getSunshineVersion(String serverInfo) throws XmlPullParserException, IOException {
+        // SunshineVersion is only present on Sunshine servers
+        return getXmlString(serverInfo, "SunshineVersion", false);
     }
     
     public boolean supports4K(String serverInfo) throws XmlPullParserException, IOException {
@@ -836,6 +849,42 @@ public class NvHTTP {
             return displays;
         } catch (org.json.JSONException e) {
             throw new IOException("Failed to parse displays response: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 旋转服务端显示器
+     * @param angle 旋转角度（0, 90, 180, 270）
+     * @param displayName 显示器名称（可选，为null时使用默认显示器）
+     * @return 是否成功
+     * @throws IOException 如果请求失败
+     * @throws InterruptedException 如果请求被中断
+     */
+    public boolean rotateDisplay(int angle, String displayName) throws IOException, InterruptedException {
+        try {
+            // 构建查询参数
+            StringBuilder query = new StringBuilder();
+            query.append("angle=").append(angle);
+            if (displayName != null && !displayName.isEmpty()) {
+                query.append("&display_name=").append(java.net.URLEncoder.encode(displayName, "UTF-8"));
+            }
+            
+            String jsonStr = openHttpConnectionToString(httpClientLongConnectTimeout, getHttpsUrl(true), "rotate-display", query.toString());
+            JSONObject json = new JSONObject(jsonStr);
+            
+            int statusCode = json.optInt("status_code", 0);
+            boolean success = json.optBoolean("success", false);
+            
+            if (statusCode != 200 || !success) {
+                String errorMsg = json.optString("status_message", "Unknown error");
+                LimeLog.warning("Failed to rotate display: " + errorMsg);
+                return false;
+            }
+            
+            LimeLog.info("Display rotation changed successfully to " + angle + " degrees");
+            return true;
+        } catch (org.json.JSONException e) {
+            throw new IOException("Failed to parse rotate display response: " + e.getMessage(), e);
         }
     }
     

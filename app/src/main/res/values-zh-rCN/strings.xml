@@ -16,6 +16,7 @@
     <string name="pcview_menu_send_wol"> 发送 Wake-On-LAN 请求 </string>
     <string name="pcview_menu_delete_pc"> 删除电脑 </string>
     <string name="pcview_menu_details"> 查看详情 </string>
+    <string name="pcview_menu_secondary_screen"> 作为副屏串流（基地适用） </string>
     <string name="pcview_menu_sleep_success"> 已催促主机睡眠 </string>
     <string name="pcview_menu_sleep_fail"> 连接主机睡眠失败 </string>
     <!-- Pair messages -->
@@ -345,7 +346,7 @@
     <string name="summary_privacy_policy">查看 Moonlight 隐私政策</string>
     <string name="title_about_mode">关于 Moonlight V+</string>
     <string name="summary_about_mode">请前往GitHub查看，喜欢的话点个Star支持一下我们吧</string>
-    
+
     <!-- About dialog strings -->
     <string name="about_dialog_description">Moonlight V+ 是专为 Foundation Sunshine 打造的增强客户端，为您带来极致的游戏串流体验。</string>
     <string name="about_dialog_project_info">基于 Moonlight-Android 开源项目，由基地社区倾力打造</string>
@@ -474,18 +475,20 @@
     <string name="summary_background_image_api">输入自定义背景图片的API，也可以是单张图片地址哦，留空就是看随机涩图</string>
     <string name="dialog_title_background_image_api">背景图片API</string>
     <string name="dialog_message_background_image_api">请输入完整的图片API</string>
-  
+
     <!-- Local image picker -->
     <string name="title_local_image_picker">选择本地图片</string>
     <string name="summary_local_image_picker">从本地相册中选择一张图片作为背景</string>
-    
+
     <!-- Reset background image -->
     <string name="title_reset_background_image">恢复默认背景</string>
     <string name="summary_reset_background_image">清除自定义设置，恢复为默认的随机背景图片</string>
-    
+
     <!-- Reverse resolution -->
     <string name="title_checkbox_reverse_resolution">反转分辨率</string>
     <string name="summary_checkbox_reverse_resolution">交换宽度和高度值，用于特殊显示需求</string>
+    <string name="title_checkbox_rotable_screen">跟随屏幕旋转</string>
+    <string name="summary_checkbox_rotable_screen">启用后，设备旋转时会同步调整显示方向</string>
 
     <!-- Moonlight V+ PC download -->
     <string name="title_moonlight_vplus_pc_download">Moonlight V+ PC版下载</string>

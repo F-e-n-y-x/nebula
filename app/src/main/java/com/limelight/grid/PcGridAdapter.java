@@ -475,19 +475,20 @@ public class PcGridAdapter extends GenericGridAdapter<PcView.ComputerObject> {
         imgView.setAlpha(isOnline ? ONLINE_ALPHA : OFFLINE_ALPHA);
 
         // 设置背景
-        int bgRes = (isOnline && details.hasMultipleAddresses())
+        parentView.setBackgroundResource(isOnline && details.hasMultipleAddresses()
                 ? R.drawable.pc_item_multiple_addresses_selector
-                : R.drawable.pc_item_selector;
-        parentView.setBackgroundResource(bgRes);
+                : R.drawable.pc_item_selector);
 
         // 处理加载动画：状态未知或正在加载 box art 时显示
-        // 注意：刚打开时电脑状态通常是 UNKNOWN，此时应该显示 spinner
         boolean isLoadingBoxArt = details.uuid != null && loadingUuids.contains(details.uuid);
-        boolean shouldShowSpinner = isUnknown || isLoadingBoxArt;
-        updateSpinner((ImageView) spinnerView, shouldShowSpinner);
+        updateSpinner((ImageView) spinnerView, isUnknown || isLoadingBoxArt);
 
-        // 设置文本
-        txtView.setText(details.name);
+        // 设置文本：如果版本号以"杂鱼"结尾，在主机名后面加 ⚡
+        String displayName = details.name;
+        if (isOnline && details.sunshineVersion != null && details.sunshineVersion.endsWith("杂鱼")) {
+            displayName += "⚡";
+        }
+        txtView.setText(displayName);
         txtView.setAlpha(isOffline ? 0.5f : 1.0f);
         txtView.setTextColor(isOffline ? OFFLINE_TEXT_COLOR : ONLINE_TEXT_COLOR);
 

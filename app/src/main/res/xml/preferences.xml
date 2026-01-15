@@ -67,8 +67,8 @@
             android:defaultValue="false" />
         <CheckBoxPreference
             android:key="checkbox_rotable_screen"
-            android:title="允许屏幕旋转"
-            android:summary="允许在串流时旋转屏幕（不会改变视频分辨率）"
+            android:title="@string/title_checkbox_rotable_screen"
+            android:summary="@string/summary_checkbox_rotable_screen"
             android:defaultValue="false" />
     </PreferenceCategory>
     <PreferenceCategory

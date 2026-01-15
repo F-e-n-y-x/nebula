@@ -55,12 +55,19 @@ public class ServerHelper {
 
     public static Intent createStartIntent(Activity parent, NvApp app, ComputerDetails computer,
                                            ComputerManagerService.ComputerManagerBinder managerBinder) {
-        return createStartIntent(parent, app, computer, managerBinder, null);
+        return createStartIntent(parent, app, computer, managerBinder, null, -1);
     }
 
     public static Intent createStartIntent(Activity parent, NvApp app, ComputerDetails computer,
                                            ComputerManagerService.ComputerManagerBinder managerBinder,
                                            PreferenceConfiguration lastSettings) {
+        return createStartIntent(parent, app, computer, managerBinder, lastSettings, -1);
+    }
+
+    public static Intent createStartIntent(Activity parent, NvApp app, ComputerDetails computer,
+                                           ComputerManagerService.ComputerManagerBinder managerBinder,
+                                           PreferenceConfiguration lastSettings,
+                                           int screenCombinationMode) {
         Intent intent = new Intent(parent, Game.class);
         intent.putExtra(Game.EXTRA_HOST, computer.activeAddress.address);
         intent.putExtra(Game.EXTRA_PORT, computer.activeAddress.port);
@@ -87,6 +94,11 @@ public class ServerHelper {
         // 如果有上一次设置，通过Intent传递
         if (lastSettings != null) {
             AppSettingsManager.addLastSettingsToIntent(intent, lastSettings);
+        }
+        
+        // 如果有自定义的屏幕组合模式，通过Intent传递
+        if (screenCombinationMode != -1) {
+            intent.putExtra(Game.EXTRA_SCREEN_COMBINATION_MODE, screenCombinationMode);
         }
         
         return intent;

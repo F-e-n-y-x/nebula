@@ -775,6 +775,68 @@ public class NvConnection {
     }
 
     /**
+     * 旋转服务端显示器
+     * @param angle 旋转角度（0, 90, 180, 270）
+     * @param callback 回调接口，用于通知结果（可选）
+     */
+    public void rotateDisplay(int angle, DisplayRotationCallback callback) {
+        new Thread(() -> {
+            NvHTTP h;
+            try {
+                h = new NvHTTP(context.serverAddress, context.httpsPort, uniqueId, clientName, context.serverCert, cryptoProvider);
+            } catch (IOException e) {
+                LimeLog.warning("Failed to create NvHTTP for display rotation: " + e.getMessage());
+                if (callback != null) {
+                    callback.onFailure("Failed to create HTTP connection: " + e.getMessage());
+                }
+                return;
+            }
+            
+            try {
+                LimeLog.info("Sending display rotation request: " + angle + " degrees");
+                boolean success = h.rotateDisplay(angle, context.displayName);
+                
+                if (success) {
+                    LimeLog.info("Display rotation successful: " + angle + " degrees");
+                    if (callback != null) {
+                        callback.onSuccess(angle);
+                    }
+                } else {
+                    LimeLog.warning("Display rotation request failed (server returned false)");
+                    if (callback != null) {
+                        callback.onFailure("Server returned failure response");
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LimeLog.warning("Display rotation interrupted: " + e.getMessage());
+                if (callback != null) {
+                    callback.onFailure("Operation interrupted");
+                }
+            } catch (java.io.FileNotFoundException e) {
+                // 服务端不支持 rotate-display 接口（返回 404）
+                LimeLog.warning("Display rotation not supported by server (404): " + e.getMessage());
+                if (callback != null) {
+                    callback.onFailure("服务端不支持显示旋转功能，请更新服务端版本");
+                }
+            } catch (IOException e) {
+                LimeLog.warning("Failed to rotate display: " + e.getMessage());
+                if (callback != null) {
+                    callback.onFailure("网络错误: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * 显示器旋转回调接口
+     */
+    public interface DisplayRotationCallback {
+        void onSuccess(int angle);
+        void onFailure(String errorMessage);
+    }
+
+    /**
      * 获取主机地址
      * @return 主机地址字符串
      */

@@ -24,6 +24,7 @@
     <string name="pcview_menu_delete_pc">Delete PC</string>
     <string name="pcview_menu_test_network">Test Network Connection</string>
     <string name="pcview_menu_details">View Details</string>
+    <string name="pcview_menu_secondary_screen">Secondary Screen Stream (Foundation Sunshine Compatible)</string>
     <string name="pcview_menu_eol">NVIDIA GameStream End-of-Service</string>
     <string name="pcview_menu_sleep_success">Host sleep success</string>
     <string name="pcview_menu_sleep_fail">Host sleep failed</string>
@@ -65,6 +66,7 @@
 
     <!-- Errors -->
     <string name="error_pc_offline">Computer is offline</string>
+    <string name="no_app_found_for_streaming">No app found for streaming</string>
     <string name="error_manager_not_running">The ComputerManager service is not running. Please wait a few seconds or restart the app.</string>
     <string name="error_unknown_host">Failed to resolve host</string>
     <string name="error_404">GFE returned an HTTP 404 error. Make sure your PC is running a supported GPU.
@@ -514,6 +516,8 @@
     <!-- Reverse resolution -->
     <string name="title_checkbox_reverse_resolution">Reverse Resolution</string>
     <string name="summary_checkbox_reverse_resolution">Swap width and height values for special display requirements</string>
+    <string name="title_checkbox_rotable_screen">Follow Screen Rotation</string>
+    <string name="summary_checkbox_rotable_screen">When enabled, display orientation will be adjusted when device rotates</string>
     
     <!-- Moonlight V+ PC download -->
     <string name="title_moonlight_vplus_pc_download">Moonlight V+ PC Download</string>
