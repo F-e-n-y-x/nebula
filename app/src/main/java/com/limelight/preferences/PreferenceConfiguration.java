@@ -138,8 +138,10 @@ public class PreferenceConfiguration {
     private static final String ENABLE_MIC_PREF_STRING = "checkbox_enable_mic";
     private static final String MIC_BITRATE_PREF_STRING = "seekbar_mic_bitrate_kbps";
     private static final String MIC_ICON_COLOR_PREF_STRING = "list_mic_icon_color";
+    
     private static final String ENABLE_ESC_MENU_PREF_STRING = "checkbox_enable_esc_menu";
     private static final String ESC_MENU_KEY_PREF_STRING = "list_esc_menu_key";
+    private static final String ENABLE_START_KEY_MENU_PREF_STRING = "checkbox_enable_start_key_menu";
     
     // 控制流only模式设置
     private static final String CONTROL_ONLY_PREF_STRING = "checkbox_control_only";
@@ -216,6 +218,7 @@ public class PreferenceConfiguration {
     private static final String DEFAULT_MIC_ICON_COLOR = "solid_white"; // 默认白
     private static final boolean DEFAULT_ENABLE_ESC_MENU = true; // 默认启用ESC菜单
     private static final int DEFAULT_ESC_MENU_KEY = KeyEvent.KEYCODE_ESCAPE;
+    private static final boolean DEFAULT_ENABLE_START_KEY_MENU = true; // 默认启用长按start键菜单
     
     // 控制流only模式默认值
     private static final boolean DEFAULT_CONTROL_ONLY = false;
@@ -367,6 +370,9 @@ public class PreferenceConfiguration {
     // ESC菜单设置
     public boolean enableEscMenu;
     public int escMenuKey;
+    
+    // Start键菜单设置
+    public boolean enableStartKeyMenu;
     
     // 控制流only模式设置
     public boolean controlOnly;
@@ -892,6 +898,9 @@ public class PreferenceConfiguration {
         config.enableEscMenu = prefs.getBoolean(ENABLE_ESC_MENU_PREF_STRING, DEFAULT_ENABLE_ESC_MENU);
         
         String escMenuKeyStr = prefs.getString(ESC_MENU_KEY_PREF_STRING, String.valueOf(DEFAULT_ESC_MENU_KEY));
+        
+        // 读取Start键菜单设置
+        config.enableStartKeyMenu = prefs.getBoolean(ENABLE_START_KEY_MENU_PREF_STRING, DEFAULT_ENABLE_START_KEY_MENU);
         try {
             config.escMenuKey = Integer.parseInt(escMenuKeyStr);
         } catch (NumberFormatException e) {
@@ -1037,6 +1046,7 @@ public class PreferenceConfiguration {
                     .putString(MIC_ICON_COLOR_PREF_STRING, micIconColor)
                     .putBoolean(ENABLE_ESC_MENU_PREF_STRING, enableEscMenu)
                     .putString(ESC_MENU_KEY_PREF_STRING, String.valueOf(escMenuKey))
+                    .putBoolean(ENABLE_START_KEY_MENU_PREF_STRING, enableStartKeyMenu)
                     .putBoolean(CONTROL_ONLY_PREF_STRING, controlOnly)
                     .putBoolean(ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, enableNativeMousePointer)
                     .putBoolean(ENABLE_DOUBLE_CLICK_DRAG_PREF_STRING, enableDoubleClickDrag)
@@ -1084,6 +1094,7 @@ public class PreferenceConfiguration {
         copy.micIconColor = this.micIconColor;
         copy.enableEscMenu = this.enableEscMenu;
         copy.escMenuKey = this.escMenuKey;
+        copy.enableStartKeyMenu = this.enableStartKeyMenu;
         copy.enableNativeMousePointer = this.enableNativeMousePointer;
         copy.enableDoubleClickDrag = this.enableDoubleClickDrag;
         copy.enableLocalCursorRendering = this.enableLocalCursorRendering;

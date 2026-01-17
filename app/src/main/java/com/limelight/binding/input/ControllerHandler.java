@@ -2704,7 +2704,7 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
             // any action.
             if ((context.inputMap & ControllerPacket.PLAY_FLAG) != 0 &&
                     event.getEventTime() - context.startDownTime > ControllerHandler.START_DOWN_TIME_MOUSE_MODE_MS &&
-                    prefConfig.mouseEmulation) {
+                    prefConfig.enableStartKeyMenu) {
                 gestures.showGameMenu(context);
             }
             context.inputMap &= ~ControllerPacket.PLAY_FLAG;
@@ -3170,6 +3170,27 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
             return;
         }
 
+        // 检测start键状态变化以支持长按切换鼠标模拟模式
+        boolean wasStartPressed = (context.inputMap & ControllerPacket.PLAY_FLAG) != 0;
+        boolean isStartPressed = (buttonFlags & ControllerPacket.PLAY_FLAG) != 0;
+        
+        if (wasStartPressed != isStartPressed) {
+            if (isStartPressed) {
+                // start键刚被按下，记录按下时间
+                context.startDownTime = System.currentTimeMillis();
+            } else {
+                // start键刚被释放，检查是否长按足够时间以切换鼠标模拟模式
+                if (context.startDownTime > 0) {
+                    long pressDuration = System.currentTimeMillis() - context.startDownTime;
+                    if (pressDuration > START_DOWN_TIME_MOUSE_MODE_MS) {
+                        // 必须在主线程上切换鼠标模拟模式
+                        mainThreadHandler.post(() -> context.toggleMouseEmulation());
+                    }
+                }
+                context.startDownTime = 0;
+            }
+        }
+
         // Gyro hold activation via analog LT/RT thresholds when mapped to L2/R2
         boolean wasHold = context.gyroHoldActive;
         context.gyroHoldActive = prefConfig.gyroToRightStick && computeAnalogActivation(leftTrigger, rightTrigger);
@@ -3291,6 +3312,8 @@ public class ControllerHandler implements InputManager.InputDeviceListener, UsbD
         public short leftStickY = 0x0000;
 
         public boolean gyroHoldActive;
+        
+        public long startDownTime = 0;
 
         public boolean mouseEmulationActive;
         public int mouseEmulationLastInputMap;
