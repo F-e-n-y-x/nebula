@@ -19,6 +19,10 @@
     <string name="pcview_menu_secondary_screen"> 作为副屏串流（基地适用） </string>
     <string name="pcview_menu_sleep_success"> 已催促主机睡眠 </string>
     <string name="pcview_menu_sleep_fail"> 连接主机睡眠失败 </string>
+    <string name="pcview_menu_disable_ipv6">禁用 IPv6</string>
+    <string name="pcview_menu_enable_ipv6">启用 IPv6</string>
+    <string name="pcview_ipv6_disabled">已禁用此电脑的 IPv6 连接</string>
+    <string name="pcview_ipv6_enabled">已启用此电脑的 IPv6 连接</string>
     <!-- Pair messages -->
     <string name="pairing"> 配对中…… </string>
     <string name="pair_pc_offline"> 电脑离线中 </string>

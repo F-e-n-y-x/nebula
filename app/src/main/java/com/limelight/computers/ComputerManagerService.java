@@ -266,6 +266,10 @@ public class ComputerManagerService extends Service {
             ComputerManagerService.this.removeComputer(computer);
         }
 
+        public void updateComputer(ComputerDetails computer) {
+            ComputerManagerService.this.updateComputer(computer);
+        }
+
         public void stopPolling() {
             // Just call the unbind handler to cleanup
             ComputerManagerService.this.onUnbind(null);
@@ -518,6 +522,27 @@ public class ComputerManagerService extends Service {
                         tuple.thread = null;
                     }
                     pollingTuples.remove(tuple);
+                    break;
+                }
+            }
+        }
+
+        releaseLocalDatabaseReference();
+    }
+
+    public void updateComputer(ComputerDetails computer) {
+        if (!getLocalDatabaseReference()) {
+            return;
+        }
+
+        // Update the computer in the database
+        dbManager.updateComputer(computer);
+
+        // Also update the in-memory copy
+        synchronized (pollingTuples) {
+            for (PollingTuple tuple : pollingTuples) {
+                if (tuple.computer.uuid.equals(computer.uuid)) {
+                    tuple.computer.update(computer);
                     break;
                 }
             }

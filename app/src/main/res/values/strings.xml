@@ -28,6 +28,10 @@
     <string name="pcview_menu_eol">NVIDIA GameStream End-of-Service</string>
     <string name="pcview_menu_sleep_success">Host sleep success</string>
     <string name="pcview_menu_sleep_fail">Host sleep failed</string>
+    <string name="pcview_menu_disable_ipv6">Disable IPv6</string>
+    <string name="pcview_menu_enable_ipv6">Enable IPv6</string>
+    <string name="pcview_ipv6_disabled">IPv6 disabled for this PC</string>
+    <string name="pcview_ipv6_enabled">IPv6 enabled for this PC</string>
 
     <!-- Network test strings -->
     <string name="nettest_title_waiting">Testing Network Connection</string>
