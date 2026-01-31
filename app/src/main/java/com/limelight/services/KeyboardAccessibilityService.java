@@ -2,9 +2,16 @@ package com.limelight.services;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
+
+import com.limelight.Game;
+import com.limelight.preferences.PreferenceConfiguration;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * 一个无障碍服务，用于在系统级别拦截硬件键盘事件。
@@ -78,6 +85,47 @@ public class KeyboardAccessibilityService extends AccessibilityService {
      */
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
+        if (interceptingEnabled && PreferenceConfiguration.readPreferences(this).enableCustomKeyMap) {
+            int fixedKeyCode = event.getKeyCode();
+            switch(fixedKeyCode){
+                case KeyEvent.KEYCODE_HOME:
+                    // HOME键映射ESC
+                    fixedKeyCode = KeyEvent.KEYCODE_ESCAPE;
+                    break;
+                case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+                    // 安卓上一首键映射Windows F5键
+                    fixedKeyCode = KeyEvent.KEYCODE_F5;
+                    break;
+                case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                    // 安卓播放暂停键映射Windows F10键
+                    fixedKeyCode = KeyEvent.KEYCODE_F10;
+                    break;
+                case KeyEvent.KEYCODE_MEDIA_NEXT:
+                    // 安卓下一首键映射Windows F11键
+                    fixedKeyCode = KeyEvent.KEYCODE_F11;
+                    break;
+            }
+            // 安卓截图键映射Windows PRINT SCREEN键
+            if(fixedKeyCode == KeyEvent.KEYCODE_SYSRQ || fixedKeyCode != event.getKeyCode()) {
+                if (keyEventCallback != null) {
+                    KeyEvent fixedEvent = new KeyEvent(
+                            event.getDownTime(),
+                            event.getEventTime(),
+                            event.getAction(),
+                            fixedKeyCode,
+                            event.getRepeatCount(),
+                            event.getMetaState(),
+                            event.getDeviceId(),
+                            event.getScanCode(),
+                            event.getFlags(),
+                            event.getSource()
+                    );
+                    keyEventCallback.onKeyEvent(fixedEvent);
+                }
+                return true;
+            }
+        }
+
         // 小米平板将物理 ESC 键（ScanCode=1）映射为 Android 的 BACK 键（Code=4）。
         // 必须在下方的 switch-case 过滤之前进行拦截，否则会被当作普通返回键忽略。
         if (event.getScanCode() == 1) {

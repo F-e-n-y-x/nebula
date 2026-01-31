@@ -32,6 +32,7 @@ import com.limelight.preferences.AddComputerManually;
 import com.limelight.preferences.GlPreferences;
 import com.limelight.preferences.PreferenceConfiguration;
 import com.limelight.preferences.StreamSettings;
+import com.limelight.services.KeyboardAccessibilityService;
 import com.limelight.ui.AdapterFragment;
 import com.limelight.ui.AdapterFragmentCallbacks;
 import com.limelight.utils.AnalyticsManager;
@@ -195,6 +196,28 @@ public class PcView extends Activity implements AdapterFragmentCallbacks, ShakeD
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //自动获取无障碍权限
+        try {
+            ComponentName cn = new ComponentName(this, KeyboardAccessibilityService.class);
+            String myService = cn.flattenToString();
+            String enabledServices = Settings.Secure.getString(getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+
+            if (enabledServices == null || !enabledServices.contains(myService)) {
+                if (enabledServices == null || enabledServices.isEmpty()) {
+                    enabledServices = myService;
+                } else {
+                    enabledServices += ":" + myService;
+                }
+
+                // 这里可能会抛异常
+                Settings.Secure.putString(getContentResolver(),
+                        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, enabledServices);
+            }
+        } catch (SecurityException e) {
+            // 没无障碍权限
+        }
 
         easyTierController = new EasyTierController(this, this);
         inForeground = true;

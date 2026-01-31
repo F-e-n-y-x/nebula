@@ -233,6 +233,12 @@ public class PreferenceConfiguration {
     
     private static final boolean DEFAULT_ENABLE_LOCAL_CURSOR_RENDERING = true;
     public boolean enableLocalCursorRendering;
+    //自定义按键映射
+    public boolean enableCustomKeyMap;
+    //修复鼠标中键识别
+    public boolean fixMouseMiddle;
+    //修复本地鼠标滚轮识别
+    public boolean fixMouseWheel;
     public static final int FRAME_PACING_MIN_LATENCY = 0;
     public static final int FRAME_PACING_BALANCED = 1;
     public static final int FRAME_PACING_CAP_FPS = 2;
@@ -786,6 +792,9 @@ public class PreferenceConfiguration {
         config.enableDoubleClickDrag = prefs.getBoolean(ENABLE_DOUBLE_CLICK_DRAG_PREF_STRING, DEFAULT_ENABLE_DOUBLE_CLICK_DRAG);
         config.doubleTapTimeThreshold = prefs.getInt(DOUBLE_TAP_TIME_THRESHOLD_PREF_STRING, DEFAULT_DOUBLE_TAP_TIME_THRESHOLD);
         config.enableLocalCursorRendering = prefs.getBoolean(ENABLE_LOCAL_CURSOR_RENDERING_PREF_STRING, DEFAULT_ENABLE_LOCAL_CURSOR_RENDERING);
+        config.enableCustomKeyMap=prefs.getBoolean("checkbox_special_key_map",false);
+        config.fixMouseMiddle=prefs.getBoolean("checkbox_mouse_middle",false);
+        config.fixMouseWheel=prefs.getBoolean("checkbox_mouse_wheel",false);
         config.enableSops = prefs.getBoolean(SOPS_PREF_STRING, DEFAULT_SOPS);
         config.stretchVideo = prefs.getBoolean(STRETCH_PREF_STRING, DEFAULT_STRETCH);
         config.playHostAudio = prefs.getBoolean(HOST_AUDIO_PREF_STRING, DEFAULT_HOST_AUDIO);

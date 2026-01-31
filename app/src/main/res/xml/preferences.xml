@@ -270,6 +270,21 @@
             android:summary="显示一个本地光标，可通过触摸板模式控制光标"
             android:defaultValue="false" />
         <CheckBoxPreference
+            android:key="checkbox_special_key_map"
+            android:title="特殊按键映射"
+            android:summary="键盘Home键映射Esc键，Esc+数字键/符号映射F1到F12,Esc+Q键映射串流菜单,安卓截图键映射Windows截图,安卓上一首/播放暂停/下一首分别映射到F5/F10/F11。"
+            android:defaultValue="false" />
+        <CheckBoxPreference
+            android:key="checkbox_mouse_middle"
+            android:title="修复鼠标中键"
+            android:summary="在一些设备上鼠标中键可能被识别为返回键，选中尝试修复此问题。"
+            android:defaultValue="true" />
+        <CheckBoxPreference
+            android:key="checkbox_mouse_wheel"
+            android:title="修复本地鼠标滚轮"
+            android:summary="在一些设备上使用本地鼠标滚轮可能产生触屏滑动事件，选中尝试修复此问题。"
+            android:defaultValue="true" />
+        <CheckBoxPreference
             android:key="checkbox_sync_touch_event_with_display"
             android:title="@string/title_checkbox_sync_touch_event_with_display"
             android:summary="@string/summary_checkbox_sync_touch_event_with_display"

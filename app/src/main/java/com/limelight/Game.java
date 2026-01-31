@@ -102,10 +102,12 @@ import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Set;
 
 import com.limelight.services.KeyboardAccessibilityService;
 
@@ -353,6 +355,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     public static final String EXTRA_SCREEN_COMBINATION_MODE = "Screen combination mode";
 
     private ExternalDisplayManager externalDisplayManager;
+
+    private float fakeScrollInitialY = -1;
+    private float scrollTotal = 0;
+    private long lastMouseHoverTime = 0; // 记录最后一次鼠标活跃的时间
+    private boolean waitRelease = false;
+    private boolean detectScrolling = false;
+    private boolean detectMouseMiddle = false;
+    private boolean detectMouseMiddleDown = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -2097,6 +2107,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         return handleKeyDown(event) || super.onKeyDown(keyCode, event);
     }
 
+    private final Set<Integer> pressedKeys = new HashSet<>();
+    // 0代表未按下，1代表按下esc，2代表按下自定义组合键
+    private int escState = 0; // 0 = 空闲，1 = ESC已按下，2 = 已进入组合键
+    private Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable escConfirmRunnable;
     @Override
     public boolean handleKeyDown(KeyEvent event) {
         switch (event.getKeyCode()) {
@@ -2105,6 +2120,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             case KeyEvent.KEYCODE_APP_SWITCH:
                 // 如果是系统导航键，则跳过我们的去重逻辑，
                 // 让事件继续被正常处理。
+            case KeyEvent.KEYCODE_VOLUME_UP:
+            case KeyEvent.KEYCODE_VOLUME_DOWN:
+            case KeyEvent.KEYCODE_VOLUME_MUTE:
+            case KeyEvent.KEYCODE_POWER:
                 break;
             default:
                 // 只有当事件不是来自服务、服务正在运行、且事件源不是虚拟键盘（即来自物理键盘）时，
@@ -2117,6 +2136,76 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                     return true;
                 }
                 break;
+        }
+
+        // 自定义组合键，只能其它+esc，esc+其它时，esc抬起时其它才会down
+        int keyCode = event.getKeyCode();
+        pressedKeys.add(keyCode);
+        if (prefConfig.enableCustomKeyMap) {
+            if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                escState = 1;
+//            Log.d("debug", "Esc: Down");
+                // 启动延迟判断是否是单独的ESC键
+                escConfirmRunnable = () -> {
+                    if (escState == 1) {
+//                    Log.d("debug", "Esc: Confirmed as Single");
+                        short translated = keyboardTranslator.translate(KeyEvent.KEYCODE_ESCAPE, event.getDeviceId());
+                        conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                        escState = 0;
+                    }
+                };
+                handler.postDelayed(escConfirmRunnable, 200); // 延迟判断
+                return true;
+            }
+
+            if (escState == 1) {
+                // 若在ESC后检测到自定义键按下，取消ESC单键判断
+                handler.removeCallbacks(escConfirmRunnable);
+
+                if (keyCode == KeyEvent.KEYCODE_Q) {
+//                Log.d("debug", "Esc + Q: Down");
+                    escState = 2;
+                    return true;
+                }
+                else if (keyCode >= KeyEvent.KEYCODE_1 && keyCode <= KeyEvent.KEYCODE_9) {
+//                Log.d("debug", "Esc + num: Down");
+                    escState = 2;
+                    int fKeyCode = KeyEvent.KEYCODE_F1 + (keyCode - KeyEvent.KEYCODE_1);
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                else if (keyCode == KeyEvent.KEYCODE_0) {
+//                Log.d("debug", "Esc + 0: Down -> F10");
+                    escState = 2;
+                    int fKeyCode = KeyEvent.KEYCODE_F10;
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                else if (keyCode == KeyEvent.KEYCODE_MINUS) {
+//                Log.d("debug", "Esc + -: Down -> F11");
+                    escState = 2;
+                    int fKeyCode = KeyEvent.KEYCODE_F11;
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                else if (keyCode == KeyEvent.KEYCODE_EQUALS) {
+//                Log.d("debug", "Esc + =: Down -> F12");
+                    escState = 2;
+                    int fKeyCode = KeyEvent.KEYCODE_F12;
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                else{
+                    // 非自定义组合键，不做处理
+                    short translated = keyboardTranslator.translate(KeyEvent.KEYCODE_ESCAPE, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    escState = 0;
+                }
+            }
         }
 
         // Pass-through virtual navigation keys
@@ -2142,6 +2231,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             // Always return true, otherwise the back press will be propagated
             // up to the parent and finish the activity.
             return true;
+        }
+
+        // 鼠标中键（同时影响触摸返回）
+        if (detectMouseMiddle && eventSource == InputDevice.SOURCE_KEYBOARD &&
+                event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            if (android.os.SystemClock.uptimeMillis() - lastMouseHoverTime < 250) {
+                detectMouseMiddleDown = true;
+                detectMouseMiddle = false;
+                conn.sendMouseButtonDown(MouseButtonPacket.BUTTON_MIDDLE);
+                return true;
+            }
         }
 
         boolean handled = false;
@@ -2242,6 +2342,73 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }
         }
+
+        int keyCode = event.getKeyCode();
+        pressedKeys.remove(keyCode);
+
+        if (prefConfig.enableCustomKeyMap) {
+            if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+                handler.removeCallbacks(escConfirmRunnable); // 若未执行则移除
+                if (escState == 1) {
+                    // 没有组合键，短时间内抬起
+//                Log.d("debug", "Esc: Up (no combo)");
+                    short translated = keyboardTranslator.translate(KeyEvent.KEYCODE_ESCAPE, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_DOWN, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    // 延迟发送 KEY_UP，不堵塞主线程
+                    handler.postDelayed(() -> {
+                        conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    }, 50); // 延迟 50ms
+                    escState = 0;
+                } else if (escState == 2) {
+                    // 组合键已触发，不处理ESC
+//                Log.d("debug", "Esc: Up (combo)");
+                    escState = 0;
+                }else{
+//                Log.d("debug", "Esc: Up (no custom combo)");
+                    short translated = keyboardTranslator.translate(KeyEvent.KEYCODE_ESCAPE, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    escState = 0;
+                }
+
+                return true;
+            }
+            if(escState == 2){
+                if (keyCode == KeyEvent.KEYCODE_Q) {
+//                Log.d("debug", "Esc + Q: Up");
+                    onBackPressed();
+                    return true;
+                }
+                if (keyCode >= KeyEvent.KEYCODE_1 && keyCode <= KeyEvent.KEYCODE_9) {
+//                Log.d("debug", "Esc + num: Up");
+                    int fKeyCode = KeyEvent.KEYCODE_F1 + (keyCode - KeyEvent.KEYCODE_1);
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_0) {
+//                Log.d("debug", "Esc + 0: Up -> F10");
+                    int fKeyCode = KeyEvent.KEYCODE_F10;
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_MINUS) {
+//                Log.d("debug", "Esc + -: Up -> F11");
+                    int fKeyCode = KeyEvent.KEYCODE_F11;
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_EQUALS) {
+//                Log.d("debug", "Esc + =: Up -> F12");
+                    int fKeyCode = KeyEvent.KEYCODE_F12;
+                    short translated = keyboardTranslator.translate(fKeyCode, event.getDeviceId());
+                    conn.sendKeyboardInput(translated, KeyboardPacket.KEY_UP, (byte) 0, MoonBridge.SS_KBE_FLAG_NON_NORMALIZED);
+                    return true;
+                }
+            }
+        }
+
         // Pass-through virtual navigation keys
         if ((event.getFlags() & KeyEvent.FLAG_VIRTUAL_HARD_KEY) != 0) {
             return false;
@@ -2263,6 +2430,14 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
             // Always return true, otherwise the back press will be propagated
             // up to the parent and finish the activity.
+            return true;
+        }
+
+        // 鼠标中键（同时影响触摸返回）
+        if (detectMouseMiddleDown && eventSource == InputDevice.SOURCE_KEYBOARD &&
+                event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+            detectMouseMiddleDown = false;
+            conn.sendMouseButtonUp(MouseButtonPacket.BUTTON_MIDDLE);
             return true;
         }
 
@@ -2831,6 +3006,120 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
 
         int eventSource = event.getSource();
+
+        // 支持华为平板识别原生鼠标下的滚动逻辑：一次8194鼠标滑动+五次4098屏幕滑动
+        if (prefConfig.fixMouseWheel && cursorVisible &&
+                eventSource == InputDevice.SOURCE_MOUSE &&
+                (event.getActionMasked() == MotionEvent.ACTION_HOVER_MOVE ||
+                        event.getActionMasked() == MotionEvent.ACTION_MOVE ||
+                        event.getActionMasked() == MotionEvent.ACTION_DOWN ||
+                        event.getActionMasked() == MotionEvent.ACTION_BUTTON_PRESS)){
+            lastMouseHoverTime = android.os.SystemClock.uptimeMillis();
+            detectScrolling = true;
+        }
+        else if (detectScrolling){
+            // 拦截系统通过触摸屏(Source 4098)模拟的鼠标滚轮事件
+            if (eventSource == InputDevice.SOURCE_TOUCHSCREEN && event.getPointerCount() == 1) {
+                int action = event.getActionMasked();
+                if (action == MotionEvent.ACTION_CANCEL) {
+                    waitRelease = true;
+                }
+                else if (action == MotionEvent.ACTION_DOWN) {
+                    long currentTime = android.os.SystemClock.uptimeMillis();
+                    long timeDiff = currentTime - lastMouseHoverTime;
+                    if (timeDiff <= 40 || waitRelease){
+                        fakeScrollInitialY = event.getY();
+                        // 同步发送绝对坐标给远程
+                        conn.sendMousePosition(
+                                (short)event.getX(),
+                                (short)event.getY(),
+                                (short)streamView.getWidth(),
+                                (short)streamView.getHeight()
+                        );
+                        return true;
+                    }
+                    else {
+//                        Log.d("debug", "timeDiff: " + timeDiff);
+                        detectScrolling = false;
+                        waitRelease = false;
+                        scrollTotal = 0;
+                    }
+                }
+                else if (action == MotionEvent.ACTION_MOVE) {
+                    float deltaY = event.getY() - fakeScrollInitialY;
+//                    Log.d("debug", "deltaY: " + deltaY);
+                    // 向上滑一次时deltaY=64，向下-64，滚动一格产生两次
+                    fakeScrollInitialY = event.getY();
+                    scrollTotal = scrollTotal + deltaY;
+                    if (scrollTotal > 127.99){
+                        scrollTotal = scrollTotal - 128;
+//                        Log.d("debug", "send: up");
+                        conn.sendMouseHighResScroll((short) 120);
+                    }
+                    else if (scrollTotal < -127.99){
+                        scrollTotal = scrollTotal + 128;
+//                        Log.d("debug", "send: down");
+                        conn.sendMouseHighResScroll((short) -120);
+                    }
+
+                    // 拦截事件，不再向下传递，避免触发点击或UI滑动
+                    return true;
+                }
+                else if (action == MotionEvent.ACTION_UP) {
+//                    Log.d("debug", "scrollTotal: " + scrollTotal);
+                    while(scrollTotal > 127.99 || scrollTotal < -127.99) {
+//                        Log.d("debug", "滚轮还未发完");
+                        if (scrollTotal > 127.99){
+                            scrollTotal = scrollTotal - 128;
+//                            Log.d("debug", "send: up");
+                            conn.sendMouseHighResScroll((short) 120);
+                        }
+                        else {
+                            scrollTotal = scrollTotal + 128;
+//                            Log.d("debug", "send: down");
+                            conn.sendMouseHighResScroll((short) -120);
+                        }
+                    }
+                    if (!waitRelease) {
+                        detectScrolling = false;
+                    }
+                    fakeScrollInitialY = -1;
+                    scrollTotal = 0;
+                    return true;
+                }
+                else {
+                    detectScrolling = false;
+                    waitRelease = false;
+                    scrollTotal = 0;
+                }
+            }
+            else if (waitRelease && eventSource == InputDevice.SOURCE_MOUSE && event.getActionMasked() == MotionEvent.ACTION_BUTTON_RELEASE) {
+                waitRelease = false;
+            }
+            else if (!waitRelease){
+                detectScrolling = false;
+                scrollTotal = 0;
+            }
+        }
+
+        // 支持华为鼠标中键
+        if (prefConfig.fixMouseMiddle) {
+            if (cursorVisible) {
+                // 本地模式：8194：7+7（x和y不变）
+                if (eventSource == InputDevice.SOURCE_MOUSE &&
+                        event.getActionMasked() == MotionEvent.ACTION_HOVER_MOVE) {
+                    lastMouseHoverTime = android.os.SystemClock.uptimeMillis();
+                    detectMouseMiddle = true;
+                }
+            }
+            else if (eventSource == InputDevice.SOURCE_MOUSE_RELATIVE &&
+                    event.getActionMasked() == MotionEvent.ACTION_BUTTON_RELEASE) {
+                // 远程模式：131076：2+11+12+2（x和y全0.0，中间可能夹杂2，依靠12来检测）
+                lastMouseHoverTime = android.os.SystemClock.uptimeMillis();
+                detectMouseMiddle = true;
+            }
+        }
+
         int deviceSources = event.getDevice() != null ? event.getDevice().getSources() : 0;
 
         // 本地鼠标指针模式的特殊处理
