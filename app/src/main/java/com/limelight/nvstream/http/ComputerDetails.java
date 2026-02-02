@@ -3,6 +3,8 @@ package com.limelight.nvstream.http;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.limelight.utils.NetHelper;
+
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
@@ -217,33 +219,20 @@ public class ComputerDetails {
                 return false;
             }
             
-            if (inetAddress.isSiteLocalAddress() || inetAddress.isLinkLocalAddress()) {
-                return true;
-            }
-            
-            return isPrivateIpv4(address.address);
+            // 复用 NetHelper 的 LAN 地址检测
+            return NetHelper.isLanAddress(address.address);
         } catch (Exception e) {
             return false;
         }
     }
 
+    /**
+     * @deprecated 使用 {@link NetHelper#isLanAddress(String)} 代替
+     */
+    @Deprecated
     private static boolean isPrivateIpv4(String addr) {
-        if (addr.startsWith("10.") || addr.startsWith("192.168.")) {
-            return true;
-        }
-        
-        if (addr.startsWith("172.")) {
-            String[] parts = addr.split("\\.");
-            if (parts.length >= 2) {
-                try {
-                    int secondOctet = Integer.parseInt(parts[1]);
-                    return secondOctet >= 16 && secondOctet <= 31;
-                } catch (NumberFormatException e) {
-                    return false;
-                }
-            }
-        }
-        return false;
+        // 委托给 NetHelper
+        return NetHelper.isLanAddress(addr);
     }
 
     public static boolean isIpv6Address(AddressTuple address) {

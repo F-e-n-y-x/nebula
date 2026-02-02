@@ -72,6 +72,7 @@
             android:defaultValue="false" />
     </PreferenceCategory>
     <PreferenceCategory
+        android:key="category_screen_position"
         android:title="@string/category_screen_position_settings"
         android:icon="@drawable/ic_screen_position"
         android:layout="@layout/preference_category_material">
@@ -110,6 +111,7 @@
         
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_audio_settings"
+        android:key="category_audio_settings"
         android:layout="@layout/preference_category_material">
         <ListPreference
             android:key="list_audio_config"
@@ -443,6 +445,7 @@
             />
     </PreferenceCategory>
     <PreferenceCategory 
+        android:key="category_crown_features"
         android:title="@string/category_crown_features"
         android:icon="@drawable/ic_enhance"
         android:layout="@layout/preference_category_material">
@@ -469,6 +472,7 @@
             android:summary="@string/summary_about_author" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_host_settings"
+        android:key="category_host_settings"
         android:layout="@layout/preference_category_material">
         <CheckBoxPreference
             android:key="checkbox_enable_sops"

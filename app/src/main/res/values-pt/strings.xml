@@ -252,4 +252,442 @@
     <string name="analogscroll_left">Stick analógico esquerdo</string>
     <string name="title_analog_scrolling">Usar um stick analógico para fazer scroll</string>
     <string name="summary_analog_scrolling">Selecciona um stick analógico para fazer scroll quando a emulação de rato está ativada</string>
+
+    <!-- Missing translations added -->
+    <string name="author_web">https://space.bilibili.com/393593468</string>
+    <string name="no_app_found_for_streaming">Nenhuma app encontrada para streaming</string>
+    <string name="error_interrupted">A operação foi interrompida</string>
+    <string name="error_code_prefix">Código de erro:</string>
+    <string name="notification_icon">Ícone de notificação</string>
+    <string name="copy_content">Copiar Conteúdo</string>
+    <string name="copy_success">Conteúdo copiado para a área de transferência</string>
+    <string name="copy_details">Copiar Detalhes</string>
+    <string name="perf_overlay_hostprocessinglatency">Latência de processamento do host min/max/média: %1$.1f/%2$.1f/%3$.1f ms</string>
+    <string name="perf_overlay_hidden">FECHAR</string>
+    <string name="perf_overlay_floating">SUSPENSÃO</string>
+    <string name="perf_overlay_locked">Fixo</string>
+    <string name="applist_menu_start_with_vdd">Iniciar com display virtual</string>
+    <string name="applist_menu_start_with_last_settings">Iniciar com últimas configurações</string>
+    
+    <!-- Game menu -->
+    <string name="game_menu_toggle_keyboard">Alternar teclado na tela</string>
+    <string name="game_menu_toggle_performance_overlay">Alternar overlay de desempenho</string>
+    <string name="game_menu_toggle_virtual_controller">Alternar controlador virtual</string>
+    <string name="game_menu_toggle_host_keyboard">Alternar teclado do host</string>
+    <string name="game_menu_toggle_all_keyboard">Alternar teclado do PC</string>
+    <string name="game_menu_toggle_mouse_on">Ativar emulação de rato pelo controlador</string>
+    <string name="game_menu_toggle_mouse_off">Desativar emulação de rato pelo controlador</string>
+    <string name="game_menu_disconnect">Desconectar</string>
+    <string name="game_menu_disconnect_and_quit">Desconectar e sair</string>
+    <string name="game_menu_cancel">Cancelar</string>
+    <string name="game_menu_send_keys">Enviar tecla(s) especial</string>
+    <string name="game_menu_send_keys_esc">Enviar ESC (Menu)</string>
+    <string name="game_menu_send_keys_f11">Enviar F11 (Alternar tela cheia)</string>
+    <string name="game_menu_send_keys_ctrl_v">Enviar CTRL + V (Colar)</string>
+    <string name="game_menu_send_keys_win">Enviar WIN (Menu Iniciar)</string>
+    <string name="game_menu_send_keys_win_d">Enviar WIN + D (Área de trabalho)</string>
+    <string name="game_menu_send_keys_win_g">Enviar WIN + G (Xbox Game Bar)</string>
+    <string name="game_menu_send_keys_shift_tab">Enviar SHIFT + TAB (Steam Overlay)</string>
+    <string name="game_menu_send_keys_alt_home">Enviar ALT + HOME (Alternar RTSS)</string>
+    <string name="game_menu_adjust_bitrate">Ajustar taxa de bits</string>
+    <string name="game_menu_bitrate_custom">Taxa de bits personalizada</string>
+    <string name="game_menu_bitrate_current">Atual: %d Mbps</string>
+    <string name="game_menu_bitrate_adjustment_success">Taxa de bits ajustada com sucesso para %d Mbps</string>
+    <string name="game_menu_bitrate_adjustment_failed">Falha ao ajustar taxa de bits</string>
+    <string name="game_menu_ok">OK</string>
+    <string name="game_menu_bitrate_range">Intervalo de taxa de bits:</string>
+    <string name="game_menu_bitrate_range_value">0.5 - 200 Mbps</string>
+    <string name="game_menu_bitrate_tip">Arraste o controle deslizante para ajustar a taxa de bits em tempo real. Valores mais altos significam melhor qualidade, mas exigem melhor rede.</string>
+    
+    <!-- Resolution settings -->
+    <string name="title_seekbar_scale">Escala de resolução do host</string>
+    <string name="summary_seekbar_scale">A resolução solicitada ao host é equivalente à resolução base do cliente × fator de escala. Isso alterará a precisão do material de renderização do jogo no host (streaming de super resolução).</string>
+    <string name="fps_suffix_fps">FPS</string>
+    <string name="title_native_fps_dialog">Aviso de FPS nativo</string>
+    <string name="title_custom_resolutions">Resoluções personalizadas</string>
+    <string name="summary_custom_resolutions">Crie suas próprias resoluções personalizadas</string>
+    <string name="custom_resolution_input_title">Inserir resolução personalizada</string>
+    <string name="width_label">Largura:</string>
+    <string name="height_label">Altura:</string>
+    <string name="width_hint">ex: 1920</string>
+    <string name="height_hint">ex: 1080</string>
+    <string name="add_resolution">Adicionar resolução</string>
+    <string name="invalid_resolution_format">Formato de resolução inválido, use o formato largura x altura</string>
+    <string name="resolution_already_exists">Esta resolução já existe</string>
+    <string name="resolution_added_successfully">Resolução adicionada com sucesso</string>
+    <string name="fps_144">144 FPS</string>
+    <string name="fps_165">165 FPS</string>
+    
+    <!-- Audio settings -->
+    <string name="title_checkbox_enable_spatializer">Ativar áudio espacial (Android 13+)</string>
+    <string name="summary_checkbox_enable_spatializer">Ativa experiência de áudio 3D imersiva usando o espacializador do Android. Requer Android 13+ e dispositivo de saída de áudio compatível.</string>
+    <string name="title_checkbox_control_only">Modo somente controle</string>
+    <string name="summary_checkbox_control_only">Estabelecer apenas conexão de controle sem streams de vídeo e áudio. Útil para controle de entrada remoto apenas.</string>
+    <string name="title_checkbox_enable_mic">Ativar redirecionamento de microfone</string>
+    <string name="summary_checkbox_enable_mic">Redirecionar o microfone do dispositivo para o computador host para chat de voz e comunicação.</string>
+    <string name="title_seekbar_mic_bitrate">Taxa de bits do microfone</string>
+    <string name="summary_seekbar_mic_bitrate">Ajustar a qualidade de áudio do redirecionamento de microfone.</string>
+    <string name="suffix_seekbar_mic_bitrate_kbps">kbps</string>
+    <string name="title_list_mic_icon_color">Cor do ícone do microfone</string>
+    <string name="summary_list_mic_icon_color">Escolha o esquema de cores para o ícone do botão do microfone</string>
+    
+    <!-- Gamepad settings -->
+    <string name="category_gamepad_settings">Configurações de gamepad</string>
+    <string name="title_seekbar_vibrate_fallback_strength">Ajustar intensidade da vibração emulada</string>
+    <string name="summary_seekbar_vibrate_fallback_strength">Amplificar ou reduzir a intensidade da vibração no seu dispositivo</string>
+    <string name="suffix_seekbar_vibrate_fallback_strength">%</string>
+    <string name="title_checkbox_enable_start_key_menu">Ativar menu de pressionar Start</string>
+    <string name="summary_checkbox_enable_start_key_menu">Pressionar longamente o botão Start abrirá o menu do jogo</string>
+    <string name="title_checkbox_gamepad_touchpad_as_mouse">Sempre controlar rato com touchpad</string>
+    <string name="summary_checkbox_gamepad_touchpad_as_mouse">Força a entrada do touchpad do gamepad a controlar o rato do host.</string>
+    <string name="title_checkbox_gamepad_motion_sensors">Permitir uso de sensores de movimento do gamepad</string>
+    <string name="summary_checkbox_gamepad_motion_sensors">Permite que hosts suportados solicitem dados do sensor de movimento.</string>
+    <string name="title_checkbox_gamepad_motion_fallback">Emular suporte a sensor de movimento do gamepad</string>
+    <string name="summary_checkbox_gamepad_motion_fallback">Usa os sensores de movimento integrados do seu dispositivo se os sensores do gamepad não forem suportados.</string>
+    
+    <!-- Input settings -->
+    <string name="title_checkbox_sync_touch_event_with_display">Sincronizar evento de toque com atualização de tela</string>
+    <string name="summary_checkbox_sync_touch_event_with_display">Se ativado, o evento de toque será sincronizado com a taxa de atualização da tela, como 60Hz.</string>
+    <string name="title_seekbar_long_press_flat_region">Região plana para eliminação de tremor de pressão longa</string>
+    <string name="summary_seekbar_long_press_flat_region">Funciona para toda a tela. Aumente para maior região plana de pressão longa.</string>
+    <string name="suffix_seekbar_flat_region_pixels">pixels</string>
+    <string name="title_checkbox_enable_keyboard_toggle_in_native_touch">Ativar alternância de teclado no modo de toque multiponto</string>
+    <string name="summary_checkbox_enable_keyboard_toggle_in_native_touch">\t</string>
+    <string name="title_seekbar_keyboard_toggle_fingers_native_touch">Dedos para tocar</string>
+    <string name="summary_seekbar_keyboard_toggle_fingers_native_touch">Número mínimo de dedos para tocar para alternar o teclado na tela local no modo de toque multiponto.</string>
+    <string name="suffix_seekbar_keyboard_toggle_fingers_native_touch"> </string>
+    <string name="title_checkbox_enable_esc_menu">Permitir tecla personalizada para abrir menu de retorno</string>
+    <string name="summary_checkbox_enable_esc_menu">Quando ativado, pressionar duas vezes a tecla selecionada abre o menu de retorno do stream</string>
+    <string name="title_list_esc_menu_key">Tecla de ativação do menu de retorno</string>
+    <string name="summary_list_esc_menu_key">Escolha qual tecla abrirá o menu de retorno quando pressionada duas vezes</string>
+    
+    <!-- Enhanced touch settings -->
+    <string name="category_enhanced_touch_settings">Toque multiponto aprimorado</string>
+    <string name="title_checkbox_enable_enhanced_touch">Ativar toque aprimorado</string>
+    <string name="summary_checkbox_enable_enhanced_touch">\t</string>
+    <string name="title_checkbox_enhanced_touch_on_which_side">Inverter zona de toque aprimorado</string>
+    <string name="summary_checkbox_enhanced_touch_on_which_side">Inverter zona de toque aprimorado para a esquerda (padrão: lado direito da tela)</string>
+    <string name="title_enhanced_touch_zone_divider">Divisor de zona de toque aprimorado</string>
+    <string name="summary_enhanced_touch_zone_divider">Define onde dividir as zonas de toque nativo e aprimorado</string>
+    <string name="dialog_title_enhanced_touch_zone_divider">Menos de 50% significa dividir de um ponto à esquerda, mais de 50% significa direita</string>
+    <string name="suffix_enhanced_touch_zone_divider">%</string>
+    <string name="title_pointer_velocity_factor">Fator de velocidade do ponteiro</string>
+    <string name="summary_pointer_velocity_factor">Definir fator de velocidade do ponteiro para zona de toque aprimorado. Defina 100% para desativar</string>
+    <string name="dialog_title_pointer_velocity_factor">Definir fator de velocidade do ponteiro para zona de toque aprimorado. Defina 100% para desativar</string>
+    <string name="suffix_pointer_velocity_factor">%</string>
+    <string name="title_fixed_x_velocity">Definir velocidade X fixa (horizontal)</string>
+    <string name="summary_fixed_x_velocity">Definir velocidade X fixa (horizontal). Defina 0 para desativar.</string>
+    <string name="dialog_title_fixed_x_velocity">Definir velocidade X fixa (horizontal) em pixels. Defina 0 para desativar.</string>
+    <string name="suffix_fixed_x_velocity">pixels</string>
+    
+    <!-- On-screen controls -->
+    <string name="title_show_guide_button">Mostrar botão guia</string>
+    <string name="summary_show_guide_button">Mostrar o botão guia na tela</string>
+    
+    <!-- UI settings -->
+    <string name="title_checkbox_enable_background_audio">Modo de áudio em segundo plano</string>
+    <string name="summary_checkbox_enable_background_audio">Ocultar toda a janela e reproduzir áudio em segundo plano, permitindo usar outros apps enquanto ouve</string>
+    <string name="title_checkbox_resume_stream">Retomar stream automaticamente</string>
+    <string name="summary_checkbox_resume_stream">Retomar automaticamente o stream ao retornar ao Moonlight do segundo plano</string>
+    
+    <!-- Host settings -->
+    <string name="title_screen_combination_mode">Modo de combinação de tela (Sunshine Foundation)</string>
+    <string name="summary_screen_combination_mode">Controle como o Sunshine gerencia seus monitores ao iniciar um stream</string>
+    <string name="screen_mode_host_default">Usar configuração do host Sunshine (padrão)</string>
+    <string name="screen_mode_no_operation">Não alterar configuração do monitor</string>
+    <string name="screen_mode_ensure_active">Garantir que a tela de streaming esteja ativa</string>
+    <string name="screen_mode_ensure_primary">Garantir que a tela de streaming seja principal</string>
+    <string name="screen_mode_ensure_only_display">Usar apenas a tela de streaming (desligar outros displays)</string>
+    
+    <!-- Advanced settings -->
+    <string name="title_enable_hdr_high_brightness">Ativar HDR com alto brilho</string>
+    <string name="summary_enable_hdr_high_brightness">Forçar brilho máximo da tela quando o streaming HDR estiver ativado</string>
+    <string name="title_enable_perf_overlay">Mostrar estatísticas de desempenho durante streaming</string>
+    <string name="summary_enable_perf_overlay">Exibir informações de desempenho do stream em tempo real durante o streaming</string>
+    <string name="title_perf_overlay_orientation">Orientação do overlay de desempenho</string>
+    <string name="summary_perf_overlay_orientation">Escolha a orientação de exibição para estatísticas de desempenho</string>
+    <string name="title_perf_overlay_position">Posição do overlay de desempenho</string>
+    <string name="summary_perf_overlay_position">Escolha superior/inferior para orientação horizontal, ou quatro posições de canto para vertical</string>
+    <string name="title_reset_perf_overlay_position">Redefinir posição do overlay de desempenho</string>
+    <string name="summary_reset_perf_overlay_position">Redefinir overlay de desempenho para posição predefinida</string>
+    <string name="title_perf_overlay_display_items">Itens de exibição do overlay de desempenho</string>
+    <string name="summary_perf_overlay_display_items">Selecionar itens de informação para exibir no overlay de desempenho</string>
+    <string name="title_checkbox_lock_screen_after_disconnect">Bloquear tela ao desconectar e sair do stream</string>
+    <string name="summary_checkbox_lock_screen_after_disconnect">Bloquear automaticamente a tela do dispositivo após desconectar e sair do stream</string>
+    <string name="title_checkbox_swap_quit_and_disconnect">Alternar função do botão \"Sair\"</string>
+    <string name="summary_checkbox_swap_quit_and_disconnect">Quando ativado, o botão \"Sair\" desconectará sem fechar a app</string>
+    <string name="mic_stats_continuity">Continuidade de áudio: %.1f%% (Capturado:%d Codificado:%d Enviado:%d Descartado:%d)</string>
+    
+    <!-- About -->
+    <string name="title_about_mode">Sobre</string>
+    <string name="summary_about_mode">Ver informações da app e detalhes do projeto</string>
+    <string name="about_dialog_description">Moonlight V+ é um cliente aprimorado construído para Foundation Sunshine, proporcionando a melhor experiência de streaming de jogos.</string>
+    <string name="about_dialog_project_info">Baseado no projeto de código aberto Moonlight-Android, criado pela comunidade Foundation</string>
+    <string name="about_dialog_thanks">Obrigado por escolher o Moonlight V+! Se você achar útil, por favor dê-nos uma estrela no GitHub ⭐</string>
+    <string name="about_dialog_github">GitHub</string>
+    <string name="about_dialog_star">Dar estrela ao projeto</string>
+    <string name="about_dialog_qq">Entrar no grupo QQ</string>
+    <string name="about_dialog_close">Fechar</string>
+    <string name="check_for_updates">Verificar atualizações</string>
+    <string name="summary_check_for_updates">Verificar se há uma nova versão disponível</string>
+    
+    <!-- Toasts -->
+    <string name="toast_controller_type_changed">O tipo de gamepad pode ter mudado devido à emulação do sensor de movimento</string>
+    
+    <!-- Video format -->
+    <string name="videoformat_av1always">Preferir AV1 (Experimental)</string>
+    <string name="videoformat_h264always">Preferir H.264</string>
+    <string name="pacing_experimental_low_latency">Experimental: Latência ultra-baixa (avançado)</string>
+    <string name="pacing_precise_sync">Sincronização precisa</string>
+    
+    <!-- Microphone -->
+    <string name="mic_button">Microfone</string>
+    <string name="mic_enabled">Microfone ativado</string>
+    <string name="mic_disabled">Microfone desativado</string>
+    <string name="mic_permission_required">Permissão de microfone necessária</string>
+    
+    <!-- Screen position settings -->
+    <string name="category_screen_position_settings">Configurações de tela</string>
+    <string name="title_screen_position">Posição da tela</string>
+    <string name="summary_screen_position">Escolha a posição da tela ao usar resolução não tela cheia</string>
+    <string name="title_screen_offset_x">Deslocamento horizontal</string>
+    <string name="summary_screen_offset_x">Deslocamento horizontal da tela</string>
+    <string name="title_screen_offset_y">Deslocamento vertical</string>
+    <string name="summary_screen_offset_y">Deslocamento vertical da tela</string>
+    
+    <!-- Crown features -->
+    <string name="category_crown_features">Área de recursos Crown</string>
+    <string name="title_crown_super_features">Super recursos Crown</string>
+    <string name="summary_crown_super_features">Botões personalizados e configurações durante streaming, salvos em configurações personalizadas para troca rápida</string>
+    <string name="title_export_super_config">Exportar configuração</string>
+    <string name="summary_export_super_config">Exportar arquivo de configuração de botões personalizados e configurações de streaming</string>
+    <string name="title_import_super_config">Importar configuração</string>
+    <string name="summary_import_super_config">Importar arquivo de configuração de botões personalizados e configurações de streaming</string>
+    <string name="title_merge_super_config">Mesclar configuração</string>
+    <string name="summary_merge_super_config">Mesclar novos botões de configuração na configuração existente</string>
+    <string name="title_about_author">Este é V+ X Royal Edition</string>
+    <string name="summary_about_author">Bilibili do Crown: XiguaHub, por favor siga-os. GitHub: https://github.com/WACrown/moonlight-android</string>
+    <string name="crown_toggle_button">Crown</string>
+    <string name="crown_mode_normal">Modo normal</string>
+    <string name="crown_mode_crown">Modo Crown</string>
+    <string name="crown_switch_to_normal">Mudar para modo normal</string>
+    <string name="crown_switch_to_crown">Mudar para modo Crown</string>
+    <string name="game_menu_crown_function">Função Crown</string>
+    <string name="game_menu_toggle_elements_visibility">Mostrar/Ocultar teclas virtuais</string>
+    <string name="game_menu_configure_crown_function">Configurar função Crown</string>
+    <string name="toast_elements_visible">Botão virtual exibido</string>
+    <string name="toast_elements_hidden">Botão virtual oculto</string>
+    <string name="toast_back_key_menu_switch_1">A configuração da função crown foi encerrada</string>
+    <string name="toast_back_key_menu_switch_2">Entrou na configuração da função crown</string>
+    <string name="game_menu_edit_mode">Modo de edição do botão Crown</string>
+    <string name="game_menu_configure_settings">Modo de configuração do botão Crown</string>
+    
+    <!-- External display -->
+    <string name="title_use_external_display">Usar display externo</string>
+    <string name="summary_use_external_display">Se um display externo estiver conectado, exibir o stream no display externo</string>
+    
+    <!-- Background image API -->
+    <string name="title_background_image_api">API de imagem de fundo</string>
+    <string name="summary_background_image_api">Insira uma API de imagem de fundo personalizada ou URL de imagem única. Deixe vazio para ver imagens aleatórias</string>
+    <string name="dialog_title_background_image_api">API de imagem de fundo</string>
+    <string name="dialog_message_background_image_api">Por favor, insira a API de imagem completa</string>
+    
+    <!-- Local image picker -->
+    <string name="title_local_image_picker">Selecionar imagem local</string>
+    <string name="summary_local_image_picker">Escolher uma imagem da sua galeria como fundo</string>
+    
+    <!-- Reset background image -->
+    <string name="title_reset_background_image">Redefinir imagem de fundo</string>
+    <string name="summary_reset_background_image">Restaurar imagem de fundo padrão (imagem aleatória da API)</string>
+    
+    <!-- Reverse resolution -->
+    <string name="title_checkbox_reverse_resolution">Inverter resolução</string>
+    <string name="summary_checkbox_reverse_resolution">Trocar valores de largura e altura para requisitos especiais de exibição</string>
+    <string name="title_checkbox_rotable_screen">Seguir rotação da tela</string>
+    <string name="summary_checkbox_rotable_screen">Quando ativado, a orientação da exibição será ajustada quando o dispositivo girar</string>
+    
+    <!-- Moonlight V+ PC download -->
+    <string name="title_moonlight_vplus_pc_download">Download do Moonlight V+ PC</string>
+    
+    <!-- Analytics settings -->
+    <string name="title_enable_analytics">Ativar análise</string>
+    <string name="summary_enable_analytics">Ajude a melhorar a app compartilhando estatísticas de uso anônimas</string>
+    
+    <!-- Tips -->
+    <string name="tip_esc_exit">💡 Dica: Use o botão \"Sair\" para sair rapidamente e completamente do stream, restaurando sua tela ao estado pré-stream~</string>
+    <string name="tip_double_tap_mouse">💡 Dica: Pressione longamente a área em branco superior na página da lista de hosts para baixar o papel de parede atual~</string>
+    <string name="tip_long_press_controller">💡 Dica: Pressione longamente uma app para escolher streaming com display virtual, super conveniente!</string>
+    <string name="tip_volume_keys">💡 Dica: Usar WiFi 5GHz proporciona uma experiência melhor, velocidade ultra rápida~</string>
+    <string name="tip_wallpaper_change">💡 Dica: A opção da API de papel de parede pode definir a API para fontes de papel de parede aleatórias, ou um endereço de imagem único</string>
+    <string name="tip_5ghz_wifi">💡 Dica: Usar o modo de taxa de quadros \"Equilibrado\" oferece o melhor equilíbrio entre taxa de quadros e latência, perfeito!</string>
+    <string name="tip_close_apps">💡 Dica: Ativar HDR proporciona melhor desempenho de cores e contraste.</string>
+    <string name="tip_home_saves">💡 Dica: Os 5 pequenos tubarões na página inicial podem salvar e trocar rapidamente configurações de streaming~</string>
+    <string name="tip_hdr_colors">💡 Dica: Ajustar a resolução pode equilibrar qualidade e desempenho, encontre as configurações perfeitas~</string>
+    <string name="tip_touch_modes">💡 Dica: Você pode trocar os modos de toque no menu do jogo. Toque multiponto aprimorado é adequado para jogos móveis, modo trackpad é ótimo para trabalho de escritório.</string>
+    <string name="tip_custom_keys">💡 Dica: Você pode adicionar combinações de teclas personalizadas, como Ctrl+Shift+Esc para abrir rapidamente o Gerenciador de Tarefas~</string>
+    <string name="tip_performance_overlay">💡 Dica: O overlay de desempenho pode ser arrastado para qualquer posição, toque duplo para alternar entre layouts horizontal e vertical~</string>
+    <string name="tip_audio_config">💡 Dica: Ativar Dolby Atmos ou DTS:X proporciona uma experiência de áudio mais imersiva~</string>
+    <string name="tip_external_display">💡 Dica: Ao conectar um display externo, você pode escolher exibir o stream no display externo nas configurações~</string>
+    <string name="tip_virtual_display">💡 Dica: A função de display virtual pode criar espaços de exibição independentes, especialmente adequada para cenários de multitarefa~</string>
+    <string name="tip_dynamic_bitrate">💡 Dica: Ao usar decodificadores HEVC ou AV1, você pode ajustar a taxa de bits durante o streaming sem sair~</string>
+    <string name="tip_cards_show">💡 Dica: Você pode editar os cartões de função exibidos no menu do jogo. Cartões desnecessários podem ser ocultados~</string>
+    
+    <!-- Touch mode switch menu -->
+    <string name="game_menu_switch_touch_mode">Trocar modo de toque</string>
+    <string name="game_menu_touch_mode_enhanced">Toque multiponto aprimorado</string>
+    <string name="game_menu_touch_mode_classic">Modo de rato clássico</string>
+    <string name="game_menu_touch_mode_trackpad">Modo trackpad</string>
+    <string name="game_menu_local_cursor_rendering">Renderização de cursor local</string>
+    <string name="game_menu_touch_mode_native_mouse">Ponteiro de rato nativo</string>
+    <string name="toast_touch_mode_enhanced_on">Toque multiponto aprimorado ativado</string>
+    <string name="toast_touch_mode_classic_on">Modo de rato clássico ativado</string>
+    <string name="toast_touch_mode_trackpad_on">Modo trackpad ativado</string>
+    <string name="toast_touch_mode_native_mouse_on">Ponteiro de rato nativo ativado</string>
+    
+    <!-- Mouse mode preset -->
+    <string name="title_list_native_mouse_mode_preset">Predefinição de modo de rato</string>
+    <string name="summary_list_native_mouse_mode_preset">Selecione uma configuração predefinida de modo de rato/toque</string>
+    <string name="native_mouse_mode_preset_enhanced">Toque multiponto aprimorado</string>
+    <string name="native_mouse_mode_preset_classic">Modo de rato clássico</string>
+    <string name="native_mouse_mode_preset_trackpad">Modo trackpad</string>
+    <string name="native_mouse_mode_preset_native">Ponteiro de rato nativo</string>
+    <string name="toast_preset_applied">Predefinição aplicada: %s</string>
+    
+    <!-- Custom special keys -->
+    <string name="game_menu_add_custom_key">Adicionar botão personalizado</string>
+    <string name="game_menu_delete_custom_key">Excluir botão personalizado</string>
+    <string name="dialog_title_add_custom_key">Adicionar botões personalizados</string>
+    <string name="dialog_hint_key_name">Nome da tecla (ex: Ctrl+Shift+Esc)</string>
+    <string name="dialog_hint_key_codes">Códigos de tecla (ex: 0x11, 0x10, 0x1B)</string>
+    <string name="dialog_button_save">SALVAR</string>
+    <string name="dialog_button_cancel">CANCELAR</string>
+    <string name="dialog_button_clear">LIMPAR</string>
+    <string name="dialog_virtual_keyboard_hint">Clique nas teclas para criar uma combinação</string>
+    <string name="dialog_title_select_keys_to_delete">Selecione o botão para excluir</string>
+    <string name="dialog_button_delete">EXCLUIR</string>
+    <string name="toast_name_and_codes_cannot_be_empty">Nome e código da tecla não podem estar vazios</string>
+    <string name="toast_key_code_format_error">Erro de formato, o código da tecla deve começar com \"0x\"</string>
+    <string name="toast_custom_key_saved">Botão personalizado \'%s\' foi salvo</string>
+    <string name="toast_save_failed">Falha ao salvar, verifique o formato</string>
+    <string name="toast_no_custom_keys_to_delete">Não há teclas personalizadas que possam ser excluídas</string>
+    <string name="toast_selected_keys_deleted">O botão selecionado foi excluído</string>
+    <string name="toast_delete_failed">Falha na exclusão</string>
+    <string name="toast_load_key_list_failed">Falha ao carregar lista de botões</string>
+    <string name="toast_load_custom_keys_corrupted">Falha ao carregar botão personalizado</string>
+    
+    <!-- Gyro -->
+    <string name="gyro_activation_method">Tecla de ativação</string>
+    <string name="gyro_invert_x_axis">Inverter X</string>
+    <string name="gyro_invert_y_axis">Inverter Y</string>
+    <string name="gyro_sensitivity">Sensibilidade</string>
+    <string name="gyro_sensitivity_format">Sensibilidade %.1fx</string>
+    <string name="gyro_activation_always">Sempre ativo</string>
+    
+    <!-- Accessibility service -->
+    <string name="accessibility_service_label">Serviço de teclado Moonlight</string>
+    <string name="accessibility_service_description">
+        Para fornecer uma experiência completa de jogo de PC com seu teclado externo, este serviço precisa capturar todas as teclas do teclado.
+        \n\n
+        Uma vez ativado, você poderá usar todos os atalhos do sistema como teclas Win/Command, Alt+Tab, etc., assim como no seu computador.
+        \n\n
+        Fique tranquilo, este serviço é usado apenas para enviar operações de tecla diretamente ao seu computador, e não registraremos nem enviaremos nenhum do seu conteúdo de entrada.
+    </string>
+    
+    <!-- Performance Overlay Info -->
+    <string name="perf_moon_phase_info">Fase da lua de hoje\n\n%s %s\nCiclo da fase lunar: %.1f%%\nDia do ciclo: Dia %d\nData: %s\n\n%s</string>
+    <string name="perf_decoder_title">🎬 Informações do decodificador</string>
+    <string name="perf_decoder_info">O decodificador é responsável por decodificar streams de vídeo em imagens exibíveis.\n\nDecodificadores comuns:\n• H.264 (AVC) - Melhor compatibilidade\n• H.265 (HEVC) - Maior compressão\n• AV1 - Padrão mais recente, mais eficiente\n\nSuporte HDR:\n• Vídeo de alta faixa dinâmica\n• Representação de cores mais rica\n• Requer suporte de hardware</string>
+    <string name="perf_fps_title">📊 Informações de taxa de quadros</string>
+    <string name="perf_fps_info">Rx FPS: Taxa de quadros recebidos\n• Número de quadros de vídeo recebidos do host\n• Deve ser estável em condições ideais\n\nRd FPS: Taxa de quadros renderizados\n• Número de quadros realmente renderizados na tela\n• Pode ser reduzido devido ao desempenho do dispositivo</string>
+    <string name="perf_packet_loss_title">📶 Informações de perda de pacotes</string>
+    <string name="perf_packet_loss_info">A perda de pacotes representa a porcentagem de pacotes de dados perdidos durante a transmissão de rede.\n\nIntervalo normal:\n• 0-0,5%: Qualidade de rede excelente\n• 0,5-2%: Boa qualidade de rede\n• 2-5%: Qualidade de rede razoável\n• &gt;5%: Má qualidade de rede</string>
+    <string name="perf_network_latency_title">🌐 Informações de latência de rede</string>
+    <string name="perf_network_latency_info">A latência de rede representa o tempo de ida e volta para pacotes de dados do host ao dispositivo.\n\nIntervalo de latência:\n• &lt;20ms: Excelente\n• 20-50ms: Bom\n• 50-100ms: Aceitável\n• &gt;100ms: Ruim</string>
+    <string name="perf_decode_latency_title">⏱️ Informações de latência de decodificação</string>
+    <string name="perf_decode_latency_info">A latência de decodificação representa o tempo necessário para decodificar quadros de vídeo.\n\nIntervalo de latência:\n• &lt;5ms: Desempenho excelente do decodificador\n• 5-10ms: Bom desempenho do decodificador\n• 10-20ms: Desempenho razoável do decodificador\n• &gt;20ms: Desempenho ruim do decodificador</string>
+    <string name="perf_host_latency_title">🖥️ Informações de latência do host</string>
+    <string name="perf_host_latency_info">A latência do host representa o tempo para o host do jogo processar quadros.\n\nIntervalo de latência:\n• &lt;5ms: Desempenho forte do host\n• 5-10ms: Bom desempenho do host\n• 10-20ms: Desempenho razoável do host\n• &gt;20ms: Desempenho fraco do host</string>
+    <string name="perf_battery_info_title">🔋 Informações da bateria</string>
+    <string name="perf_battery_status_sufficient">Nível da bateria é suficiente</string>
+    <string name="perf_battery_status_low">Nível da bateria está baixo, recomenda-se carregar</string>
+    <string name="perf_battery_status_critical">Nível da bateria está criticamente baixo, carregue em breve</string>
+    <string name="perf_battery_info_content">Bateria atual: %1$d%%\nStatus: %2$s\n\nDica: Bateria baixa pode afetar a experiência de jogo, recomenda-se conectar o carregador</string>
+    
+    <!-- App last settings -->
+    <string name="app_last_settings_title">Últimas configurações</string>
+    <string name="app_last_settings_none">Sem últimas configurações</string>
+    <string name="app_last_settings_use_checkbox">Usar últimas configurações</string>
+    <string name="app_last_settings_apply_success">Últimas configurações aplicadas</string>
+    <string name="app_last_settings_start_with_last">Iniciado com últimas configurações</string>
+    
+    <!-- Setting detail strings -->
+    <string name="setting_resolution">Resolução: %1$dx%2$d</string>
+    <string name="setting_fps">Taxa de quadros: %1$dfps</string>
+    <string name="setting_bitrate">Taxa de bits: %1$dkbps</string>
+    <string name="setting_scale">Escala: %1$d%%</string>
+    <string name="setting_format">Codec de vídeo: %1$s</string>
+    <string name="setting_hdr_enabled">HDR: Ativado</string>
+    <string name="setting_mic_enabled">Microfone: %1$dkbps</string>
+    <string name="setting_native_mouse_enabled">Rato nativo: Ativado</string>
+    <string name="setting_gyro_sensitivity">Giroscópio: %1$.1fx</string>
+    <string name="setting_bitrate_card_enabled">Cartão de taxa de bits: Ativado</string>
+    <string name="setting_gyro_card_enabled">Cartão de giroscópio: Ativado</string>
+    <string name="setting_QuickKey_card_enabled">Cartão de tecla especial: Ativado</string>
+    
+    <!-- Time format strings -->
+    <string name="time_just_now">Agora mesmo</string>
+    <string name="time_minutes_ago">%1$d minutos atrás</string>
+    <string name="time_hours_ago">%1$d horas atrás</string>
+    <string name="time_days_ago">%1$d dias atrás</string>
+    <string name="time_unknown">Hora desconhecida</string>
+    
+    <!-- PcView strings -->
+    <string name="storage_permission_required">Permissão de armazenamento necessária para salvar imagens, conceda permissão nas configurações</string>
+    <string name="downloading_image_please_wait">Re-baixando imagem, por favor aguarde...</string>
+    <string name="image_download_failed_retry">Falha no download da imagem, tente novamente</string>
+    <string name="image_download_failed_with_error">Falha no download da imagem: %1$s</string>
+    <string name="image_not_loaded_please_retry">Imagem não carregada, tente novamente mais tarde</string>
+    <string name="image_invalid">Imagem inválida</string>
+    <string name="image_saved_successfully">Imagem salva com sucesso no diretório do sistema (Picture/setu)</string>
+    <string name="image_save_failed_with_error">Falha ao salvar imagem: %1$s</string>
+    <string name="config_save_failed">Falha ao salvar configuração</string>
+    <string name="scene_config_applied">Configuração da cena %1$d aplicada: %2$dx%3$d@%4$dFPS %5.2fMbps %6$s HDR %7$s</string>
+    <string name="scene_not_configured">Cena %1$d não configurada</string>
+    <string name="config_apply_failed">Falha ao aplicar configuração</string>
+    <string name="save_to_scene">Salvar na cena %1$d</string>
+    <string name="overwrite_current_config">Sobrescrever configuração atual?</string>
+    <string name="scene_saved_successfully">Cena %1$d salva com sucesso</string>
+    <string name="unable_to_get_pc_address">Não foi possível obter o endereço do PC: %1$s</string>
+    <string name="send_sleep_command">Enviar comando de suspensão</string>
+    <string name="network_bandwidth_test">Teste de largura de banda de rede (iPerf3)</string>
+    <string name="no_online_computer_with_running_game">Nenhum computador online com jogo em execução encontrado</string>
+    <string name="restoring_session">Restaurando sessão: %1$s</string>
+    <string name="please_wait_seconds">Por favor aguarde %1$ds</string>
+    <string name="daily_limit_reached">Limite diário atingido (5/5). Tente novamente amanhã!</string>
+    <string name="refreshing_with_remaining">Atualizando... (%1$d restantes hoje)</string>
+    <string name="background_refreshed_with_remaining">Fundo atualizado! (%1$d restantes hoje)</string>
+    <string name="refresh_failed_please_retry">Falha na atualização, tente novamente</string>
+    <string name="refresh_failed_with_error">Falha na atualização: %1$s</string>
+    <string name="game_menu_toggle_remote_mouse">Mostrar/Ocultar rato remoto</string>
+    <string name="toast_remote_mouse_toast">Rato remoto exibido/oculto</string>
+    
+    <!-- Output Buffer Queue -->
+    <string name="title_seekbar_output_buffer_queue_limit">Limite da fila de buffer de saída</string>
+    <string name="summary_seekbar_output_buffer_queue_limit">Controla o número máximo de quadros decodificados que podem ser enfileirados antes da renderização. Valores mais baixos reduzem a latência, mas podem causar queda de quadros.</string>
+    <string name="suffix_seekbar_output_buffer_queue_limit">quadros</string>
+    <string name="unpaired_devices_shown">Dispositivos não pareados exibidos</string>
+    <string name="unpaired_devices_hidden">Dispositivos não pareados ocultos</string>
+    <string name="new_unpaired_device_shown">Novo dispositivo não pareado detectado, exibindo dispositivos não pareados</string>
+    <string name="host_resolution_changed">Resolução do host alterada para %1$dx%2$d</string>
+    
+    <!-- PC view menu -->
+    <string name="pcview_menu_secondary_screen">Stream de tela secundária (compatível com Foundation Sunshine)</string>
+    <string name="pcview_menu_eol">Fim de serviço do NVIDIA GameStream</string>
+    <string name="pcview_menu_sleep_success">Suspensão do host bem-sucedida</string>
+    <string name="pcview_menu_sleep_fail">Falha na suspensão do host</string>
+    <string name="pair_pairing_help">Se o seu PC host estiver executando o Sunshine, navegue até a interface web do Sunshine para inserir o PIN.</string>
+    
+    <!-- Drawer Menu -->
+    <string name="menu">Menu</string>
+    <string name="title_settings">Configurações</string>
 </resources>

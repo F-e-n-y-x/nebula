@@ -67,6 +67,10 @@ public class ComputerManagerService extends Service {
     private final Lock defaultNetworkLock = new ReentrantLock();
 
     private ConnectivityManager.NetworkCallback networkCallback;
+    
+    // 网络诊断和动态超时管理
+    private NetworkDiagnostics networkDiagnostics;
+    private DynamicTimeoutManager timeoutManager;
 
     private DiscoveryService.DiscoveryBinder discoveryBinder;
     private final ServiceConnection discoveryServiceConnection = new ServiceConnection() {
@@ -340,60 +344,135 @@ public class ComputerManagerService extends Service {
             return;
         }
 
-        boolean boundToNetwork = false;
-        boolean activeNetworkIsVpn = NetHelper.isActiveNetworkVpn(this);
-        ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        // 异步执行STUN请求，不阻塞主机查询
+        new Thread(() -> performStunRequestAsync(details), 
+                   "STUN-Request-" + details.name).start();
+    }
+    
+    /**
+     * 异步执行STUN请求 - 不阻塞主机查询流程
+     */
+    private void performStunRequestAsync(ComputerDetails details) {
+        try {
+            boolean boundToNetwork = false;
+            boolean activeNetworkIsVpn = NetHelper.isActiveNetworkVpn(this);
+            ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
 
-        // Check if we're currently connected to a VPN which may send our
-        // STUN request from an unexpected interface
-        if (activeNetworkIsVpn) {
-            // Acquire the default network lock since we could be changing global process state
-            defaultNetworkLock.lock();
+            // 获取动态超时配置
+            int stunTimeout = timeoutManager != null ? 
+                    timeoutManager.getStunTimeout() : 5000; // 默认5秒
+            
+            LimeLog.info("Starting async STUN request for " + details.name + " with timeout: " + stunTimeout + "ms");
 
-            // On Lollipop or later, we can bind our process to the underlying interface
-            // to ensure our STUN request goes out on that interface or not at all (which is
-            // preferable to getting a VPN endpoint address back).
-            Network[] networks = connMgr.getAllNetworks();
-            for (Network net : networks) {
-                NetworkCapabilities netCaps = connMgr.getNetworkCapabilities(net);
-                if (netCaps != null &&
-                        !netCaps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) &&
-                        !netCaps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
-                    // This network looks like an underlying multicast-capable transport,
-                    // so let's guess that it's probably where our mDNS response came from.
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        if (connMgr.bindProcessToNetwork(net)) {
-                            boundToNetwork = true;
-                            break;
+            // Check if we're currently connected to a VPN which may send our
+            // STUN request from an unexpected interface
+            if (activeNetworkIsVpn) {
+                // Acquire the default network lock since we could be changing global process state
+                defaultNetworkLock.lock();
+
+                try {
+                    // On Lollipop or later, we can bind our process to the underlying interface
+                    // to ensure our STUN request goes out on that interface or not at all (which is
+                    // preferable to getting a VPN endpoint address back).
+                    Network[] networks = connMgr.getAllNetworks();
+                    for (Network net : networks) {
+                        NetworkCapabilities netCaps = connMgr.getNetworkCapabilities(net);
+                        if (netCaps != null &&
+                                !netCaps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) &&
+                                !netCaps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                            // This network looks like an underlying multicast-capable transport,
+                            // so let's guess that it's probably where our mDNS response came from.
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                if (connMgr.bindProcessToNetwork(net)) {
+                                    boundToNetwork = true;
+                                    break;
+                                }
+                            } else if (ConnectivityManager.setProcessDefaultNetwork(net)) {
+                                boundToNetwork = true;
+                                break;
+                            }
                         }
-                    } else if (ConnectivityManager.setProcessDefaultNetwork(net)) {
-                        boundToNetwork = true;
-                        break;
                     }
+
+                    // Perform the STUN request if we're not on a VPN or if we bound to a network
+                    if (!activeNetworkIsVpn || boundToNetwork) {
+                        long startTime = System.currentTimeMillis();
+                        String stunResolvedAddress = performStunQueryWithTimeout("stun.moonlight-stream.org", 3478, stunTimeout);
+                        long duration = System.currentTimeMillis() - startTime;
+                        
+                        if (stunResolvedAddress != null) {
+                            // We don't know for sure what the external port is, so we will have to guess.
+                            // When we contact the PC (if we haven't already), it will update the port.
+                            details.remoteAddress = new ComputerDetails.AddressTuple(stunResolvedAddress, details.guessExternalPort());
+                            LimeLog.info("STUN success for " + details.name + " in " + duration + "ms: " + stunResolvedAddress);
+                            
+                            // 记录成功
+                            if (timeoutManager != null) {
+                                timeoutManager.recordSuccess("STUN-" + details.name, duration);
+                            }
+                        } else {
+                            LimeLog.warning("STUN failed for " + details.name + " after " + duration + "ms, timeout: " + stunTimeout + "ms");
+                            // 记录失败
+                            if (timeoutManager != null) {
+                                timeoutManager.recordFailure("STUN-" + details.name);
+                            }
+                        }
+                    }
+                } finally {
+                    // Unbind from the network
+                    if (boundToNetwork) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            connMgr.bindProcessToNetwork(null);
+                        } else {
+                            ConnectivityManager.setProcessDefaultNetwork(null);
+                        }
+                    }
+
+                    // Unlock the network state
+                    defaultNetworkLock.unlock();
                 }
             }
-
-            // Perform the STUN request if we're not on a VPN or if we bound to a network
-            if (!activeNetworkIsVpn || boundToNetwork) {
-                String stunResolvedAddress = NvConnection.findExternalAddressForMdns("stun.moonlight-stream.org", 3478);
-                if (stunResolvedAddress != null) {
-                    // We don't know for sure what the external port is, so we will have to guess.
-                    // When we contact the PC (if we haven't already), it will update the port.
-                    details.remoteAddress = new ComputerDetails.AddressTuple(stunResolvedAddress, details.guessExternalPort());
-                }
+        } catch (Exception e) {
+            LimeLog.warning("Async STUN request failed: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * 执行带有超时控制的STUN查询
+     */
+    private String performStunQueryWithTimeout(String stunHost, int stunPort, int timeoutMs) {
+        // 使用带超时的线程执行STUN查询
+        class StunResult {
+            String address;
+        }
+        
+        final StunResult result = new StunResult();
+        Thread stunThread = new Thread(() -> {
+            try {
+                result.address = NvConnection.findExternalAddressForMdns(stunHost, stunPort);
+            } catch (Exception e) {
+                LimeLog.warning("STUN query exception: " + e.getMessage());
             }
-
-            // Unbind from the network
-            if (boundToNetwork) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    connMgr.bindProcessToNetwork(null);
-                } else {
-                    ConnectivityManager.setProcessDefaultNetwork(null);
-                }
+        }, "STUN-Query");
+        
+        stunThread.start();
+        
+        try {
+            stunThread.join(timeoutMs);
+            
+            if (stunThread.isAlive()) {
+                // 超时 - 中断线程
+                LimeLog.warning("STUN query timeout after " + timeoutMs + "ms");
+                stunThread.interrupt();
+                // 给线程时间处理中断
+                stunThread.join(500);
+                return null;
             }
-
-            // Unlock the network state
-            defaultNetworkLock.unlock();
+            
+            return result.address;
+        } catch (InterruptedException e) {
+            stunThread.interrupt();
+            return null;
         }
     }
 
@@ -567,6 +646,7 @@ public class ComputerManagerService extends Service {
     }
 
     private ComputerDetails tryPollIp(ComputerDetails details, ComputerDetails.AddressTuple address) {
+        long startTime = System.currentTimeMillis();
         try {
             // If the current address's port number matches the active address's port number, we can also assume
             // the HTTPS port will also match. This assumption is currently safe because Sunshine sets all ports
@@ -579,31 +659,65 @@ public class ComputerManagerService extends Service {
 
             // If this PC is currently online at this address, extend the timeouts to allow more time for the PC to respond.
             boolean isLikelyOnline = details.state == ComputerDetails.State.ONLINE && address.equals(details.activeAddress);
+            
+            // 获取动态超时配置
+            DynamicTimeoutManager.TimeoutConfig timeoutConfig = null;
+            if (timeoutManager != null) {
+                timeoutConfig = timeoutManager.getDynamicTimeoutConfig(address.address, isLikelyOnline);
+                LimeLog.info("Polling " + address + " with timeout config: " + timeoutConfig);
+            }
 
             ComputerDetails newDetails = http.getComputerDetails(isLikelyOnline);
 
             // Check if this is the PC we expected
             if (newDetails.uuid == null) {
                 LimeLog.severe("Polling returned no UUID!");
+                // 记录失败
+                if (timeoutManager != null) {
+                    timeoutManager.recordFailure(address.address);
+                }
                 return null;
             }
             // details.uuid can be null on initial PC add
             if (details.uuid != null && !details.uuid.equals(newDetails.uuid)) {
                 // We got the wrong PC!
                 LimeLog.info("Polling returned the wrong PC!");
+                // 记录失败 - 获取到了错误的PC
+                if (timeoutManager != null) {
+                    timeoutManager.recordFailure(address.address);
+                }
                 return null;
             }
+            
+            // 记录成功
+            long responseTime = System.currentTimeMillis() - startTime;
+            if (timeoutManager != null) {
+                timeoutManager.recordSuccess(address.address, responseTime);
+            }
+            LimeLog.info("Poll success for " + address + " in " + responseTime + "ms");
 
             return newDetails;
         } catch (XmlPullParserException e) {
             e.printStackTrace();
+            // 记录失败
+            if (timeoutManager != null) {
+                timeoutManager.recordFailure(address.address);
+            }
             return null;
         } catch (IOException e) {
+            // 记录失败
+            if (timeoutManager != null) {
+                timeoutManager.recordFailure(address.address);
+            }
             return null;
         } catch (InterruptedException e) {
             // Thread was interrupted during HTTP request (e.g., when parallel polling is cancelled)
             // This is expected behavior, just return null to indicate polling failed
             Thread.currentThread().interrupt(); // Restore interrupt status
+            // 记录失败 - 超时或被中断
+            if (timeoutManager != null) {
+                timeoutManager.recordFailure(address.address);
+            }
             return null;
         }
     }
@@ -738,11 +852,43 @@ public class ComputerManagerService extends Service {
             }
             return;
         }
+        
+        // 检查地址类型以优化超时策略
+        boolean isLanAddress = NetworkDiagnostics.isLanAddress(tuple.address.address);
+        NetworkDiagnostics.NetworkDiagnosticsSnapshot diagnostics = 
+                networkDiagnostics != null ? networkDiagnostics.getLastDiagnostics() : null;
+        
+        LimeLog.info("Starting poll thread for " + tuple.address + 
+                   " (LAN: " + isLanAddress + 
+                   ", Network: " + (diagnostics != null ? diagnostics.networkType : "UNKNOWN") + ")");
 
         tuple.pollingThread = new Thread() {
             @Override
             public void run() {
-                ComputerDetails details = tryPollIp(tuple.existingDetails, tuple.address);
+                long startTime = System.currentTimeMillis();
+                ComputerDetails details = null;
+                
+                try {
+                    // 对于LAN地址，如果网络类型是WAN或移动网络，快速失败
+                    // 因为LAN地址不应该从公网访问
+                    if (isLanAddress && diagnostics != null && 
+                        (diagnostics.networkType == NetworkDiagnostics.NetworkType.WAN ||
+                         diagnostics.networkType == NetworkDiagnostics.NetworkType.MOBILE)) {
+                        LimeLog.info("Skipping LAN address " + tuple.address + " on WAN/Mobile network");
+                        details = null;
+                    } else {
+                        // 对于其他情况，执行正常轮询
+                        details = tryPollIp(tuple.existingDetails, tuple.address);
+                    }
+                    
+                    long duration = System.currentTimeMillis() - startTime;
+                    if (details == null && duration < 1000) {
+                        // 如果轮询失败且完成很快，说明可能是网络不可达
+                        LimeLog.warning("Poll failed quickly for " + tuple.address + " (" + duration + "ms)");
+                    }
+                } catch (Exception e) {
+                    LimeLog.warning("Poll thread exception for " + tuple.address + ": " + e.getMessage());
+                }
 
                 synchronized (tuple) {
                     tuple.complete = true;
@@ -775,6 +921,13 @@ public class ComputerManagerService extends Service {
 
     @Override
     public void onCreate() {
+        // 初始化网络诊断工具
+        networkDiagnostics = new NetworkDiagnostics(this);
+        timeoutManager = new DynamicTimeoutManager(networkDiagnostics);
+        
+        // 执行初始网络诊断
+        networkDiagnostics.diagnoseNetwork();
+        
         // Bind to the discovery service
         bindService(new Intent(this, DiscoveryService.class),
                 discoveryServiceConnection, Service.BIND_AUTO_CREATE);
@@ -804,6 +957,11 @@ public class ComputerManagerService extends Service {
                 @Override
                 public void onAvailable(Network network) {
                     LimeLog.info("Resetting PC state for new available network");
+                    // 重新诊断网络
+                    if (networkDiagnostics != null) {
+                        networkDiagnostics.diagnoseNetwork();
+                        LimeLog.info("Network diagnostics after available: " + networkDiagnostics.getLastDiagnostics());
+                    }
                     synchronized (pollingTuples) {
                         for (PollingTuple tuple : pollingTuples) {
                             tuple.computer.state = ComputerDetails.State.UNKNOWN;
@@ -817,6 +975,10 @@ public class ComputerManagerService extends Service {
                 @Override
                 public void onLost(Network network) {
                     LimeLog.info("Offlining PCs due to network loss");
+                    // 重新诊断网络
+                    if (networkDiagnostics != null) {
+                        networkDiagnostics.diagnoseNetwork();
+                    }
                     synchronized (pollingTuples) {
                         for (PollingTuple tuple : pollingTuples) {
                             tuple.computer.state = ComputerDetails.State.OFFLINE;

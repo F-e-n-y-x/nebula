@@ -196,7 +196,7 @@
     <string name="addpc_wrong_sitelocal">That address doesn\'t look right. You must use your router\'s public IP address for streaming over the Internet.</string>
 
     <!-- Preferences -->
-    <string name="category_basic_settings">⚙️ Basic Settings</string>
+    <string name="category_basic_settings">Basic Settings</string>
     <string name="title_resolution_list">Video resolution</string>
     <string name="summary_resolution_list">Increase to improve image clarity. Decrease for better performance on lower end devices and slower networks.</string>
     <string name="title_native_res_dialog">Native Resolution Warning</string>
@@ -227,7 +227,7 @@
     <string name="resolution_already_exists">This resolution already exists</string>
     <string name="resolution_added_successfully">Resolution added successfully</string>
 
-    <string name="category_audio_settings">🔊 Audio Settings</string>
+    <string name="category_audio_settings">Audio Settings</string>
     <string name="title_audio_config_list">Surround sound configurationItem</string>
     <string name="summary_audio_config_list">Enable 5.1 or 7.1 surround sound for home-theater systems</string>
     <string name="title_checkbox_enable_audiofx">Enable system equalizer support</string>
@@ -246,7 +246,7 @@
     <string name="title_checkbox_reduce_refresh_rate">Allow refresh rate reduction</string>
     <string name="summary_checkbox_reduce_refresh_rate">Lower display refresh rates can save power at the expense of some additional video latency</string>
 
-    <string name="category_gamepad_settings">🎮 Gamepad Settings</string>
+    <string name="category_gamepad_settings">Gamepad Settings</string>
     <string name="title_checkbox_multi_controller">Automatic gamepad presence detection</string>
     <string name="summary_checkbox_multi_controller">Unchecking this option forces a gamepad to always be present</string>
     <string name="title_checkbox_vibrate_fallback">Emulate rumble support with vibration</string>
@@ -274,7 +274,7 @@
     <string name="title_checkbox_gamepad_motion_fallback">Emulate gamepad motion sensor support</string>
     <string name="summary_checkbox_gamepad_motion_fallback">Uses your device\'s built-in motion sensors if gamepad sensors are not supported by your connected gamepad or your Android version.\nNote: Enabling this option may cause your gamepad to appear as a PlayStation controller on the host.</string>
 
-    <string name="category_input_settings">⌨️ Input Settings</string>
+    <string name="category_input_settings">Input Settings</string>
     <string name="title_checkbox_touchscreen_trackpad">Use the touchscreen as a trackpad</string>
     <string name="summary_checkbox_touchscreen_trackpad">If enabled, the touchscreen acts like a trackpad. If disabled, multi-point touch will be enabled.</string>
 
@@ -300,7 +300,7 @@
     <string name="title_checkbox_mouse_nav_buttons">Enable back and forward mouse buttons</string>
     <string name="summary_checkbox_mouse_nav_buttons">Enabling this option may break right clicking on some buggy devices</string>
 
-    <string name="category_enhanced_touch_settings">👆 Enhanced Multi-Point Touch</string>
+    <string name="category_enhanced_touch_settings">Enhanced Multi-Point Touch</string>
     <string name="title_checkbox_enable_enhanced_touch">Enable enhanced touch</string>
     <string name="summary_checkbox_enable_enhanced_touch">\t</string>
     <string name="title_checkbox_enhanced_touch_on_which_side">Reverse enhanced touch zone</string>
@@ -318,7 +318,7 @@
     <string name="dialog_title_fixed_x_velocity">Set fixed X (horizontal) velocity in pixels. Set 0 to disable fixed x velocity.</string>
     <string name="suffix_fixed_x_velocity">pixels</string>
 
-    <string name="category_on_screen_controls_settings">🎛️ On-screen Controls Settings</string>
+    <string name="category_on_screen_controls_settings">On-screen Controls Settings</string>
     <string name="title_checkbox_show_onscreen_controls">Show on-screen controls</string>
     <string name="summary_checkbox_show_onscreen_controls">Show virtual controller overlay on touchscreen</string>
     <string name="title_checkbox_vibrate_osc">Enable vibration</string>
@@ -337,7 +337,7 @@
     <string name="dialog_title_osc_opacity">Change opacity</string>
     <string name="suffix_osc_opacity">%</string>
 
-    <string name="category_ui_settings">🎨 UI Settings</string>
+    <string name="category_ui_settings">UI Settings</string>
     <string name="title_checkbox_enable_pip">Enable Picture-in-Picture observer mode</string>
     <string name="summary_checkbox_enable_pip">Allows the stream to be viewed (but not controlled) while multitasking</string>
     <string name="title_checkbox_enable_background_audio">Background Audio Mode</string>
@@ -349,7 +349,7 @@
     <string name="title_checkbox_resume_stream">Resume stream automatically</string>
     <string name="summary_checkbox_resume_stream">Automatically resume the stream when returning to Moonlight from the background</string>
 
-    <string name="category_host_settings">🖥️ Host Settings</string>
+    <string name="category_host_settings">Host Settings</string>
     <string name="title_checkbox_enable_sops">Optimize game settings</string>
     <string name="summary_checkbox_enable_sops">Allow GFE to modify game settings for optimal streaming</string>
     <string name="title_checkbox_host_audio">Play audio on PC</string>
@@ -362,7 +362,7 @@
     <string name="screen_mode_ensure_primary">Ensure streaming display is primary</string>
     <string name="screen_mode_ensure_only_display">Use streaming display only (turn off other displays)</string>
 
-    <string name="category_advanced_settings">🔧 Advanced Settings</string>
+    <string name="category_advanced_settings">Advanced Settings</string>
     <string name="title_unlock_fps">Unlock all possible frame rates</string>
     <string name="summary_unlock_fps">Streaming at 90 or 120 FPS may reduce latency on high-end devices but can cause lag or instability on devices that can\'t support it</string>
     <string name="title_checkbox_disable_warnings">Disable warning messages</string>
@@ -395,7 +395,7 @@
     <string name="summary_checkbox_swap_quit_and_disconnect">When enabled, the “Quit” button will disconnect without closing the app</string>
     <string name="mic_stats_continuity">Audio continuity: %.1f%% (Captured:%d Encoded:%d Sent:%d Dropped:%d)</string>
 
-    <string name="category_help">❓ Help</string>
+    <string name="category_help">Help</string>
     <string name="title_setup_guide">Setup guide</string>
     <string name="summary_setup_guide">View instructions on how to set up your gaming PC for streaming</string>
     <string name="title_troubleshooting">Troubleshooting guide</string>
@@ -464,7 +464,7 @@
     <string name="mic_permission_required">Microphone permission required</string>
     
     <!-- Screen position settings -->
-    <string name="category_screen_position_settings">📱 Screen Settings</string>
+    <string name="category_screen_position_settings">Screen Settings</string>
     <string name="title_screen_position">Screen Position</string>
     <string name="summary_screen_position">Choose the position of the screen when using non-fullscreen resolution</string>
     <string name="title_screen_offset_x">Horizontal Offset</string>
@@ -473,7 +473,7 @@
     <string name="summary_screen_offset_y">Vertical offset of the screen</string>
     
     <!-- Crown feature area -->
-    <string name="category_crown_features">👑 Crown Feature Area</string>
+    <string name="category_crown_features">Crown Feature Area</string>
     <string name="title_crown_super_features">Crown Super Features</string>
     <string name="summary_crown_super_features">Custom buttons and settings during streaming, saved to custom configurations for quick switching</string>
     <string name="title_export_super_config">Export Configuration</string>
@@ -715,5 +715,9 @@
     <string name="unpaired_devices_hidden">Unpaired devices hidden</string>
     <string name="new_unpaired_device_shown">New unpaired device detected, showing unpaired devices</string>
     <string name="host_resolution_changed">Host resolution changed to %1$dx%2$d</string>
+
+    <!-- Drawer Menu -->
+    <string name="menu">Menu</string>
+    <string name="title_settings">Settings</string>
 
 </resources>

@@ -172,12 +172,22 @@ public class AnalyticsManager {
     
     /**
      * 记录游戏流媒体结束事件（包含性能数据）
+     * 
+     * @param computerName 主机名称
+     * @param appName 应用名称
+     * @param effectiveDurationMs 有效串流时长（排除后台暂停时间）
+     * @param decoderMessage 解码器信息
+     * @param resolutionWidth 分辨率宽度
+     * @param resolutionHeight 分辨率高度
+     * @param averageEndToEndLatency 平均端到端延迟
+     * @param averageDecoderLatency 平均解码延迟
      */
-    public void logGameStreamEnd(String computerName, String appName, long durationMs, 
+    public void logGameStreamEnd(String computerName, String appName, long effectiveDurationMs, 
                                 String decoderMessage, int resolutionWidth, int resolutionHeight,
                                 int averageEndToEndLatency, int averageDecoderLatency) {
         if (!canExecuteAnalytics()) {
-            Log.d(TAG, "Game stream end disabled: " + computerName + ", app: " + appName + ", duration: " + (durationMs / 1000) + " seconds");
+            Log.d(TAG, "Game stream end disabled: " + computerName + ", app: " + appName + 
+                    ", effective duration: " + (effectiveDurationMs / 1000) + " seconds");
             return;
         }
         
@@ -185,8 +195,15 @@ public class AnalyticsManager {
         bundle.putString("computer_name", computerName);
         bundle.putString("app_name", appName != null ? appName : "unknown");
         bundle.putString("stream_type", "game");
-        bundle.putLong("stream_duration_ms", durationMs);
-        bundle.putLong("stream_duration_minutes", durationMs / (1000 * 60));
+        
+        // 有效串流时长（排除后台暂停时间，更准确反映实际使用时间）
+        bundle.putLong("effective_stream_duration_ms", effectiveDurationMs);
+        bundle.putLong("effective_stream_duration_seconds", effectiveDurationMs / 1000);
+        bundle.putLong("effective_stream_duration_minutes", effectiveDurationMs / (1000 * 60));
+        
+        // 保留原有字段名以保持向后兼容
+        bundle.putLong("stream_duration_ms", effectiveDurationMs);
+        bundle.putLong("stream_duration_minutes", effectiveDurationMs / (1000 * 60));
         
         // 性能数据
         bundle.putString("decoder", decoderMessage != null ? decoderMessage : "unknown");
@@ -195,6 +212,9 @@ public class AnalyticsManager {
         bundle.putInt("average_decoder_latency_ms", averageDecoderLatency);
             
         firebaseAnalytics.logEvent("game_stream_end", bundle);
+        
+        Log.d(TAG, "Game stream ended for: " + computerName + ", app: " + appName + 
+                ", effective duration: " + (effectiveDurationMs / 1000) + " seconds");
     }
     
     /**

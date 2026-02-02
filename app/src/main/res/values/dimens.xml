@@ -13,4 +13,7 @@
     <!-- PC View toolbar buttons -->
     <dimen name="pc_toolbar_button_size">64dp</dimen>
 
+    <!-- Drawer width -->
+    <dimen name="drawer_width">280dp</dimen>
+
 </resources>

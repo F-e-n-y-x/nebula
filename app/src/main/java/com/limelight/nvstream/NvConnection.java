@@ -12,6 +12,8 @@ import android.net.RouteInfo;
 import android.os.Build;
 import android.provider.Settings;
 
+import com.limelight.utils.NetHelper;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -206,24 +208,20 @@ public class NvConnection {
     }
 
     private int detectServerConnectionType() {
+        // 使用 NetHelper 进行快速网络类型检测
+        boolean isVpn = NetHelper.isActiveNetworkVpn(appContext);
+        boolean isMobile = NetHelper.isActiveNetworkMobile(appContext);
+        
+        // VPN 和移动网络都视为远程连接
+        if (isVpn || isMobile) {
+            return StreamConfiguration.STREAM_CFG_REMOTE;
+        }
+        
+        // 进一步检查路由以确定是否为本地连接
         ConnectivityManager connMgr = (ConnectivityManager) appContext.getSystemService(Context.CONNECTIVITY_SERVICE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Network activeNetwork = connMgr.getActiveNetwork();
             if (activeNetwork != null) {
-                NetworkCapabilities netCaps = connMgr.getNetworkCapabilities(activeNetwork);
-                if (netCaps != null) {
-                    if (netCaps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
-                            !netCaps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
-                        // VPNs are treated as remote connections
-                        return StreamConfiguration.STREAM_CFG_REMOTE;
-                    }
-                    else if (netCaps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-                        // Cellular is always treated as remote to avoid any possible
-                        // issues with 464XLAT or similar technologies.
-                        return StreamConfiguration.STREAM_CFG_REMOTE;
-                    }
-                }
-
                 // Check if the server address is on-link
                 LinkProperties linkProperties = connMgr.getLinkProperties(activeNetwork);
                 if (linkProperties != null) {

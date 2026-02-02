@@ -190,6 +190,8 @@ dependencies {
     implementation 'androidx.tvprovider:tvprovider:1.1.0'
 
     // Firebase Analytics
-    implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    // BOM 版本说明: https://firebase.google.com/support/release-notes/android
+    // 注意: Firebase 33.0.0+ 需要 minSdk 23，我们使用 32.8.1 保持 API 22 兼容
+    implementation platform('com.google.firebase:firebase-bom:32.8.1')
     implementation 'com.google.firebase:firebase-analytics'
 }

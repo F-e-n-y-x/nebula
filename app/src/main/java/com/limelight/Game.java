@@ -175,7 +175,10 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     private boolean surfaceCreated = false;
     private boolean attemptedConnection = false;
     private AnalyticsManager analyticsManager;
-    private long streamStartTime;
+    private long streamStartTime;           // 串流开始的时间戳
+    private long accumulatedStreamTime;     // 累计的有效串流时间（排除后台暂停）
+    private long lastActiveTime;            // 上次活跃的时间戳（用于计算暂停时间）
+    private boolean isStreamingActive;      // 串流是否处于活跃状态
     private int suppressPipRefCount = 0;
     private String pcName;
     private String appName;
@@ -1830,6 +1833,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     protected void onStop() {
         super.onStop();
 
+        // 暂停串流时长计时（进入后台时串流实际上是暂停的）
+        if (isStreamingActive && lastActiveTime > 0) {
+            accumulatedStreamTime += System.currentTimeMillis() - lastActiveTime;
+            isStreamingActive = false;
+            LimeLog.info("串流时长计时暂停，已累计: " + (accumulatedStreamTime / 1000) + " 秒");
+        }
+
         // 检查是否是因为进入后台（包括锁屏、滑到任务栏、Home键）导致的应用停止
         // 只要 Activity 不是正在 Finishing（即不是用户点了退出或崩溃），且开启了快速恢复，就标记为需要恢复
         if (!shouldResumeSession && !isFinishing()) {
@@ -1928,7 +1938,15 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         // 记录游戏流媒体结束事件
         if (analyticsManager != null && pcName != null && streamStartTime > 0) {
-            long streamDuration = System.currentTimeMillis() - streamStartTime;
+            // 计算精确的有效串流时长
+            // = 已累计的时间 + 当前活跃段时间（如果当前是活跃状态）
+            long effectiveStreamDuration = accumulatedStreamTime;
+            if (isStreamingActive && lastActiveTime > 0) {
+                effectiveStreamDuration += System.currentTimeMillis() - lastActiveTime;
+            }
+            
+            // 同时记录总耗时（包括后台暂停时间）用于对比
+            long totalElapsedTime = System.currentTimeMillis() - streamStartTime;
 
             // 收集性能数据
             int resolutionWidth = 0;
@@ -1943,9 +1961,17 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 averageDecoderLatency = decoderRenderer.getAverageDecoderLatency();
             }
 
-            analyticsManager.logGameStreamEnd(pcName, appName, streamDuration,
+            // 使用有效串流时长进行统计
+            analyticsManager.logGameStreamEnd(pcName, appName, effectiveStreamDuration,
                     decoderMessage, resolutionWidth, resolutionHeight,
                     averageEndToEndLatency, averageDecoderLatency);
+            
+            LimeLog.info("串流统计 - 有效时长: " + (effectiveStreamDuration / 1000) + "秒, 总耗时: " + (totalElapsedTime / 1000) + "秒");
+            
+            // 重置统计状态
+            streamStartTime = 0;
+            accumulatedStreamTime = 0;
+            isStreamingActive = false;
         }
 
         if (shouldResumeSession) {
@@ -3955,8 +3981,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             });
         }
 
-        // 记录游戏流媒体开始事件
+        // 初始化串流时长统计
         streamStartTime = System.currentTimeMillis();
+        accumulatedStreamTime = 0;
+        lastActiveTime = streamStartTime;
+        isStreamingActive = true;
+        
+        // 记录游戏流媒体开始事件
         if (analyticsManager != null && pcName != null) {
             analyticsManager.logGameStreamStart(pcName, appName);
         }
@@ -3971,6 +4002,13 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     @Override
     protected void onStart() {
         super.onStart();
+
+        // 恢复串流时长计时（从后台恢复时）
+        if (!isStreamingActive && streamStartTime > 0) {
+            lastActiveTime = System.currentTimeMillis();
+            isStreamingActive = true;
+            LimeLog.info("串流时长计时恢复，之前累计: " + (accumulatedStreamTime / 1000) + " 秒");
+        }
 
         if (shouldResumeSession) {
             LimeLog.info("从后台恢复，正在快速重连...");

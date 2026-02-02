@@ -22,8 +22,11 @@ import android.database.sqlite.SQLiteException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+/**
+ * Database manager for computer information.
+ * Uses SQLiteOpenHelper for proper version management and migration handling.
+ */
 public class ComputerDatabaseManager {
-    private static final String COMPUTER_DB_NAME = "computers4.db";
     private static final String COMPUTER_TABLE_NAME = "Computers";
     private static final String COMPUTER_UUID_COLUMN_NAME = "UUID";
     private static final String COMPUTER_NAME_COLUMN_NAME = "ComputerName";
@@ -42,43 +45,45 @@ public class ComputerDatabaseManager {
     private static final String MAC_ADDRESS_COLUMN_NAME = "MacAddress";
     private static final String SERVER_CERT_COLUMN_NAME = "ServerCert";
 
+    private final ComputerDatabaseHelper dbHelper;
     private SQLiteDatabase computerDb;
 
     public ComputerDatabaseManager(Context c) {
-        try {
-            // Create or open an existing DB
-            computerDb = c.openOrCreateDatabase(COMPUTER_DB_NAME, 0, null);
-        } catch (SQLiteException e) {
-            // Delete the DB and try again
-            c.deleteDatabase(COMPUTER_DB_NAME);
-            computerDb = c.openOrCreateDatabase(COMPUTER_DB_NAME, 0, null);
-        }
-        initializeDb(c);
+        // Use SQLiteOpenHelper for proper version management
+        dbHelper = new ComputerDatabaseHelper(c);
+        computerDb = dbHelper.getWritableDatabase();
+        
+        // Apply any pending migrations from legacy databases
+        applyPendingMigrations();
     }
 
     public void close() {
         computerDb.close();
+        dbHelper.close();
     }
 
-    private void initializeDb(Context c) {
-        // Create tables if they aren't already there
-        computerDb.execSQL(String.format((Locale)null,
-                "CREATE TABLE IF NOT EXISTS %s(%s TEXT PRIMARY KEY, %s TEXT NOT NULL, %s TEXT NOT NULL, %s TEXT, %s TEXT)",
-                COMPUTER_TABLE_NAME, COMPUTER_UUID_COLUMN_NAME, COMPUTER_NAME_COLUMN_NAME,
-                ADDRESSES_COLUMN_NAME, MAC_ADDRESS_COLUMN_NAME, SERVER_CERT_COLUMN_NAME));
-
-        // Move all computers from the old DB (if any) to the new one
-        List<ComputerDetails> oldComputers = LegacyDatabaseReader.migrateAllComputers(c);
-        for (ComputerDetails computer : oldComputers) {
-            updateComputer(computer);
+    /**
+     * Apply pending migrations from legacy database files using a transaction for better performance.
+     * Migrates from: computers.db (v1), computers2.db, computers3.db, computers4.db
+     */
+    private void applyPendingMigrations() {
+        List<ComputerDetails> pendingMigrations = dbHelper.getPendingMigrations();
+        if (pendingMigrations.isEmpty()) {
+            return;
         }
-        oldComputers = LegacyDatabaseReader2.migrateAllComputers(c);
-        for (ComputerDetails computer : oldComputers) {
-            updateComputer(computer);
-        }
-        oldComputers = LegacyDatabaseReader3.migrateAllComputers(c);
-        for (ComputerDetails computer : oldComputers) {
-            updateComputer(computer);
+        
+        LimeLog.info("Migrating " + pendingMigrations.size() + " computers from legacy databases");
+        
+        // Use transaction for batch insert performance
+        computerDb.beginTransaction();
+        try {
+            for (ComputerDetails computer : pendingMigrations) {
+                updateComputer(computer);
+            }
+            computerDb.setTransactionSuccessful();
+            LimeLog.info("Successfully migrated " + pendingMigrations.size() + " computers");
+        } finally {
+            computerDb.endTransaction();
         }
     }
 
