@@ -520,6 +520,7 @@ public class NvConnection {
                         context.videoCapabilities,
                         context.streamConfig.getColorSpace(),
                         context.streamConfig.getColorRange(),
+                        context.streamConfig.getHdrMode(),
                         context.streamConfig.getEnableMic(),
                         context.streamConfig.getControlOnly());
                 if (ret != 0) {
