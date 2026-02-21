@@ -174,9 +174,9 @@ public class AndroidAudioRenderer implements AudioRenderer {
                 continue;
             }
 
-            // Skip low latency options when using audio effects, since low latency mode
-            // precludes the use of the audio effect pipeline (as of Android 13).
-            if (enableAudioFx && lowLatency) {
+            // Skip low latency options when using audio effects or spatializer, since low
+            // latency mode precludes the use of the audio effect / spatialization pipeline.
+            if ((enableAudioFx || enableSpatializer) && lowLatency) {
                 continue;
             }
 
@@ -185,7 +185,7 @@ public class AndroidAudioRenderer implements AudioRenderer {
                 track.play();
 
                 // Successfully created working AudioTrack. We're done here.
-                LimeLog.info("Audio track configuration: "+bufferSize+" "+lowLatency);
+                LimeLog.info("Audio track configuration: "+bufferSize+" lowLatency="+lowLatency+" spatializer="+enableSpatializer);
                 break;
             } catch (Exception e) {
                 // Try to release the AudioTrack if we got far enough
@@ -371,10 +371,12 @@ public class AndroidAudioRenderer implements AudioRenderer {
 
     @Override
     public void cleanup() {
+        spatializer = null;
         if (track != null) {
             track.pause();
             track.flush();
             track.release();
+            track = null;
         }
     }
 
