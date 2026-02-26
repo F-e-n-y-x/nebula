@@ -874,7 +874,7 @@ public class ComputerManagerService extends Service {
                     if (isLanAddress && diagnostics != null && 
                         (diagnostics.networkType == NetworkDiagnostics.NetworkType.WAN ||
                          diagnostics.networkType == NetworkDiagnostics.NetworkType.MOBILE)) {
-                        LimeLog.info("Skipping LAN address " + tuple.address + " on WAN/Mobile network");
+                        LimeLog.info("Skipping LAN address " + tuple.address + " on WAN/MOBILE network");
                         details = null;
                     } else {
                         // 对于其他情况，执行正常轮询
