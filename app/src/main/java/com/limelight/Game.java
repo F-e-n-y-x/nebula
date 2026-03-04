@@ -80,14 +80,12 @@ import android.view.InputDevice;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.PointerIcon;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.View.OnGenericMotionListener;
 import android.view.View.OnSystemUiVisibilityChangeListener;
 import android.view.View.OnTouchListener;
-import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
@@ -95,13 +93,8 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 
-import androidx.annotation.NonNull;
-import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import android.provider.Settings;
 import androidx.core.content.ContextCompat;
@@ -112,7 +105,6 @@ import androidx.annotation.RequiresApi;
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -124,9 +116,6 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
-import android.media.Image;
-import android.media.ImageReader;
-import android.graphics.ImageFormat;
 
 import com.limelight.services.KeyboardAccessibilityService;
 
@@ -234,6 +223,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     // 性能覆盖层管理器
     private PerformanceOverlayManager performanceOverlayManager;
+
+    // 光标服务管理器
+    private CursorServiceManager cursorServiceManager;
 
     private MediaCodecDecoderRenderer decoderRenderer;
     private boolean reportedCrash;
@@ -482,7 +474,8 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // Enter landscape unless we're on a square screen
         setPreferredOrientationForCurrentDisplay();
 
-        if (prefConfig.stretchVideo || shouldIgnoreInsetsForResolution(prefConfig.width, prefConfig.height)) {
+        if (prefConfig.stretchVideo || DisplayModeManager.shouldIgnoreInsetsForResolution(
+                getWindowManager().getDefaultDisplay(), prefConfig.width, prefConfig.height)) {
             // Allow the activity to layout under notches if the fill-screen option
             // was turned on by the user or it's a full-screen native resolution
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -502,17 +495,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
         panZoomHandler = new PanZoomHandler(this, this, streamView, prefConfig);
 
-        // 1. 添加监听器 (应对屏幕旋转、大小变化)
-        streamView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            // 只有当尺寸或位置真的变了才执行
-            if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
-                syncCursorWithStream();
-            }
-        });
-
-        // 2. 手动强制执行一次
-        // 使用 post 确保在 UI 绘制队列的下一个节拍执行，此时 View 的宽/高已经计算好了
-        streamView.post(this::syncCursorWithStream);
+        // 光标同步监听器将在 cursorServiceManager 初始化后注册（见 touch context 初始化之后）
 
         // Listen for touch events on the background touch view to enable trackpad mode
         // to work on areas outside of the StreamView itself. We use a separate View
@@ -684,6 +667,29 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         } else {
             touchContextMap = relativeTouchContextMap;
         }
+
+        // 初始化光标服务管理器
+        CursorView cursorOverlayView = findViewById(R.id.cursorOverlay);
+        cursorServiceManager = new CursorServiceManager(
+                streamView, cursorOverlayView, prefConfig, relativeTouchContextMap,
+                new CursorServiceManager.UiCallback() {
+                    @Override
+                    public void runOnUi(Runnable runnable) {
+                        runOnUiThread(runnable);
+                    }
+                    @Override
+                    public boolean isActivityAlive() {
+                        return !isFinishing() && !isDestroyed();
+                    }
+                });
+
+        // 添加监听器 (应对屏幕旋转、大小变化)
+        streamView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (left != oldLeft || top != oldTop || right != oldRight || bottom != oldBottom) {
+                cursorServiceManager.syncCursorWithStream();
+            }
+        });
+        streamView.post(() -> cursorServiceManager.syncCursorWithStream());
 
         if (prefConfig.onscreenController) {
             // create virtual onscreen controller
@@ -975,7 +981,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
     private void prepareConnection() {
         // 1. 清理旧的光标资源
-        destroyLocalCursorRenderers();
+        cursorServiceManager.destroyLocalCursorRenderers();
         runOnUiThread(() -> {
             CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
             if (cursorOverlay != null) {
@@ -1592,218 +1598,31 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         inputCaptureProvider.onWindowFocusChanged(hasFocus);
     }
 
-    private boolean isRefreshRateEqualMatch(float refreshRate) {
-        return refreshRate >= prefConfig.fps &&
-                refreshRate <= prefConfig.fps + 3;
-    }
-
-    private boolean isRefreshRateGoodMatch(float refreshRate) {
-        return refreshRate >= prefConfig.fps &&
-                Math.round(refreshRate) % prefConfig.fps <= 3;
-    }
-
-    private boolean shouldIgnoreInsetsForResolution(int width, int height) {
-        // Never ignore insets for non-native resolutions
-        if (!PreferenceConfiguration.isNativeResolution(width, height)) {
-            return false;
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Display display = getWindowManager().getDefaultDisplay();
-            for (Display.Mode candidate : display.getSupportedModes()) {
-                // Ignore insets if this is an exact match for the display resolution
-                if ((width == candidate.getPhysicalWidth() && height == candidate.getPhysicalHeight()) ||
-                        (height == candidate.getPhysicalWidth() && width == candidate.getPhysicalHeight())) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private boolean mayReduceRefreshRate() {
-        return prefConfig.framePacing == PreferenceConfiguration.FRAME_PACING_CAP_FPS ||
-                prefConfig.framePacing == PreferenceConfiguration.FRAME_PACING_MAX_SMOOTHNESS ||
-                (prefConfig.framePacing == PreferenceConfiguration.FRAME_PACING_BALANCED && prefConfig.reduceRefreshRate);
-    }
-
     private float prepareDisplayForRendering() {
         Display display = externalDisplayManager != null ?
                 externalDisplayManager.getTargetDisplay() : getWindowManager().getDefaultDisplay();
+
+        // 使用 DisplayModeManager 计算最佳显示模式
+        DisplayModeManager.DisplayModeResult result =
+                DisplayModeManager.selectBestDisplayMode(display, prefConfig);
+
+        // 应用显示模式结果
         WindowManager.LayoutParams windowLayoutParams = getWindow().getAttributes();
-        float displayRefreshRate;
-
-        // On M, we can explicitly set the optimal display mode
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Display.Mode bestMode = display.getMode();
-            boolean isNativeResolutionStream = PreferenceConfiguration.isNativeResolution(prefConfig.width, prefConfig.height);
-            boolean refreshRateIsGood = isRefreshRateGoodMatch(bestMode.getRefreshRate());
-            boolean refreshRateIsEqual = isRefreshRateEqualMatch(bestMode.getRefreshRate());
-
-            LimeLog.info("Current display mode: " + bestMode.getPhysicalWidth() + "x" +
-                    bestMode.getPhysicalHeight() + "x" + bestMode.getRefreshRate());
-
-            for (Display.Mode candidate : display.getSupportedModes()) {
-                boolean refreshRateReduced = candidate.getRefreshRate() < bestMode.getRefreshRate();
-                boolean resolutionReduced = candidate.getPhysicalWidth() < bestMode.getPhysicalWidth() ||
-                        candidate.getPhysicalHeight() < bestMode.getPhysicalHeight();
-                boolean resolutionFitsStream = candidate.getPhysicalWidth() >= prefConfig.width &&
-                        candidate.getPhysicalHeight() >= prefConfig.height;
-
-                LimeLog.info("Examining display mode: " + candidate.getPhysicalWidth() + "x" +
-                        candidate.getPhysicalHeight() + "x" + candidate.getRefreshRate());
-
-                if (candidate.getPhysicalWidth() > 4096 && prefConfig.width <= 4096) {
-                    // Avoid resolutions options above 4K to be safe
-                    continue;
-                }
-
-                // On non-4K streams, we force the resolution to never change unless it's above
-                // 60 FPS, which may require a resolution reduction due to HDMI bandwidth limitations,
-                // or it's a native resolution stream.
-                if (prefConfig.width < 3840 && prefConfig.fps <= 60 && !isNativeResolutionStream) {
-                    if (display.getMode().getPhysicalWidth() != candidate.getPhysicalWidth() ||
-                            display.getMode().getPhysicalHeight() != candidate.getPhysicalHeight()) {
-                        continue;
-                    }
-                }
-
-                // Make sure the resolution doesn't regress unless if it's over 60 FPS
-                // where we may need to reduce resolution to achieve the desired refresh rate.
-                if (resolutionReduced && !(prefConfig.fps > 60 && resolutionFitsStream)) {
-                    continue;
-                }
-
-                if (mayReduceRefreshRate() && refreshRateIsEqual && !isRefreshRateEqualMatch(candidate.getRefreshRate())) {
-                    // If we had an equal refresh rate and this one is not, skip it. In min latency
-                    // mode, we want to always prefer the highest frame rate even though it may cause
-                    // microstuttering.
-                    continue;
-                } else if (refreshRateIsGood) {
-                    // We've already got a good match, so if this one isn't also good, it's not
-                    // worth considering at all.
-                    if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
-                        continue;
-                    }
-
-                    if (mayReduceRefreshRate()) {
-                        // User asked for the lowest possible refresh rate, so don't raise it if we
-                        // have a good match already
-                        if (candidate.getRefreshRate() > bestMode.getRefreshRate()) {
-                            continue;
-                        }
-                    } else {
-                        // User asked for the highest possible refresh rate, so don't reduce it if we
-                        // have a good match already
-                        if (refreshRateReduced) {
-                            continue;
-                        }
-                    }
-                } else if (!isRefreshRateGoodMatch(candidate.getRefreshRate())) {
-                    // We didn't have a good match and this match isn't good either, so just don't
-                    // reduce the refresh rate.
-                    if (refreshRateReduced) {
-                        continue;
-                    }
-                } else {
-                    // We didn't have a good match and this match is good. Prefer this refresh rate
-                    // even if it reduces the refresh rate. Lowering the refresh rate can be beneficial
-                    // when streaming a 60 FPS stream on a 90 Hz device. We want to select 60 Hz to
-                    // match the frame rate even if the active display mode is 90 Hz.
-                }
-
-                bestMode = candidate;
-                refreshRateIsGood = isRefreshRateGoodMatch(candidate.getRefreshRate());
-                refreshRateIsEqual = isRefreshRateEqualMatch(candidate.getRefreshRate());
-            }
-
-            LimeLog.info("Best display mode: " + bestMode.getPhysicalWidth() + "x" +
-                    bestMode.getPhysicalHeight() + "x" + bestMode.getRefreshRate());
-
-            // Only apply new window layout parameters if we've actually changed the display mode
-            if (display.getMode().getModeId() != bestMode.getModeId()) {
-                // If we only changed refresh rate and we're on an OS that supports Surface.setFrameRate()
-                // use that instead of using preferredDisplayModeId to avoid the possibility of triggering
-                // bugs that can cause the system to switch from 4K60 to 4K24 on Chromecast 4K.
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || UiHelper.isColorOS() ||
-                        display.getMode().getPhysicalWidth() != bestMode.getPhysicalWidth() ||
-                        display.getMode().getPhysicalHeight() != bestMode.getPhysicalHeight()) {
-                    // Apply the display mode change
-                    windowLayoutParams.preferredDisplayModeId = bestMode.getModeId();
-                    getWindow().setAttributes(windowLayoutParams);
-                } else {
-                    LimeLog.info("Using setFrameRate() instead of preferredDisplayModeId due to matching resolution");
-                }
-            } else {
-                LimeLog.info("Current display mode is already the best display mode");
-            }
-
-            displayRefreshRate = bestMode.getRefreshRate();
-        }
-        // On L, we can at least tell the OS that we want a refresh rate
-        else {
-            float bestRefreshRate = display.getRefreshRate();
-            for (float candidate : display.getSupportedRefreshRates()) {
-                LimeLog.info("Examining refresh rate: " + candidate);
-
-                if (candidate > bestRefreshRate) {
-                    // Ensure the frame rate stays around 60 Hz for <= 60 FPS streams
-                    if (prefConfig.fps <= 60) {
-                        if (candidate >= 63) {
-                            continue;
-                        }
-                    }
-
-                    bestRefreshRate = candidate;
-                }
-            }
-
-            LimeLog.info("Selected refresh rate: " + bestRefreshRate);
-            windowLayoutParams.preferredRefreshRate = bestRefreshRate;
-            displayRefreshRate = bestRefreshRate;
-
-            // Apply the refresh rate change
+        if (result.preferredModeId >= 0) {
+            windowLayoutParams.preferredDisplayModeId = result.preferredModeId;
+            getWindow().setAttributes(windowLayoutParams);
+        } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            // Pre-M: 通过 preferredRefreshRate 设置
+            windowLayoutParams.preferredRefreshRate = result.refreshRate;
             getWindow().setAttributes(windowLayoutParams);
         }
 
-        // Until Marshmallow, we can't ask for a 4K display mode, so we'll
-        // need to hint the OS to provide one.
-        boolean aspectRatioMatch = false;
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            // We'll calculate whether we need to scale by aspect ratio. If not, we'll use
-            // setFixedSize so we can handle 4K properly. The only known devices that have
-            // >= 4K screens have exactly 4K screens, so we'll be able to hit this good path
-            // on these devices. On Marshmallow, we can start changing to 4K manually but no
-            // 4K devices run 6.0 at the moment.
-            Point screenSize = new Point(0, 0);
-            display.getSize(screenSize);
-
-            double screenAspectRatio = ((double) screenSize.y) / screenSize.x;
-            double streamAspectRatio = ((double) prefConfig.height) / prefConfig.width;
-            if (Math.abs(screenAspectRatio - streamAspectRatio) < 0.001) {
-                LimeLog.info("Stream has compatible aspect ratio with output display");
-                aspectRatioMatch = true;
-            }
-        }
-
-        updateStreamViewSize(prefConfig.width, prefConfig.height, aspectRatioMatch);
+        updateStreamViewSize(prefConfig.width, prefConfig.height, result.aspectRatioMatch);
 
         // Set the desired refresh rate that will get passed into setFrameRate() later
-        desiredRefreshRate = displayRefreshRate;
+        desiredRefreshRate = result.refreshRate;
 
-        // Return the selected display refresh rate (from bestMode.getRefreshRate())
-        // This is the refresh rate we requested the system to switch to.
-        //
-        // Important: We intentionally return displayRefreshRate directly instead of
-        // checking the current display refresh rate, because:
-        // 1. Display mode switching is asynchronous - the current refresh rate may still
-        //    be the old value when this method returns
-        // 2. The server needs to know the refresh rate we WILL be running at, not the
-        //    old refresh rate before the switch completes
-        // 3. This value is used for clientRefreshRateX100 which determines the server's
-        //    capture and encoding frame rate - it must match our target refresh rate
-        return displayRefreshRate;
+        return result.refreshRate;
     }
 
     @SuppressLint("InlinedApi")
@@ -2672,11 +2491,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 prefConfig.touchscreenTrackpad = true;
                 prefConfig.enableNativeMousePointer = false;
                 touchContextMap = relativeTouchContextMap;
-                refreshLocalCursorState(prefConfig.enableLocalCursorRendering); //如果本地光标处于开启状态，则开启本地光标
+                cursorServiceManager.refreshLocalCursorState(prefConfig.enableLocalCursorRendering); //如果本地光标处于开启状态，则开启本地光标
             } else {
                 prefConfig.touchscreenTrackpad = false;
                 touchContextMap = absoluteTouchContextMap;
-                refreshLocalCursorState(false); //关闭本地光标
+                cursorServiceManager.refreshLocalCursorState(false); //关闭本地光标
             }
         }
     }
@@ -2723,7 +2542,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
 
             // 注意：我们不设置 grabbedInput = false，这样按键事件仍能正常处理
 
-            refreshLocalCursorState(true);//开启本地光标服务
+            cursorServiceManager.refreshLocalCursorState(true);//开启本地光标服务
 
             // 切换 CursorView 的可见性
             CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
@@ -3874,7 +3693,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
                 }
             }.start();
 
-            stopCursorService();
+            cursorServiceManager.stopService();
         }
     }
 
@@ -4135,7 +3954,9 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         this.currentHostAddress = getIntent().getStringExtra(EXTRA_HOST);
 
         // 2. 调用统一的状态管理方法
-        updateCursorServiceState(prefConfig.enableLocalCursorRendering && prefConfig.touchscreenTrackpad);
+        cursorServiceManager.updateServiceState(
+                prefConfig.enableLocalCursorRendering && prefConfig.touchscreenTrackpad,
+                currentHostAddress);
     }
 
     @Override
@@ -4441,12 +4262,12 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             conn.start(this.audioRenderer, decoderRenderer, Game.this);
 
             if (streamView != null) {
-                streamView.post(this::syncCursorWithStream);
+                streamView.post(() -> cursorServiceManager.syncCursorWithStream());
             }
         } else if (connected && isExtremeResumeEnabled) {
             // 恢复时强制同步一次光标位置，防止错位
             if (streamView != null) {
-                streamView.post(this::syncCursorWithStream);
+                streamView.post(() -> cursorServiceManager.syncCursorWithStream());
             }
 
             // 回到前台，恢复音量
@@ -4475,7 +4296,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         // FPS value if there's no suitable matching refresh rate. In that case, Android could try to
         // select a lower refresh rate that avoids uneven pull-down (ex: 30 Hz for a 60 FPS stream on
         // a display that maxes out at 50 Hz).
-        if (mayReduceRefreshRate() || desiredRefreshRate < prefConfig.fps) {
+        if (DisplayModeManager.mayReduceRefreshRate(prefConfig) || desiredRefreshRate < prefConfig.fps) {
             desiredFrameRate = prefConfig.fps;
         } else {
             // Otherwise, we will pretend that our frame rate matches the refresh rate we picked in
@@ -4505,7 +4326,7 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
 
         // 销毁本地光标渲染器
-        destroyLocalCursorRenderers();
+        cursorServiceManager.destroyLocalCursorRenderers();
 
         if (attemptedConnection) {
             if (isExtremeResumeEnabled && !isFinishing()) {
@@ -4534,58 +4355,6 @@ public class Game extends Activity implements SurfaceHolder.Callback,
         }
     }
 
-    /**
-     * 初始化本地光标渲染器
-     * 通过 findViewById 找到 XML 中的 CursorView
-     */
-    private void initializeLocalCursorRenderers(int width, int height) {
-        CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
-
-        if (cursorOverlay == null) {
-            return;
-        }
-
-        for (TouchContext context : relativeTouchContextMap) {
-            if (context instanceof RelativeTouchContext) {
-                RelativeTouchContext relativeContext = (RelativeTouchContext) context;
-                relativeContext.initializeLocalCursorRenderer(cursorOverlay, width, height);
-                // 1. 开关必须开启
-                // 2. 必须处于触控板模式 (touchscreenTrackpad == true)
-                // 3. 必须没开启原生鼠标 (防止冲突)
-                boolean shouldShow = prefConfig.enableLocalCursorRendering
-                        && prefConfig.touchscreenTrackpad
-                        && !prefConfig.enableNativeMousePointer;
-
-                relativeContext.setEnableLocalCursorRendering(shouldShow);
-            }
-        }
-    }
-
-    /**
-     * 销毁本地光标渲染器
-     * 清理所有相对触摸上下文的光标渲染器
-     */
-    private void destroyLocalCursorRenderers() {
-        for (TouchContext context : relativeTouchContextMap) {
-            if (context instanceof RelativeTouchContext) {
-                RelativeTouchContext relativeContext = (RelativeTouchContext) context;
-                relativeContext.destroyLocalCursorRenderer();
-            }
-        }
-    }
-
-    public void refreshLocalCursorState(boolean enabled) {
-        boolean shouldRender = enabled && !prefConfig.enableNativeMousePointer;
-
-        for (TouchContext context : relativeTouchContextMap) {
-            if (context instanceof RelativeTouchContext) {
-                ((RelativeTouchContext) context).setEnableLocalCursorRendering(shouldRender);
-            }
-        }
-        updateCursorServiceState(enabled);
-    }
-
-    private static final String KEEP_ALIVE_CHANNEL_ID = "keep_alive_channel";
     private static final int KEEP_ALIVE_NOTIFICATION_ID = 1001;
 
     private void showKeepAliveNotification() {
@@ -4641,301 +4410,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
     }
 
     /**
-     * 强制将光标层与视频层 1:1 对齐
+     * 委托给 CursorServiceManager 刷新本地光标状态
      */
-    private void syncCursorWithStream() {
-        if (streamView == null) return;
-        CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
-        if (cursorOverlay == null) return;
-
-        // 获取 StreamView 当前的真实位置和大小
-        float x = streamView.getX();
-        float y = streamView.getY();
-        int w = streamView.getWidth();
-        int h = streamView.getHeight();
-
-        // 如果视频还没渲染出来（宽高为0），直接返回，等下次
-        if (w == 0 || h == 0) return;
-
-        ViewGroup.LayoutParams params = cursorOverlay.getLayoutParams();
-
-        // 1. 强制清除 Gravity
-        // 我们要用 setX/setY 绝对定位，所以必须把 Gravity 设为左上角，否则会发生双重偏移
-        if (params instanceof android.widget.FrameLayout.LayoutParams) {
-            ((android.widget.FrameLayout.LayoutParams) params).gravity = android.view.Gravity.TOP | android.view.Gravity.LEFT;
-        }
-
-        // 2. 同步大小
-        boolean needLayout = false;
-        if (params.width != w || params.height != h) {
-            params.width = w;
-            params.height = h;
-            needLayout = true;
-        }
-
-        if (needLayout) {
-            cursorOverlay.setLayoutParams(params);
-        }
-
-        // 3. 同步位置
-        cursorOverlay.setX(x);
-        cursorOverlay.setY(y);
-
-        // 4. 同步渲染器边界
-        initializeLocalCursorRenderers(w, h);
-
-        LimeLog.info("CursorFix:" + "Sync executed: W=" + w + " H=" + h + " X=" + x);
-    }
-
-    private Thread cursorNetworkThread;
-    private boolean isCursorNetworking = false;
-    private java.net.Socket cursorSocket;
-    private static final int CURSOR_PORT = 5005;
-    private String computerIpAddress;
-
-    // 定义全局变量，用于管理当前正在播放的动画，防止多个动画叠加
-    private Runnable currentAnimationTask = null;
-    private final android.os.Handler animationHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-
-    // 使用 Android LruCache 进行内存管理 (最大缓存 100 张光标)
-    private android.util.LruCache<Integer, android.graphics.Bitmap> cursorCache = new android.util.LruCache<>(100);
-
-    private void startCursorService(String hostIp) {
-        if (isCursorNetworking) return;
-        this.computerIpAddress = hostIp;
-        this.isCursorNetworking = true;
-
-        cursorNetworkThread = new Thread(() -> {
-            while (isCursorNetworking) {
-                try {
-                    cursorSocket = new java.net.Socket();
-                    cursorSocket.connect(new java.net.InetSocketAddress(computerIpAddress, CURSOR_PORT), 3000);
-                    cursorSocket.setTcpNoDelay(true);
-                    java.io.DataInputStream dis = new java.io.DataInputStream(cursorSocket.getInputStream());
-
-                    // 连接成功时清空缓存，因为服务端重连后状态重置了
-                    cursorCache.evictAll();
-
-                    while (isCursorNetworking) {
-                        // 1. 读取总长度
-                        byte[] lenBytes = new byte[4];
-                        dis.readFully(lenBytes);
-                        int packetLen = (lenBytes[0] & 0xFF) | ((lenBytes[1] & 0xFF) << 8) | ((lenBytes[2] & 0xFF) << 16) | ((lenBytes[3] & 0xFF) << 24);
-
-                        // 2. 读取包体
-                        byte[] bodyData = new byte[packetLen];
-                        dis.readFully(bodyData);
-
-                        // 3. 解析协议 (新协议头 20 字节)
-                        // [Hash(4)] [HotX(4)] [HotY(4)] [Frames(4)] [Delay(4)] [PNG...]
-                        java.nio.ByteBuffer wrapped = java.nio.ByteBuffer.wrap(bodyData);
-                        wrapped.order(java.nio.ByteOrder.LITTLE_ENDIAN);
-
-                        int cursorHash = wrapped.getInt(); // 新增 Hash 字段
-                        int hotX = wrapped.getInt();
-                        int hotY = wrapped.getInt();
-                        int frameCount = wrapped.getInt();
-                        int frameDelay = wrapped.getInt();
-
-                        int headerSize = 20;
-                        int pngSize = packetLen - headerSize;
-
-                        android.graphics.Bitmap targetBitmap = null;
-
-                        if (pngSize > 0) {
-                            // === 情况 A: 服务端发送了完整图片 ===
-                            targetBitmap = android.graphics.BitmapFactory.decodeByteArray(bodyData, headerSize, pngSize);
-                            if (targetBitmap != null) {
-                                // 存入本地缓存
-                                cursorCache.put(cursorHash, targetBitmap);
-                            }
-                        } else {
-                            // === 情况 B: 服务端只发了 Hash (pngSize == 0) ===
-                            targetBitmap = cursorCache.get(cursorHash);
-                            if (targetBitmap == null) {
-                                LimeLog.warning("CursorNet: 缓存未命中! Hash: " + cursorHash);
-                                // 理论上不应发生，如果发生，可能是服务端重启了但客户端没断
-                                // 这里可以考虑断开重连，或者暂时忽略
-                                continue;
-                            }
-                        }
-
-                        if (targetBitmap != null) {
-                            final android.graphics.Bitmap finalBmp = targetBitmap;
-                            runOnUiThread(() -> handleCursorUpdate(finalBmp, hotX, hotY, frameCount, frameDelay));
-                        }
-                    }
-                } catch (Exception e) {
-                    LimeLog.warning("CursorNet: Connection disconnected or failed: " + e.getMessage());
-                } finally {
-                    try { if (cursorSocket != null) cursorSocket.close(); } catch (Exception ignored) {}
-                    cursorSocket = null;
-
-                    if (isCursorNetworking) {
-                        // 停止任何正在进行的动画
-                        stopCurrentAnimation();
-                        restoreDefaultCursor();
-
-                        LimeLog.info("CursorNet: 2秒后重试连接...");
-                        try { Thread.sleep(2000); } catch (InterruptedException e) { break; }
-                    }
-                }
-            }
-            LimeLog.info("CursorNet: 服务线程已退出");
-        });
-        cursorNetworkThread.start();
-    }
-
-    /**
-     * 停止当前正在运行的光标动画
-     */
-    private void stopCurrentAnimation() {
-        animationHandler.removeCallbacksAndMessages(null);
-        currentAnimationTask = null;
-    }
-
-    /**
-     * 处理光标更新逻辑 (运行在 UI 线程)
-     */
-    private void handleCursorUpdate(android.graphics.Bitmap spriteSheet, int hotX, int hotY, int frameCount, int frameDelay) {
-        // 1. 先停止旧的动画
-        stopCurrentAnimation();
-
-        // 2. 如果是静态光标 (帧数 <= 1)，直接设置
-        if (frameCount <= 1) {
-            setSystemOrOverlayCursor(spriteSheet, hotX, hotY);
-            return;
-        }
-
-        // 3. 如果是动态光标，进行切割和播放
-        try {
-            int singleFrameW = spriteSheet.getWidth();
-            int singleFrameH = spriteSheet.getHeight() / frameCount; // 垂直切割
-
-            // 切割 Sprite Sheet 为帧数组
-            // 注意：这里可以加一个简单的 LRU 缓存避免重复切割，但为了代码简洁先直接切
-            final android.graphics.Bitmap[] frames = new android.graphics.Bitmap[frameCount];
-            for (int i = 0; i < frameCount; i++) {
-                frames[i] = android.graphics.Bitmap.createBitmap(spriteSheet, 0, i * singleFrameH, singleFrameW, singleFrameH);
-            }
-
-            // 定义动画任务
-            currentAnimationTask = new Runnable() {
-                int index = 0;
-                @Override
-                public void run() {
-                    if (!isCursorNetworking) return;
-
-                    // 设置当前帧
-                    setSystemOrOverlayCursor(frames[index], hotX, hotY);
-
-                    // 计算下一帧
-                    index = (index + 1) % frameCount;
-
-                    // 调度下一次更新
-                    animationHandler.postDelayed(this, frameDelay > 0 ? frameDelay : 33);
-                }
-            };
-
-            // 立即开始播放
-            currentAnimationTask.run();
-
-        } catch (Exception e) {
-            LimeLog.warning("CursorNet: 动画处理失败: " + e.getMessage());
-            // 降级处理：只显示第一帧
-            setSystemOrOverlayCursor(spriteSheet, hotX, hotY);
-        }
-    }
-
-    /**
-     * 设置系统指针或 Overlay 指针的底层方法
-     */
-    private void setSystemOrOverlayCursor(android.graphics.Bitmap bitmap, int hotX, int hotY) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && prefConfig.enableNativeMousePointer) {
-            try {
-                // Android 7.0+ 原生鼠标指针
-                PointerIcon pointerIcon = PointerIcon.create(bitmap, hotX, hotY);
-                streamView.setPointerIcon(pointerIcon);
-            } catch (Exception ignored) {}
-        } else {
-            // 旧版/自定义 Overlay
-            com.limelight.ui.CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
-            if (cursorOverlay != null) {
-                cursorOverlay.setCursorBitmap(bitmap, hotX, hotY);
-            }
-        }
-    }
-
-    // 辅助方法：恢复默认光标
-    private void restoreDefaultCursor() {
-        runOnUiThread(() -> {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && prefConfig.enableNativeMousePointer) {
-                try {
-                    streamView.setPointerIcon(PointerIcon.getSystemIcon(Game.this, PointerIcon.TYPE_ARROW));
-                } catch (Exception ignored) {}
-            } else {
-                com.limelight.ui.CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
-                if (cursorOverlay != null) {
-                    cursorOverlay.resetToDefault();
-                }
-            }
-        });
-    }
-
-    private void stopCursorService() {
-        // 1. 设置标志位，阻止外层循环再次重连
-        isCursorNetworking = false;
-
-        // 2. 打断线程的 sleep (如果正在重连等待中)
-        if (cursorNetworkThread != null) {
-            cursorNetworkThread.interrupt();
-        }
-
-        // 3. 强制关闭 Socket (打断 readFully 阻塞)
-        if (cursorSocket != null) {
-            try {
-                cursorSocket.close();
-            } catch (Exception e) {
-                // 忽略关闭时的错误
-            }
-            cursorSocket = null;
-        }
-
-        // 4. 清理 UI：恢复默认光标
-        runOnUiThread(() -> {
-            if (isFinishing() || isDestroyed()) return;
-
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N && prefConfig.enableNativeMousePointer) {
-                try {
-                    streamView.setPointerIcon(PointerIcon.getSystemIcon(Game.this, PointerIcon.TYPE_ARROW));
-                } catch (Exception ignored) {}
-            } else {
-                com.limelight.ui.CursorView cursorOverlay = findViewById(R.id.cursorOverlay);
-                if (cursorOverlay != null) {
-                    cursorOverlay.resetToDefault();
-                }
-            }
-        });
-
-        LimeLog.info("CursorNet: 服务已停止");
-    }
-    /**
-     * 根据当前配置和运行状态，决定是启动还是停止光标服务
-     */
-    public void updateCursorServiceState(boolean shouldRun) {
-
-        if (shouldRun) {
-            if (!isCursorNetworking && currentHostAddress != null) {
-                // 如果没在运行，且有IP，就开始运行
-                LimeLog.info("CursorNet: Enabling cursor service during stream");
-                startCursorService(currentHostAddress);
-            }
-        } else {
-            if (isCursorNetworking) {
-                // 如果正在运行，就停止它
-                LimeLog.info("CursorNet: Disabling cursor service during stream");
-                stopCursorService();
-            }
+    public void refreshLocalCursorState(boolean enabled) {
+        if (cursorServiceManager != null) {
+            cursorServiceManager.refreshLocalCursorState(enabled);
         }
     }
 

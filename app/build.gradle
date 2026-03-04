@@ -19,11 +19,15 @@ android {
         minSdk 22
         targetSdk 35
 
-        versionName "12.7.0"
-        versionCode = 366
+        versionName "12.7.1"
+        versionCode = 367
 
         // Generate native debug symbols to allow Google Play to symbolicate our native crashes
         ndk.debugSymbolLevel = 'FULL'
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
     }
 
     flavorDimensions.add("root")
