@@ -347,6 +347,16 @@ public class PerformanceOverlayManager {
     }
 
     /**
+     * 屏幕方向变化时重新配置覆盖层布局和位置。
+     * 应由 Activity.onConfigurationChanged() 调用。
+     */
+    public void onConfigurationChanged() {
+        if (performanceOverlayView != null) {
+            configurePerformanceOverlay();
+        }
+    }
+
+    /**
      * 更新性能信息（带宽、丢包、延迟等）并刷新文案
      */
     public void updatePerformanceInfo(final PerformanceInfo performanceInfo) {
@@ -895,18 +905,28 @@ public class PerformanceOverlayManager {
     }
 
     /**
-     * 根据屏幕 PPI 计算自适应字体大小（像素）。
-     * 使用屏幕短边像素数作为参考，使覆盖层在不同 PPI 设备上占据一致的屏幕比例。
-     * 参考基准: 1080p 屏幕，10sp ≈ 屏幕短边的 ~1.5%
+     * 根据屏幕物理尺寸计算自适应字体大小（像素）。
+     * 以 SP 为基线，根据屏幕短边 dp 值相对于参考手机做平方根阻尼缩放，
+     * 确保手机上与原来一致，平板/电视适度放大但不会过大。
+     *
+     * 参考基准: 1080p xxhdpi 手机，短边 ≈ 411dp
+     * - 手机 (411dp): scaleFactor=1.0 → 与原 SP 完全一致
+     * - 平板 (800dp): scaleFactor≈1.4 → 适度放大
+     * - 电视 (1920dp): scaleFactor≈2.2 → 合理放大，不会 4 倍暴涨
      */
     private float getAdaptiveTextSizePx(float baseSizeSp) {
         DisplayMetrics dm = activity.getResources().getDisplayMetrics();
         int shortSide = Math.min(dm.widthPixels, dm.heightPixels);
 
-        // 参考基准：1080px 短边，10sp → 10 * 2.625(xxhdpi) ≈ 26px
-        // 公式：targetPx = shortSide * (baseSizeSp / 10) * (26 / 1080)
-        // 简化：targetPx = shortSide * baseSizeSp * 0.0024f
-        float targetPx = shortSide * baseSizeSp * 0.0024f;
+        // 短边 dp 值 = 短边像素 / density
+        float shortSideDp = shortSide / dm.density;
+        float referenceDp = 411f; // 典型手机短边 dp (1080px / 2.625)
+
+        // 平方根阻尼：大屏增长减缓，避免大屏字体过大
+        float scaleFactor = (float) Math.sqrt(shortSideDp / referenceDp);
+
+        // 基于 SP 标准像素值再乘以阻尼系数
+        float targetPx = baseSizeSp * dm.density * scaleFactor;
 
         // 限制范围：最小 8px，最大 40px
         return Math.max(8f, Math.min(targetPx, 40f));

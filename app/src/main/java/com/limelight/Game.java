@@ -1364,6 +1364,11 @@ public class Game extends Activity implements SurfaceHolder.Callback,
             }
         }
 
+        // 屏幕方向变化时重新配置性能覆盖层布局
+        if (performanceOverlayManager != null) {
+            performanceOverlayManager.onConfigurationChanged();
+        }
+
         // Re-apply display position
         refreshDisplayPosition();
 
