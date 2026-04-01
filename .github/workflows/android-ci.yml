@@ -152,7 +152,7 @@ jobs:
           echo "Renamed APK to: $DEST"
           echo "REL_APK=$DEST" >> $GITHUB_ENV
 
-      - name: Generate cute release notes
+      - name: Generate release notes
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
@@ -161,28 +161,78 @@ jobs:
           V="${VERSION_NAME:-${GITHUB_REF#refs/tags/}}"; V="${V#v}"
           CUR_TAG="${GITHUB_REF#refs/tags/}"
           PREV_TAG=$(git tag --sort=-creatordate | sed -n '2p' || true)
+
           if [ -n "$PREV_TAG" ]; then
-            CHANGES=$(git log --pretty=format:'- %s (%h)' "${PREV_TAG}..${CUR_TAG}" || true)
+            LOG=$(git log --pretty=format:'%s' "${PREV_TAG}..${CUR_TAG}" --no-merges || true)
           else
-            CHANGES=$(git log --pretty=format:'- %s (%h)' -n 100 || true)
+            LOG=$(git log --pretty=format:'%s' -n 100 --no-merges || true)
           fi
-          [ -z "$CHANGES" ] && CHANGES="- 初始发布"
-          cat > release_notes.md << EOF
-          ## 🌙 Moonlight V+ ${V}
 
-          感谢你使用 Moonlight V+！如果喜欢，记得点亮一颗 ⭐～
+          # 按 conventional commit 前缀分类
+          FEAT="" FIX="" PERF="" OTHER=""
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            # 提取前缀和描述（支持 type(scope): desc 和 type: desc）
+            if [[ "$line" =~ ^(feat|fix|perf|refactor|remove|chore|ci|docs|style|test|build)(\([^)]*\))?:\ (.+)$ ]]; then
+              prefix="${BASH_REMATCH[1]}"
+              desc="${BASH_REMATCH[3]}"
+              case "$prefix" in
+                feat)           FEAT+="- ✨ ${desc}"$'\n' ;;
+                fix)            FIX+="- 🐛 ${desc}"$'\n' ;;
+                perf|refactor)  PERF+="- ⚡ ${desc}"$'\n' ;;
+                remove)         OTHER+="- 🗑️ ${desc}"$'\n' ;;
+                # chore/ci/docs/style/test/build → 跳过
+              esac
+            fi
+          done <<< "$LOG"
 
-          ### ✨ 更新内容
-          ${CHANGES}
+          # 拼装 release notes
+          {
+            echo "## 🌙 Moonlight V+ ${V}"
+            echo ""
+            echo "感谢你使用 Moonlight V+！如果喜欢，记得点亮一颗 ⭐～"
+            echo ""
 
-          ### 📦 下载
-          - APK 文件：Moonlight.V+.${V}.apk
+            if [ -n "$FEAT" ]; then
+              echo "### 新增"
+              printf '%s' "$FEAT"
+              echo ""
+            fi
+            if [ -n "$PERF" ]; then
+              echo "### 优化"
+              printf '%s' "$PERF"
+              echo ""
+            fi
+            if [ -n "$FIX" ]; then
+              echo "### 修复"
+              printf '%s' "$FIX"
+              echo ""
+            fi
+            if [ -n "$OTHER" ]; then
+              echo "### 其他"
+              printf '%s' "$OTHER"
+              echo ""
+            fi
 
-          ### 🧭 另外
-          - 如遇到问题，请在 Issues 反馈。祝你游戏顺利、低延迟满帧！🎮
+            # 如果所有分类都为空，列出原始提交
+            if [ -z "$FEAT" ] && [ -z "$FIX" ] && [ -z "$PERF" ] && [ -z "$OTHER" ]; then
+              echo "### 更新内容"
+              if [ -n "$PREV_TAG" ]; then
+                git log --pretty=format:'- %s' "${PREV_TAG}..${CUR_TAG}" --no-merges || true
+              else
+                echo "- 初始发布"
+              fi
+              echo ""
+            fi
 
-          —— 发布于 ${DATE}
-          EOF
+            echo "### 📦 下载"
+            echo "- APK 文件：\`Moonlight.V+.${V}.apk\`"
+            echo ""
+            echo "---"
+            echo "如遇到问题，请在 [Issues](../../issues) 反馈。祝你游戏顺利、低延迟满帧！🎮"
+            echo ""
+            echo "*发布于 ${DATE}*"
+          } > release_notes.md
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
