@@ -115,7 +115,8 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     private SpinnerDialog blockingLoadSpinner;
 
     // ==================== UI 组件 - 背景 ====================
-    private ImageView appBackgroundImage;
+    private ImageView appBackgroundImageBlur;
+    private ImageView appBackgroundImageClear;
     private BackgroundImageManager backgroundImageManager;
     private final Handler backgroundChangeHandler = new Handler(Looper.getMainLooper());
     private Runnable backgroundChangeRunnable;
@@ -368,9 +369,10 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
 
         setContentView(R.layout.activity_app_view);
 
-        // Initialize background image view
-        appBackgroundImage = findViewById(R.id.appBackgroundImage);
-        backgroundImageManager = new BackgroundImageManager(this, appBackgroundImage);
+        // Initialize background image views
+        appBackgroundImageBlur = findViewById(R.id.appBackgroundImageBlur);
+        appBackgroundImageClear = findViewById(R.id.appBackgroundImageClear);
+        backgroundImageManager = new BackgroundImageManager(this, appBackgroundImageBlur, appBackgroundImageClear);
 
         // Initialize app settings manager and UI components
         appSettingsManager = new AppSettingsManager(this);
@@ -589,26 +591,9 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
             return;
         }
 
-        if (backgroundImageManager != null && appBackgroundImage != null) {
+        if (backgroundImageManager != null && appBackgroundImageBlur != null) {
             CachedAppAssetLoader loader = appGridAdapter.getLoader();
-            CachedAppAssetLoader.LoaderTuple tuple = new CachedAppAssetLoader.LoaderTuple(computer, appObject.app);
-
-            // 尝试从内存缓存获取bitmap
-            ScaledBitmap cachedBitmap = loader.getBitmapFromCache(tuple);
-            if (cachedBitmap != null && cachedBitmap.bitmap != null) {
-                backgroundImageManager.setBackgroundSmoothly(cachedBitmap.bitmap);
-            } else {
-                // 如果缓存中没有，异步加载
-                ImageView tempImageView = new ImageView(this);
-                loader.populateImageView(appObject, tempImageView, null, false, () -> {
-                    if (tempImageView.getDrawable() instanceof BitmapDrawable) {
-                        Bitmap bitmap = ((BitmapDrawable) tempImageView.getDrawable()).getBitmap();
-                        if (bitmap != null) {
-                            backgroundImageManager.setBackgroundSmoothly(bitmap);
-                        }
-                    }
-                });
-            }
+            loader.loadFullBitmap(appObject.app, bitmap -> backgroundImageManager.setBackgroundSmoothly(bitmap));
         }
     }
 
@@ -1427,7 +1412,7 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
         // Only set background if we don't have one already and there are apps
         if (backgroundImageManager.getCurrentBackground() == null && 
             !appObjects.isEmpty() && 
-            appBackgroundImage != null) {
+            appBackgroundImageBlur != null) {
             
             AppObject firstApp = appObjects.get(0);
             
@@ -1442,30 +1427,17 @@ public class AppView extends Activity implements AdapterFragmentCallbacks {
     
     private void setFirstAppBackgroundImage(AppObject firstApp) {
         CachedAppAssetLoader loader = appGridAdapter.getLoader();
-        CachedAppAssetLoader.LoaderTuple tuple = new CachedAppAssetLoader.LoaderTuple(computer, firstApp.app);
-        
-        // Try memory cache first for immediate display
-        ScaledBitmap cachedBitmap = loader.getBitmapFromCache(tuple);
-        if (cachedBitmap != null && cachedBitmap.bitmap != null) {
-            backgroundImageManager.setBackgroundSmoothly(cachedBitmap.bitmap);
-        } else {
-            // Load asynchronously if not in cache
-            ImageView tempImageView = new ImageView(this);
-            loader.populateImageView(firstApp, tempImageView, null, false, () -> {
-                if (tempImageView.getDrawable() instanceof BitmapDrawable) {
-                    Bitmap bitmap = ((BitmapDrawable) tempImageView.getDrawable()).getBitmap();
-                    if (bitmap != null) {
-                        backgroundImageManager.setBackgroundSmoothly(bitmap);
-                    }
-                }
-            });
-        }
+        loader.loadFullBitmap(firstApp.app, bitmap -> backgroundImageManager.setBackgroundSmoothly(bitmap));
     }
 
     @Override
     public int getAdapterFragmentLayoutId() {
         return PreferenceConfiguration.readPreferences(AppView.this).smallIconMode ?
                     R.layout.app_grid_view_small : R.layout.app_grid_view;
+    }
+
+    public BackgroundImageManager getBackgroundImageManager() {
+        return backgroundImageManager;
     }
 
     public void receiveAbsListView(AbsListView listView) {

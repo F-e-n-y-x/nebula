@@ -7,13 +7,26 @@
     android:clipToPadding="false"
     tools:context=".AppView">
 
-    <!-- 背景图 -->
-    <ImageView
-        android:id="@+id/appBackgroundImage"
+    <!-- 背景图容器 -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:alpha="0.33" />
+        android:layout_height="match_parent">
+
+        <!-- 高斯模糊背景 -->
+        <ImageView
+            android:id="@+id/appBackgroundImageBlur"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <!-- 中间完整图片 -->
+        <ImageView
+            android:id="@+id/appBackgroundImageClear"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter" />
+
+    </FrameLayout>
 
     <!-- App 图标网格容器 -->
     <FrameLayout
