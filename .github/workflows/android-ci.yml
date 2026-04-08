@@ -170,10 +170,12 @@ jobs:
 
           # 按 conventional commit 前缀分类
           FEAT="" FIX="" PERF="" OTHER=""
+          # 正则存入变量，避免 bash [[ =~ ]] 的括号解析问题
+          RE='^(feat|fix|perf|refactor|remove|chore|ci|docs|style|test|build)(\([^)]*\))?:[[:space:]](.+)$'
           while IFS= read -r line; do
             [ -z "$line" ] && continue
             # 提取前缀和描述（支持 type(scope): desc 和 type: desc）
-            if [[ "$line" =~ ^(feat|fix|perf|refactor|remove|chore|ci|docs|style|test|build)(\([^)]*\))?:\ (.+)$ ]]; then
+            if [[ "$line" =~ $RE ]]; then
               prefix="${BASH_REMATCH[1]}"
               desc="${BASH_REMATCH[3]}"
               case "$prefix" in
