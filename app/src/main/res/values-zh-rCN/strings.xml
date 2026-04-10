@@ -1106,4 +1106,9 @@
     <string name="quick_button_editor_title">快捷按钮配置</string>
     <string name="quick_button_reset_default">恢复默认</string>
 
+    <!-- Layout accessibility & download -->
+    <string name="download_preparing">准备下载…</string>
+    <string name="seekbar_decrease">减小</string>
+    <string name="seekbar_increase">增大</string>
+
 </resources>

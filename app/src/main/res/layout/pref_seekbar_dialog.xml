@@ -33,7 +33,7 @@
             android:layout_height="36dp"
             android:background="@drawable/pref_adjust_btn_bg"
             android:scaleType="center"
-            android:contentDescription="减小"
+            android:contentDescription="@string/seekbar_decrease"
             android:visibility="gone"
             android:clickable="true"
             android:focusable="true" />
@@ -75,7 +75,7 @@
             android:layout_height="36dp"
             android:background="@drawable/pref_adjust_btn_bg"
             android:scaleType="center"
-            android:contentDescription="增大"
+            android:contentDescription="@string/seekbar_increase"
             android:visibility="gone"
             android:clickable="true"
             android:focusable="true" />

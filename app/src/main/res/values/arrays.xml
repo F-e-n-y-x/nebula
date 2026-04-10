@@ -179,17 +179,17 @@
         <item>left</item>
     </string-array>
 
-    <!-- 画面位置选项 -->
+    <!-- Screen position options -->
     <string-array name="screen_position_names">
-        <item>左上</item>
-        <item>顶部居中</item>
-        <item>右上</item>
-        <item>左侧居中</item>
-        <item>居中</item>
-        <item>右侧居中</item>
-        <item>左下</item>
-        <item>底部居中</item>
-        <item>右下</item>
+        <item>Top Left</item>
+        <item>Top Center</item>
+        <item>Top Right</item>
+        <item>Center Left</item>
+        <item>Center</item>
+        <item>Center Right</item>
+        <item>Bottom Left</item>
+        <item>Bottom Center</item>
+        <item>Bottom Right</item>
     </string-array>
 
     <string-array name="screen_position_values">
@@ -204,7 +204,7 @@
         <item>bottom_right</item>
     </string-array>
 
-    <!-- 画面位置图标数组 -->
+    <!-- Screen position icon array -->
     <array name="screen_position_icons">
         <item>@drawable/ic_position_top_left</item>
         <item>@drawable/ic_position_top_center</item>
@@ -217,7 +217,7 @@
         <item>@drawable/ic_position_bottom_right</item>
     </array>
 
-    <!-- 屏幕组合模式（Sunshine 自定义屏幕模式） -->
+    <!-- Screen combination mode (Sunshine custom display mode) -->
     <string-array name="screen_combination_mode_names">
         <item>@string/screen_mode_host_default</item>
         <item>@string/screen_mode_no_operation</item>
@@ -233,7 +233,7 @@
         <item>3</item>
     </string-array>
 
-    <!-- VDD 屏幕组合模式 -->
+    <!-- VDD screen combination mode -->
     <string-array name="vdd_screen_combination_mode_names">
         <item>@string/vdd_screen_mode_host_default</item>
         <item>@string/vdd_screen_mode_no_operation</item>
@@ -249,32 +249,32 @@
         <item>3</item>
     </string-array>
 
-    <!-- 性能覆盖层方向选项 -->
+    <!-- Performance overlay orientation options -->
     <string-array name="perf_overlay_orientation_names">
-        <item>水平显示</item>
-        <item>垂直显示</item>
+        <item>Horizontal</item>
+        <item>Vertical</item>
     </string-array>
     <string-array name="perf_overlay_orientation_values" translatable="false">
         <item>horizontal</item>
         <item>vertical</item>
     </string-array>
     
-    <!-- 性能覆盖层位置选项 - 水平方向 -->
+    <!-- Performance overlay position options - horizontal -->
     <string-array name="perf_overlay_position_horizontal_names">
-        <item>顶部</item>
-        <item>底部</item>
+        <item>Top</item>
+        <item>Bottom</item>
     </string-array>
     <string-array name="perf_overlay_position_horizontal_values" translatable="false">
         <item>top</item>
         <item>bottom</item>
     </string-array>
     
-    <!-- 性能覆盖层位置选项 - 垂直方向 -->
+    <!-- Performance overlay position options - vertical -->
     <string-array name="perf_overlay_position_vertical_names">
-        <item>左上角</item>
-        <item>右上角</item>
-        <item>左下角</item>
-        <item>右下角</item>
+        <item>Top Left</item>
+        <item>Top Right</item>
+        <item>Bottom Left</item>
+        <item>Bottom Right</item>
     </string-array>
     <string-array name="perf_overlay_position_vertical_values" translatable="false">
         <item>top_left</item>
@@ -283,17 +283,17 @@
         <item>bottom_right</item>
     </string-array>
     
-    <!-- 性能覆盖层显示项目选项 -->
+    <!-- Performance overlay display items -->
     <string-array name="perf_overlay_display_items_names">
-        <item>🎬 目标分辨率与帧率</item>
-        <item>codec 解码器信息</item>
-        <item>Rx/Rd 传输帧率与渲染帧率</item>
-        <item>📶 丢帧率</item>
-        <item>🌐 带宽与网络延迟</item>
-        <item>⏱️/🥵 解码延迟(15ms以下为正常)</item>
-        <item>🖥 主机延迟</item>
-        <item>🔋 电池电量</item>
-        <item>📉 1%Low帧 (帧率平滑性)</item>
+        <item>🎬 Resolution &amp; Target FPS</item>
+        <item>Codec Decoder Info</item>
+        <item>Rx/Rd Received &amp; Rendered FPS</item>
+        <item>📶 Packet Loss</item>
+        <item>🌐 Bitrate &amp; Network Latency</item>
+        <item>⏱️/🥵 Decode Latency (normal &lt; 15ms)</item>
+        <item>🖥 Host Latency</item>
+        <item>🔋 Battery Level</item>
+        <item>📉 1% Low FPS (Smoothness)</item>
     </string-array>
     <string-array name="perf_overlay_display_items_values" translatable="false">
         <item>resolution</item>
@@ -323,7 +323,7 @@
         <item>solid_white</item>
     </string-array>
 
-    <!-- 本地鼠标模式预设选项 -->
+    <!-- Native mouse mode preset options -->
     <string-array name="native_mouse_mode_preset_names">
         <item>@string/native_mouse_mode_preset_enhanced</item>
         <item>@string/native_mouse_mode_preset_classic</item>

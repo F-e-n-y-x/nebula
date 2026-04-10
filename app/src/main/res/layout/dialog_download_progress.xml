@@ -23,7 +23,7 @@
         android:id="@+id/download_progress_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="准备下载..."
+        android:text="@string/download_preparing"
         android:textSize="13sp"
         android:textColor="@color/app_dialog_subtitle_color"
         android:shadowRadius="0"

@@ -1159,4 +1159,9 @@
     <string name="quick_button_editor_title">Quick Buttons</string>
     <string name="quick_button_reset_default">Reset</string>
 
+    <!-- Layout accessibility & download -->
+    <string name="download_preparing">Preparing download…</string>
+    <string name="seekbar_decrease">Decrease</string>
+    <string name="seekbar_increase">Increase</string>
+
 </resources>

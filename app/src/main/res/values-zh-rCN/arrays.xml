@@ -30,4 +30,50 @@
         <item>打开虚拟键盘</item>
         <item>打开菜单</item>
     </string-array>
+
+    <!-- 画面位置选项 -->
+    <string-array name="screen_position_names">
+        <item>左上</item>
+        <item>顶部居中</item>
+        <item>右上</item>
+        <item>左侧居中</item>
+        <item>居中</item>
+        <item>右侧居中</item>
+        <item>左下</item>
+        <item>底部居中</item>
+        <item>右下</item>
+    </string-array>
+
+    <!-- 性能覆盖层方向选项 -->
+    <string-array name="perf_overlay_orientation_names">
+        <item>水平显示</item>
+        <item>垂直显示</item>
+    </string-array>
+
+    <!-- 性能覆盖层位置选项 - 水平方向 -->
+    <string-array name="perf_overlay_position_horizontal_names">
+        <item>顶部</item>
+        <item>底部</item>
+    </string-array>
+
+    <!-- 性能覆盖层位置选项 - 垂直方向 -->
+    <string-array name="perf_overlay_position_vertical_names">
+        <item>左上角</item>
+        <item>右上角</item>
+        <item>左下角</item>
+        <item>右下角</item>
+    </string-array>
+
+    <!-- 性能覆盖层显示项目选项 -->
+    <string-array name="perf_overlay_display_items_names">
+        <item>🎬 目标分辨率与帧率</item>
+        <item>codec 解码器信息</item>
+        <item>Rx/Rd 传输帧率与渲染帧率</item>
+        <item>📶 丢帧率</item>
+        <item>🌐 带宽与网络延迟</item>
+        <item>⏱️/🥵 解码延迟(15ms以下为正常)</item>
+        <item>🖥 主机延迟</item>
+        <item>🔋 电池电量</item>
+        <item>📉 1%Low帧 (帧率平滑性)</item>
+    </string-array>
 </resources>
