@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.limelight.preferences
 
 import android.annotation.SuppressLint
@@ -25,6 +26,7 @@ class AboutDialogPreference : Preference {
 
     constructor(context: Context) : super(context)
 
+    @Deprecated("Deprecated in Java")
     override fun onClick() {
         showAboutDialog()
     }
@@ -68,7 +70,7 @@ class AboutDialogPreference : Preference {
     private fun getVersionInfo(context: Context): String {
         return try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            String.format("Version %s (Build %d)", packageInfo.versionName, packageInfo.versionCode)
+            String.format("Version %s (Build %d)", packageInfo.versionName, androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(packageInfo))
         } catch (e: PackageManager.NameNotFoundException) {
             "Version Unknown"
         }

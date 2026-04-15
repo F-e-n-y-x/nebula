@@ -121,7 +121,6 @@ class GameMenu(
         ALT(KeyboardTranslator.VK_MENU.s(), KeyboardPacket.MODIFIER_ALT);
 
         companion object {
-            @JvmStatic
             fun getModifier(key: Short): Byte =
                 entries.find { it.keyCode == key }?.modifier ?: 0
         }
@@ -451,10 +450,6 @@ class GameMenu(
     private fun testLocalRumbleAll() {
         try {
             val ch = game.controllerHandler
-            if (ch == null) {
-                Toast.makeText(game, getString(R.string.toast_cannot_access_controller), Toast.LENGTH_SHORT).show()
-                return
-            }
 
             val on: Short = 0xFFFF.toShort()
             val off: Short = 0
@@ -552,7 +547,7 @@ class GameMenu(
                     }
                 }
 
-                override fun onFailure(errorMessage: String?) {
+                override fun onFailure(errorMessage: String) {
                     game.runOnUiThread {
                         try {
                             val errorMsg = getString(R.string.game_menu_bitrate_adjustment_failed) + ": " + errorMessage
@@ -927,9 +922,9 @@ class GameMenu(
             }
 
             val action = QuickActionRegistry.getBuiltin(id)
-            if (id == "toggle_mic" && (game.prefConfig == null || !game.prefConfig.enableMic)) {
+            if (id == "toggle_mic" && !game.prefConfig.enableMic) {
                 btn.isEnabled = false; btn.alpha = 0.5f
-                if (action?.iconDisabledRes != 0 && action != null)
+                if (action != null && action.iconDisabledRes != 0)
                     btn.setUniformIcon(action.iconDisabledRes)
                 btn.setOnClickListener {
                     Toast.makeText(game, getString(R.string.toast_enable_mic_redirect), Toast.LENGTH_SHORT).show()
@@ -1391,7 +1386,7 @@ class GameMenu(
 
     private fun saveCustomKey(name: String, keysString: String) {
         val preferences = game.getSharedPreferences(PREF_NAME, Activity.MODE_PRIVATE)
-        val value = preferences.getString(KEY_NAME, "{\"data\":[]}")
+        val value = preferences.getString(KEY_NAME, "{\"data\":[]}") ?: "{\"data\":[]}"
 
         try {
             val keyParts = keysString.split(",")
@@ -1778,7 +1773,6 @@ class GameMenu(
         private const val PREF_NAME = "custom_special_keys"
         private const val KEY_NAME = "data"
 
-        @JvmStatic
         private var mouse_enable_switch = false
 
         private val ICON_MAP = mapOf(
@@ -1797,7 +1791,6 @@ class GameMenu(
             "game_menu_test_local_rumble" to R.drawable.ic_rumble_cute
         )
 
-        @JvmStatic
         fun getIconForMenuOption(iconKey: String?): Int {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 return ICON_MAP.getOrDefault(iconKey, R.drawable.ic_menu_item_default)

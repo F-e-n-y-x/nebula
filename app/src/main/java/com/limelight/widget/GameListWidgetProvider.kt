@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION")
 package com.limelight.widget
 
 import android.app.PendingIntent
@@ -64,7 +65,6 @@ class GameListWidgetProvider : AppWidgetProvider() {
         const val ACTION_REFRESH_WIDGET = "com.limelight.widget.ACTION_REFRESH_WIDGET"
         const val EXTRA_COMPUTER_UUID = "com.limelight.widget.EXTRA_COMPUTER_UUID"
 
-        @JvmStatic
         fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val prefs = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
             val computerName = prefs.getString("widget_${appWidgetId}_name", context.getString(R.string.widget_name))
