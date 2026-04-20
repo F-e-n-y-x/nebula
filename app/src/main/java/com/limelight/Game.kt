@@ -28,6 +28,7 @@ import com.limelight.binding.video.PerformanceInfo
 import com.limelight.nvstream.NvConnection
 import com.limelight.nvstream.StreamConfiguration
 import com.limelight.nvstream.http.ComputerDetails
+import com.limelight.nvstream.http.AdaptiveBitrateService
 import com.limelight.nvstream.NvConnectionListener
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
@@ -138,6 +139,10 @@ class Game : Activity(), SurfaceHolder.Callback,
 
     var conn: NvConnection? = null
     var progressOverlay: FullscreenProgressOverlay? = null
+
+    // 智能码率
+    var adaptiveBitrateService: AdaptiveBitrateService? = null
+    @Volatile private var latestPerfInfo: PerformanceInfo? = null
 
     var displayedFailureDialog = false
     var connecting = false
@@ -1402,6 +1407,38 @@ class Game : Activity(), SurfaceHolder.Callback,
         connectionCallbackHandler.connectionStarted()
     }
 
+    /** 启动智能码率（如设置已开启）。在连接建立后调用。*/
+    fun startAdaptiveBitrateIfEnabled() {
+        if (!prefConfig.enableAdaptiveBitrate) return
+        if (adaptiveBitrateService != null) return
+        val c = conn ?: return
+        val service = AdaptiveBitrateService(
+            nvHttpFactory = { c.createNvHttp() },
+            statsProvider = {
+                latestPerfInfo?.let { p ->
+                    AdaptiveBitrateService.AbrStats(
+                        packetLoss = p.lostFrameRate,
+                        rttMs = (p.rttInfo shr 32).toInt(),
+                        decodeFps = p.totalFps,
+                        droppedFrames = 0
+                    )
+                }
+            },
+            onBitrateChanged = { kbps, _ ->
+                // service 已成功通知服务端，仅同步本地配置
+                c.applyBitrateLocally(kbps)
+            }
+        )
+        service.start(prefConfig.bitrate, prefConfig.abrMode)
+        adaptiveBitrateService = service
+    }
+
+    /** 停止智能码率，恢复初始码率。*/
+    fun stopAdaptiveBitrate() {
+        adaptiveBitrateService?.stop()
+        adaptiveBitrateService = null
+    }
+
     override fun onStart() {
         super.onStart()
 
@@ -1749,6 +1786,9 @@ class Game : Activity(), SurfaceHolder.Callback,
     }
 
     override fun onPerfUpdateWG(performanceInfo: PerformanceInfo) {
+        // 缓存最新性能数据，供 ABR 服务使用
+        latestPerfInfo = performanceInfo
+
         runOnUiThread {
             val currentRxBytes = TrafficStats.getTotalRxBytes()
             val timeMillis = System.currentTimeMillis()
