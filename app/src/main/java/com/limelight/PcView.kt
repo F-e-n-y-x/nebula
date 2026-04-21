@@ -91,6 +91,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import androidx.preference.PreferenceManager
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.animation.ObjectAnimator
@@ -169,6 +170,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private var runningPolling = false
     private var inForeground = false
     private var completeOnCreateCalled = false
+    private var pendingSplashFadeIn = true
     private var lastShakeTime = 0L
 
     // Helpers
@@ -220,18 +222,29 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         // androidx core-splashscreen backport shows the static icon over splash_bg and then
         // hands control to postSplashScreenTheme (AppTheme).
         val splashScreen = installSplashScreen()
-        // Customize exit transition: subtle scale-up + fade-out of the icon, ~350ms.
-        // System will block the first frame of our content until this animation finishes,
-        // creating a smooth handoff instead of a hard cut.
+        // Hold the splash on screen until PcView's real content view is inflated
+        // (completeOnCreate -> initializeViews -> setContentView(activity_pc_view)).
+        // Without this, the system fires onExitAnimationListener as soon as the
+        // GL-detection surfaceView reports its first frame, which is just a tiny
+        // black surface — causing a visible "black flash" before the real UI.
+        // Safety cap: 1500ms — never block UI longer than that even on slow GL probes.
+        val splashDeadline = SystemClock.uptimeMillis() + 1500L
+        splashScreen.setKeepOnScreenCondition {
+            !completeOnCreateCalled && SystemClock.uptimeMillis() < splashDeadline
+        }
+        // Custom exit transition: cross-fade the entire splash overlay (icon + bg)
+        // into PcView so the color/content handoff is seamless.
         splashScreen.setOnExitAnimationListener { provider ->
+            val splashView = provider.view
             val icon = provider.iconView
-            val scaleX = ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.2f, 0.6f)
-            val scaleY = ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.2f, 0.6f)
-            val alpha = ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f)
+            val iconScaleX = ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.15f, 0.7f)
+            val iconScaleY = ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.15f, 0.7f)
+            val iconAlpha = ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f)
+            val splashAlpha = ObjectAnimator.ofFloat(splashView, View.ALPHA, 1f, 0f)
             val set = AnimatorSet().apply {
-                duration = 350L
-                interpolator = AnticipateInterpolator(1.4f)
-                playTogether(scaleX, scaleY, alpha)
+                duration = 380L
+                interpolator = AnticipateInterpolator(1.2f)
+                playTogether(iconScaleX, iconScaleY, iconAlpha, splashAlpha)
             }
             set.doOnEnd { provider.remove() }
             set.start()
@@ -378,6 +391,19 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private fun initializeViews() {
         setContentView(R.layout.activity_pc_view)
         UiHelper.notifyNewRootView(this)
+
+        // Fade the entire root in to mask any frame the splash backport might have
+        // exposed during the theme handoff. Since splash_bg matches advance_setting_background,
+        // even an early-revealed window background looks identical — only widget content
+        // (icons, text, list) needs to fade in to feel smooth instead of "popping".
+        // Only do this on the first inflation; rotation/config changes should not re-fade.
+        if (pendingSplashFadeIn) {
+            pendingSplashFadeIn = false
+            findViewById<View>(R.id.pcViewRootLayout)?.let { root ->
+                root.alpha = 0f
+                root.animate().alpha(1f).setDuration(260L).start()
+            }
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             setShouldDockBigOverlays(false)

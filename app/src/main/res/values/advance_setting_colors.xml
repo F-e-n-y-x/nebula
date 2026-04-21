@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="advance_setting_background">#4D464A</color>
-    <!-- Splash screen colors -->
-    <color name="splash_bg">#2A2428</color>
+    <!-- Splash screen colors. splash_bg MUST match advance_setting_background so any
+         premature theme/window swap during the launch handoff is invisible to the user. -->
+    <color name="splash_bg">#4D464A</color>
     <color name="splash_icon_bg">#FFFFFF</color>
     <color name="configuration_line">#535353</color>
     <color name="advance_setting_button_background">#404040</color>
