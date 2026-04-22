@@ -329,11 +329,11 @@
     <string name="title_checkbox_enhanced_touch_on_which_side">Reverse enhanced touch zone</string>
     <string name="summary_checkbox_enhanced_touch_on_which_side">Reverse enhanced touch zone to the left (default: on the right side of screen)</string>
     <string name="title_enhanced_touch_zone_divider">Enhanced touch zone divider</string>
-    <string name="summary_enhanced_touch_zone_divider">Defines where to divide native-touch and enhanced-touch zones, less than 50% means divide from a point on the left, more than 50% means right</string>
-    <string name="dialog_title_enhanced_touch_zone_divider">Less than 50% means divide from a point on the left, more than 50% means right</string>
+    <string name="summary_enhanced_touch_zone_divider" formatted="false">Defines where to divide native-touch and enhanced-touch zones, less than 50% means divide from a point on the left, more than 50% means right</string>
+    <string name="dialog_title_enhanced_touch_zone_divider" formatted="false">Less than 50% means divide from a point on the left, more than 50% means right</string>
     <string name="suffix_enhanced_touch_zone_divider">%</string>
     <string name="title_pointer_velocity_factor">Pointer velocity factor</string>
-    <string name="summary_pointer_velocity_factor">Set pointer velocity factor for enhanced touch zone. Set 100% to disable</string>
+    <string name="summary_pointer_velocity_factor" formatted="false">Set pointer velocity factor for enhanced touch zone. Set 100% to disable</string>
     <string name="dialog_title_pointer_velocity_factor">Set pointer velocity factor for enhanced touch zone. Set 100% to disable</string>
     <string name="suffix_pointer_velocity_factor">%</string>
     <string name="title_fixed_x_velocity">Set fixed X (horizontal) velocity</string>
@@ -458,7 +458,7 @@
     <string name="summary_checkbox_lock_screen_after_disconnect">Automatically lock the device screen after disconnecting and exiting the stream (you need to manually turn on the on-screen keyboard, which is the host keyboard in the menu)</string>
     <string name="title_checkbox_swap_quit_and_disconnect">Toggle “Quit” Button Function</string>
     <string name="summary_checkbox_swap_quit_and_disconnect">When enabled, the “Quit” button will disconnect without closing the app</string>
-    <string name="mic_stats_continuity">Audio continuity: %.1f%% (Captured:%d Encoded:%d Sent:%d Dropped:%d)</string>
+    <string name="mic_stats_continuity">Audio continuity: %1$.1f%% (Captured:%2$d Encoded:%3$d Sent:%4$d Dropped:%5$d)</string>
 
     <string name="category_help">Help</string>
     <string name="category_mic_settings">Microphone Settings</string>
@@ -705,7 +705,7 @@
     </string>
 
     <!-- Performance Overlay Info Dialogs -->
-    <string name="perf_moon_phase_info">Today\'s Moon Phase\n\n%s %s\nMoon Phase Cycle: %.1f%%\nCycle Day: Day %d\nDate: %s\n\n%s</string>
+    <string name="perf_moon_phase_info">Today\'s Moon Phase\n\n%1$s %2$s\nMoon Phase Cycle: %3$.1f%%\nCycle Day: Day %4$d\nDate: %5$s\n\n%6$s</string>
     
     <string name="perf_decoder_title">🎬 Decoder Information</string>
     <string name="perf_decoder_info">The decoder is responsible for decoding video streams into displayable images.\n\nCommon Decoders:\n• H.264 (AVC) - Best compatibility\n• H.265 (HEVC) - Higher compression\n• AV1 - Latest standard, most efficient\n\nHDR Support:\n• High Dynamic Range video\n• Richer color representation\n• Requires hardware support</string>
@@ -714,7 +714,7 @@
     <string name="perf_fps_info">Rx FPS: Received Frame Rate\n• Number of video frames received from host\n• Should be stable under ideal conditions\n\nRd FPS: Rendered Frame Rate\n• Number of frames actually rendered to screen\n• May be reduced due to device performance\n\nPerformance Indicators:\n• Close values indicate good performance\n• Low render FPS may affect smoothness</string>
     
     <string name="perf_packet_loss_title">📶 Packet Loss Information</string>
-    <string name="perf_packet_loss_info">Packet loss represents the percentage of data packets lost during network transmission.\n\nNormal Range:\n• 0-0.5%: Excellent network quality\n• 0.5-2%: Good network quality\n• 2-5%: Fair network quality\n• &gt;5%: Poor network quality\n\nInfluencing Factors:\n• Network stability\n• Router performance\n• Wireless signal strength</string>
+    <string name="perf_packet_loss_info" formatted="false">Packet loss represents the percentage of data packets lost during network transmission.\n\nNormal Range:\n• 0-0.5%: Excellent network quality\n• 0.5-2%: Good network quality\n• 2-5%: Fair network quality\n• &gt;5%: Poor network quality\n\nInfluencing Factors:\n• Network stability\n• Router performance\n• Wireless signal strength</string>
     
     <string name="perf_network_latency_title">🌐 Network Latency Information</string>
     <string name="perf_network_latency_info">Network latency represents the round-trip time for data packets from host to device.\n\nLatency Range:\n• &lt;20ms: Excellent\n• 20-50ms: Good\n• 50-100ms: Acceptable\n• &gt;100ms: Poor\n\nBandwidth:\n• Represents network transmission speed\n• Affects maximum video quality\n\n± Value:\n• Represents latency fluctuation range\n• Smaller values indicate more stability</string>
@@ -775,7 +775,7 @@
     <string name="image_saved_successfully">Image successfully saved to system directory (Picture/setu)</string>
     <string name="image_save_failed_with_error">Image save failed: %1$s</string>
     <string name="config_save_failed">Configuration save failed</string>
-    <string name="scene_config_applied">Applied scene %1$d configuration: %2$dx%3$d@%4$dFPS %5.2fMbps %6$s HDR %7$s</string>
+    <string name="scene_config_applied">Applied scene %1$d configuration: %2$dx%3$d@%4$dFPS %5$.2fMbps %6$s HDR %7$s</string>
     <string name="scene_not_configured">Scene %1$d not configured</string>
     <string name="config_apply_failed">Configuration apply failed</string>
     <string name="save_to_scene">Save to Scene %1$d</string>
@@ -811,7 +811,7 @@
     <string name="menu">Menu</string>
     <string name="title_settings">Settings</string>
     <string name="game_menu_change_resolution">Change resolution</string>
-    <string name="notification_content_streaming">Streaming in progress: %s (%s)</string>
+    <string name="notification_content_streaming">Streaming in progress: %1$s (%2$s)</string>
 
     <!-- Audio Vibration Settings -->
     <string name="title_checkbox_audio_vibration">Enable audio-driven vibration</string>

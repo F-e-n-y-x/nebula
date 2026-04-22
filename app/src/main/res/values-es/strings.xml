@@ -322,7 +322,7 @@
     <string name="dialog_message_background_image_api">Por favor ingresa la API de imagen completa</string>
     <string name="dialog_title_add_custom_key">Agregar botones personalizados</string>
     <string name="dialog_title_background_image_api">API de Imagen de Fondo</string>
-    <string name="dialog_title_enhanced_touch_zone_divider">Menos del 50% significa dividir desde un punto a la izquierda, más del 50% significa derecha</string>
+    <string name="dialog_title_enhanced_touch_zone_divider" formatted="false">Menos del 50% significa dividir desde un punto a la izquierda, más del 50% significa derecha</string>
     <string name="dialog_title_fixed_x_velocity">Establecer velocidad X (horizontal) fija en píxeles. Establecer 0 para deshabilitar velocidad x fija.</string>
     <string name="dialog_title_pointer_velocity_factor">Establecer factor de velocidad del puntero para la zona de toque mejorada. Establecer 100% para deshabilitar</string>
     <string name="dialog_title_select_keys_to_delete">Seleccionar el botón a eliminar</string>
@@ -382,7 +382,7 @@
     <string name="mic_disabled">Micrófono deshabilitado</string>
     <string name="mic_enabled">Micrófono habilitado</string>
     <string name="mic_permission_required">Permiso de micrófono requerido</string>
-    <string name="mic_stats_continuity">Continuidad de audio: %.1f%% (Capturado:%d Codificado:%d Enviado:%d Perdido:%d)</string>
+    <string name="mic_stats_continuity">Continuidad de audio: %1$.1f%% (Capturado:%2$d Codificado:%3$d Enviado:%4$d Perdido:%5$d)</string>
     <string name="notification_icon">Icono de notificación</string>
     <string name="pacing_experimental_low_latency">Experimental: Latencia ultra-baja (avanzado)</string>
     <string name="pcview_menu_sleep_fail">Falló el sueño del host</string>
@@ -398,8 +398,8 @@
     <string name="perf_network_latency_title">🌐 Información de Latencia de Red</string>
     <string name="perf_network_latency_info">La latencia de red representa el tiempo de ida y vuelta para paquetes de datos del host al dispositivo.\n\nRango de Latencia:\n• &lt;20ms: Excelente\n• 20-50ms: Bueno\n• 50-100ms: Aceptable\n• &gt;100ms: Pobre\n\nAncho de Banda:\n• Representa la velocidad de transmisión de red\n• Afecta la calidad máxima de video\n\nValor ±:\n• Representa el rango de fluctuación de latencia\n• Valores más pequeños indican más estabilidad</string>
     <string name="perf_packet_loss_title">📶 Información de Pérdida de Paquetes</string>
-    <string name="perf_packet_loss_info">La pérdida de paquetes representa el porcentaje de paquetes de datos perdidos durante la transmisión de red.\n\nRango Normal:\n• 0-0.5%: Excelente calidad de red\n• 0.5-2%: Buena calidad de red\n• 2-5%: Calidad justa de red\n• &gt;5%: Pobre calidad de red\n\nFactores que Influyen:\n• Estabilidad de red\n• Rendimiento del router\n• Fuerza de señal inalámbrica</string>
-    <string name="perf_moon_phase_info">Fase Lunar de Hoy\n\n%s %s\nCiclo de Fase Lunar: %.1f%%\nDía del Ciclo: Día %d\nFecha: %s\n\n%s</string>
+    <string name="perf_packet_loss_info" formatted="false">La pérdida de paquetes representa el porcentaje de paquetes de datos perdidos durante la transmisión de red.\n\nRango Normal:\n• 0-0.5%: Excelente calidad de red\n• 0.5-2%: Buena calidad de red\n• 2-5%: Calidad justa de red\n• &gt;5%: Pobre calidad de red\n\nFactores que Influyen:\n• Estabilidad de red\n• Rendimiento del router\n• Fuerza de señal inalámbrica</string>
+    <string name="perf_moon_phase_info">Fase Lunar de Hoy\n\n%1$s %2$s\nCiclo de Fase Lunar: %3$.1f%%\nDía del Ciclo: Día %4$d\nFecha: %5$s\n\n%6$s</string>
     <!-- perf Battery Information -->
     <string name="perf_battery_info_title">🔋 Información de Batería</string>
     <string name="perf_battery_status_sufficient">El nivel de batería es suficiente</string>
@@ -429,7 +429,7 @@
     <string name="summary_custom_resolutions">Crear tus propias resoluciones personalizadas</string>
     <string name="summary_enable_analytics">Ayudar a mejorar la aplicación compartiendo estadísticas de uso anónimas</string>
     <string name="summary_enable_perf_overlay">Mostrar información de rendimiento de transmisión en tiempo real mientras transmites</string>
-    <string name="summary_enhanced_touch_zone_divider">Define dónde dividir zonas de toque nativo y toque mejorado, menos del 50% significa dividir desde un punto a la izquierda, más del 50% significa derecha</string>
+    <string name="summary_enhanced_touch_zone_divider" formatted="false">Define dónde dividir zonas de toque nativo y toque mejorado, menos del 50% significa dividir desde un punto a la izquierda, más del 50% significa derecha</string>
     <string name="summary_export_super_config">Exportar archivo de configuración de botones personalizados y configuraciones de transmisión</string>
     <string name="summary_fixed_x_velocity">Establecer velocidad X (horizontal) fija. Establecer 0 para deshabilitar modo de velocidad x fija. Mayor que 0 significa deshabilitar factor de velocidad horizontal para usar velocidad fija en su lugar.</string>
     <string name="summary_import_super_config">Importar archivo de configuración de botones personalizados y configuraciones de transmisión</string>
@@ -437,7 +437,7 @@
     <string name="summary_perf_overlay_display_items">Seleccionar elementos de información para mostrar en la superposición de rendimiento</string>
     <string name="summary_perf_overlay_orientation">Elegir la orientación de visualización para estadísticas de rendimiento</string>
     <string name="summary_perf_overlay_position">Elegir arriba/abajo para orientación horizontal, o cuatro posiciones de esquina para orientación vertical</string>
-    <string name="summary_pointer_velocity_factor">Establecer factor de velocidad del puntero para zona de toque mejorada. Establecer 100% para deshabilitar</string>
+    <string name="summary_pointer_velocity_factor" formatted="false">Establecer factor de velocidad del puntero para zona de toque mejorada. Establecer 100% para deshabilitar</string>
     <string name="summary_reset_perf_overlay_position">Reiniciar superposición de rendimiento a posición preestablecida</string>
     <string name="summary_screen_offset_x">Desplazamiento horizontal de la pantalla</string>
     <string name="summary_screen_offset_y">Desplazamiento vertical de la pantalla</string>

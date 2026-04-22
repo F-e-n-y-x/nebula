@@ -368,11 +368,11 @@
     <string name="title_checkbox_enhanced_touch_on_which_side">Inverter zona de toque aprimorado</string>
     <string name="summary_checkbox_enhanced_touch_on_which_side">Inverter zona de toque aprimorado para a esquerda (padrão: lado direito da tela)</string>
     <string name="title_enhanced_touch_zone_divider">Divisor de zona de toque aprimorado</string>
-    <string name="summary_enhanced_touch_zone_divider">Define onde dividir as zonas de toque nativo e aprimorado</string>
-    <string name="dialog_title_enhanced_touch_zone_divider">Menos de 50% significa dividir de um ponto à esquerda, mais de 50% significa direita</string>
+    <string name="summary_enhanced_touch_zone_divider" formatted="false">Define onde dividir as zonas de toque nativo e aprimorado</string>
+    <string name="dialog_title_enhanced_touch_zone_divider" formatted="false">Menos de 50% significa dividir de um ponto à esquerda, mais de 50% significa direita</string>
     <string name="suffix_enhanced_touch_zone_divider">%</string>
     <string name="title_pointer_velocity_factor">Fator de velocidade do ponteiro</string>
-    <string name="summary_pointer_velocity_factor">Definir fator de velocidade do ponteiro para zona de toque aprimorado. Defina 100% para desativar</string>
+    <string name="summary_pointer_velocity_factor" formatted="false">Definir fator de velocidade do ponteiro para zona de toque aprimorado. Defina 100% para desativar</string>
     <string name="dialog_title_pointer_velocity_factor">Definir fator de velocidade do ponteiro para zona de toque aprimorado. Defina 100% para desativar</string>
     <string name="suffix_pointer_velocity_factor">%</string>
     <string name="title_fixed_x_velocity">Definir velocidade X fixa (horizontal)</string>
@@ -416,7 +416,7 @@
     <string name="summary_checkbox_lock_screen_after_disconnect">Bloquear automaticamente a tela do dispositivo após desconectar e sair do stream</string>
     <string name="title_checkbox_swap_quit_and_disconnect">Alternar função do botão \"Sair\"</string>
     <string name="summary_checkbox_swap_quit_and_disconnect">Quando ativado, o botão \"Sair\" desconectará sem fechar a app</string>
-    <string name="mic_stats_continuity">Continuidade de áudio: %.1f%% (Capturado:%d Codificado:%d Enviado:%d Descartado:%d)</string>
+    <string name="mic_stats_continuity">Continuidade de áudio: %1$.1f%% (Capturado:%2$d Codificado:%3$d Enviado:%4$d Descartado:%5$d)</string>
     
     <!-- About -->
     <string name="title_about_mode">Sobre</string>
@@ -594,13 +594,13 @@
     </string>
     
     <!-- Performance Overlay Info -->
-    <string name="perf_moon_phase_info">Fase da lua de hoje\n\n%s %s\nCiclo da fase lunar: %.1f%%\nDia do ciclo: Dia %d\nData: %s\n\n%s</string>
+    <string name="perf_moon_phase_info">Fase da lua de hoje\n\n%1$s %2$s\nCiclo da fase lunar: %3$.1f%%\nDia do ciclo: Dia %4$d\nData: %5$s\n\n%6$s</string>
     <string name="perf_decoder_title">🎬 Informações do decodificador</string>
     <string name="perf_decoder_info">O decodificador é responsável por decodificar streams de vídeo em imagens exibíveis.\n\nDecodificadores comuns:\n• H.264 (AVC) - Melhor compatibilidade\n• H.265 (HEVC) - Maior compressão\n• AV1 - Padrão mais recente, mais eficiente\n\nSuporte HDR:\n• Vídeo de alta faixa dinâmica\n• Representação de cores mais rica\n• Requer suporte de hardware</string>
     <string name="perf_fps_title">📊 Informações de taxa de quadros</string>
     <string name="perf_fps_info">Rx FPS: Taxa de quadros recebidos\n• Número de quadros de vídeo recebidos do host\n• Deve ser estável em condições ideais\n\nRd FPS: Taxa de quadros renderizados\n• Número de quadros realmente renderizados na tela\n• Pode ser reduzido devido ao desempenho do dispositivo</string>
     <string name="perf_packet_loss_title">📶 Informações de perda de pacotes</string>
-    <string name="perf_packet_loss_info">A perda de pacotes representa a porcentagem de pacotes de dados perdidos durante a transmissão de rede.\n\nIntervalo normal:\n• 0-0,5%: Qualidade de rede excelente\n• 0,5-2%: Boa qualidade de rede\n• 2-5%: Qualidade de rede razoável\n• &gt;5%: Má qualidade de rede</string>
+    <string name="perf_packet_loss_info" formatted="false">A perda de pacotes representa a porcentagem de pacotes de dados perdidos durante a transmissão de rede.\n\nIntervalo normal:\n• 0-0,5%: Qualidade de rede excelente\n• 0,5-2%: Boa qualidade de rede\n• 2-5%: Qualidade de rede razoável\n• &gt;5%: Má qualidade de rede</string>
     <string name="perf_network_latency_title">🌐 Informações de latência de rede</string>
     <string name="perf_network_latency_info">A latência de rede representa o tempo de ida e volta para pacotes de dados do host ao dispositivo.\n\nIntervalo de latência:\n• &lt;20ms: Excelente\n• 20-50ms: Bom\n• 50-100ms: Aceitável\n• &gt;100ms: Ruim</string>
     <string name="perf_decode_latency_title">⏱️ Informações de latência de decodificação</string>
@@ -651,7 +651,7 @@
     <string name="image_saved_successfully">Imagem salva com sucesso no diretório do sistema (Picture/setu)</string>
     <string name="image_save_failed_with_error">Falha ao salvar imagem: %1$s</string>
     <string name="config_save_failed">Falha ao salvar configuração</string>
-    <string name="scene_config_applied">Configuração da cena %1$d aplicada: %2$dx%3$d@%4$dFPS %5.2fMbps %6$s HDR %7$s</string>
+    <string name="scene_config_applied">Configuração da cena %1$d aplicada: %2$dx%3$d@%4$dFPS %5$.2fMbps %6$s HDR %7$s</string>
     <string name="scene_not_configured">Cena %1$d não configurada</string>
     <string name="config_apply_failed">Falha ao aplicar configuração</string>
     <string name="save_to_scene">Salvar na cena %1$d</string>
