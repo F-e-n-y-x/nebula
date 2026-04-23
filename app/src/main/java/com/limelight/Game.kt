@@ -891,7 +891,9 @@ class Game : Activity(), SurfaceHolder.Callback,
         if (microphoneManager != null && micButton != null) {
             microphoneManager?.updateMicrophoneButtonState()
         }
-        floatBallHandler.show()
+        if (::floatBallHandler.isInitialized) {
+            floatBallHandler.show()
+        }
     }
 
     override fun onKeyEvent(event: KeyEvent) {
@@ -1107,8 +1109,12 @@ class Game : Activity(), SurfaceHolder.Callback,
 
     override fun onDestroy() {
         cancelKeepAliveNotification()
-        orientationManager.cleanup()
-        floatBallHandler.release()
+        if (::orientationManager.isInitialized) {
+            orientationManager.cleanup()
+        }
+        if (::floatBallHandler.isInitialized) {
+            floatBallHandler.release()
+        }
 
         super.onDestroy()
 
@@ -1116,7 +1122,9 @@ class Game : Activity(), SurfaceHolder.Callback,
             connectionCallbackHandler.stopConnection()
         }
 
-        controllerHandler.destroy()
+        if (::controllerHandler.isInitialized) {
+            controllerHandler.destroy()
+        }
 
         if (audioVibrationService != null) {
             audioVibrationService?.stop()
@@ -1124,25 +1132,35 @@ class Game : Activity(), SurfaceHolder.Callback,
             MoonBridge.setBassEnergyListener(null)
         }
 
-        val inputManager = getSystemService(INPUT_SERVICE) as InputManager
-        inputManager.unregisterInputDeviceListener(keyboardInputHandler.keyboardTranslator)
+        if (::keyboardInputHandler.isInitialized) {
+            val inputManager = getSystemService(INPUT_SERVICE) as InputManager
+            inputManager.unregisterInputDeviceListener(keyboardInputHandler.keyboardTranslator)
+        }
 
         lowLatencyWifiLock?.release()
         highPerfWifiLock?.release()
         usbDriverServiceManager?.stopAndUnbind()
-        inputCaptureProvider.destroy()
+        if (::inputCaptureProvider.isInitialized) {
+            inputCaptureProvider.destroy()
+        }
         externalDisplayManager?.cleanup()
         microphoneManager?.stopMicrophoneStream()
     }
 
     override fun onPause() {
-        floatBallHandler.hide()
+        if (::floatBallHandler.isInitialized) {
+            floatBallHandler.hide()
+        }
         KeyboardAccessibilityService.setIntercepting(false)
         KeyboardAccessibilityService.instance?.keyEventCallback = null
 
         if (isFinishing) {
-            controllerHandler.stop()
-            setInputGrabState(false)
+            if (::controllerHandler.isInitialized) {
+                controllerHandler.stop()
+            }
+            if (::inputCaptureProvider.isInitialized) {
+                setInputGrabState(false)
+            }
         }
         super.onPause()
     }

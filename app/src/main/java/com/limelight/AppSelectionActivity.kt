@@ -111,8 +111,12 @@ class AppSelectionActivity : Activity() {
             managerBinder?.stopPolling()
             unbindService(serviceConnection)
         }
-        appGridAdapter.cancelQueuedOperations()
-        bridge.cleanup()
+        if (::appGridAdapter.isInitialized) {
+            appGridAdapter.cancelQueuedOperations()
+        }
+        if (::bridge.isInitialized) {
+            bridge.cleanup()
+        }
         if (connectingDialog != null) {
             connectingDialog?.dismiss()
             connectingDialog = null
