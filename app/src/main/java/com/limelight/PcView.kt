@@ -247,15 +247,23 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         // into PcView so the color/content handoff is seamless.
         splashScreen.setOnExitAnimationListener { provider ->
             val splashView = provider.view
-            val icon = provider.iconView
-            val iconScaleX = ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.15f, 0.7f)
-            val iconScaleY = ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.15f, 0.7f)
-            val iconAlpha = ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f)
-            val splashAlpha = ObjectAnimator.ofFloat(splashView, View.ALPHA, 1f, 0f)
+            // provider.iconView is declared non-null in androidx core-splashscreen,
+            // but on some OEM ROMs (e.g. Xiaomi HyperOS / Android 16) the system
+            // SplashScreenView.getIconView() returns null and the Kotlin intrinsic
+            // null-check (or the underlying NPE) crashes the launch. Guard it.
+            val icon: View? = try { provider.iconView } catch (_: Throwable) { null }
+            val animators = mutableListOf<android.animation.Animator>(
+                ObjectAnimator.ofFloat(splashView, View.ALPHA, 1f, 0f)
+            )
+            if (icon != null) {
+                animators += ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.15f, 0.7f)
+                animators += ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.15f, 0.7f)
+                animators += ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f)
+            }
             val set = AnimatorSet().apply {
                 duration = 380L
                 interpolator = AnticipateInterpolator(1.2f)
-                playTogether(iconScaleX, iconScaleY, iconAlpha, splashAlpha)
+                playTogether(animators)
             }
             set.doOnEnd { provider.remove() }
             set.start()
