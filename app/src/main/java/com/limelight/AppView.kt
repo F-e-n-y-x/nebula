@@ -409,7 +409,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         uuidString = intent.getStringExtra(UUID_EXTRA) ?: ""
 
         val hiddenAppsPrefs = getSharedPreferences(HIDDEN_APPS_PREF_FILENAME, MODE_PRIVATE)
-        for (hiddenAppIdStr in hiddenAppsPrefs.getStringSet(uuidString, HashSet())!!) {
+        for (hiddenAppIdStr in (hiddenAppsPrefs.getStringSet(uuidString, HashSet()) ?: emptySet())) {
             hiddenAppIds.add(hiddenAppIdStr.toInt())
         }
 
@@ -831,10 +831,19 @@ class AppView : Activity(), AdapterFragmentCallbacks {
      * @param useVdd 是否使用VDD虚拟显示器
      */
     private fun doStartStream(app: AppObject, displayName: String?, useVdd: Boolean) {
-        if (appSettingsManager != null && computer != null) {
+        val comp = computer ?: run {
+            Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val binder = managerBinder ?: run {
+            Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (appSettingsManager != null) {
             // 使用AppSettingsManager统一管理启动逻辑
             val startIntent = appSettingsManager?.createStartIntentWithLastSettingsIfEnabled(
-                    this, app.app, computer, managerBinder!!)
+                    this, app.app, comp, binder)
             if (displayName != null) {
                 startIntent?.putExtra(Game.EXTRA_DISPLAY_NAME, displayName)
             }
@@ -844,14 +853,12 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         } else {
             // 回退到默认方式启动
             if (displayName != null) {
-                val startIntent = ServerHelper.createStartIntent(this, app.app, computer!!, managerBinder!!)
+                val startIntent = ServerHelper.createStartIntent(this, app.app, comp, binder)
                 startIntent.putExtra(Game.EXTRA_DISPLAY_NAME, displayName)
                 addScreenCombinationModeToIntent(startIntent, useVdd)
                 startActivity(startIntent)
             } else {
-                if (computer != null) {
-                    ServerHelper.doStart(this, app.app, computer!!, managerBinder!!)
-                }
+                ServerHelper.doStart(this, app.app, comp, binder)
             }
         }
     }
@@ -1105,7 +1112,8 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         // Only show the hide checkbox if this is not the currently running app or it's already hidden
         if (lastRunningAppId != selectedApp.app.appId || selectedApp.isHidden) {
             // Add "Start with Last Settings" option if last settings exist
-            if (appSettingsManager != null && appSettingsManager?.hasLastSettings(computer?.uuid!!, selectedApp.app) == true) {
+            if (appSettingsManager != null && computer?.uuid != null &&
+                appSettingsManager?.hasLastSettings(computer?.uuid!!, selectedApp.app) == true) {
                 menu.add(Menu.NONE, START_WITH_LAST_SETTINGS_ID, 1, resources.getString(R.string.applist_menu_start_with_last_settings))
             }
 
@@ -1170,19 +1178,35 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
             START_WITH_LAST_SETTINGS_ID -> {
                 // Start with last settings (force use last settings for this launch)
-                if (appSettingsManager != null && computer != null) {
+                val comp = computer ?: run {
+                    Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+                    return true
+                }
+                val binder = managerBinder ?: run {
+                    Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+                    return true
+                }
+                if (appSettingsManager != null) {
                     val startIntent = appSettingsManager?.createStartIntentWithLastSettingsIfEnabled(
-                            this, app.app, computer, managerBinder!!)
+                            this, app.app, comp, binder)
                     startIntent?.let { startActivity(it) }
                 }
                 return true
             }
 
             QUIT_ID -> {
+                val comp = computer ?: run {
+                    Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+                    return true
+                }
+                val binder = managerBinder ?: run {
+                    Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+                    return true
+                }
                 // Display a confirmation dialog first
                 UiHelper.displayQuitConfirmationDialog(this, {
                     suspendGridUpdates = true
-                    ServerHelper.doQuit(this, computer!!, app.app, managerBinder!!) {
+                    ServerHelper.doQuit(this, comp, app.app, binder) {
                         // Trigger a poll immediately
                         suspendGridUpdates = false
                         poller?.pollNow()
@@ -1209,6 +1233,10 @@ class AppView : Activity(), AdapterFragmentCallbacks {
             }
 
             CREATE_SHORTCUT_ID -> {
+                val comp = computer ?: run {
+                    Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
+                    return true
+                }
                 // 对于RecyclerView，我们需要从缓存中获取bitmap
                 var appBitmap: Bitmap? = null
 
@@ -1223,7 +1251,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
                 // 如果从视图获取失败,尝试从缓存获取
                 if (appBitmap == null && appGridAdapter != null && appGridAdapter?.getLoader() != null) {
-                    val tuple = CachedAppAssetLoader.LoaderTuple(computer!!, app.app)
+                    val tuple = CachedAppAssetLoader.LoaderTuple(comp, app.app)
                     val cachedBitmap = appGridAdapter?.getLoader()?.getBitmapFromCache(tuple)
                     if (cachedBitmap != null) {
                         appBitmap = cachedBitmap.bitmap
@@ -1232,7 +1260,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
                 // 创建快捷方式
                 if (appBitmap != null) {
-                    if (!shortcutHelper.createPinnedGameShortcut(computer!!, app.app, appBitmap)) {
+                    if (!shortcutHelper.createPinnedGameShortcut(comp, app.app, appBitmap)) {
                         Toast.makeText(this@AppView, resources.getString(R.string.unable_to_pin_shortcut), Toast.LENGTH_LONG).show()
                     }
                 } else {
