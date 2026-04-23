@@ -1,10 +1,10 @@
 package com.limelight.crash
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 
-import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 
 import com.limelight.R
