@@ -347,15 +347,15 @@ class TouchInputHandler(private val game: Game) {
                                 }
 
                                 MotionEvent.TOOL_TYPE_FINGER -> {
-                                    TODO()
+                                    logIgnoredStylusBranchToolType(event, 0, "down")
                                 }
 
                                 MotionEvent.TOOL_TYPE_MOUSE -> {
-                                    TODO()
+                                    logIgnoredStylusBranchToolType(event, 0, "down")
                                 }
 
                                 MotionEvent.TOOL_TYPE_UNKNOWN -> {
-                                    TODO()
+                                    logIgnoredStylusBranchToolType(event, 0, "down")
                                 }
                             }
                         }
@@ -375,15 +375,15 @@ class TouchInputHandler(private val game: Game) {
                                 }
 
                                 MotionEvent.TOOL_TYPE_FINGER -> {
-                                    TODO()
+                                    logIgnoredStylusBranchToolType(event, 0, "up")
                                 }
 
                                 MotionEvent.TOOL_TYPE_MOUSE -> {
-                                    TODO()
+                                    logIgnoredStylusBranchToolType(event, 0, "up")
                                 }
 
                                 MotionEvent.TOOL_TYPE_UNKNOWN -> {
-                                    TODO()
+                                    logIgnoredStylusBranchToolType(event, 0, "up")
                                 }
                             }
                         }
@@ -849,6 +849,15 @@ class TouchInputHandler(private val game: Game) {
 
     private fun getTouchContext(actionIndex: Int): TouchContext? =
         if (actionIndex < touchContextMap.size) touchContextMap[actionIndex] else null
+
+    private fun logIgnoredStylusBranchToolType(event: MotionEvent, pointerIndex: Int, phase: String) {
+        LimeLog.warning(
+            "Ignoring non-stylus tool type in stylus branch: phase=$phase" +
+                ", toolType=${event.getToolType(pointerIndex)}" +
+                ", source=${event.source}" +
+                ", action=${event.actionMasked}"
+        )
+    }
 
     fun getRelativeTouchContextMap(): Array<RelativeTouchContext?> =
         Array(relativeTouchContextMap.size) { i ->
