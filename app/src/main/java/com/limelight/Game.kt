@@ -21,7 +21,6 @@ import com.limelight.binding.input.driver.UsbDriverService
 import com.limelight.binding.input.evdev.EvdevListener
 import com.limelight.binding.input.virtual_controller.VirtualController
 import com.limelight.binding.video.MediaCodecDecoderRenderer
-import com.limelight.binding.video.CrashListener
 import com.limelight.binding.video.MediaCodecHelper
 import com.limelight.binding.video.PerfOverlayListener
 import com.limelight.binding.video.PerformanceInfo
@@ -32,7 +31,6 @@ import com.limelight.nvstream.http.AdaptiveBitrateService
 import com.limelight.nvstream.NvConnectionListener
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
-import com.limelight.nvstream.input.KeyboardPacket
 import com.limelight.nvstream.input.MouseButtonPacket
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.preferences.GlPreferences
@@ -55,7 +53,6 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.PictureInPictureParams
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -70,14 +67,11 @@ import android.net.TrafficStats
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.os.PowerManager
 import androidx.preference.PreferenceManager
 import android.util.Rational
 import android.view.Display
 import android.view.InputDevice
-import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
@@ -91,22 +85,21 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
-import android.widget.TextView
 import android.widget.Toast
-import android.app.NotificationManager
 import androidx.core.app.NotificationManagerCompat
-import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.core.app.ActivityCompat
 import androidx.annotation.RequiresApi
 
 import java.io.ByteArrayInputStream
 import java.lang.reflect.InvocationTargetException
-import java.lang.reflect.Method
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Locale
+import kotlin.math.roundToInt
+import androidx.core.content.edit
+import androidx.core.net.toUri
 
 class Game : Activity(), SurfaceHolder.Callback,
     OnGenericMotionListener, OnTouchListener, NvConnectionListener, EvdevListener,
@@ -359,12 +352,12 @@ class Game : Activity(), SurfaceHolder.Callback,
             }
         }
 
-        val connMgr = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connMgr = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
         if (connMgr.isActiveNetworkMetered) {
             displayTransientMessage(resources.getString(R.string.conn_metered))
         }
 
-        val wifiMgr = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val wifiMgr = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
         try {
             highPerfWifiLock = wifiMgr.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Moonlight High Perf Lock")
             highPerfWifiLock?.setReferenceCounted(false)
@@ -425,7 +418,7 @@ class Game : Activity(), SurfaceHolder.Callback,
         MoonBridge.setBassEnergyEnabled(prefConfig.enableAudioVibration)
         MoonBridge.setBassEnergySceneMode(prefConfig.audioVibrationScene)
 
-        val inputManager = getSystemService(Context.INPUT_SERVICE) as InputManager
+        val inputManager = getSystemService(INPUT_SERVICE) as InputManager
         inputManager.registerInputDeviceListener(keyboardInputHandler.keyboardTranslator, null)
 
         touchInputHandler = TouchInputHandler(this)
@@ -553,7 +546,7 @@ class Game : Activity(), SurfaceHolder.Callback,
         return object : ExternalDisplayManager.ExternalDisplayCallback {
             override fun onExternalDisplayConnected(display: Display) {
                 LimeLog.info("External display connected, reinitializing input capture provider")
-                inputCaptureProvider?.disableCapture()
+                inputCaptureProvider.disableCapture()
                 inputCaptureProvider = InputCaptureManager.getInputCaptureProviderForExternalDisplay(this@Game, this@Game)
             }
 
@@ -561,7 +554,7 @@ class Game : Activity(), SurfaceHolder.Callback,
                 externalStreamView = null
                 LimeLog.info("External display disconnected, cleared externalStreamView")
                 retargetTouchContexts(this@Game.streamView)
-                inputCaptureProvider?.disableCapture()
+                inputCaptureProvider.disableCapture()
                 inputCaptureProvider = InputCaptureManager.getInputCaptureProvider(this@Game, this@Game)
             }
 
@@ -685,7 +678,7 @@ class Game : Activity(), SurfaceHolder.Callback,
         displayName: String?
     ): StreamConfigResult {
         val glPrefs = GlPreferences.readPreferences(this)
-        val connMgr = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val connMgr = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
         var willStreamHdr = false
         if (prefConfig.enableHdr) {
@@ -711,8 +704,13 @@ class Game : Activity(), SurfaceHolder.Callback,
         if (decoderRenderer == null) {
             decoderRenderer = MediaCodecDecoderRenderer(
                 this, prefConfig,
-                CrashListener {
-                    tombstonePrefs.edit().putInt("CrashCount", tombstonePrefs.getInt("CrashCount", 0) + 1).commit()
+                {
+                    tombstonePrefs.edit(commit = true) {
+                        putInt(
+                            "CrashCount",
+                            tombstonePrefs.getInt("CrashCount", 0) + 1
+                        )
+                    }
                     reportedCrash = true
                 },
                 tombstonePrefs.getInt("CrashCount", 0),
@@ -762,9 +760,9 @@ class Game : Activity(), SurfaceHolder.Callback,
 
         performanceOverlayManager?.setActualDisplayRefreshRate(displayRefreshRate)
 
-        val clientRefreshRateX100 = Math.round(displayRefreshRate * 100)
+        val clientRefreshRateX100 = (displayRefreshRate * 100).roundToInt()
 
-        val roundedRefreshRate = Math.round(displayRefreshRate)
+        val roundedRefreshRate = displayRefreshRate.roundToInt()
         var chosenFrameRate = prefConfig.fps
         if (prefConfig.framePacing == PreferenceConfiguration.FRAME_PACING_CAP_FPS) {
             if (prefConfig.fps >= roundedRefreshRate) {
@@ -933,7 +931,7 @@ class Game : Activity(), SurfaceHolder.Callback,
                 performanceOverlayManager?.hideOverlayImmediate()
                 notificationOverlayManager.setHiding(true)
                 microphoneManager?.setEnableMic(false)
-                controllerHandler?.disableSensors()
+                controllerHandler.disableSensors()
                 UiHelper.notifyStreamEnteringPiP(this)
             } else {
                 virtualController?.show()
@@ -1118,7 +1116,7 @@ class Game : Activity(), SurfaceHolder.Callback,
             connectionCallbackHandler.stopConnection()
         }
 
-        controllerHandler?.destroy()
+        controllerHandler.destroy()
 
         if (audioVibrationService != null) {
             audioVibrationService?.stop()
@@ -1126,7 +1124,7 @@ class Game : Activity(), SurfaceHolder.Callback,
             MoonBridge.setBassEnergyListener(null)
         }
 
-        val inputManager = getSystemService(Context.INPUT_SERVICE) as InputManager
+        val inputManager = getSystemService(INPUT_SERVICE) as InputManager
         inputManager.unregisterInputDeviceListener(keyboardInputHandler.keyboardTranslator)
 
         lowLatencyWifiLock?.release()
@@ -1143,7 +1141,7 @@ class Game : Activity(), SurfaceHolder.Callback,
         KeyboardAccessibilityService.instance?.keyEventCallback = null
 
         if (isFinishing) {
-            controllerHandler?.stop()
+            controllerHandler.stop()
             setInputGrabState(false)
         }
         super.onPause()
@@ -1191,7 +1189,7 @@ class Game : Activity(), SurfaceHolder.Callback,
             virtualController?.cleanup()
         }
 
-        var decoderMessage = getDecoderFormatLabel()
+        val decoderMessage = getDecoderFormatLabel()
 
         if (conn != null) {
             displayedFailureDialog = true
@@ -1199,10 +1197,10 @@ class Game : Activity(), SurfaceHolder.Callback,
             showLatencyToast(decoderMessage)
 
             if (!reportedCrash && tombstonePrefs.getInt("CrashCount", 0) != 0) {
-                tombstonePrefs.edit()
-                    .putInt("CrashCount", 0)
-                    .putInt("LastNotifiedCrashCount", 0)
-                    .apply()
+                tombstonePrefs.edit {
+                    putInt("CrashCount", 0)
+                        .putInt("LastNotifiedCrashCount", 0)
+                }
             }
         }
 
@@ -1342,7 +1340,7 @@ class Game : Activity(), SurfaceHolder.Callback,
     override fun toggleKeyboard() {
         LimeLog.info("Toggling keyboard overlay")
         streamView.clearFocus()
-        val inputManager = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        val inputManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         inputManager.toggleSoftInput(0, 0)
     }
 
@@ -1353,14 +1351,14 @@ class Game : Activity(), SurfaceHolder.Callback,
         if (enable) {
             inputCaptureProvider.disableCapture()
             cursorVisible = true
-            inputCaptureProvider?.showCursor()
+            inputCaptureProvider.showCursor()
             setMetaKeyCaptureState(true)
             cursorServiceManager.refreshLocalCursorState(true)
             val cursorOverlay = findViewById<CursorView>(R.id.cursorOverlay)
             cursorOverlay?.hide()
         } else {
             cursorVisible = false
-            inputCaptureProvider?.hideCursor()
+            inputCaptureProvider.hideCursor()
             setInputGrabState(true)
         }
     }
@@ -1479,8 +1477,8 @@ class Game : Activity(), SurfaceHolder.Callback,
             connected = false
             orientationManager.connected = false
 
-            streamView?.requestLayout()
-            streamView?.invalidate()
+            streamView.requestLayout()
+            streamView.invalidate()
         }
     }
 
@@ -1521,7 +1519,7 @@ class Game : Activity(), SurfaceHolder.Callback,
 
                 val params = window.attributes
                 if (hdrEnabled) {
-                    if (prefConfig?.enableHdrHighBrightness == true) {
+                    if (prefConfig.enableHdrHighBrightness) {
                         params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -1625,9 +1623,9 @@ class Game : Activity(), SurfaceHolder.Callback,
             this.audioRenderer = AndroidAudioRenderer(this, prefConfig.enableAudioFx, prefConfig.enableSpatializer)
             conn?.start(this.audioRenderer!!, decoderRenderer!!, this)
 
-            streamView?.post { cursorServiceManager.syncCursorWithStream() }
+            streamView.post { cursorServiceManager.syncCursorWithStream() }
         } else if (connected && isExtremeResumeEnabled) {
-            streamView?.post { cursorServiceManager.syncCursorWithStream() }
+            streamView.post { cursorServiceManager.syncCursorWithStream() }
             audioRenderer?.resumeProcessing()
             decoderRenderer?.resumeProcessing()
         }
@@ -1683,6 +1681,7 @@ class Game : Activity(), SurfaceHolder.Callback,
         }
     }
 
+    @SuppressLint("BatteryLife")
     fun showKeepAliveNotification() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
@@ -1707,13 +1706,18 @@ class Game : Activity(), SurfaceHolder.Callback,
                     if (ContextCompat.checkSelfPermission(this, "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS")
                         == PackageManager.PERMISSION_GRANTED
                     ) {
-                        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                        val pm = getSystemService(POWER_SERVICE) as PowerManager
                         if (!pm.isIgnoringBatteryOptimizations(packageName)) {
                             val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                            intent.data = android.net.Uri.parse("package:$packageName")
+                            intent.data = "package:$packageName".toUri()
                             try {
                                 startActivity(intent)
-                                prefs.edit().putBoolean("pref_battery_optimization_requested", true).apply()
+                                prefs.edit {
+                                    putBoolean(
+                                        "pref_battery_optimization_requested",
+                                        true
+                                    )
+                                }
                             } catch (e: Exception) {
                                 LimeLog.warning("Cannot open battery optimization settings: ${e.message}")
                             }
@@ -1732,7 +1736,7 @@ class Game : Activity(), SurfaceHolder.Callback,
     }
 
     fun refreshLocalCursorState(enabled: Boolean) {
-        cursorServiceManager?.refreshLocalCursorState(enabled)
+        cursorServiceManager.refreshLocalCursorState(enabled)
     }
 
     override fun mouseMove(deltaX: Int, deltaY: Int) {
@@ -1794,7 +1798,7 @@ class Game : Activity(), SurfaceHolder.Callback,
             val timeMillis = System.currentTimeMillis()
             val timeMillisInterval = timeMillis - previousTimeMillis
 
-            if (timeMillisInterval > 0 && timeMillisInterval < 5000) {
+            if (timeMillisInterval in 1..<5000) {
                 performanceInfo.bandWidth = NetHelper.calculateBandwidth(currentRxBytes, previousRxBytes, timeMillisInterval)
             }
 

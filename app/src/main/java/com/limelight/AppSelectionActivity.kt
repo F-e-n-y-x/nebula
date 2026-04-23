@@ -2,7 +2,6 @@ package com.limelight
 
 import android.app.Activity
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
@@ -102,7 +101,7 @@ class AppSelectionActivity : Activity() {
         findViewById<android.view.View>(R.id.closeButton).setOnClickListener { finish() }
 
         val serviceIntent = Intent(this, ComputerManagerService::class.java)
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+        bindService(serviceIntent, serviceConnection, BIND_AUTO_CREATE)
     }
 
     override fun onDestroy() {
@@ -112,8 +111,8 @@ class AppSelectionActivity : Activity() {
             managerBinder?.stopPolling()
             unbindService(serviceConnection)
         }
-        appGridAdapter?.cancelQueuedOperations()
-        bridge?.cleanup()
+        appGridAdapter.cancelQueuedOperations()
+        bridge.cleanup()
         if (connectingDialog != null) {
             connectingDialog?.dismiss()
             connectingDialog = null

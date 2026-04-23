@@ -22,13 +22,12 @@ class NotificationOverlayManager(
 
         textView.text = message
 
-        val backgroundColor = when {
-            connectionStatus == MoonBridge.CONN_STATUS_POOR && bitrateProvider() > 5000 ->
+        val backgroundColor = when (connectionStatus) {
+            MoonBridge.CONN_STATUS_POOR if bitrateProvider() > 5000 ->
                 0x80FF9800.toInt() // Orange - slow
-            connectionStatus == MoonBridge.CONN_STATUS_POOR ->
+            MoonBridge.CONN_STATUS_POOR ->
                 0x80F44336.toInt() // Red - poor
-            else ->
-                0x80FF5722.toInt() // Orange-red - default
+            else -> 0x80FF5722.toInt() // Orange-red - default
         }
         cardView.setCardBackgroundColor(backgroundColor)
     }

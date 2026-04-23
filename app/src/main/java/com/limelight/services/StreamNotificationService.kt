@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.limelight.Game
 import com.limelight.LimeLog
 import com.limelight.R
+import androidx.core.content.edit
 
 class StreamNotificationService : Service() {
 
@@ -39,11 +40,11 @@ class StreamNotificationService : Service() {
             appName = intent.getStringExtra(EXTRA_APP_NAME) ?: "Desktop"
         }
 
-        getSharedPreferences("StreamState", Context.MODE_PRIVATE)
-            .edit()
-            .putString("last_pc_name", pcName)
-            .putString("last_app_name", appName)
-            .apply()
+        getSharedPreferences("StreamState", MODE_PRIVATE)
+            .edit {
+                putString("last_pc_name", pcName)
+                    .putString("last_app_name", appName)
+            }
 
         val notification = buildNotification(pcName, appName)
 
@@ -142,7 +143,7 @@ class StreamNotificationService : Service() {
 
     private fun initWakeLock() {
         try {
-            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val pm = getSystemService(POWER_SERVICE) as? PowerManager
             if (pm != null) {
                 wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Moonlight:StreamKeepAlive").apply {
                     setReferenceCounted(false)
@@ -180,9 +181,9 @@ class StreamNotificationService : Service() {
                         LimeLog.info("StreamNotificationService: Re-acquired WakeLock during heartbeat")
                     }
 
-                    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                    val nm = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
                     if (nm != null) {
-                        val prefs = getSharedPreferences("StreamState", Context.MODE_PRIVATE)
+                        val prefs = getSharedPreferences("StreamState", MODE_PRIVATE)
                         val pc = prefs.getString("last_pc_name", "Unknown")
                         val app = prefs.getString("last_app_name", "Desktop")
                         nm.notify(NOTIFICATION_ID, buildNotification(pc, app))

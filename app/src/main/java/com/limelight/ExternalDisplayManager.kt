@@ -90,43 +90,41 @@ class ExternalDisplayManager(
     fun isUsingExternalDisplay(): Boolean = useExternalDisplay && externalDisplay != null
 
     private fun setupDisplayListener() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            displayListener = object : DisplayManager.DisplayListener {
-                override fun onDisplayAdded(displayId: Int) {
-                    LimeLog.info("Display added: $displayId")
-                    if (prefConfig.useExternalDisplay && displayId != Display.DEFAULT_DISPLAY) {
-                        checkForExternalDisplay()
-                        if (useExternalDisplay) {
-                            startExternalDisplayPresentation()
-                        }
+        displayListener = object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) {
+                LimeLog.info("Display added: $displayId")
+                if (prefConfig.useExternalDisplay && displayId != Display.DEFAULT_DISPLAY) {
+                    checkForExternalDisplay()
+                    if (useExternalDisplay) {
+                        startExternalDisplayPresentation()
                     }
-                }
-
-                override fun onDisplayRemoved(displayId: Int) {
-                    LimeLog.info("Display removed: $displayId")
-                    if (externalDisplay != null && displayId == externalDisplay?.displayId) {
-                        if (externalPresentation != null) {
-                            externalPresentation?.dismiss()
-                            externalPresentation = null
-                        }
-                        externalDisplay = null
-                        useExternalDisplay = false
-
-                        val surfaceView = activity.findViewById<View>(R.id.surfaceView)
-                        surfaceView?.visibility = View.VISIBLE
-                        Toast.makeText(activity, activity.getString(R.string.toast_external_display_disconnected), Toast.LENGTH_SHORT).show()
-
-                        callback?.onExternalDisplayDisconnected()
-                    }
-                }
-
-                override fun onDisplayChanged(displayId: Int) {
-                    LimeLog.info("Display changed: $displayId")
                 }
             }
 
-            displayManager?.registerDisplayListener(displayListener, null)
+            override fun onDisplayRemoved(displayId: Int) {
+                LimeLog.info("Display removed: $displayId")
+                if (externalDisplay != null && displayId == externalDisplay?.displayId) {
+                    if (externalPresentation != null) {
+                        externalPresentation?.dismiss()
+                        externalPresentation = null
+                    }
+                    externalDisplay = null
+                    useExternalDisplay = false
+
+                    val surfaceView = activity.findViewById<View>(R.id.surfaceView)
+                    surfaceView?.visibility = View.VISIBLE
+                    Toast.makeText(activity, activity.getString(R.string.toast_external_display_disconnected), Toast.LENGTH_SHORT).show()
+
+                    callback?.onExternalDisplayDisconnected()
+                }
+            }
+
+            override fun onDisplayChanged(displayId: Int) {
+                LimeLog.info("Display changed: $displayId")
+            }
         }
+
+        displayManager?.registerDisplayListener(displayListener, null)
     }
 
     private fun checkForExternalDisplay() {
@@ -135,23 +133,21 @@ class ExternalDisplayManager(
             return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            val displays = displayManager?.displays
+        val displays = displayManager?.displays
 
-            for (display in (displays ?: emptyArray<Display>())) {
-                if (display.displayId != Display.DEFAULT_DISPLAY) {
-                    externalDisplay = display
-                    useExternalDisplay = true
-                    LimeLog.info("Found external display: ${display.name} (ID: ${display.displayId})")
+        for (display in (displays ?: emptyArray<Display>())) {
+            if (display.displayId != Display.DEFAULT_DISPLAY) {
+                externalDisplay = display
+                useExternalDisplay = true
+                LimeLog.info("Found external display: ${display.name} (ID: ${display.displayId})")
 
-                    callback?.onExternalDisplayConnected(display)
-                    break
-                }
+                callback?.onExternalDisplayConnected(display)
+                break
             }
+        }
 
-            if (!useExternalDisplay) {
-                LimeLog.info("No external display found, using default display")
-            }
+        if (!useExternalDisplay) {
+            LimeLog.info("No external display found, using default display")
         }
     }
 
@@ -251,13 +247,11 @@ class ExternalDisplayManager(
 
     companion object {
         fun hasExternalDisplay(context: Context): Boolean {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-                val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
-                if (displayManager != null) {
-                    for (display in displayManager.displays) {
-                        if (display.displayId != Display.DEFAULT_DISPLAY) {
-                            return true
-                        }
+            val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+            if (displayManager != null) {
+                for (display in displayManager.displays) {
+                    if (display.displayId != Display.DEFAULT_DISPLAY) {
+                        return true
                     }
                 }
             }

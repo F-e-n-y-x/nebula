@@ -108,13 +108,14 @@ object ServerHelper {
             val ret = MoonBridge.testClientConnectivity(CONNECTION_TEST_SERVER, 443, MoonBridge.ML_PORT_FLAG_ALL)
             spinnerDialog.dismiss()
 
-            val dialogSummary = when {
-                ret == MoonBridge.ML_TEST_RESULT_INCONCLUSIVE ->
+            val dialogSummary = when (ret) {
+                MoonBridge.ML_TEST_RESULT_INCONCLUSIVE ->
                     parent.resources.getString(R.string.nettest_text_inconclusive)
-                ret == 0 ->
+
+                0 ->
                     parent.resources.getString(R.string.nettest_text_success)
-                else ->
-                    parent.resources.getString(R.string.nettest_text_failure) + MoonBridge.stringifyPortFlags(ret, "\n")
+
+                else -> parent.resources.getString(R.string.nettest_text_failure) + MoonBridge.stringifyPortFlags(ret, "\n")
             }
 
             Dialog.displayDialog(
@@ -145,7 +146,7 @@ object ServerHelper {
                     parent.resources.getString(R.string.pcview_menu_sleep_fail)
                 }
             } catch (e: HostHttpResponseException) {
-                message = e.message ?: ""
+                message = e.message
             } catch (e: UnknownHostException) {
                 message = parent.resources.getString(R.string.error_unknown_host)
             } catch (e: FileNotFoundException) {
@@ -201,7 +202,7 @@ object ServerHelper {
                             " so it cannot be quit. End streaming on the original " +
                             "device or the PC itself. (Error code: ${e.getErrorCode()})"
                 } else {
-                    e.message ?: ""
+                    e.message
                 }
             } catch (e: UnknownHostException) {
                 message = parent.resources.getString(R.string.error_unknown_host)

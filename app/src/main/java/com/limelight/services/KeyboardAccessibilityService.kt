@@ -1,6 +1,7 @@
 package com.limelight.services
 
 import android.accessibilityservice.AccessibilityService
+import android.annotation.SuppressLint
 import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -11,6 +12,7 @@ import com.limelight.preferences.PreferenceConfiguration
  * 主要目的是捕获像 Win 键、Alt+Tab 等被 Android 系统默认行为占用的按键，
  * 并将它们转发给应用（如 Moonlight 的 Game Activity），以提供完整的 PC 游戏体验。
  */
+@SuppressLint("AccessibilityPolicy")
 class KeyboardAccessibilityService : AccessibilityService() {
 
     interface KeyEventCallback {

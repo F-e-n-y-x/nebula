@@ -14,7 +14,6 @@ import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.round
-import kotlin.math.roundToInt
 
 class SeekBarPreference(context: Context, attrs: AttributeSet) : DialogPreference(context, attrs) {
 
@@ -61,7 +60,7 @@ class SeekBarPreference(context: Context, attrs: AttributeSet) : DialogPreferenc
         }
 
         setDefaultValue(defaultValue)
-        setDialogLayoutResource(R.layout.pref_seekbar_dialog)
+        dialogLayoutResource = R.layout.pref_seekbar_dialog
     }
 
     fun linearToLog(linearValue: Int): Int {
@@ -91,7 +90,7 @@ class SeekBarPreference(context: Context, attrs: AttributeSet) : DialogPreferenc
     }
 
     override fun onSetInitialValue(defaultValue: Any?) {
-        val def = if (defaultValue is Int) defaultValue else this.defaultValue
+        val def = defaultValue as? Int ?: this.defaultValue
         currentValue = getPersistedInt(def)
     }
 

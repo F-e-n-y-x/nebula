@@ -4,6 +4,8 @@ import android.os.Build
 import android.view.Display
 import com.limelight.preferences.PreferenceConfiguration
 import com.limelight.utils.UiHelper
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * 显示模式管理器
@@ -24,7 +26,7 @@ object DisplayModeManager {
     }
 
     fun isRefreshRateGoodMatch(refreshRate: Float, targetFps: Int): Boolean {
-        return refreshRate >= targetFps && Math.round(refreshRate) % targetFps <= 3
+        return refreshRate >= targetFps && refreshRate.roundToInt() % targetFps <= 3
     }
 
     fun mayReduceRefreshRate(prefConfig: PreferenceConfiguration): Boolean {
@@ -162,7 +164,7 @@ object DisplayModeManager {
 
             val screenAspectRatio = screenSize.y.toDouble() / screenSize.x
             val streamAspectRatio = prefConfig.height.toDouble() / prefConfig.width
-            if (Math.abs(screenAspectRatio - streamAspectRatio) < 0.001) {
+            if (abs(screenAspectRatio - streamAspectRatio) < 0.001) {
                 LimeLog.info("Stream has compatible aspect ratio with output display")
                 aspectRatioMatch = true
             }

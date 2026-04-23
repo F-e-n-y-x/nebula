@@ -12,7 +12,6 @@ import java.security.*
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Arrays
 import java.util.Locale
 
 class PairingManager(
@@ -120,7 +119,7 @@ class PairingManager(
         }
 
         val serverChallengeRespHash = hashAlgo.hashData(concatBytes(concatBytes(randomChallenge, serverCert.signature), serverSecret))
-        if (!Arrays.equals(serverChallengeRespHash, serverResponse)) {
+        if (!serverChallengeRespHash.contentEquals(serverResponse)) {
             http.unpair()
             return PairResult(PairState.PIN_WRONG, pairName)
         }
@@ -267,7 +266,7 @@ class PairingManager(
             val blockSize = blockCipher.blockSize
             val blockRoundedSize = (input.size + (blockSize - 1)) and (blockSize - 1).inv()
 
-            val blockRoundedInputData = Arrays.copyOf(input, blockRoundedSize)
+            val blockRoundedInputData = input.copyOf(blockRoundedSize)
             val blockRoundedOutputData = ByteArray(blockRoundedSize)
 
             var offset = 0
@@ -292,7 +291,7 @@ class PairingManager(
         }
 
         private fun generateAesKey(hashAlgo: PairingHashAlgorithm, keyData: ByteArray): ByteArray {
-            return Arrays.copyOf(hashAlgo.hashData(keyData), 16)
+            return hashAlgo.hashData(keyData).copyOf(16)
         }
 
         private fun concatBytes(a: ByteArray, b: ByteArray): ByteArray {

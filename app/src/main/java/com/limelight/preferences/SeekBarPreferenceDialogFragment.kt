@@ -1,5 +1,6 @@
 package com.limelight.preferences
 
+import android.annotation.SuppressLint
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
@@ -14,6 +15,7 @@ import android.widget.TextView
 import androidx.preference.PreferenceDialogFragmentCompat
 
 import com.limelight.R
+import kotlin.math.roundToInt
 
 class SeekBarPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
 
@@ -23,6 +25,7 @@ class SeekBarPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
     private val pref: SeekBarPreference
         get() = preference as SeekBarPreference
 
+    @SuppressLint("UseCompatLoadingForDrawables")
     override fun onBindDialogView(layout: View) {
         super.onBindDialogView(layout)
 
@@ -62,7 +65,7 @@ class SeekBarPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
                 }
 
                 if (!pref.isLogarithmic) {
-                    val roundedValue = maxOf(pref.minValue, Math.round(value.toFloat() / pref.stepSize) * pref.stepSize)
+                    val roundedValue = maxOf(pref.minValue, (value.toFloat() / pref.stepSize).roundToInt() * pref.stepSize)
                     if (roundedValue != value) {
                         seekBar.progress = roundedValue
                         return
@@ -106,7 +109,7 @@ class SeekBarPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
         val pref = pref
         var text = pref.formatDisplayValue(displayValue)
         if (pref.suffix != null) {
-            text = text + if (pref.suffix!!.length > 1) " ${pref.suffix}" else pref.suffix
+            text += if (pref.suffix.length > 1) " ${pref.suffix}" else pref.suffix
         }
         valueText.text = text
     }
@@ -130,6 +133,7 @@ class SeekBarPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
         seekBar.progress = newProgress
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupLongPressView(view: View, direction: Int) {
         val handler = Handler(Looper.getMainLooper())
         val isLongPressing = booleanArrayOf(false)

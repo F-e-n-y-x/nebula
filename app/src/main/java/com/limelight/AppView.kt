@@ -8,11 +8,9 @@ import java.util.HashSet
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
-import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Paint
@@ -48,7 +46,6 @@ import com.limelight.binding.PlatformBinding
 import com.limelight.computers.ComputerManagerService
 import com.limelight.grid.AppGridAdapter
 import com.limelight.grid.assets.CachedAppAssetLoader
-import com.limelight.grid.assets.ScaledBitmap
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
@@ -76,6 +73,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.content.edit
+import androidx.core.view.isVisible
+import androidx.core.view.isNotEmpty
+import kotlin.math.ceil
 
 class AppView : Activity(), AdapterFragmentCallbacks {
 
@@ -95,8 +96,8 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
         // ==================== Intent Extras & 偏好键 ====================
         const val HIDDEN_APPS_PREF_FILENAME = "HiddenApps"
-        val NAME_EXTRA = "Name"
-        val UUID_EXTRA = "UUID"
+        const val NAME_EXTRA = "Name"
+        const val UUID_EXTRA = "UUID"
         const val NEW_PAIR_EXTRA = "NewPair"
         const val SHOW_HIDDEN_APPS_EXTRA = "ShowHiddenApps"
         const val SELECTED_ADDRESS_EXTRA = "SelectedAddress"
@@ -170,8 +171,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
                 val ready = withContext(Dispatchers.IO) {
                     localBinder.waitForReady()
 
-                    val comp = localBinder.getComputer(uuidString)
-                    if (comp == null) return@withContext false
+                    val comp = localBinder.getComputer(uuidString) ?: return@withContext false
                     computer = comp
 
                     val selectedAddress = intent.getStringExtra(SELECTED_ADDRESS_EXTRA)
@@ -359,7 +359,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         displaySelectionInfo = findViewById(R.id.displaySelectionInfo)
         displayRadioGroup = findViewById(R.id.displayRadioGroup)
         screenCombinationModeLabel = findViewById(R.id.screenCombinationModeLabel)
-        screenCombinationModeLabel?.let { label ->
+        screenCombinationModeLabel.let { label ->
             label.paintFlags = label.paintFlags or Paint.UNDERLINE_TEXT_FLAG
 
             // 点击组合模式标签时弹出选择对话框
@@ -369,7 +369,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         // 监听 RadioGroup 选中变化，动态更新组合模式选项
         displayRadioGroup.setOnCheckedChangeListener { _, checkedId ->
             if (checkedId == -1) {
-                screenCombinationModeLabel?.visibility = View.GONE
+                screenCombinationModeLabel.visibility = View.GONE
                 selectedScreenCombinationMode = -1
                 return@setOnCheckedChangeListener
             }
@@ -382,7 +382,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
             currentModeValues = resources.getStringArray(valuesArrayId)
             selectedScreenCombinationMode = -1
             updateScreenCombinationModeLabel()
-            screenCombinationModeLabel?.visibility = View.VISIBLE
+            screenCombinationModeLabel.visibility = View.VISIBLE
         }
 
         // Set up event listeners
@@ -456,7 +456,8 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
         // Bind to the computer manager service
         bindService(Intent(this, ComputerManagerService::class.java), serviceConnection,
-                Service.BIND_AUTO_CREATE)
+            BIND_AUTO_CREATE
+        )
 
         // Delay checking displays to allow service connection to complete
         Handler(Looper.getMainLooper()).postDelayed({ checkDisplaysAndUpdateUI() }, 500)
@@ -472,9 +473,9 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         }
 
         getSharedPreferences(HIDDEN_APPS_PREF_FILENAME, MODE_PRIVATE)
-                .edit()
-                .putStringSet(uuidString, hiddenAppIdStringSet)
-                .apply()
+                .edit {
+                    putStringSet(uuidString, hiddenAppIdStringSet)
+                }
 
         appGridAdapter?.updateHiddenApps(hiddenAppIds, hideImmediately)
     }
@@ -557,7 +558,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
      * @param appObject 应用对象
      */
     private fun setAppAsBackground(appObject: AppObject) {
-        if (isFinishing || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed)) {
+        if (isFinishing || isDestroyed) {
             return
         }
 
@@ -660,14 +661,13 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         var displayGuid: String? = null
         var useVdd = false
 
-        if (displaySelectionInfo.visibility == View.VISIBLE && availableDisplays != null) {
+        if (displaySelectionInfo.isVisible && availableDisplays != null) {
             val selectedId = displayRadioGroup.checkedRadioButtonId
             if (selectedId == VIRTUAL_DISPLAY_ID) {
                 useVdd = true
             } else if (selectedId >= 0 && selectedId < (availableDisplays?.size ?: 0)) {
                 val selectedDisplay = availableDisplays!![selectedId]
-                displayGuid = if (selectedDisplay.guid.isNotEmpty())
-                    selectedDisplay.guid else selectedDisplay.name
+                displayGuid = selectedDisplay.guid.ifEmpty { selectedDisplay.name }
             }
         }
 
@@ -693,6 +693,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
     /**
      * 打开顶部面板 (带动画)
      */
+    @SuppressLint("SetTextI18n")
     private fun openTopPanel() {
         if (isPanelOpen) return
         isPanelOpen = true
@@ -720,6 +721,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
     /**
      * 关闭顶部面板 (带动画)
      */
+    @SuppressLint("CutPasteId", "SetTextI18n")
     private fun closeTopPanel() {
         if (!isPanelOpen) return
         isPanelOpen = false
@@ -750,7 +752,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
      */
     private fun checkDisplaysAndUpdateUI() {
         if (computer == null || computer?.activeAddress == null || managerBinder == null) {
-            displaySelectionInfo?.visibility = View.GONE
+            displaySelectionInfo.visibility = View.GONE
             return
         }
 
@@ -765,11 +767,11 @@ class AppView : Activity(), AdapterFragmentCallbacks {
                 if (displays.isNotEmpty()) {
                     updateDisplaySelectionUI(displays)
                 } else {
-                    displaySelectionInfo?.visibility = View.GONE
+                    displaySelectionInfo.visibility = View.GONE
                 }
             } catch (e: Exception) {
                 LimeLog.warning("Failed to get displays: " + e.message)
-                displaySelectionInfo?.visibility = View.GONE
+                displaySelectionInfo.visibility = View.GONE
             }
         }
     }
@@ -788,8 +790,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         // 添加所有物理显示器选项
         for (i in displays.indices) {
             val display = displays[i]
-            val displayName = if (display.name.isNotEmpty())
-                display.name else "Display " + (display.index + 1)
+            val displayName = display.name.ifEmpty { "Display " + (display.index + 1) }
             LimeLog.info("Display " + (display.index + 1) + ": " + display.name + " (guid: " + display.guid + ")")
 
             displayRadioGroup.addView(createDisplayRadioButton(i, displayName))
@@ -844,9 +845,9 @@ class AppView : Activity(), AdapterFragmentCallbacks {
             // 回退到默认方式启动
             if (displayName != null) {
                 val startIntent = ServerHelper.createStartIntent(this, app.app, computer!!, managerBinder!!)
-                startIntent?.putExtra(Game.EXTRA_DISPLAY_NAME, displayName)
-                startIntent?.let { addScreenCombinationModeToIntent(it, useVdd) }
-                startIntent?.let { startActivity(it) }
+                startIntent.putExtra(Game.EXTRA_DISPLAY_NAME, displayName)
+                addScreenCombinationModeToIntent(startIntent, useVdd)
+                startActivity(startIntent)
             } else {
                 if (computer != null) {
                     ServerHelper.doStart(this, app.app, computer!!, managerBinder!!)
@@ -911,10 +912,10 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog)
                 .setTitle(R.string.title_screen_combination_mode)
                 .setSingleChoiceItems(currentModeNames, checkedIndex) { dialog, which ->
-                    try {
-                        selectedScreenCombinationMode = currentModeValues!![which].toInt()
-                    } catch (e: NumberFormatException) {
-                        selectedScreenCombinationMode = -1
+                    selectedScreenCombinationMode = try {
+                        currentModeValues!![which].toInt()
+                    } catch (_: NumberFormatException) {
+                        -1
                     }
                     updateScreenCombinationModeLabel()
                     dialog.dismiss()
@@ -1359,7 +1360,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
     private fun setFirstAppAsBackground(appObjects: List<AppObject>) {
         // Check if activity is still valid
-        if (isFinishing || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed)) {
+        if (isFinishing || isDestroyed) {
             return
         }
 
@@ -1518,12 +1519,12 @@ class AppView : Activity(), AdapterFragmentCallbacks {
             }
 
             val itemCount = appGridAdapter?.count ?: 0
-            val totalRows = Math.ceil(itemCount.toDouble() / spanCount).toInt()
+            val totalRows = ceil(itemCount.toDouble() / spanCount).toInt()
             val screenWidth = resources.displayMetrics.widthPixels
             var actualItemSize = getCurrentItemWidth()
 
             // 如果RecyclerView已经有子视图,优先使用实际测量的尺寸
-            if (rv.childCount > 0) {
+            if (rv.isNotEmpty()) {
                 val firstChild = rv.getChildAt(0)
                 if (firstChild != null && firstChild.width > 0) {
                     actualItemSize = firstChild.width
@@ -1733,10 +1734,6 @@ class AppView : Activity(), AdapterFragmentCallbacks {
     class AppObject(val app: NvApp) {
         var isRunning = false
         var isHidden = false
-
-        init {
-            requireNotNull(app) { "app must not be null" }
-        }
 
         override fun toString(): String {
             return app.appName

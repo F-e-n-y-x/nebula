@@ -17,7 +17,7 @@ class PosterContentProvider : ContentProvider() {
     private lateinit var diskAssetLoader: DiskAssetLoader
 
     @Throws(FileNotFoundException::class)
-    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
         val match = sUriMatcher.match(uri)
         if (match == BOXART_URI_ID) {
             return openBoxArtFile(uri, mode)

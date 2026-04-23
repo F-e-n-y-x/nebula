@@ -5,12 +5,10 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.Html
-import android.text.TextUtils
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -31,7 +29,6 @@ import android.widget.Toast
 import com.google.gson.JsonArray
 import com.limelight.binding.input.GameInputDevice
 import com.limelight.binding.input.KeyboardTranslator
-import com.limelight.binding.input.advance_setting.ControllerManager
 import com.limelight.binding.input.advance_setting.config.PageConfigController
 import com.limelight.binding.input.advance_setting.element.ElementController
 import com.limelight.nvstream.NvConnection
@@ -41,12 +38,11 @@ import com.limelight.preferences.PreferenceConfiguration
 import com.limelight.utils.KeyCodeMapper
 import org.json.JSONArray
 import org.json.JSONObject
-import org.xmlpull.v1.XmlPullParserException
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
 import java.util.ArrayDeque
-import java.util.LinkedHashMap
+import androidx.core.content.edit
 
 /** Int → Short 快捷转换 */
 private fun Int.s(): Short = this.toShort()
@@ -501,7 +497,7 @@ class GameMenu(
                     val w1 = parts1[0].toInt(); val h1 = parts1[1].toInt()
                     val w2 = parts2[0].toInt(); val h2 = parts2[1].toInt()
                     if (w1 != w2) w1.compareTo(w2) else h1.compareTo(h2)
-                } catch (e: NumberFormatException) {
+                } catch (_: NumberFormatException) {
                     s1.compareTo(s2)
                 }
             })
@@ -522,9 +518,9 @@ class GameMenu(
     private fun changeResolution(resString: String) {
         @Suppress("DEPRECATION")
         android.preference.PreferenceManager.getDefaultSharedPreferences(game)
-            .edit()
-            .putString(PreferenceConfiguration.RESOLUTION_PREF_STRING, resString)
-            .apply()
+            .edit {
+                putString(PreferenceConfiguration.RESOLUTION_PREF_STRING, resString)
+            }
 
         Toast.makeText(game, "Resolution changed to $resString. Restarting...", Toast.LENGTH_SHORT).show()
 
@@ -651,7 +647,7 @@ class GameMenu(
         AlertDialog.Builder(game, R.style.AppDialogStyle)
             .setTitle(getString(R.string.game_menu_card_config_title))
             .setMultiChoiceItems(items, checked) { _, which, isChecked -> checked[which] = isChecked }
-            .setPositiveButton("OK") { d, _ ->
+            .setPositiveButton("OK") { _, _ ->
                 game.prefConfig.showBitrateCard = checked[0]
                 game.prefConfig.showGyroCard = checked[1]
                 game.prefConfig.showQuickKeyCard = checked[2]
@@ -701,12 +697,12 @@ class GameMenu(
         // 如果 SharedPreferences 中没有数据，则从 raw 资源文件加载默认按键
         if (value.isNullOrEmpty()) {
             value = readRawResourceAsString(R.raw.default_special_keys)
-            if (!value.isNullOrEmpty()) {
-                preferences.edit().putString(KEY_NAME, value).apply()
+            if (value.isNotEmpty()) {
+                preferences.edit { putString(KEY_NAME, value) }
             }
         }
 
-        if (value.isNullOrEmpty()) return resultList
+        if (value.isEmpty()) return resultList
 
         try {
             val root = JSONObject(value)
@@ -837,7 +833,7 @@ class GameMenu(
             val hdrSupported = app.isHdrSupported()
             val appNameTextView = customView.findViewById<TextView>(R.id.appNameTextView)
             appNameTextView.text = "$appName (${if (hdrSupported) "HDR: Supported" else "HDR: Unknown"})"
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             customView.findViewById<TextView>(R.id.appNameTextView)?.text = "Moonlight V+"
         }
     }
@@ -1148,7 +1144,7 @@ class GameMenu(
     }
 
     /** 为按钮设置统一大小的左侧图标 */
-    private fun Button.setUniformIcon(@android.annotation.SuppressLint("SupportAnnotationUsage") iconRes: Int) {
+    private fun Button.setUniformIcon(@SuppressLint("SupportAnnotationUsage") iconRes: Int) {
         if (iconRes == 0) return
         val drawable = androidx.core.content.ContextCompat.getDrawable(game, iconRes) ?: return
         val size = dpToPx(20)
@@ -1412,7 +1408,7 @@ class GameMenu(
             newKeyEntry.put("data", keyCodesArray)
             dataArray.put(newKeyEntry)
 
-            preferences.edit().putString(KEY_NAME, root.toString()).apply()
+            preferences.edit { putString(KEY_NAME, root.toString()) }
 
             Toast.makeText(game, game.getString(R.string.toast_custom_key_saved, name), Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -1488,7 +1484,7 @@ class GameMenu(
                         ?: throw NullPointerException()
                     windowsCodesBuilder.append(windowsCode)
                     if (i < androidCodes.size - 1) windowsCodesBuilder.append(",")
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     Toast.makeText(game, "error: invalid key code", Toast.LENGTH_LONG).show()
                     return@setOnClickListener
                 }
@@ -1559,7 +1555,7 @@ class GameMenu(
                             if (checkedItems[i]) dataArray.remove(i)
                         }
                         root.put("data", dataArray)
-                        preferences.edit().putString(KEY_NAME, root.toString()).apply()
+                        preferences.edit { putString(KEY_NAME, root.toString()) }
                         Toast.makeText(game, R.string.toast_selected_keys_deleted, Toast.LENGTH_SHORT).show()
                     } catch (e: Exception) {
                         LimeLog.warning("Exception while deleting keys${e.message}")
@@ -1601,7 +1597,8 @@ class GameMenu(
 
         normalOptions.add(MenuOption(
             touchModeDescription, false,
-            { showTouchModeMenu() }, "mouse_mode", true, true))
+            { showTouchModeMenu() }, "mouse_mode", isShowIcon = true, isKeepDialog = true
+        ))
 
         normalOptions.add(MenuOption(
             if (game.getisTouchOverrideEnabled()) getString(R.string.game_menu_disable_pan_zoom) else getString(R.string.game_menu_enable_pan_zoom),
@@ -1619,7 +1616,7 @@ class GameMenu(
         if (game.isCrownFeatureEnabled) {
             normalOptions.add(MenuOption(
                 getString(R.string.game_menu_crown_function), false,
-                { showCrownFunctionMenu() }, "crown_function_menu", true, true
+                { showCrownFunctionMenu() }, "crown_function_menu", isShowIcon = true, isKeepDialog = true
             ))
         }
 
@@ -1634,12 +1631,12 @@ class GameMenu(
                 game.togglePerformanceOverlay()
                 rebuildAndReplaceMenu()
             },
-            "game_menu_toggle_performance_overlay", true, true
+            "game_menu_toggle_performance_overlay", isShowIcon = true, isKeepDialog = true
         ))
 
         normalOptions.add(MenuOption(
             getString(R.string.game_menu_change_resolution), false,
-            { showResolutionMenu() }, "game_menu_change_resolution", true, true
+            { showResolutionMenu() }, "game_menu_change_resolution", isShowIcon = true, isKeepDialog = true
         ))
 
         if (game.prefConfig.onscreenController) {
@@ -1648,7 +1645,8 @@ class GameMenu(
         }
 
         normalOptions.add(MenuOption(getString(R.string.game_menu_send_keys),
-            false, { showSpecialKeysMenu() }, "game_menu_send_keys", true, true))
+            false, { showSpecialKeysMenu() }, "game_menu_send_keys", isShowIcon = true, isKeepDialog = true
+        ))
 
         normalOptions.add(MenuOption(getString(R.string.game_menu_disconnect), true,
             { game.disconnect() }, "game_menu_disconnect", true))
@@ -1710,7 +1708,7 @@ class GameMenu(
      */
     private class GameMenuAdapter(
         context: Context,
-        private val options: Array<MenuOption>
+        options: Array<MenuOption>
     ) : ArrayAdapter<MenuOption>(context, 0, options) {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -1740,7 +1738,7 @@ class GameMenu(
      */
     private class SuperMenuAdapter(
         context: Context,
-        private val options: Array<MenuOption>
+        options: Array<MenuOption>
     ) : ArrayAdapter<MenuOption>(context, 0, options) {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {

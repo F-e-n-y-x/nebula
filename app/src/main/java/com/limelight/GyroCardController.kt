@@ -10,6 +10,7 @@ import android.widget.Toast
 import java.util.Locale
 
 import com.limelight.binding.input.ControllerHandler
+import kotlin.math.roundToInt
 
 /**
  * Encapsulates the gyro control card logic (right-stick mode and mouse mode).
@@ -67,7 +68,7 @@ class GyroCardController(private val game: Game) {
                     // 没有手柄，完全关闭陀螺仪
                     ch.setGyroToRightStickEnabled(false)
                     ch.setGyroToMouseEnabled(false)
-                    toggleSwitch?.isChecked = false
+                    toggleSwitch.isChecked = false
                     statusText?.text = "OFF"
                     Toast.makeText(game, game.getString(R.string.gyro_no_controller_detected), Toast.LENGTH_SHORT).show()
                 }
@@ -84,7 +85,7 @@ class GyroCardController(private val game: Game) {
             sensSeek.max = max
             val mult = (if (game.prefConfig.gyroSensitivityMultiplier > 0)
                 game.prefConfig.gyroSensitivityMultiplier else 1.0f).coerceIn(0.5f, 3.0f)
-            val progress = Math.round((mult - 0.5f) / 0.1f)
+            val progress = ((mult - 0.5f) / 0.1f).roundToInt()
             sensSeek.progress = progress
             sensVal.text = String.format(Locale.US, "%.1fx", mult)
 

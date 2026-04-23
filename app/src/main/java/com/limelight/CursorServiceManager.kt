@@ -8,7 +8,6 @@ import android.os.Looper
 import android.util.LruCache
 import android.view.Gravity
 import android.view.PointerIcon
-import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.limelight.binding.input.touch.RelativeTouchContext
 import com.limelight.binding.input.touch.TouchContext
@@ -165,7 +164,7 @@ class CursorServiceManager(
                         val headerSize = 20
                         val pngSize = packetLen - headerSize
 
-                        var targetBitmap: Bitmap? = null
+                        var targetBitmap: Bitmap?
 
                         if (pngSize > 0) {
                             targetBitmap = BitmapFactory.decodeByteArray(bodyData, headerSize, pngSize)

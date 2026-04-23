@@ -1,6 +1,6 @@
 package com.limelight.nvstream.http
 
-import android.os.Build
+import android.annotation.SuppressLint
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
@@ -15,17 +15,13 @@ import java.security.KeyStore
 import java.security.NoSuchAlgorithmException
 import java.security.Principal
 import java.security.SecureRandom
-import java.security.cert.Certificate
 import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.LinkedList
-import java.util.ListIterator
-import java.util.Objects
 import java.util.Stack
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-import org.json.JSONArray
 import org.json.JSONObject
 
 import javax.net.ssl.HostnameVerifier
@@ -55,7 +51,6 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import okhttp3.ResponseBody
 
 class NvHTTP(
@@ -66,7 +61,7 @@ class NvHTTP(
     serverCert: X509Certificate?,
     cryptoProvider: LimelightCryptoProvider
 ) {
-    private var uniqueId: String
+    private var uniqueId: String = "0123456789ABCDEF"
     val pairingManager: PairingManager
     private var clientName: String? = null
 
@@ -90,7 +85,6 @@ class NvHTTP(
     )
 
     init {
-        this.uniqueId = "0123456789ABCDEF"
 
         if (clientName.isNotEmpty()) this.clientName = clientName
 
@@ -132,7 +126,8 @@ class NvHTTP(
         }
 
         defaultTrustManager = getDefaultTrustManager()
-        trustManager = object : X509TrustManager {
+        trustManager = @SuppressLint("CustomX509TrustManager")
+        object : X509TrustManager {
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
             override fun checkClientTrusted(certs: Array<X509Certificate>, authType: String) {
                 throw IllegalStateException("Should never be called")
@@ -300,10 +295,10 @@ class NvHTTP(
         val body = response.body
 
         if (response.isSuccessful) {
-            return body!!
+            return body
         }
 
-        body?.close()
+        body.close()
 
         if (response.code == 404) {
             throw FileNotFoundException(completeUrl.toString())
@@ -689,6 +684,7 @@ class NvHTTP(
         return getXmlString(xmlStr, "supercmd", true) != "0"
     }
 
+    @SuppressLint("DefaultLocale")
     @Throws(IOException::class, XmlPullParserException::class, InterruptedException::class)
     fun setBitrate(bitrateKbps: Int): Boolean {
         val query = String.format("bitrate=%d", bitrateKbps)
@@ -709,18 +705,18 @@ class NvHTTP(
         performAndroidTlsHack(httpClientLongConnectTimeout)
             .newCall(Request.Builder().url(url).get().build())
             .execute()
-            .use { if (it.isSuccessful) it.body?.string() else null }
+            .use { if (it.isSuccessful) it.body.string() else null }
     } catch (e: Exception) { null }
 
     /** ABR HTTPS POST 助手；返回响应正文或 null（失败/非 2xx 也返回 null）。*/
-    private fun abrPost(pathSegments: String, payload: org.json.JSONObject): String? = try {
+    private fun abrPost(pathSegments: String, payload: JSONObject): String? = try {
         val url = getHttpsUrl(true).newBuilder().addPathSegments(pathSegments).build()
         val body = payload.toString()
             .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
         performAndroidTlsHack(httpClientLongConnectTimeout)
             .newCall(Request.Builder().url(url).post(body).build())
             .execute()
-            .use { if (it.isSuccessful) it.body?.string() ?: "" else null }
+            .use { if (it.isSuccessful) it.body.string() else null }
     } catch (e: Exception) { null }
 
     /** 查询服务端 ABR 能力。失败返回 supported=false 的占位对象。*/
@@ -728,7 +724,7 @@ class NvHTTP(
         val body = abrGet("api/abr/capabilities").takeUnless { it.isNullOrEmpty() }
             ?: return AbrCapabilities(false, 0, emptyList())
         return try {
-            val json = org.json.JSONObject(body)
+            val json = JSONObject(body)
             val features = mutableListOf<String>()
             json.optJSONArray("features")?.let { arr ->
                 for (i in 0 until arr.length()) features.add(arr.optString(i))
@@ -745,7 +741,7 @@ class NvHTTP(
 
     /** 通知服务端启用/关闭 ABR。*/
     fun setAbrMode(config: AbrConfig): Boolean {
-        val payload = org.json.JSONObject().apply {
+        val payload = JSONObject().apply {
             put("enabled", config.enabled)
             put("minBitrate", config.minBitrate)
             put("maxBitrate", config.maxBitrate)
@@ -756,7 +752,7 @@ class NvHTTP(
 
     /** 上报客户端网络指标，可能返回服务端建议的新码率。*/
     fun reportNetworkFeedback(feedback: NetworkFeedback): AbrAction? {
-        val payload = org.json.JSONObject().apply {
+        val payload = JSONObject().apply {
             put("packetLoss", feedback.packetLoss)
             put("rttMs", feedback.rttMs)
             put("decodeFps", feedback.decodeFps)
@@ -766,7 +762,7 @@ class NvHTTP(
         val body = abrPost("api/abr/feedback", payload).takeUnless { it.isNullOrEmpty() }
             ?: return null
         return try {
-            val json = org.json.JSONObject(body)
+            val json = JSONObject(body)
             AbrAction(
                 if (json.has("newBitrate")) json.optInt("newBitrate") else null,
                 if (json.has("reason")) json.optString("reason") else null

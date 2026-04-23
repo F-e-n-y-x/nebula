@@ -15,14 +15,14 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.LocaleList
 import android.view.View
-import android.view.WindowInsets
 import android.view.WindowManager
-import com.limelight.Game
+import androidx.annotation.RequiresApi
 import com.limelight.LimeLog
 import com.limelight.R
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.preferences.PreferenceConfiguration
 import java.util.Locale
+import androidx.core.content.edit
 
 object UiHelper {
 
@@ -31,6 +31,7 @@ object UiHelper {
 
     private var sGameManagerAvailable: Boolean? = null
 
+    @RequiresApi(Build.VERSION_CODES.S)
     private fun isGameManagerAvailable(context: Context): Boolean {
         sGameManagerAvailable?.let { return it }
         return try {
@@ -64,15 +65,30 @@ object UiHelper {
         }
     }
 
-    fun notifyStreamConnecting(context: Context) = setGameModeStatus(context, true, true)
+    fun notifyStreamConnecting(context: Context) = setGameModeStatus(context,
+        streaming = true,
+        interruptible = true
+    )
 
-    fun notifyStreamConnected(context: Context) = setGameModeStatus(context, true, false)
+    fun notifyStreamConnected(context: Context) = setGameModeStatus(context,
+        streaming = true,
+        interruptible = false
+    )
 
-    fun notifyStreamEnteringPiP(context: Context) = setGameModeStatus(context, true, true)
+    fun notifyStreamEnteringPiP(context: Context) = setGameModeStatus(context,
+        streaming = true,
+        interruptible = true
+    )
 
-    fun notifyStreamExitingPiP(context: Context) = setGameModeStatus(context, true, false)
+    fun notifyStreamExitingPiP(context: Context) = setGameModeStatus(context,
+        streaming = true,
+        interruptible = false
+    )
 
-    fun notifyStreamEnded(context: Context) = setGameModeStatus(context, false, false)
+    fun notifyStreamEnded(context: Context) = setGameModeStatus(context,
+        streaming = false,
+        interruptible = false
+    )
 
     fun setLocale(activity: Activity) {
         val locale = PreferenceConfiguration.readPreferences(activity).language
@@ -113,7 +129,7 @@ object UiHelper {
         val rootView = activity.findViewById<View>(android.R.id.content)
         val modeMgr = activity.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
 
-        setGameModeStatus(activity, false, false)
+        setGameModeStatus(activity, streaming = false, interruptible = false)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             activity.window.attributes.layoutInDisplayCutoutMode =
@@ -162,7 +178,7 @@ object UiHelper {
                     activity.resources.getString(R.string.title_decoding_reset),
                     activity.resources.getString(R.string.message_decoding_reset)
                 ) {
-                    prefs.edit().putInt("LastNotifiedCrashCount", crashCount).apply()
+                    prefs.edit { putInt("LastNotifiedCrashCount", crashCount) }
                 }
             } else {
                 Dialog.displayDialog(
@@ -170,7 +186,7 @@ object UiHelper {
                     activity.resources.getString(R.string.title_decoding_error),
                     activity.resources.getString(R.string.message_decoding_error)
                 ) {
-                    prefs.edit().putInt("LastNotifiedCrashCount", crashCount).apply()
+                    prefs.edit { putInt("LastNotifiedCrashCount", crashCount) }
                 }
             }
         }
@@ -198,18 +214,10 @@ object UiHelper {
 
     fun getBatteryLevel(context: Context): Int {
         try {
-            val level = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-                batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-            } else {
-                val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-                if (batteryIntent != null) {
-                    (batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100) /
-                            batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                } else 0
-            }
+            val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+            val level = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
 
-            if (level < 0 || level > 100) {
+            if (level !in 0..100) {
                 LimeLog.warning("Invalid battery level: $level")
                 return 0
             }

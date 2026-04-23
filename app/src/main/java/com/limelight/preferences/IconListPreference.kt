@@ -1,17 +1,12 @@
 package com.limelight.preferences
 
-import android.app.AlertDialog
 import android.content.Context
-import android.content.res.TypedArray
 import androidx.preference.ListPreference
 import android.util.AttributeSet
-import android.view.View
-import android.view.ViewGroup
-import android.widget.ArrayAdapter
-import android.widget.ImageView
 
 import com.limelight.Game
 import com.limelight.R
+import androidx.core.content.withStyledAttributes
 
 class IconListPreference(context: Context, attrs: AttributeSet?) : ListPreference(context, attrs) {
     var entryIcons: IntArray? = null
@@ -19,14 +14,14 @@ class IconListPreference(context: Context, attrs: AttributeSet?) : ListPreferenc
     private var mOriginalSummary: String? = null
 
     init {
-        val a = context.obtainStyledAttributes(attrs, R.styleable.IconListPreference)
-        val iconsResId = a.getResourceId(R.styleable.IconListPreference_entryIcons, 0)
-        if (iconsResId != 0) {
-            val icons = context.resources.obtainTypedArray(iconsResId)
-            entryIcons = IntArray(icons.length()) { icons.getResourceId(it, 0) }
-            icons.recycle()
+        context.withStyledAttributes(attrs, R.styleable.IconListPreference) {
+            val iconsResId = getResourceId(R.styleable.IconListPreference_entryIcons, 0)
+            if (iconsResId != 0) {
+                val icons = context.resources.obtainTypedArray(iconsResId)
+                entryIcons = IntArray(icons.length()) { icons.getResourceId(it, 0) }
+                icons.recycle()
+            }
         }
-        a.recycle()
 
         mOriginalSummary = summary?.toString()
 
@@ -34,7 +29,7 @@ class IconListPreference(context: Context, attrs: AttributeSet?) : ListPreferenc
             updateSummary(newValue.toString())
 
             if (context is Game) {
-                (context as Game).refreshDisplayPosition()
+                context.refreshDisplayPosition()
             }
             true
         }

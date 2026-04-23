@@ -85,7 +85,10 @@ class AdaptiveBitrateService(
             }
         }
 
-        future = executor.scheduleAtFixedRate({
+        // 使用 scheduleWithFixedDelay 而非 scheduleAtFixedRate：
+        // Android 进程被 cached 后唤醒时，fixedRate 会"补跑"积压的几百上千次 tick，
+        // 而 fixedDelay 只在每次执行完成后再等待 1 秒，避免突发风暴。
+        future = executor.scheduleWithFixedDelay({
             try {
                 tick()
             } catch (e: Exception) {

@@ -1,12 +1,12 @@
 @file:Suppress("DEPRECATION")
 package com.limelight.utils
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
-import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -23,12 +23,9 @@ import android.widget.Toast
 
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 
-import com.limelight.BuildConfig
 import com.limelight.R
 
-import org.json.JSONArray
 import org.json.JSONObject
 
 import java.io.BufferedReader
@@ -39,6 +36,8 @@ import java.util.regex.Pattern
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import androidx.core.content.edit
+import androidx.core.net.toUri
 
 object UpdateManager {
     private const val TAG = "UpdateManager"
@@ -130,10 +129,10 @@ object UpdateManager {
         val apkName = prefs.getString(PREF_DOWNLOAD_APK_NAME, "update.apk")
 
         // 清除已保存的下载信息
-        prefs.edit()
-                .remove(PREF_DOWNLOAD_ID)
+        prefs.edit {
+            remove(PREF_DOWNLOAD_ID)
                 .remove(PREF_DOWNLOAD_APK_NAME)
-                .apply()
+        }
 
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager ?: return
 
@@ -183,7 +182,7 @@ object UpdateManager {
                 val json = httpGetWithProxies(GITHUB_API_URL)
                 if (json != null) {
                     val jsonResponse = JSONObject(json)
-                    val latestVersion = jsonResponse.optString("tag_name", "")
+                    val latestVersion = jsonResponse.optString("tag_name", "").removePrefix("v")
                     val releaseNotes = jsonResponse.optString("body", "")
 
                     // 解析资产，优先选择APK
@@ -206,7 +205,7 @@ object UpdateManager {
                         for (a in apkAssets) {
                             val name = a.optString("name", "")
                             val isRootApk = name.lowercase().contains("root")
-                            if (isRootApk == BuildConfig.ROOT_BUILD) {
+                            if (!isRootApk) {
                                 apkName = name
                                 apkUrl = a.opt("browser_download_url") as? String
                                 break
@@ -237,9 +236,9 @@ object UpdateManager {
             isChecking.set(false)
 
             context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
-                    .edit()
-                    .putLong("last_check_time", System.currentTimeMillis())
-                    .apply()
+                    .edit {
+                        putLong("last_check_time", System.currentTimeMillis())
+                    }
 
             if (updateInfo == null) {
                 if (showToast) {
@@ -261,24 +260,24 @@ object UpdateManager {
     // 对话框
     // ------------------------------------------------------------------
 
+    @SuppressLint("SetTextI18n")
     private fun showLatestVersionDialog(context: Context, currentVersion: String, releaseNotes: String?) {
         if (context !is Activity) {
             Toast.makeText(context, context.getString(R.string.toast_already_latest_version, currentVersion), Toast.LENGTH_SHORT).show()
             return
         }
 
-        val activity = context
-        activity.runOnUiThread {
-            val builder = AlertDialog.Builder(activity, R.style.AppDialogStyle)
+        context.runOnUiThread {
+            val builder = AlertDialog.Builder(context, R.style.AppDialogStyle)
             builder.setTitle(context.getString(R.string.update_already_latest_title))
 
-            val view = LayoutInflater.from(activity).inflate(R.layout.dialog_update, null)
+            val view = LayoutInflater.from(context).inflate(R.layout.dialog_update, null)
 
             val version = view.findViewById<TextView>(R.id.update_version)
             version.text = "v$currentVersion"
 
             if (releaseNotes != null && releaseNotes.trim().isNotEmpty()) {
-                val accentColor = ContextCompat.getColor(activity, R.color.theme_pink_primary)
+                val accentColor = ContextCompat.getColor(context, R.color.theme_pink_primary)
                 val notesScroll = view.findViewById<ScrollView>(R.id.update_notes_scroll)
                 notesScroll.visibility = View.VISIBLE
                 val notes = view.findViewById<TextView>(R.id.update_notes)
@@ -297,16 +296,15 @@ object UpdateManager {
             return
         }
 
-        val activity = context
-        activity.runOnUiThread {
-            val view = LayoutInflater.from(activity).inflate(R.layout.dialog_update, null)
+        context.runOnUiThread {
+            val view = LayoutInflater.from(context).inflate(R.layout.dialog_update, null)
 
             val curVer = getCurrentVersion(context)
             val version = view.findViewById<TextView>(R.id.update_version)
             version.text = "v$curVer → v${updateInfo.version}"
 
-            if (updateInfo.releaseNotes != null && updateInfo.releaseNotes.isNotEmpty()) {
-                val accentColor = ContextCompat.getColor(activity, R.color.theme_pink_primary)
+            if (!updateInfo.releaseNotes.isNullOrEmpty()) {
+                val accentColor = ContextCompat.getColor(context, R.color.theme_pink_primary)
                 val notesScroll = view.findViewById<ScrollView>(R.id.update_notes_scroll)
                 notesScroll.visibility = View.VISIBLE
                 val notesView = view.findViewById<TextView>(R.id.update_notes)
@@ -319,12 +317,12 @@ object UpdateManager {
                 fileName.visibility = View.VISIBLE
             }
 
-            val builder = AlertDialog.Builder(activity, R.style.AppDialogStyle)
+            val builder = AlertDialog.Builder(context, R.style.AppDialogStyle)
             builder.setTitle(context.getString(R.string.update_new_version_title))
             builder.setView(view)
 
             builder.setPositiveButton(context.getString(R.string.update_btn_browser_download)) { _, _ ->
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_RELEASE_PAGE))
+                val intent = Intent(Intent.ACTION_VIEW, GITHUB_RELEASE_PAGE.toUri())
                 context.startActivity(intent)
             }
 
@@ -334,7 +332,11 @@ object UpdateManager {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                             showInstallPermissionDialog(context, updateInfo)
                         } else {
-                            Toast.makeText(context, context.getString(R.string.toast_cannot_get_install_permission), Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.toast_cannot_get_install_permission),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     } else {
                         startDirectDownload(context, updateInfo)
@@ -369,21 +371,20 @@ object UpdateManager {
             return
         }
 
-        val activity = context
-        val builder = AlertDialog.Builder(activity)
+        val builder = AlertDialog.Builder(context)
         builder.setTitle(context.getString(R.string.update_install_permission_title))
         builder.setMessage(context.getString(R.string.update_install_permission_msg))
         builder.setPositiveButton(android.R.string.ok) { _, _ ->
             try {
                 val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-                intent.data = Uri.parse("package:" + context.getPackageName())
+                intent.data = ("package:" + context.packageName).toUri()
                 @Suppress("DEPRECATION")
-                activity.startActivityForResult(intent, INSTALL_PERMISSION_REQUEST_CODE)
+                context.startActivityForResult(intent, INSTALL_PERMISSION_REQUEST_CODE)
             } catch (e: Exception) {
                 try {
                     val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
                     @Suppress("DEPRECATION")
-                    activity.startActivityForResult(intent, INSTALL_PERMISSION_REQUEST_CODE)
+                    context.startActivityForResult(intent, INSTALL_PERMISSION_REQUEST_CODE)
                 } catch (e2: Exception) {
                     pendingUpdateInfo = null
                     Toast.makeText(context, context.getString(R.string.toast_cannot_open_settings), Toast.LENGTH_SHORT).show()
@@ -420,7 +421,7 @@ object UpdateManager {
                 return
             }
 
-            val req = DownloadManager.Request(Uri.parse(primaryUrl))
+            val req = DownloadManager.Request(primaryUrl.toUri())
             req.setTitle(context.getString(R.string.update_download_notification_title))
             req.setDescription(fileName)
             req.setMimeType("application/vnd.android.package-archive")
@@ -438,13 +439,13 @@ object UpdateManager {
 
             // 保存下载信息到 SharedPreferences（供 BroadcastReceiver 和代理重试使用）
             val prefs = context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
-            prefs.edit()
-                    .putLong(PREF_DOWNLOAD_ID, downloadId)
+            prefs.edit {
+                putLong(PREF_DOWNLOAD_ID, downloadId)
                     .putString(PREF_DOWNLOAD_APK_NAME, fileName)
                     // 保存完整候选 URL 列表用于重试
                     .putString("update_download_candidates", joinStrings(candidates))
                     .putInt("update_download_candidate_index", 0)
-                    .apply()
+            }
 
             // 如果当前在 Activity 中，显示应用内进度对话框
             if (context is Activity) {
@@ -489,6 +490,7 @@ object UpdateManager {
         val currentCandidateIndex = intArrayOf(0)
 
         val runnable = object : Runnable {
+            @SuppressLint("SetTextI18n")
             override fun run() {
                 if (activity.isFinishing || activity.isDestroyed) {
                     dismissProgressDialog()
@@ -569,7 +571,7 @@ object UpdateManager {
                                     progressText.text = activity.getString(R.string.update_progress_switching_source)
 
                                     try {
-                                        val retryReq = DownloadManager.Request(Uri.parse(nextUrl))
+                                        val retryReq = DownloadManager.Request(nextUrl.toUri())
                                         retryReq.setTitle(activity.getString(R.string.update_download_notification_title))
                                         retryReq.setDescription(fileName)
                                         retryReq.setMimeType("application/vnd.android.package-archive")
@@ -587,10 +589,13 @@ object UpdateManager {
 
                                         // 更新 SharedPreferences 中的下载 ID
                                         val prefs = activity.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
-                                        prefs.edit()
-                                                .putLong(PREF_DOWNLOAD_ID, newDownloadId)
-                                                .putInt("update_download_candidate_index", currentCandidateIndex[0])
-                                                .apply()
+                                        prefs.edit {
+                                            putLong(PREF_DOWNLOAD_ID, newDownloadId)
+                                                .putInt(
+                                                    "update_download_candidate_index",
+                                                    currentCandidateIndex[0]
+                                                )
+                                        }
 
                                         handler.postDelayed(this, PROGRESS_POLL_INTERVAL_MS)
                                     } catch (e: Exception) {
@@ -689,7 +694,7 @@ object UpdateManager {
             val currentParts = current.split(".")
             val latestParts = latest.split(".")
 
-            val maxLength = Math.max(currentParts.size, latestParts.size)
+            val maxLength = currentParts.size.coerceAtLeast(latestParts.size)
 
             for (i in 0 until maxLength) {
                 val currentPart = if (i < currentParts.size) currentParts[i].toInt() else 0
@@ -732,9 +737,9 @@ object UpdateManager {
                     PROXY_PREFIXES = allProxies.toTypedArray()
 
                     context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
-                            .edit()
-                            .putLong(PREF_LAST_PROXY_UPDATE_TIME, System.currentTimeMillis())
-                            .apply()
+                            .edit {
+                                putLong(PREF_LAST_PROXY_UPDATE_TIME, System.currentTimeMillis())
+                            }
 
                     Log.d(TAG, "代理列表已更新，共 ${PROXY_PREFIXES.size} 个代理：${PROXY_PREFIXES.contentToString()}")
                 }
@@ -838,11 +843,7 @@ object UpdateManager {
             }
         }
 
-        if (detectRedirectToGhproxyLink(url)) {
-            return false
-        }
-
-        return true
+        return !detectRedirectToGhproxyLink(url)
     }
 
     private fun detectRedirectToGhproxyLink(proxyUrl: String): Boolean {
@@ -897,7 +898,7 @@ object UpdateManager {
     private fun httpGetWithProxies(url: String): String? {
         val tries = buildProxiedUrls(url)
 
-        val maxTries = Math.min(tries.size, 3)
+        val maxTries = tries.size.coerceAtMost(3)
         for (i in 0 until maxTries) {
             val u = tries[i]
             try {

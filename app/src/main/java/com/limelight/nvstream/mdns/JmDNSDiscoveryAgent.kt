@@ -27,7 +27,7 @@ class JmDNSDiscoveryAgent(
     private val pendingResolution = HashSet<String>()
 
     init {
-        val wifiMgr = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val wifiMgr = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicastLock = wifiMgr.createMulticastLock("Limelight mDNS")
         multicastLock.setReferenceCounted(false)
     }
@@ -179,13 +179,7 @@ class JmDNSDiscoveryAgent(
         }
 
         init {
-            NetworkTopologyDiscovery.Factory.setClassDelegate(
-                object : NetworkTopologyDiscovery.Factory.ClassDelegate {
-                    override fun newNetworkTopologyDiscovery(): NetworkTopologyDiscovery {
-                        return MyNetworkTopologyDiscovery()
-                    }
-                }
-            )
+            NetworkTopologyDiscovery.Factory.setClassDelegate { MyNetworkTopologyDiscovery() }
         }
 
         private fun referenceResolver(): JmmDNS {

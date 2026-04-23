@@ -2,30 +2,24 @@
 package com.limelight.preferences
 
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.graphics.Bitmap
 import android.graphics.Color
-import android.media.MediaCodecInfo
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Vibrator
 import android.util.DisplayMetrics
-import android.util.Range
 import android.view.Display
 import android.view.DisplayCutout
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.TextView
@@ -41,7 +35,6 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceGroupAdapter
 import androidx.preference.PreferenceManager
-import androidx.preference.PreferenceScreen
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
@@ -59,15 +52,17 @@ import com.limelight.utils.UpdateManager
 
 import java.io.BufferedReader
 import java.io.IOException
-import java.io.InputStream
 import java.io.InputStreamReader
-import java.io.OutputStream
 import java.util.*
 
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.RequestOptions
 import jp.wasabeef.glide.transformations.BlurTransformation
 import jp.wasabeef.glide.transformations.ColorFilterTransformation
+import androidx.core.graphics.toColorInt
+import androidx.core.content.edit
+import androidx.core.net.toUri
+import kotlin.math.roundToInt
 
 class StreamSettings : AppCompatActivity() {
 
@@ -120,7 +115,7 @@ class StreamSettings : AppCompatActivity() {
     @SuppressLint("SuspiciousIndentation")
     fun reloadSettings() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val mode = windowManager.defaultDisplay.getMode()
+            val mode = windowManager.defaultDisplay.mode
             previousDisplayPixelCount = mode.physicalWidth * mode.physicalHeight
         }
         supportFragmentManager.beginTransaction().replace(
@@ -171,6 +166,7 @@ class StreamSettings : AppCompatActivity() {
     /**
      * 设置版本号显示
      */
+    @SuppressLint("SetTextI18n")
     private fun setupVersionInfo() {
         val versionText = findViewById<TextView>(R.id.drawer_version)
         if (versionText != null) {
@@ -191,7 +187,7 @@ class StreamSettings : AppCompatActivity() {
     private fun initDrawerMenu() {
         // 横屏时 drawer_layout 是 LinearLayout，不是 DrawerLayout
         val rootView = findViewById<View>(R.id.drawer_layout)
-        drawerLayout = if (rootView is DrawerLayout) rootView else null
+        drawerLayout = rootView as? DrawerLayout
 
         categoryList = findViewById(R.id.category_list)
 
@@ -333,8 +329,8 @@ class StreamSettings : AppCompatActivity() {
             // 使用项目公共粉色主题
             val pinkPrimary = androidx.core.content.ContextCompat.getColor(this@StreamSettings, R.color.theme_pink_primary)    // #FF6B9D
             val white = Color.WHITE
-            val lightGray = Color.parseColor("#BBBBBB")
-            val dimGray = Color.parseColor("#888888")
+            val lightGray = "#BBBBBB".toColorInt()
+            val dimGray = "#888888".toColorInt()
 
             // 指示器显示（小圆点）
             holder.indicator.visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
@@ -412,7 +408,7 @@ class StreamSettings : AppCompatActivity() {
 
         // 验证并校正 selectedCategoryIndex（屏幕旋转后恢复时可能越界）
         if (selectedCategoryIndex >= categories.size) {
-            selectedCategoryIndex = Math.max(0, categories.size - 1)
+            selectedCategoryIndex = 0.coerceAtLeast(categories.size - 1)
         }
 
         categoryAdapter?.notifyDataSetChanged()
@@ -487,7 +483,7 @@ class StreamSettings : AppCompatActivity() {
         updateDrawerMode()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val mode = windowManager.defaultDisplay.getMode()
+            val mode = windowManager.defaultDisplay.mode
 
             // If the display's physical pixel count has changed, we consider that it's a new display
             // and we should reload our settings (which include display-dependent values).
@@ -604,6 +600,7 @@ class StreamSettings : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        super.onBackPressed()
         if (handleBackForDrawer()) {
             return
         }
@@ -671,8 +668,8 @@ class StreamSettings : AppCompatActivity() {
         }
 
         private fun appendPreferenceEntry(pref: ListPreference, newEntryName: String, newEntryValue: String) {
-            val newEntries = Arrays.copyOf(pref.entries, pref.entries.size + 1)
-            val newValues = Arrays.copyOf(pref.entryValues, pref.entryValues.size + 1)
+            val newEntries = pref.entries.copyOf(pref.entries.size + 1)
+            val newValues = pref.entryValues.copyOf(pref.entryValues.size + 1)
 
             // Add the new option
             newEntries[newEntries.size - 1] = newEntryName
@@ -725,13 +722,15 @@ class StreamSettings : AppCompatActivity() {
         }
 
         private fun addCustomResolutionsEntries() {
-            val storage = requireActivity().getSharedPreferences(CustomResolutionsConsts.CUSTOM_RESOLUTIONS_FILE, Context.MODE_PRIVATE)
+            val storage = requireActivity().getSharedPreferences(CustomResolutionsConsts.CUSTOM_RESOLUTIONS_FILE,
+                MODE_PRIVATE
+            )
             val stored = storage.getStringSet(CustomResolutionsConsts.CUSTOM_RESOLUTIONS_KEY, null)
             val pref = findPreference<ListPreference>(PreferenceConfiguration.RESOLUTION_PREF_STRING)!!
 
             val preferencesList = listOf(*pref.entryValues)
 
-            if (stored == null || stored.isEmpty()) {
+            if (stored.isNullOrEmpty()) {
                 return
             }
 
@@ -776,7 +775,7 @@ class StreamSettings : AppCompatActivity() {
         }
 
         private fun addNativeFrameRateEntry(framerate: Float) {
-            val frameRateRounded = Math.round(framerate)
+            val frameRateRounded = framerate.roundToInt()
             if (frameRateRounded == 0) {
                 return
             }
@@ -845,10 +844,12 @@ class StreamSettings : AppCompatActivity() {
                 fpsValue = prefs.getString(PreferenceConfiguration.FPS_PREF_STRING, PreferenceConfiguration.DEFAULT_FPS)
             }
 
-            prefs.edit()
-                    .putInt(PreferenceConfiguration.BITRATE_PREF_STRING,
-                            PreferenceConfiguration.getDefaultBitrate(resValue!!, fpsValue!!))
-                    .apply()
+            prefs.edit {
+                putInt(
+                    PreferenceConfiguration.BITRATE_PREF_STRING,
+                    PreferenceConfiguration.getDefaultBitrate(resValue!!, fpsValue!!)
+                )
+            }
         }
 
         override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -858,7 +859,8 @@ class StreamSettings : AppCompatActivity() {
 
             // 减少顶部间距，让设置内容更贴近导航栏
             val topPadding = view.paddingTop
-            val reducedPadding = Math.max(0, topPadding - (16 * resources.displayMetrics.density).toInt())
+            val reducedPadding =
+                0.coerceAtLeast(topPadding - (16 * resources.displayMetrics.density).toInt())
             view.setPadding(view.paddingLeft, reducedPadding,
                     view.paddingRight, view.paddingBottom)
             UiHelper.applyStatusBarPadding(view)
@@ -883,14 +885,13 @@ class StreamSettings : AppCompatActivity() {
                 val pref = screen.getPreference(i)
                 if (pref !is PreferenceCategory) continue
 
-                val category = pref
-                if (category.title == null) continue
+                if (pref.title == null) continue
 
-                val title = category.title.toString()
-                val key = category.key ?: "category_$i"
+                val title = pref.title.toString()
+                val key = pref.key ?: "category_$i"
                 val emoji = getEmojiForCategory(key)
 
-                categoryList.add(category)
+                categoryList.add(pref)
                 items.add(CategoryItem(key, title, emoji))
             }
 
@@ -971,10 +972,9 @@ class StreamSettings : AppCompatActivity() {
 
             val lm = recyclerView.layoutManager
             if (lm !is LinearLayoutManager) return
-            val layoutManager = lm
 
-            val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
-            val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+            val firstVisiblePosition = lm.findFirstVisibleItemPosition()
+            val lastVisiblePosition = lm.findLastVisibleItemPosition()
 
             var newCategoryIndex = -1
             var categoryPosition = -1
@@ -998,9 +998,10 @@ class StreamSettings : AppCompatActivity() {
 
         private fun dpToPx(dp: Int): Int {
             val density = resources.displayMetrics.density
-            return Math.round(dp * density)
+            return (dp * density).roundToInt()
         }
 
+        @SuppressLint("RestrictedApi")
         private fun findAdapterPositionForPreference(target: Preference?): Int {
             val recyclerView = listView ?: return -1
             if (target == null) return -1
@@ -1032,21 +1033,21 @@ class StreamSettings : AppCompatActivity() {
 
                 if (url.trim().isNotEmpty()) {
                     // 设置为API类型，并清除本地文件配置
-                    prefs.edit()
-                            .putString("background_image_type", "api")
+                    prefs.edit {
+                        putString("background_image_type", "api")
                             .putString("background_image_url", url.trim())
                             .remove("background_image_local_path")
-                            .apply()
+                    }
 
                     // 发送广播通知 PcView 更新背景图片
                     val broadcastIntent = Intent("com.limelight.REFRESH_BACKGROUND_IMAGE")
                     requireActivity().sendBroadcast(broadcastIntent)
                 } else {
                     // 恢复默认
-                    prefs.edit()
-                            .putString("background_image_type", "default")
+                    prefs.edit {
+                        putString("background_image_type", "default")
                             .remove("background_image_url")
-                            .apply()
+                    }
 
                     // 发送广播通知 PcView 更新背景图片
                     val broadcastIntent = Intent("com.limelight.REFRESH_BACKGROUND_IMAGE")
@@ -1107,14 +1108,14 @@ class StreamSettings : AppCompatActivity() {
             }*/
             val categoryGamepadSettings = findPreference<PreferenceCategory>("category_gamepad_settings")!!
             // Remove the vibration options if the device can't vibrate
-            if (!(requireActivity().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator).hasVibrator()) {
+            if (!(requireActivity().getSystemService(VIBRATOR_SERVICE) as Vibrator).hasVibrator()) {
                 categoryGamepadSettings.removePreference(findPreference("checkbox_vibrate_fallback")!!)
                 categoryGamepadSettings.removePreference(findPreference("seekbar_vibrate_fallback_strength")!!)
                 // The entire OSC category may have already been removed by the touchscreen check above
                 val category = findPreference<PreferenceCategory>("category_onscreen_controls")
                 category?.removePreference(findPreference("checkbox_vibrate_osc")!!)
             } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
-                    !(requireActivity().getSystemService(Context.VIBRATOR_SERVICE) as Vibrator).hasAmplitudeControl()) {
+                    !(requireActivity().getSystemService(VIBRATOR_SERVICE) as Vibrator).hasAmplitudeControl()) {
                 // Remove the vibration strength selector of the device doesn't have amplitude control
                 categoryGamepadSettings.removePreference(findPreference("seekbar_vibrate_fallback_strength")!!)
             }
@@ -1147,8 +1148,10 @@ class StreamSettings : AppCompatActivity() {
                             val metrics = DisplayMetrics()
                             display.getRealMetrics(metrics)
 
-                            val width = Math.max(metrics.widthPixels - widthInsets, metrics.heightPixels - heightInsets)
-                            val height = Math.min(metrics.widthPixels - widthInsets, metrics.heightPixels - heightInsets)
+                            val width =
+                                (metrics.widthPixels - widthInsets).coerceAtLeast(metrics.heightPixels - heightInsets)
+                            val height =
+                                (metrics.widthPixels - widthInsets).coerceAtMost(metrics.heightPixels - heightInsets)
 
                             addNativeResolutionEntries(width, height, false)
                             hasInsets = true
@@ -1163,8 +1166,8 @@ class StreamSettings : AppCompatActivity() {
                     // where height > width. Normalize these to the conventional width > height
                     // arrangement before we process them.
 
-                    val width = Math.max(candidate.physicalWidth, candidate.physicalHeight)
-                    val height = Math.min(candidate.physicalWidth, candidate.physicalHeight)
+                    val width = candidate.physicalWidth.coerceAtLeast(candidate.physicalHeight)
+                    val height = candidate.physicalWidth.coerceAtMost(candidate.physicalHeight)
 
                     // Some TVs report strange values here, so let's avoid native resolutions on a TV
                     // unless they report greater than 4K resolutions.
@@ -1188,7 +1191,7 @@ class StreamSettings : AppCompatActivity() {
 
                 // This must be called to do runtime initialization before calling functions that evaluate
                 // decoder lists.
-                MediaCodecHelper.initialize(context!!, GlPreferences.readPreferences(context!!).glRenderer)
+                MediaCodecHelper.initialize(requireContext(), GlPreferences.readPreferences(requireContext()).glRenderer)
 
                 val avcDecoder = MediaCodecHelper.findProbableSafeDecoder("video/avc", -1)
                 val hevcDecoder = MediaCodecHelper.findProbableSafeDecoder("video/hevc", -1)
@@ -1267,8 +1270,8 @@ class StreamSettings : AppCompatActivity() {
                 // that getWidth() and getHeight() tell to us).
                 val metrics = DisplayMetrics()
                 display.getRealMetrics(metrics)
-                val width = Math.max(metrics.widthPixels, metrics.heightPixels)
-                val height = Math.min(metrics.widthPixels, metrics.heightPixels)
+                val width = metrics.widthPixels.coerceAtLeast(metrics.heightPixels)
+                val height = metrics.widthPixels.coerceAtMost(metrics.heightPixels)
                 addNativeResolutionEntries(width, height, false)
             }
 
@@ -1469,7 +1472,7 @@ class StreamSettings : AppCompatActivity() {
 
                         // If this is native frame rate, show the warning dialog
                         val values = (preference as ListPreference).entryValues
-                        if (nativeFramerateShown && values[values.size - 1].toString() == newValue.toString()) {
+                        if (nativeFramerateShown && values[values.size - 1].toString() == newValue) {
                             Dialog.displayDialog(requireActivity(),
                                     resources.getString(R.string.title_native_fps_dialog),
                                     resources.getString(R.string.text_native_res_dialog),
@@ -1549,7 +1552,8 @@ class StreamSettings : AppCompatActivity() {
 
             findPreference<Preference>(PreferenceConfiguration.ABOUT_AUTHOR)!!.onPreferenceClickListener =
                     Preference.OnPreferenceClickListener {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.author_web)))
+                        val intent = Intent(Intent.ACTION_VIEW,
+                            getString(R.string.author_web).toUri())
                         startActivity(intent)
                         true
                     }
@@ -1579,47 +1583,89 @@ class StreamSettings : AppCompatActivity() {
 
                 // 强制设置为本地鼠标指针模式
                 val prefs = PreferenceManager.getDefaultSharedPreferences(this@SettingsFragment.requireActivity())
-                val editor = prefs.edit()
-                editor.putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, false)
-                editor.putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, false)
-                editor.putBoolean(PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, true)
-                editor.apply()
+                prefs.edit {
+                    putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, false)
+                    putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, false)
+                    putBoolean(
+                        PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
+                        true
+                    )
+                }
             }
 
             // 添加本地鼠标模式预设选择监听器
             mouseModePresetPref.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
                 val preset = newValue as String
                 val prefs = PreferenceManager.getDefaultSharedPreferences(this@SettingsFragment.requireActivity())
-                val editor = prefs.edit()
+                prefs.edit {
 
-                // 根据预设值自动设置相关配置
-                when (preset) {
-                    "enhanced" -> {
-                        // 增强式多点触控
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, true)
-                        editor.putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, false)
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, false)
-                    }
-                    "classic" -> {
-                        // 经典鼠标模式
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, false)
-                        editor.putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, false)
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, false)
-                    }
-                    "trackpad" -> {
-                        // 触控板模式
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, false)
-                        editor.putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, true)
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, false)
-                    }
-                    "native" -> {
-                        // 本地鼠标指针
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, false)
-                        editor.putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, false)
-                        editor.putBoolean(PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, true)
+                    // 根据预设值自动设置相关配置
+                    when (preset) {
+                        "enhanced" -> {
+                            // 增强式多点触控
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
+                                true
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
+                                false
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
+                                false
+                            )
+                        }
+
+                        "classic" -> {
+                            // 经典鼠标模式
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
+                                false
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
+                                false
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
+                                false
+                            )
+                        }
+
+                        "trackpad" -> {
+                            // 触控板模式
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
+                                false
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
+                                true
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
+                                false
+                            )
+                        }
+
+                        "native" -> {
+                            // 本地鼠标指针
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
+                                false
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
+                                false
+                            )
+                            putBoolean(
+                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
+                                true
+                            )
+                        }
                     }
                 }
-                editor.apply()
 
                 // 显示提示信息
                 val presetName = when (preset) {
@@ -1672,7 +1718,7 @@ class StreamSettings : AppCompatActivity() {
             @Suppress("DEPRECATION")
             super.onActivityResult(requestCode, resultCode, data)
             //导出配置文件
-            if (requestCode == 1 && resultCode == Activity.RESULT_OK) {
+            if (requestCode == 1 && resultCode == RESULT_OK) {
                 val uri = data?.data
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -1690,7 +1736,7 @@ class StreamSettings : AppCompatActivity() {
                 }
             }
             //导入配置文件
-            if (requestCode == 2 && resultCode == Activity.RESULT_OK) {
+            if (requestCode == 2 && resultCode == RESULT_OK) {
                 val importUri = data?.data
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -1733,7 +1779,7 @@ class StreamSettings : AppCompatActivity() {
                 }
             }
 
-            if (requestCode == 3 && resultCode == Activity.RESULT_OK) {
+            if (requestCode == 3 && resultCode == RESULT_OK) {
                 val importUri = data?.data
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -1762,7 +1808,7 @@ class StreamSettings : AppCompatActivity() {
             }
 
             // 处理本地图片选择
-            if (requestCode == LocalImagePickerPreference.PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK) {
+            if (requestCode == LocalImagePickerPreference.PICK_IMAGE_REQUEST && resultCode == RESULT_OK) {
                 val pickerPreference = LocalImagePickerPreference.instance
                 pickerPreference?.handleImagePickerResult(data)
             }
@@ -1774,8 +1820,8 @@ class StreamSettings : AppCompatActivity() {
 
         // Limit decoded bitmap size to screen dimensions to avoid
         // "Canvas: trying to draw too large bitmap" on older devices
-        val width = Math.max(resources.displayMetrics.widthPixels, 1)
-        val height = Math.max(resources.displayMetrics.heightPixels, 1)
+        val width = resources.displayMetrics.widthPixels.coerceAtLeast(1)
+        val height = resources.displayMetrics.heightPixels.coerceAtLeast(1)
 
         Thread {
             UpdateManager.ensureProxyListUpdated(this)

@@ -25,7 +25,6 @@ import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
 import com.limelight.nvstream.http.PairingManager
-import com.limelight.nvstream.http.PairingManager.PairResult
 import com.limelight.nvstream.http.PairingManager.PairState
 import com.limelight.nvstream.wol.WakeOnLanSender
 import com.limelight.preferences.AddComputerManually
@@ -61,7 +60,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 import com.google.zxing.integration.android.IntentIntegrator
-import com.google.zxing.integration.android.IntentResult
 
 import org.json.JSONException
 import org.json.JSONObject
@@ -71,7 +69,6 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.AlertDialog
-import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -79,7 +76,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.SharedPreferences
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -114,6 +110,7 @@ import android.view.View
 import android.view.animation.AnimationUtils
 import android.view.animation.LayoutAnimationController
 import android.widget.AbsListView
+import android.widget.AdapterView
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.GridView
 import android.widget.ImageButton
@@ -121,12 +118,16 @@ import android.widget.ImageView
 import android.widget.RelativeLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 import jp.wasabeef.glide.transformations.BlurTransformation
 import jp.wasabeef.glide.transformations.ColorFilterTransformation
+import androidx.core.content.edit
+import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.net.toUri
 
 class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, EasyTierController.VpnPermissionCallback {
 
@@ -390,7 +391,9 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         analyticsManager?.logAppLaunch()
         UpdateManager.checkForUpdatesOnStartup(this)
 
-        bindService(Intent(this, ComputerManagerService::class.java), serviceConnection, Service.BIND_AUTO_CREATE)
+        bindService(Intent(this, ComputerManagerService::class.java), serviceConnection,
+            BIND_AUTO_CREATE
+        )
 
         pcGridAdapter = PcGridAdapter(this, PreferenceConfiguration.readPreferences(this))
         pcGridAdapter.setAvatarClickListener { computer, itemView -> handleAvatarClick(computer, itemView) }
@@ -541,7 +544,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private fun currentBackgroundTarget(): String? =
         BackgroundSource.current(this).resolveTarget(this, resources.configuration.orientation)
 
-    /** Glide target normalisation: HTTP URLs go straight, filesystem paths become Files. */
+    /** Glide target normalization: HTTP URLs go straight, filesystem paths become Files. */
     private fun resolveGlideTarget(target: String): Any {
         if (target.startsWith("http")) return target
         val localFile = File(target)
@@ -688,10 +691,11 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         saveImage()
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun requestStoragePermission() {
         try {
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-            intent.data = Uri.parse("package:$packageName")
+            intent.data = "package:$packageName".toUri()
             startActivity(intent)
         } catch (e: Exception) {
             startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
@@ -836,10 +840,10 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         val count = prefs.getInt(REFRESH_COUNT_KEY, 0)
 
         if (today != savedDate) {
-            prefs.edit()
-                    .putString(REFRESH_DATE_KEY, today)
+            prefs.edit {
+                putString(REFRESH_DATE_KEY, today)
                     .putInt(REFRESH_COUNT_KEY, 0)
-                    .apply()
+            }
             return true
         }
         return count < MAX_DAILY_REFRESH
@@ -851,7 +855,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         val savedDate = prefs.getString(REFRESH_DATE_KEY, "")
         val count = prefs.getInt(REFRESH_COUNT_KEY, 0)
 
-        return if (today == savedDate) Math.max(0, MAX_DAILY_REFRESH - count) else MAX_DAILY_REFRESH
+        return if (today == savedDate) 0.coerceAtLeast(MAX_DAILY_REFRESH - count) else MAX_DAILY_REFRESH
     }
 
     private fun incrementRefreshCount() {
@@ -860,10 +864,10 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         val savedDate = prefs.getString(REFRESH_DATE_KEY, "")
         val count = if (today == savedDate) prefs.getInt(REFRESH_COUNT_KEY, 0) else 0
 
-        prefs.edit()
-                .putString(REFRESH_DATE_KEY, today)
+        prefs.edit {
+            putString(REFRESH_DATE_KEY, today)
                 .putInt(REFRESH_COUNT_KEY, count + 1)
-                .apply()
+        }
     }
 
     // Background Receiver Methods
@@ -880,7 +884,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
         val filter = IntentFilter(BackgroundSource.ACTION_REFRESH)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(backgroundImageRefreshReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(backgroundImageRefreshReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(backgroundImageRefreshReceiver, filter)
         }
@@ -1023,9 +1027,9 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         DiskAssetLoader(this).deleteAssetsForComputer(details.uuid!!)
 
         getSharedPreferences(AppView.HIDDEN_APPS_PREF_FILENAME, MODE_PRIVATE)
-                .edit()
-                .remove(details.uuid)
-                .apply()
+                .edit {
+                    remove(details.uuid)
+                }
 
         for (i in 0 until pcGridAdapter.rawCount) {
             val computer = pcGridAdapter.getRawItem(i)
@@ -1177,9 +1181,9 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
             config.put("enablePerfOverlay", prefs.enablePerfOverlay)
 
             getSharedPreferences(SCENE_PREF_NAME, MODE_PRIVATE)
-                    .edit()
-                    .putString(SCENE_KEY_PREFIX + sceneNumber, config.toString())
-                    .apply()
+                    .edit {
+                        putString(SCENE_KEY_PREFIX + sceneNumber, config.toString())
+                    }
 
             showToast(getString(R.string.scene_saved_successfully, sceneNumber))
         } catch (e: JSONException) {
@@ -1201,7 +1205,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
         showToast(getString(R.string.pairing))
         uiScope.launch {
-            var message: String? = null
+            var message: String?
             var success = false
 
             try {
@@ -1254,9 +1258,9 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 success = result.second
                 result.third?.let { (uuid, pairName) ->
                     getSharedPreferences("pair_name_map", MODE_PRIVATE)
-                            .edit()
-                            .putString(uuid, pairName)
-                            .apply()
+                            .edit {
+                                putString(uuid, pairName)
+                            }
                     managerBinder?.invalidateStateForComputer(uuid)
                 }
             } catch (e: UnknownHostException) {
@@ -1277,7 +1281,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 showToast(message)
             }
             if (success) {
-                doAppList(computer, true, false)
+                doAppList(computer, newlyPaired = true, showHiddenGames = false)
             } else {
                 startComputerUpdates()
             }
@@ -1311,7 +1315,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     }
 
     private fun handleQrPairResult(url: String) {
-        val uri = Uri.parse(url)
+        val uri = url.toUri()
         if ("moonlight" != uri.scheme || "pair" != uri.host) {
             showToast(getString(R.string.qr_invalid_code))
             return
@@ -1334,7 +1338,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         showToast(getString(R.string.qr_pairing))
         val finalPort = port
         uiScope.launch {
-            var message: String? = null
+            var message: String?
             var success = false
             var pairedComputer: ComputerDetails? = null
 
@@ -1391,9 +1395,9 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 pairedComputer = result.computer
                 result.saveName?.let { (uuid, pairName) ->
                     getSharedPreferences("pair_name_map", MODE_PRIVATE)
-                        .edit()
-                        .putString(uuid, pairName)
-                        .apply()
+                        .edit {
+                            putString(uuid, pairName)
+                        }
                     managerBinder?.invalidateStateForComputer(uuid)
                 }
             } catch (e: Exception) {
@@ -1406,7 +1410,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
             if (success) {
                 showToast(getString(R.string.qr_pair_success))
                 if (pairedComputer != null) {
-                    doAppList(pairedComputer, true, false)
+                    doAppList(pairedComputer, newlyPaired = true, showHiddenGames = false)
                 } else {
                     startComputerUpdates()
                 }
@@ -1589,8 +1593,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 return@launch
             }
 
-            val appToStart = targetApp
-            ServerHelper.doStart(this@PcView, appToStart, targetComputer, managerBinder!!)
+            ServerHelper.doStart(this@PcView, targetApp, targetComputer, managerBinder!!)
         }
     }
 
@@ -1655,7 +1658,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private fun fallbackToAppList(computer: ComputerDetails) {
         runOnUiThread {
             val target = prepareComputerWithAddress(computer)
-            doAppList(target ?: computer, false, false)
+            doAppList(target ?: computer, newlyPaired = false, showHiddenGames = false)
         }
     }
 
@@ -1677,7 +1680,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
     private fun getFirstAppFromCache(uuid: String): NvApp? {
         val appList = getAppListFromCache(uuid)
-        return if (appList != null && appList.isNotEmpty()) appList[0] else null
+        return if (!appList.isNullOrEmpty()) appList[0] else null
     }
 
     private fun getNvAppById(appId: Int, uuid: String): NvApp? {
@@ -1728,7 +1731,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         val dialog = AddressSelectionDialog(this, computer) { address ->
             val temp = ComputerDetails(computer)
             temp.activeAddress = address
-            doAppList(temp, false, false)
+            doAppList(temp, newlyPaired = false, showHiddenGames = false)
         }
         dialog.show()
     }
@@ -1846,7 +1849,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 true
             }
             FULL_APP_LIST_ID -> {
-                doAppList(details, false, true)
+                doAppList(details, newlyPaired = false, showHiddenGames = true)
                 true
             }
             RESUME_ID -> {
@@ -1969,7 +1972,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
             }
 
             // 从availableAddresses中移除所有IPv6地址
-            details.availableAddresses?.removeIf { ComputerDetails.isIpv6Address(it) }
+            details.availableAddresses.removeIf { ComputerDetails.isIpv6Address(it) }
         }
 
         // 更新数据库
@@ -2054,7 +2057,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
             } else {
                 val temp = prepareComputerWithAddress(computer.details)
                 if (temp != null) {
-                    doAppList(temp, false, false)
+                    doAppList(temp, newlyPaired = false, showHiddenGames = false)
                 } else {
                     showToast(getString(R.string.error_pc_offline))
                 }
@@ -2072,14 +2075,14 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private fun setupEmptyAreaLongPress(listView: AbsListView) {
         val detector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onLongPress(e: MotionEvent) {
-                if (listView.pointToPosition(e.x.toInt(), e.y.toInt()) == android.widget.AdapterView.INVALID_POSITION) {
+                if (listView.pointToPosition(e.x.toInt(), e.y.toInt()) == AdapterView.INVALID_POSITION) {
                     saveImageWithPermissionCheck()
                 }
             }
         })
 
         listView.setOnTouchListener { _, event ->
-            if (listView.pointToPosition(event.x.toInt(), event.y.toInt()) == android.widget.AdapterView.INVALID_POSITION) {
+            if (listView.pointToPosition(event.x.toInt(), event.y.toInt()) == AdapterView.INVALID_POSITION) {
                 detector.onTouchEvent(event)
             }
             false
@@ -2093,7 +2096,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         val spacingPx = (15f * density).toInt()
         val minColumnPx = (180f * density).toInt()
 
-        val numColumns = Math.max(1, (availableWidth + spacingPx) / (minColumnPx + spacingPx))
+        val numColumns = 1.coerceAtLeast((availableWidth + spacingPx) / (minColumnPx + spacingPx))
         val columnWidth = (availableWidth - (numColumns - 1) * spacingPx) / numColumns
 
         gridView.columnWidth = columnWidth
@@ -2120,10 +2123,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         // PcView 继承自 Activity 而非 AppCompatActivity，在 Android 6 等设备上使用
         // R.style.AppDialogStyle（父主题为 Theme.AppCompat.Light.Dialog.Alert）会触发
         // "You need to use a Theme.AppCompat theme" 类崩溃，故此处使用系统 Material 对话框主题。
-        val dialogTheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            android.R.style.Theme_Material_Light_Dialog_Alert
-        else
-            android.R.style.Theme_DeviceDefault_Light_Dialog_Alert
+        val dialogTheme = android.R.style.Theme_Material_Light_Dialog_Alert
         val dialog = AlertDialog.Builder(this, dialogTheme)
                 .setView(dialogView)
                 .setPositiveButton(R.string.about_dialog_github) { _, _ -> openUrl("https://github.com/qiin2333/moonlight-vplus") }
@@ -2140,7 +2140,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private fun getVersionInfo(): String {
         try {
             val info = packageManager.getPackageInfo(packageName, 0)
-            return String.format("Version %s (Build %d)", info.versionName, androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(info))
+            return String.format("Version %s (Build %d)", info.versionName, PackageInfoCompat.getLongVersionCode(info))
         } catch (e: PackageManager.NameNotFoundException) {
             return "Version Unknown"
         }
@@ -2159,7 +2159,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
     private fun openUrl(url: String) {
         try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             startActivity(intent)
         } catch (ignored: Exception) {
@@ -2169,7 +2169,8 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     fun joinQQGroup(key: String) {
         try {
             val intent = Intent()
-            intent.data = Uri.parse("mqqopensdkapi://bizAgent/qm/qr?url=http%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Ffrom%3Dapp%26p%3Dandroid%26jump_from%3Dwebapi%26k%3D$key")
+            intent.data =
+                "mqqopensdkapi://bizAgent/qm/qr?url=http%3A%2F%2Fqm.qq.com%2Fcgi-bin%2Fqm%2Fqr%3Ffrom%3Dapp%26p%3Dandroid%26jump_from%3Dwebapi%26k%3D$key".toUri()
             startActivity(intent)
         } catch (ignored: Exception) {
         }
@@ -2213,9 +2214,6 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     // Inner Classes
 
     class ComputerObject(var details: ComputerDetails) {
-        init {
-            requireNotNull(details) { "details must not be null" }
-        }
 
         override fun toString(): String {
             return details.name!!

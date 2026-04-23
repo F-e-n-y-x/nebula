@@ -2,12 +2,8 @@ package com.limelight
 
 import android.app.AlertDialog
 import android.content.Context
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
@@ -17,6 +13,7 @@ import android.widget.TextView
 import android.widget.Toast
 
 import com.limelight.nvstream.NvConnection
+import androidx.core.content.edit
 
 /**
  * Encapsulates the bitrate adjustment card logic shown in the Game Menu dialog.
@@ -57,7 +54,7 @@ class BitrateCardController(
 
         fun setHapticMode(context: Context, mode: HapticMode) {
             context.getSharedPreferences("game_menu_prefs", Context.MODE_PRIVATE)
-                .edit().putInt(PREF_HAPTIC_MODE, mode.ordinal).apply()
+                .edit { putInt(PREF_HAPTIC_MODE, mode.ordinal) }
         }
 
         /** Convert seekbar progress (0..59) to bitrate in kbps. */

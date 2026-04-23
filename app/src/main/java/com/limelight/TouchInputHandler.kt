@@ -2,9 +2,11 @@
 package com.limelight
 
 import android.graphics.Point
+import android.os.Build
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.View
+import androidx.annotation.RequiresApi
 import com.limelight.binding.input.touch.AbsoluteTouchContext
 import com.limelight.binding.input.touch.NativeTouchContext
 import com.limelight.binding.input.touch.RelativeTouchContext
@@ -60,6 +62,7 @@ class TouchInputHandler(private val game: Game) {
 
     // ---- 公共入口 ----
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun handleMotionEvent(view: View?, event: MotionEvent): Boolean {
         if (!game.grabbedInput) return false
 
@@ -86,8 +89,8 @@ class TouchInputHandler(private val game: Game) {
                             game.conn?.sendMousePosition(
                                 event.x.toInt().toShort(),
                                 event.y.toInt().toShort(),
-                                (game.streamView?.width?.toShort() ?: 0),
-                                (game.streamView?.height?.toShort() ?: 0)
+                                game.streamView.width.toShort(),
+                                game.streamView.height.toShort()
                             )
                             return true
                         } else {
@@ -210,9 +213,8 @@ class TouchInputHandler(private val game: Game) {
         }
 
         if (eventSource and InputDevice.SOURCE_CLASS_JOYSTICK != 0) {
-            return game.controllerHandler?.handleMotionEvent(event) == true
-        } else if (deviceSources and InputDevice.SOURCE_CLASS_JOYSTICK != 0 &&
-            game.controllerHandler?.tryHandleTouchpadEvent(event) == true
+            return game.controllerHandler.handleMotionEvent(event)
+        } else if (deviceSources and InputDevice.SOURCE_CLASS_JOYSTICK != 0 && game.controllerHandler.tryHandleTouchpadEvent(event)
         ) {
             return true
         } else if ((eventSource and InputDevice.SOURCE_CLASS_POINTER != 0) ||
@@ -343,6 +345,18 @@ class TouchInputHandler(private val game: Game) {
                                     lastAbsTouchDownY = event.getY(0)
                                     game.conn?.sendMouseButtonDown(MouseButtonPacket.BUTTON_RIGHT)
                                 }
+
+                                MotionEvent.TOOL_TYPE_FINGER -> {
+                                    TODO()
+                                }
+
+                                MotionEvent.TOOL_TYPE_MOUSE -> {
+                                    TODO()
+                                }
+
+                                MotionEvent.TOOL_TYPE_UNKNOWN -> {
+                                    TODO()
+                                }
                             }
                         }
                         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -358,6 +372,18 @@ class TouchInputHandler(private val game: Game) {
                                     lastAbsTouchUpX = event.getX(0)
                                     lastAbsTouchUpY = event.getY(0)
                                     game.conn?.sendMouseButtonUp(MouseButtonPacket.BUTTON_RIGHT)
+                                }
+
+                                MotionEvent.TOOL_TYPE_FINGER -> {
+                                    TODO()
+                                }
+
+                                MotionEvent.TOOL_TYPE_MOUSE -> {
+                                    TODO()
+                                }
+
+                                MotionEvent.TOOL_TYPE_UNKNOWN -> {
+                                    TODO()
                                 }
                             }
                         }
@@ -428,7 +454,7 @@ class TouchInputHandler(private val game: Game) {
                         }
 
                         if (event.pointerCount == 1 &&
-                            (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
+                            (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                                 (event.flags and MotionEvent.FLAG_CANCELED) == 0)
                         ) {
                             if (twoFingerTapPending && !twoFingerMoved && game.prefConfig.touchscreenTrackpad) {
@@ -451,7 +477,7 @@ class TouchInputHandler(private val game: Game) {
                             }
                         }
 
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                             (event.flags and MotionEvent.FLAG_CANCELED) != 0
                         ) {
                             context.cancelTouch()
@@ -635,8 +661,8 @@ class TouchInputHandler(private val game: Game) {
         val minorCart = polarToCartesian(contactAreaMinor, (orientation + (Math.PI / 2).toFloat()))
 
         val refView = game.activeStreamView
-        val refWidth = if (refView != null && refView.width > 0) refView.width else game.streamView?.width?.coerceAtLeast(1) ?: 1
-        val refHeight = if (refView != null && refView.height > 0) refView.height else game.streamView?.height?.coerceAtLeast(1) ?: 1
+        val refWidth = if (refView != null && refView.width > 0) refView.width else game.streamView.width.coerceAtLeast(1)
+        val refHeight = if (refView != null && refView.height > 0) refView.height else game.streamView.height.coerceAtLeast(1)
 
         majorCart[0] = abs(majorCart[0]).coerceAtMost(refWidth.toFloat()) / refWidth
         minorCart[0] = abs(minorCart[0]).coerceAtMost(refWidth.toFloat()) / refWidth
@@ -734,48 +760,55 @@ class TouchInputHandler(private val game: Game) {
         val eventType = getLiTouchTypeFromEvent(event)
         if (eventType < 0) return false
 
-        if (event.actionMasked == MotionEvent.ACTION_MOVE) {
-            for (i in 0 until event.pointerCount) {
-                if (game.prefConfig.enableEnhancedTouch) {
-                    nativeTouchPointerMap[event.getPointerId(i)]?.updatePointerCoords(event, i)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                for (i in 0 until event.pointerCount) {
+                    if (game.prefConfig.enableEnhancedTouch) {
+                        nativeTouchPointerMap[event.getPointerId(i)]?.updatePointerCoords(event, i)
+                    }
+                    if (!sendTouchEventForPointer(view, event, eventType, i)) return false
                 }
-                if (!sendTouchEventForPointer(view, event, eventType, i)) return false
+                return true
             }
-            return true
-        } else if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
-            return game.conn?.sendTouchEvent(
-                MoonBridge.LI_TOUCH_EVENT_CANCEL_ALL, 0,
-                0f, 0f, 0f, 0f, 0f,
-                MoonBridge.LI_ROT_UNKNOWN
-            ) != MoonBridge.LI_ERR_UNSUPPORTED
-        } else {
-            val actionIndex = event.actionIndex
-            when (event.actionMasked) {
-                MotionEvent.ACTION_POINTER_DOWN -> {
-                    multiFingerTapChecker(event)
-                    if (game.prefConfig.enableEnhancedTouch) {
-                        val pointer = NativeTouchContext.Pointer(event)
-                        nativeTouchPointerMap[pointer.pointerId] = pointer
-                    }
-                }
-                MotionEvent.ACTION_DOWN -> {
-                    if (game.prefConfig.enableEnhancedTouch) {
-                        val pointer = NativeTouchContext.Pointer(event)
-                        nativeTouchPointerMap[pointer.pointerId] = pointer
-                    }
-                }
-                MotionEvent.ACTION_UP -> {
-                    if (event.eventTime - multiFingerDownTime < MULTI_FINGER_TAP_THRESHOLD) {
-                        game.toggleKeyboard()
-                    }
-                }
-                MotionEvent.ACTION_POINTER_UP -> {
-                    if (game.prefConfig.enableEnhancedTouch) {
-                        nativeTouchPointerMap.remove(event.getPointerId(actionIndex))
-                    }
-                }
+            MotionEvent.ACTION_CANCEL -> {
+                return game.conn?.sendTouchEvent(
+                    MoonBridge.LI_TOUCH_EVENT_CANCEL_ALL, 0,
+                    0f, 0f, 0f, 0f, 0f,
+                    MoonBridge.LI_ROT_UNKNOWN
+                ) != MoonBridge.LI_ERR_UNSUPPORTED
             }
-            return sendTouchEventForPointer(view, event, eventType, actionIndex)
+            else -> {
+                val actionIndex = event.actionIndex
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_POINTER_DOWN -> {
+                        multiFingerTapChecker(event)
+                        if (game.prefConfig.enableEnhancedTouch) {
+                            val pointer = NativeTouchContext.Pointer(event)
+                            nativeTouchPointerMap[pointer.pointerId] = pointer
+                        }
+                    }
+
+                    MotionEvent.ACTION_DOWN -> {
+                        if (game.prefConfig.enableEnhancedTouch) {
+                            val pointer = NativeTouchContext.Pointer(event)
+                            nativeTouchPointerMap[pointer.pointerId] = pointer
+                        }
+                    }
+
+                    MotionEvent.ACTION_UP -> {
+                        if (event.eventTime - multiFingerDownTime < MULTI_FINGER_TAP_THRESHOLD) {
+                            game.toggleKeyboard()
+                        }
+                    }
+
+                    MotionEvent.ACTION_POINTER_UP -> {
+                        if (game.prefConfig.enableEnhancedTouch) {
+                            nativeTouchPointerMap.remove(event.getPointerId(actionIndex))
+                        }
+                    }
+                }
+                return sendTouchEventForPointer(view, event, eventType, actionIndex)
+            }
         }
     }
 

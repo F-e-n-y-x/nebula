@@ -135,7 +135,7 @@ object NetHelper {
 
     @SuppressLint("DefaultLocale")
     fun calculateBandwidth(currentRxBytes: Long, previousRxBytes: Long, timeInterval: Long): String {
-        if (timeInterval <= 0 || timeInterval > 5000) return "N/A"
+        if (timeInterval !in 1..5000) return "N/A"
         if (currentRxBytes < 0 || previousRxBytes < 0) return "N/A"
 
         val rxBytesDifference = currentRxBytes - previousRxBytes

@@ -30,26 +30,24 @@ import com.limelight.nvstream.av.video.VideoDecoderRenderer
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.HostHttpResponseException
 import com.limelight.nvstream.http.LimelightCryptoProvider
-import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
 import com.limelight.nvstream.http.PairingManager
 import com.limelight.nvstream.input.MouseButtonPacket
 import com.limelight.nvstream.jni.MoonBridge
 
-class NvConnection constructor(
+open class NvConnection(
     private val appContext: Context,
     host: ComputerDetails.AddressTuple,
     httpsPort: Int,
-    uniqueId: String,
+    private val uniqueId: String,
     pairName: String,
     config: StreamConfiguration,
     private val cryptoProvider: LimelightCryptoProvider,
     serverCert: X509Certificate?,
     displayName: String? = null
 ) {
-    private val uniqueId: String = uniqueId
-    private val clientName: String = if (pairName.isNotEmpty()) pairName
-        else Settings.Global.getString(appContext.contentResolver, "device_name")
+    private val clientName: String =
+        pairName.ifEmpty { Settings.Global.getString(appContext.contentResolver, "device_name") }
     private val context: ConnectionContext = ConnectionContext()
     private val isMonkey: Boolean = ActivityManager.isUserAMonkey()
 
@@ -192,10 +190,6 @@ class NvConnection constructor(
         val serverInfo = h.getServerInfo(true)
 
         context.serverAppVersion = h.getServerVersion(serverInfo)
-        if (context.serverAppVersion == null) {
-            connListener.displayMessage("Server version malformed")
-            return false
-        }
 
         val details = h.getComputerDetails(serverInfo)
         context.isNvidiaServerSoftware = details.nvidiaServer
@@ -344,7 +338,7 @@ class NvConnection constructor(
                 context.connListener.stageComplete(appName)
             } catch (e: HostHttpResponseException) {
                 e.printStackTrace()
-                context.connListener.displayMessage(e.message ?: "")
+                context.connListener.displayMessage(e.message)
                 context.connListener.stageFailed(appName, 0, e.getErrorCode())
                 return@Thread
             } catch (e: XmlPullParserException) {

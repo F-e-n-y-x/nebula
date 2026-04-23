@@ -36,6 +36,10 @@ import com.limelight.ui.StreamView
 import com.limelight.utils.NetHelper
 import com.limelight.utils.MoonPhaseUtils
 import com.limelight.utils.UiHelper
+import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.sqrt
+import androidx.core.content.edit
 
 class PerformanceOverlayManager(
     private val activity: Activity,
@@ -560,6 +564,7 @@ class PerformanceOverlayManager(
         return prefConfig.perfOverlayOrientation == PreferenceConfiguration.PerfOverlayOrientation.VERTICAL
     }
 
+    @SuppressLint("RtlHardcoded")
     private fun configurePerformanceOverlay() {
         val overlay = performanceOverlayView ?: return
 
@@ -623,7 +628,6 @@ class PerformanceOverlayManager(
     }
 
     private fun configureTextAlignment() {
-        val overlay = performanceOverlayView ?: return
 
         val isVertical = isEffectiveVerticalLayout()
         val isRightSide = determineRightSidePosition(isVertical)
@@ -697,7 +701,7 @@ class PerformanceOverlayManager(
         val shortSide = minOf(dm.widthPixels, dm.heightPixels)
         val shortSideDp = shortSide / dm.density
         val referenceDp = 411f
-        val scaleFactor = Math.sqrt((shortSideDp / referenceDp).toDouble()).toFloat()
+        val scaleFactor = sqrt((shortSideDp / referenceDp).toDouble()).toFloat()
         val targetPx = baseSizeSp * dm.density * scaleFactor
         return targetPx.coerceIn(8f, 40f)
     }
@@ -1062,9 +1066,9 @@ class PerformanceOverlayManager(
 
     private fun saveLayoutOrientation() {
         val prefs = activity.getSharedPreferences("performance_overlay", Activity.MODE_PRIVATE)
-        prefs.edit()
-            .putString("layout_orientation", prefConfig.perfOverlayOrientation.name)
-            .apply()
+        prefs.edit {
+            putString("layout_orientation", prefConfig.perfOverlayOrientation.name)
+        }
     }
 
     private fun loadLayoutOrientation() {
@@ -1081,8 +1085,8 @@ class PerformanceOverlayManager(
     }
 
     private fun isClick(event: MotionEvent): Boolean {
-        val deltaX = Math.abs(event.rawX - perfOverlayStartX)
-        val deltaY = Math.abs(event.rawY - perfOverlayStartY)
+        val deltaX = abs(event.rawX - perfOverlayStartX)
+        val deltaY = abs(event.rawY - perfOverlayStartY)
         val deltaTime = System.currentTimeMillis() - clickStartTime
         return deltaX < CLICK_THRESHOLD && deltaY < CLICK_THRESHOLD && deltaTime < 500
     }
@@ -1115,9 +1119,9 @@ class PerformanceOverlayManager(
         var minDistance = Double.MAX_VALUE
 
         for (i in snapPositions.indices) {
-            val distance = Math.sqrt(
-                Math.pow((currentX - snapPositions[i][0]).toDouble(), 2.0) +
-                    Math.pow((currentY - snapPositions[i][1]).toDouble(), 2.0)
+            val distance = sqrt(
+                (currentX - snapPositions[i][0]).toDouble().pow(2.0) +
+                        (currentY - snapPositions[i][1]).toDouble().pow(2.0)
             )
             if (distance < minDistance) {
                 minDistance = distance
@@ -1163,11 +1167,11 @@ class PerformanceOverlayManager(
 
     private fun savePerformanceOverlayPosition(x: Int, y: Int) {
         val prefs = activity.getSharedPreferences("performance_overlay", Activity.MODE_PRIVATE)
-        prefs.edit()
-            .putBoolean("has_custom_position", true)
-            .putInt("left_margin", x)
-            .putInt("top_margin", y)
-            .apply()
+        prefs.edit {
+            putBoolean("has_custom_position", true)
+                .putInt("left_margin", x)
+                .putInt("top_margin", y)
+        }
     }
 
     private fun getViewDimensions(view: View): IntArray {
