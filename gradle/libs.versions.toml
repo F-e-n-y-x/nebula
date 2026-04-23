@@ -2,7 +2,7 @@
 agp = "9.2.0"
 kotlin = "2.2.10"
 google-services = "4.4.4"
-firebase-crashlytics-gradle = "2.9.9"
+firebase-crashlytics-gradle = "3.0.5"
 desugar = "2.1.5"
 bouncycastle = "1.83"
 jcodec = "0.2.5"
