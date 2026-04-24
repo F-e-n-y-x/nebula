@@ -651,6 +651,12 @@ class StreamSettings : AppCompatActivity() {
         // 标记是否正在手动滚动（点击分类触发的滚动）
         private var isManualScrolling = false
 
+        // 缓存 category -> adapter position 映射，避免每帧 O(N*M) 全表扫
+        // 仅在数据集变化时失效；滚动期间复用
+        private var categoryPositions: IntArray = IntArray(0)
+        private var categoryPositionsValid = false
+        private var adapterDataObserver: RecyclerView.AdapterDataObserver? = null
+
         /**
          * 获取目标显示器（优先使用外接显示器）
          */
@@ -947,6 +953,20 @@ class StreamSettings : AppCompatActivity() {
          * 设置滚动监听
          */
         private fun setupScrollListener(recyclerView: RecyclerView, settingsActivity: StreamSettings) {
+            // 注册数据集变化监听，仅在数据集变化时失效缓存的 category positions
+            val adapter = recyclerView.adapter
+            if (adapter != null && adapterDataObserver == null) {
+                val observer = object : RecyclerView.AdapterDataObserver() {
+                    override fun onChanged() { categoryPositionsValid = false }
+                    override fun onItemRangeChanged(positionStart: Int, itemCount: Int) { categoryPositionsValid = false }
+                    override fun onItemRangeInserted(positionStart: Int, itemCount: Int) { categoryPositionsValid = false }
+                    override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) { categoryPositionsValid = false }
+                    override fun onItemRangeMoved(fromPosition: Int, toPosition: Int, itemCount: Int) { categoryPositionsValid = false }
+                }
+                adapter.registerAdapterDataObserver(observer)
+                adapterDataObserver = observer
+            }
+
             recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
                     if (newState == RecyclerView.SCROLL_STATE_IDLE) {
@@ -964,8 +984,58 @@ class StreamSettings : AppCompatActivity() {
             updateVisibleCategory(recyclerView, settingsActivity)
         }
 
+        override fun onDestroyView() {
+            // 注销 adapter observer，避免泄漏
+            val obs = adapterDataObserver
+            if (obs != null) {
+                try {
+                    listView?.adapter?.unregisterAdapterDataObserver(obs)
+                } catch (_: Exception) {
+                }
+                adapterDataObserver = null
+            }
+            categoryPositionsValid = false
+            super.onDestroyView()
+        }
+
+        /**
+         * 一次性扫描 adapter，建立 category preference -> position 的映射缓存。
+         * 避免每个滚动帧都做 O(categories * itemCount) 全表扫描。
+         */
+        @SuppressLint("RestrictedApi")
+        private fun ensureCategoryPositions(recyclerView: RecyclerView): Boolean {
+            if (categoryPositionsValid && categoryPositions.size == categoryList.size) {
+                return true
+            }
+            val adapter = recyclerView.adapter as? PreferenceGroupAdapter ?: return false
+            val n = categoryList.size
+            if (categoryPositions.size != n) {
+                categoryPositions = IntArray(n) { -1 }
+            } else {
+                for (i in 0 until n) categoryPositions[i] = -1
+            }
+            // 用引用比较的 IdentityHashMap 反查表，单次 O(itemCount)
+            val targets = java.util.IdentityHashMap<Preference, Int>(n * 2)
+            for (i in 0 until n) targets[categoryList[i]] = i
+            val total = adapter.itemCount
+            var found = 0
+            for (i in 0 until total) {
+                val pref = adapter.getItem(i) ?: continue
+                val idx = targets[pref] ?: continue
+                if (categoryPositions[idx] == -1) {
+                    categoryPositions[idx] = i
+                    found++
+                    if (found >= n) break
+                }
+            }
+            categoryPositionsValid = true
+            return true
+        }
+
         /**
          * 更新当前可见分类
+         * 使用缓存的 categoryPositions 配合 firstVisiblePosition 做 O(N) 单次扫描，
+         * 替代原先每帧 O(categories * adapter.itemCount) 的全表扫。
          */
         private fun updateVisibleCategory(recyclerView: RecyclerView?, settingsActivity: StreamSettings) {
             if (recyclerView == null || categoryList.isEmpty()) return
@@ -973,20 +1043,31 @@ class StreamSettings : AppCompatActivity() {
             val lm = recyclerView.layoutManager
             if (lm !is LinearLayoutManager) return
 
+            if (!ensureCategoryPositions(recyclerView)) return
+
             val firstVisiblePosition = lm.findFirstVisibleItemPosition()
-            val lastVisiblePosition = lm.findLastVisibleItemPosition()
+            if (firstVisiblePosition < 0) return
 
+            // 找到最大的 position <= firstVisiblePosition 的 category
+            // categoryPositions 通常按 adapter 顺序递增，但保险起见线性扫描（N ~ 15）
             var newCategoryIndex = -1
-            var categoryPosition = -1
-
-            for (i in categoryList.indices) {
-                val category = categoryList[i]
-                val position = findAdapterPositionForPreference(category)
-
-                if (position >= 0 && position <= lastVisiblePosition &&
-                        (position >= firstVisiblePosition || position > categoryPosition)) {
+            var bestPosition = -1
+            for (i in 0 until categoryPositions.size) {
+                val p = categoryPositions[i]
+                if (p in 0..firstVisiblePosition && p > bestPosition) {
+                    bestPosition = p
                     newCategoryIndex = i
-                    categoryPosition = position
+                }
+            }
+            // 若所有 category 都在 first 之后，则取第一个可见的
+            if (newCategoryIndex < 0) {
+                val lastVisible = lm.findLastVisibleItemPosition()
+                for (i in 0 until categoryPositions.size) {
+                    val p = categoryPositions[i]
+                    if (p in 0..lastVisible) {
+                        newCategoryIndex = i
+                        break
+                    }
                 }
             }
 
@@ -1005,6 +1086,11 @@ class StreamSettings : AppCompatActivity() {
         private fun findAdapterPositionForPreference(target: Preference?): Int {
             val recyclerView = listView ?: return -1
             if (target == null) return -1
+            // 优先走缓存
+            if (categoryPositionsValid && categoryPositions.size == categoryList.size) {
+                val idx = categoryList.indexOfFirst { it === target }
+                if (idx >= 0) return categoryPositions[idx]
+            }
             val adapter = recyclerView.adapter
             if (adapter is PreferenceGroupAdapter) {
                 for (i in 0 until adapter.itemCount) {
