@@ -55,8 +55,15 @@ import java.io.IOException
 import java.io.InputStreamReader
 import java.util.*
 
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.MultiTransformation
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
 import jp.wasabeef.glide.transformations.BlurTransformation
 import jp.wasabeef.glide.transformations.ColorFilterTransformation
 import androidx.core.graphics.toColorInt
@@ -1909,25 +1916,86 @@ class StreamSettings : AppCompatActivity() {
         val width = resources.displayMetrics.widthPixels.coerceAtLeast(1)
         val height = resources.displayMetrics.heightPixels.coerceAtLeast(1)
 
+        // 模糊 + 半透明黑色蒙版，单次解码完成（合并到一个 Glide pipeline）
+        val transformations = MultiTransformation<Bitmap>(
+                BlurTransformation(2, 3),
+                ColorFilterTransformation(Color.argb(120, 0, 0, 0))
+        )
+        val options = RequestOptions()
+                .override(width, height)
+                .transform(transformations)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+
+        // 候选 URL（含原始与所有代理变体）。Glide 缓存键以 URL 为基础，
+        // 因此可能上次走代理 A 命中、原始 URL 在缓存中并不存在；这里逐个尝试，
+        // 任一变体在缓存中就立即贴图，体验等同本地资源。
+        val candidates = mutableListOf<String>().apply {
+            add(SETTINGS_BG_URL)
+            try { addAll(UpdateManager.buildProxiedUrls(SETTINGS_BG_URL)) } catch (_: Exception) {}
+        }.distinct()
+
+        tryCachedThenNetwork(imageView, options, candidates, 0)
+    }
+
+    /**
+     * 依次对候选 URL 做 onlyRetrieveFromCache 同步缓存查询：
+     *   - 命中：直接贴图，无线程切换、无渐入，体验秒开
+     *   - 全部未命中：转入网络下载路径，下载完成后带 crossFade 渐入
+     */
+    private fun tryCachedThenNetwork(
+            imageView: ImageView,
+            options: RequestOptions,
+            candidates: List<String>,
+            index: Int
+    ) {
+        if (isDestroyed || isFinishing) return
+        if (index >= candidates.size) {
+            loadBackgroundImageFromNetwork(imageView, options, candidates)
+            return
+        }
+        Glide.with(this)
+                .load(candidates[index])
+                .apply(options.clone().onlyRetrieveFromCache(true))
+                .into(object : CustomTarget<Drawable>() {
+                    override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
+                        imageView.setImageDrawable(resource)
+                    }
+                    override fun onLoadCleared(placeholder: Drawable?) {}
+                    override fun onLoadFailed(errorDrawable: Drawable?) {
+                        tryCachedThenNetwork(imageView, options, candidates, index + 1)
+                    }
+                })
+    }
+
+    private fun loadBackgroundImageFromNetwork(
+            imageView: ImageView,
+            options: RequestOptions,
+            preBuiltCandidates: List<String>?
+    ) {
         Thread {
+            // 代理列表可能在调用前还未就绪，需要刷新一次
             UpdateManager.ensureProxyListUpdated(this)
-            val candidates = UpdateManager.buildProxiedUrls(SETTINGS_BG_URL)
+            val candidates = preBuiltCandidates?.takeIf { it.isNotEmpty() }
+                    ?: UpdateManager.buildProxiedUrls(SETTINGS_BG_URL)
             for (url in candidates) {
                 try {
                     if (isDestroyed || isFinishing) return@Thread
-                    val bitmap = Glide.with(applicationContext)
-                            .asBitmap()
+                    // 后台同步预热：把图解码到 Glide 缓存中（包含 blur+mask 变换）；
+                    // 失败则尝试下一条代理，不会污染 UI
+                    val ready = Glide.with(applicationContext)
+                            .asDrawable()
                             .load(url)
-                            .override(width, height)
+                            .apply(options)
                             .submit()
                             .get()
-                    if (bitmap != null) {
+                    if (ready != null) {
                         runOnUiThread {
                             if (isDestroyed || isFinishing) return@runOnUiThread
-                            Glide.with(this@StreamSettings as Context)
-                                    .load(bitmap)
-                                    .apply(RequestOptions.bitmapTransform(BlurTransformation(2, 3)))
-                                    .transform(ColorFilterTransformation(Color.argb(120, 0, 0, 0)))
+                            // 用同一份缓存渲染，加 400ms 渐入避免突兀 pop-in
+                            Glide.with(this@StreamSettings)
+                                    .load(url)
+                                    .apply(options)
+                                    .transition(DrawableTransitionOptions.withCrossFade(400))
                                     .into(imageView)
                         }
                         return@Thread
