@@ -11,14 +11,19 @@
         android:layout_height="match_parent"
         android:scaleType="centerCrop" />
 
+    <Space
+        android:id="@+id/topSafeArea"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/activity_horizontal_margin"
+        android:layout_alignParentTop="true" />
+
     <RelativeLayout
         android:id="@+id/pcFragmentContainer"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:layout_marginTop="@dimen/activity_horizontal_margin"
+        android:layout_below="@+id/topSafeArea"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentTop="true"
         android:layout_toRightOf="@+id/settingsButton"
         android:layout_toEndOf="@+id/settingsButton"
         android:clickable="false"
@@ -73,10 +78,9 @@
         android:cropToPadding="false"
         android:scaleType="fitCenter"
         android:nextFocusForward="@id/aboutButton"
-        android:layout_marginTop="@dimen/activity_horizontal_margin"
+        android:layout_below="@+id/topSafeArea"
         android:layout_alignParentStart="true"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentTop="true"
         android:src="@drawable/ic_settings"
         style="?android:attr/borderlessButtonStyle"/>
 

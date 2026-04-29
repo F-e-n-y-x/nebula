@@ -116,6 +116,7 @@ import android.widget.GridView
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.RelativeLayout
+import android.widget.Space
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
@@ -128,6 +129,8 @@ import jp.wasabeef.glide.transformations.ColorFilterTransformation
 import androidx.core.content.edit
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, EasyTierController.VpnPermissionCallback {
 
@@ -167,6 +170,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private lateinit var pcGridAdapter: PcGridAdapter
     private var pcListView: AbsListView? = null
     private var backgroundImageView: ImageView? = null
+    private var topSafeArea: Space? = null
 
     // State
     private var isFirstLoad = true
@@ -431,6 +435,15 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             setShouldDockBigOverlays(false)
+        }
+
+        topSafeArea = findViewById(R.id.topSafeArea)
+        topSafeArea?.let {
+            ViewCompat.setOnApplyWindowInsetsListener(it) { v, windowInsets ->
+                val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+                v.layoutParams.height = insets.top
+                windowInsets
+            }
         }
 
         clientName = Settings.Global.getString(contentResolver, "device_name")
