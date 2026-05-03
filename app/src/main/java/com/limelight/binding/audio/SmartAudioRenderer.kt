@@ -34,6 +34,10 @@ class SmartAudioRenderer(
         //   PCM_S16  -> PcmPassthroughRenderer (raw LPCM, lowest latency)
         //   AC3/EAC3 -> Ac3PassthroughRenderer (encoded bitstream to AVR)
         //   OPUS     -> AndroidAudioRenderer (decode + render)
+        //
+        // The user-facing 'audio passthrough' toggle is enforced upstream
+        // in Game.setupAudio by forcing audioCodec=OPUS when disabled, so
+        // we don't need to reinspect that preference here.
         if (codec == MoonBridge.AUDIO_CODEC_PCM_S16) {
             val pcmThru = PcmPassthroughRenderer(context, passthroughBufferBytes)
             val res = pcmThru.setup(audioConfiguration, sampleRate, samplesPerFrame, codec, bitrate)

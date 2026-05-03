@@ -798,7 +798,10 @@ class Game : Activity(), SurfaceHolder.Callback,
             .setAttachedGamepadMask(gamepadMask)
             .setClientRefreshRateX100(clientRefreshRateX100)
             .setAudioConfiguration(prefConfig.audioConfiguration)
-            .setAudioCodec(prefConfig.audioCodec)
+            // When the user has disabled audio passthrough, force-negotiate Opus
+            // so the host sends a decoded stream that AndroidAudioRenderer can play
+            // — bypasses both PcmPassthroughRenderer and Ac3PassthroughRenderer.
+            .setAudioCodec(if (prefConfig.enableAudioPassthrough) prefConfig.audioCodec else MoonBridge.AUDIO_CODEC_OPUS)
             .setAudioBitrate(prefConfig.audioCodecBitrate)
             .setColorSpace(decoderRenderer?.getPreferredColorSpace() ?: 0)
             .setColorRange(

@@ -150,6 +150,8 @@ class PreferenceConfiguration {
     var enableNativeMousePointer = false
     var enableAudioFx = false
     var enableSpatializer = false
+    /** When false, SmartAudioRenderer skips PCM/AC3 passthrough and always uses the software renderer. */
+    var enableAudioPassthrough = false
     var reduceRefreshRate = false
     var fullRange = false
     var gamepadMotionSensors = false
@@ -405,6 +407,8 @@ class PreferenceConfiguration {
 
         private const val ENABLE_AUDIO_FX_PREF_STRING = "checkbox_enable_audiofx"
         private const val ENABLE_SPATIALIZER_PREF_STRING = "checkbox_enable_spatializer"
+        private const val ENABLE_AUDIO_PASSTHROUGH_PREF_STRING = "checkbox_enable_audio_passthrough"
+        private const val DEFAULT_ENABLE_AUDIO_PASSTHROUGH = false
         private const val REDUCE_REFRESH_RATE_PREF_STRING = "checkbox_reduce_refresh_rate"
         private const val FULL_RANGE_PREF_STRING = "checkbox_full_range"
         private const val GAMEPAD_TOUCHPAD_AS_MOUSE_PREF_STRING = "checkbox_gamepad_touchpad_as_mouse"
@@ -1086,6 +1090,7 @@ class PreferenceConfiguration {
             }
             config.enableAudioFx = prefs.getBoolean(ENABLE_AUDIO_FX_PREF_STRING, DEFAULT_ENABLE_AUDIO_FX)
             config.enableSpatializer = prefs.getBoolean(ENABLE_SPATIALIZER_PREF_STRING, DEFAULT_ENABLE_SPATIALIZER)
+            config.enableAudioPassthrough = prefs.getBoolean(ENABLE_AUDIO_PASSTHROUGH_PREF_STRING, DEFAULT_ENABLE_AUDIO_PASSTHROUGH)
             config.reduceRefreshRate = prefs.getBoolean(REDUCE_REFRESH_RATE_PREF_STRING, DEFAULT_REDUCE_REFRESH_RATE)
             config.fullRange = prefs.getBoolean(FULL_RANGE_PREF_STRING, DEFAULT_FULL_RANGE)
             config.gamepadTouchpadAsMouse = prefs.getBoolean(GAMEPAD_TOUCHPAD_AS_MOUSE_PREF_STRING, DEFAULT_GAMEPAD_TOUCHPAD_AS_MOUSE)
