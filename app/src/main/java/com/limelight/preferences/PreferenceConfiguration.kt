@@ -4,6 +4,8 @@ package com.limelight.preferences
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Point
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.os.Build
 import android.view.Display
 import android.view.KeyEvent
@@ -503,6 +505,54 @@ class PreferenceConfiguration {
         private const val DEFAULT_MULTI_CONTROLLER = true
         private const val DEFAULT_USB_DRIVER = true
 
+        private fun isPcmOutputSupported(channelMask: Int): Boolean {
+            return try {
+                AudioTrack.getMinBufferSize(48000, channelMask, AudioFormat.ENCODING_PCM_16BIT) > 0
+            } catch (_: Throwable) {
+                false
+            }
+        }
+
+        private fun isAudioConfigurationSupported(audioConfiguration: MoonBridge.AudioConfiguration): Boolean {
+            val androidChannelMask = when (audioConfiguration.channelCount) {
+                2 -> AudioFormat.CHANNEL_OUT_STEREO
+                6 -> AudioFormat.CHANNEL_OUT_5POINT1
+                8 -> 0x000018fc // AudioFormat.CHANNEL_OUT_7POINT1_SURROUND
+                12 -> 0x0003d8fc // 7.1.4 surround
+                else -> return false
+            }
+            return isPcmOutputSupported(androidChannelMask)
+        }
+
+        private fun coerceSupportedAudioConfiguration(audioConfiguration: MoonBridge.AudioConfiguration): MoonBridge.AudioConfiguration {
+            // Many Android TV firmwares expose 7.1 / 7.1.4 in UI-friendly settings,
+            // but their AudioTrack sink may only accept 7.1, 5.1, or stereo PCM.
+            // If we keep an unsupported channel count, Opus output fails with
+            // renderer error -2. Degrade one step at a time to preserve the best
+            // channel layout the device can actually open.
+            val candidates = when (audioConfiguration.channelCount) {
+                12 -> arrayOf(
+                    MoonBridge.AUDIO_CONFIGURATION_714_SURROUND,
+                    MoonBridge.AUDIO_CONFIGURATION_71_SURROUND,
+                    MoonBridge.AUDIO_CONFIGURATION_51_SURROUND,
+                    MoonBridge.AUDIO_CONFIGURATION_STEREO
+                )
+                8 -> arrayOf(
+                    MoonBridge.AUDIO_CONFIGURATION_71_SURROUND,
+                    MoonBridge.AUDIO_CONFIGURATION_51_SURROUND,
+                    MoonBridge.AUDIO_CONFIGURATION_STEREO
+                )
+                6 -> arrayOf(
+                    MoonBridge.AUDIO_CONFIGURATION_51_SURROUND,
+                    MoonBridge.AUDIO_CONFIGURATION_STEREO
+                )
+                else -> arrayOf(MoonBridge.AUDIO_CONFIGURATION_STEREO)
+            }
+
+            return candidates.firstOrNull { isAudioConfigurationSupported(it) }
+                ?: MoonBridge.AUDIO_CONFIGURATION_STEREO
+        }
+
         private const val ONSCREEN_CONTROLLER_DEFAULT = false
         private const val ONSCREEN_KEYBOARD_DEFAULT = false
         private const val ONLY_L3_R3_DEFAULT = false
@@ -956,6 +1006,9 @@ class PreferenceConfiguration {
             config.enhanceTouchZoneDivider = prefs.getInt(ENHANCED_TOUCH_ZONE_DIVIDER_PREF_STRING, 50) // decides where to divide native touch zone & enhance touch zone
             config.pointerVelocityFactor = prefs.getInt(POINTER_VELOCITY_FACTOR_PREF_STRING, 100).toFloat() // set pointer velocity faster or slower
 
+            val enableAudioPassthrough = prefs.getBoolean(ENABLE_AUDIO_PASSTHROUGH_PREF_STRING, DEFAULT_ENABLE_AUDIO_PASSTHROUGH)
+            config.enableAudioPassthrough = enableAudioPassthrough
+
             val audioConfig = prefs.getString(AUDIO_CONFIG_PREF_STRING, DEFAULT_AUDIO_CONFIG) ?: DEFAULT_AUDIO_CONFIG
             config.audioConfiguration = when (audioConfig) {
                 "714" -> MoonBridge.AUDIO_CONFIGURATION_714_SURROUND
@@ -963,17 +1016,30 @@ class PreferenceConfiguration {
                 "51" -> MoonBridge.AUDIO_CONFIGURATION_51_SURROUND
                 else -> MoonBridge.AUDIO_CONFIGURATION_STEREO
             }
+            config.audioConfiguration = coerceSupportedAudioConfiguration(config.audioConfiguration)
 
-            // Audio codec preference (auto = AC3 for 5.1+ if device supports passthrough, else Opus)
+            // Audio codec preference.
+            //
+            // Auto policy:
+            //   * 2ch  -> PCM_S16: lowest latency and universally supported by Android's mixer.
+            //             Several Android TV firmwares (notably Sony BRAVIA) accept AC3/E-AC3
+            //             AudioTrack creation for stereo but silently render no sound.
+            //   * 5.1  -> AC3: widest AVR / TV passthrough compatibility.
+            //   * 7.1+ -> clamp to 5.1 first: AC3/E-AC3 passthrough is capped at 5.1 in
+            //             our pipeline and the PCM renderer currently supports up to 5.1.
             val audioCodec = prefs.getString(AUDIO_CODEC_PREF_STRING, DEFAULT_AUDIO_CODEC) ?: DEFAULT_AUDIO_CODEC
+            if (enableAudioPassthrough && audioCodec != "opus" && config.audioConfiguration.channelCount > 6) {
+                config.audioConfiguration = MoonBridge.AUDIO_CONFIGURATION_51_SURROUND
+            }
             config.audioCodec = when (audioCodec) {
                 "ac3" -> MoonBridge.AUDIO_CODEC_AC3
                 "eac3" -> MoonBridge.AUDIO_CODEC_EAC3
                 "pcm" -> MoonBridge.AUDIO_CODEC_PCM_S16
                 "opus" -> MoonBridge.AUDIO_CODEC_OPUS
-                else -> {
-                    // "auto": let Game.kt fill in based on device capability + channel count.
-                    MoonBridge.AUDIO_CODEC_OPUS
+                else -> when (config.audioConfiguration.channelCount) {
+                    2 -> MoonBridge.AUDIO_CODEC_PCM_S16
+                    6 -> MoonBridge.AUDIO_CODEC_AC3
+                    else -> MoonBridge.AUDIO_CODEC_AC3
                 }
             }
             val audioPassthroughBuffer = prefs.getString(AUDIO_PASSTHROUGH_BUFFER_PREF_STRING, DEFAULT_AUDIO_PASSTHROUGH_BUFFER) ?: DEFAULT_AUDIO_PASSTHROUGH_BUFFER
@@ -1090,7 +1156,7 @@ class PreferenceConfiguration {
             }
             config.enableAudioFx = prefs.getBoolean(ENABLE_AUDIO_FX_PREF_STRING, DEFAULT_ENABLE_AUDIO_FX)
             config.enableSpatializer = prefs.getBoolean(ENABLE_SPATIALIZER_PREF_STRING, DEFAULT_ENABLE_SPATIALIZER)
-            config.enableAudioPassthrough = prefs.getBoolean(ENABLE_AUDIO_PASSTHROUGH_PREF_STRING, DEFAULT_ENABLE_AUDIO_PASSTHROUGH)
+            config.enableAudioPassthrough = enableAudioPassthrough
             config.reduceRefreshRate = prefs.getBoolean(REDUCE_REFRESH_RATE_PREF_STRING, DEFAULT_REDUCE_REFRESH_RATE)
             config.fullRange = prefs.getBoolean(FULL_RANGE_PREF_STRING, DEFAULT_FULL_RANGE)
             config.gamepadTouchpadAsMouse = prefs.getBoolean(GAMEPAD_TOUCHPAD_AS_MOUSE_PREF_STRING, DEFAULT_GAMEPAD_TOUCHPAD_AS_MOUSE)

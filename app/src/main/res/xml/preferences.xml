@@ -222,6 +222,22 @@
             android:title="@string/title_checkbox_enable_audio_passthrough"
             android:summary="@string/summary_checkbox_enable_audio_passthrough"
             android:defaultValue="false" />
+        <ListPreference
+            android:key="list_audio_codec"
+            android:dependency="checkbox_enable_audio_passthrough"
+            android:title="@string/title_list_audio_codec"
+            android:summary="@string/summary_list_audio_codec"
+            android:entries="@array/audio_codec_names"
+            android:entryValues="@array/audio_codec_values"
+            android:defaultValue="auto" />
+        <ListPreference
+            android:key="list_audio_passthrough_buffer"
+            android:dependency="checkbox_enable_audio_passthrough"
+            android:title="@string/title_list_audio_passthrough_buffer"
+            android:summary="@string/summary_list_audio_passthrough_buffer"
+            android:entries="@array/audio_passthrough_buffer_names"
+            android:entryValues="@array/audio_passthrough_buffer_values"
+            android:defaultValue="normal" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_mic_settings"
         android:key="category_mic_settings"

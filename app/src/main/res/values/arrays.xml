@@ -92,6 +92,34 @@
         <item>714</item>
     </string-array>
 
+    <!-- Audio passthrough codec selection (Sunshine extension) -->
+    <string-array name="audio_codec_names">
+        <item>@string/audio_codec_auto</item>
+        <item>@string/audio_codec_opus</item>
+        <item>@string/audio_codec_ac3</item>
+        <item>@string/audio_codec_eac3</item>
+        <item>@string/audio_codec_pcm</item>
+    </string-array>
+    <string-array name="audio_codec_values" translatable="false">
+        <item>auto</item>
+        <item>opus</item>
+        <item>ac3</item>
+        <item>eac3</item>
+        <item>pcm</item>
+    </string-array>
+
+    <!-- Audio passthrough buffer size preset -->
+    <string-array name="audio_passthrough_buffer_names">
+        <item>@string/audio_passthrough_buffer_low</item>
+        <item>@string/audio_passthrough_buffer_normal</item>
+        <item>@string/audio_passthrough_buffer_high</item>
+    </string-array>
+    <string-array name="audio_passthrough_buffer_values" translatable="false">
+        <item>low</item>
+        <item>normal</item>
+        <item>high</item>
+    </string-array>
+
     <!-- Don't forget to update locales_config.xml when you modify this! -->
     <string-array name="language_names" translatable="false">
         <item>Default</item>
