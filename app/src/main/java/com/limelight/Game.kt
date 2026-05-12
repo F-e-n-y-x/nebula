@@ -1448,6 +1448,10 @@ class Game : Activity(), SurfaceHolder.Callback,
             syncText = wantText,
             syncImage = wantImage,
             fileProviderAuthority = "$packageName.clipboard_fileprovider",
+            // Lazily resolve NvHTTP each time so the manager outlives transient
+            // disconnects without us caching a stale instance. conn is set
+            // before connectionStarted fires, so this is safe at construction.
+            nvHttpProvider = { conn?.createNvHttp() },
         )
         runCatching { mgr.start() }
             .onFailure { LimeLog.warning("Clipboard sync start failed: ${it.message}") }
