@@ -418,6 +418,10 @@
     <string name="summary_checkbox_enable_sops">Allow GFE to modify game settings for optimal streaming</string>
     <string name="title_checkbox_host_audio">Play audio on PC</string>
     <string name="summary_checkbox_host_audio">Play audio from the computer and this device</string>
+    <string name="title_checkbox_clipboard_sync_text">Sync clipboard text with PC</string>
+    <string name="summary_checkbox_clipboard_sync_text">Forward text copied on this device to the PC and vice versa. Warning: anything you copy (including passwords and 2FA codes) will leave this device.</string>
+    <string name="title_checkbox_clipboard_sync_image">Sync clipboard images with PC</string>
+    <string name="summary_checkbox_clipboard_sync_image">Forward images copied on this device to the PC. Large screenshots may use significant bandwidth.</string>
     <string name="title_screen_combination_mode">Screen combination mode (Sunshine Foundation)</string>
     <string name="summary_screen_combination_mode">Control how Sunshine manages your monitors when starting a stream, this configuration will override the host configuration.</string>
     <string name="screen_mode_host_default">Use Sunshine host configuration (default)</string>
@@ -475,10 +479,6 @@
     <string name="category_help">Help</string>
     <string name="category_mic_settings">Microphone Settings</string>
     <string name="category_audio_vibration_settings">Audio Vibration</string>
-    <string name="title_checkbox_clipboard_sync_text">Sync clipboard text (Sunshine)</string>
-    <string name="summary_checkbox_clipboard_sync_text">Mirror text copied here to/from the host (Sunshine only)</string>
-    <string name="title_checkbox_clipboard_sync_image">Sync clipboard images (Sunshine)</string>
-    <string name="summary_checkbox_clipboard_sync_image">Mirror PNG images copied here to/from the host (Sunshine only)</string>
     <string name="title_checkbox_enable_audio_passthrough">Enable audio passthrough</string>
     <string name="summary_checkbox_enable_audio_passthrough">Forward PCM/AC3/E-AC3 audio bit-perfect to the AVR when supported. Disable to always decode locally.</string>
     <string name="title_list_audio_codec">Passthrough codec</string>
