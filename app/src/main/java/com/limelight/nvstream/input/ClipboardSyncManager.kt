@@ -65,6 +65,12 @@ class ClipboardSyncManager(
 
     @Volatile private var pendingSelfWrites = 0
 
+    // Fingerprint of the last payload we actually dispatched to the host.
+    // Used to suppress duplicates when the focus-regain poll sees the same
+    // clip we already sent (the OnPrimaryClipChangedListener would normally
+    // not refire, but the polling path will re-read it on every focus gain).
+    @Volatile private var lastDispatchedFingerprint: Long = 0L
+
     private var blobExecutor: ExecutorService? = null
 
     private val primaryClipListener = ClipboardManager.OnPrimaryClipChangedListener {
@@ -92,6 +98,24 @@ class ClipboardSyncManager(
         synchronized(recentSentTokens) { recentSentTokens.clear() }
         blobExecutor?.shutdownNow()
         blobExecutor = null
+        lastDispatchedFingerprint = 0L
+    }
+
+    /**
+     * Re-poll the system clipboard. Android only fires
+     * [ClipboardManager.OnPrimaryClipChangedListener] while the app holds input
+     * focus, so any clip change that happened in another app while Game was
+     * paused is silently dropped. Call this when focus is regained so the most
+     * recent clip is forwarded to the host. The fingerprint check prevents
+     * duplicate sends when the user did not actually copy anything new.
+     */
+    fun onFocusGained() {
+        if (!syncText && !syncImage) return
+        try {
+            handleLocalClipChanged()
+        } catch (t: Throwable) {
+            LimeLog.warning("Clipboard focus poll failed: ${t.message}")
+        }
     }
 
     // ---------------------------------------------------------------------
@@ -168,6 +192,11 @@ class ClipboardSyncManager(
      */
     private fun sendPayloadOrBlob(kind: Byte, mime: String, bytes: ByteArray, displayName: String) {
         if (bytes.isEmpty()) return
+        // Suppress duplicates: focus-regain polling will re-read the same
+        // clip on every focus event. We only care about new content.
+        val fp = fingerprint(kind, bytes)
+        if (fp == lastDispatchedFingerprint) return
+        lastDispatchedFingerprint = fp
         if (bytes.size <= MAX_PAYLOAD_BYTES) {
             sendInlinePayload(kind, bytes)
             return
@@ -405,6 +434,22 @@ class ClipboardSyncManager(
     }
 
     private data class TokenEntry(val token: Int, val timestamp: Long)
+
+    /**
+     * 64-bit FNV-1a fingerprint of (kind, payload bytes). Used purely for
+     * dedup; not a cryptographic hash. Returns 0L iff bytes is empty so the
+     * "never sent yet" sentinel cannot collide with real content.
+     */
+    private fun fingerprint(kind: Byte, bytes: ByteArray): Long {
+        if (bytes.isEmpty()) return 0L
+        var h = -3750763034362895579L // FNV offset basis (64-bit)
+        h = (h xor (kind.toLong() and 0xFFL)) * 1099511628211L
+        for (b in bytes) {
+            h = (h xor (b.toLong() and 0xFFL)) * 1099511628211L
+        }
+        // Avoid the sentinel value collision.
+        return if (h == 0L) 1L else h
+    }
 
     companion object {
         // moonlight-common-c PR #5 caps the wire payload at ~64 KiB; no chunking.

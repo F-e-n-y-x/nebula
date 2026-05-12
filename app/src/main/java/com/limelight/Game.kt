@@ -1056,6 +1056,12 @@ class Game : Activity(), SurfaceHolder.Callback,
         super.onWindowFocusChanged(hasFocus)
         keyboardInputHandler.clearModifierState()
         inputCaptureProvider.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            // Android only delivers OnPrimaryClipChangedListener events while
+            // the app holds input focus; clips copied in another app while
+            // Game was paused are silently dropped. Re-poll on focus regain.
+            clipboardSyncManager?.onFocusGained()
+        }
     }
 
     private fun prepareDisplayForRendering(): Float {
