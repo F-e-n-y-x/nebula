@@ -13,6 +13,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Vibrator
+import android.text.Editable
+import android.text.TextWatcher
 import android.util.DisplayMetrics
 import android.view.Display
 import android.view.DisplayCutout
@@ -21,6 +23,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -83,6 +87,12 @@ class StreamSettings : AppCompatActivity() {
     private var categoryAdapter: CategoryAdapter? = null
     private val categories: MutableList<CategoryItem> = ArrayList()
     private var selectedCategoryIndex = 0
+
+    // 搜索栏相关（仅竖屏 layout 提供，横屏 layout 不渲染搜索控件）
+    private var searchBar: View? = null
+    private var searchInput: EditText? = null
+    private var searchToggle: ImageView? = null
+    private var menuToggleView: ImageView? = null
 
     // 状态保存键
     companion object {
@@ -201,6 +211,7 @@ class StreamSettings : AppCompatActivity() {
         setupMenuToggle()
         setupCategoryList()
         setupDrawerListener()
+        setupSearchBar()
     }
 
     /**
@@ -213,6 +224,59 @@ class StreamSettings : AppCompatActivity() {
             menuToggle.isFocusable = true
             menuToggle.isFocusableInTouchMode = false
         }
+    }
+
+    /**
+     * 设置浮动搜索按钮 + 顶部搜索栏（仅竖屏 layout 提供这些 view，
+     * 横屏 layout 不包含搜索控件，findViewById 返回 null，自动跳过）。
+     */
+    private fun setupSearchBar() {
+        searchBar = findViewById(R.id.settings_search_bar)
+        searchInput = findViewById(R.id.settings_search_input)
+        searchToggle = findViewById(R.id.settings_search_toggle)
+        menuToggleView = findViewById(R.id.settings_menu_toggle)
+        val closeBtn = findViewById<ImageView?>(R.id.settings_search_close)
+
+        // 横屏布局没有这些控件
+        if (searchBar == null || searchInput == null || searchToggle == null) return
+
+        searchToggle?.setOnClickListener { showSearchBar() }
+        closeBtn?.setOnClickListener { hideSearchBar() }
+
+        searchInput?.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                applyFilterToFragment(s?.toString().orEmpty())
+            }
+        })
+    }
+
+    private fun showSearchBar() {
+        searchBar?.visibility = View.VISIBLE
+        searchToggle?.visibility = View.GONE
+        menuToggleView?.visibility = View.GONE
+        searchInput?.requestFocus()
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun hideSearchBar() {
+        searchInput?.setText("")
+        applyFilterToFragment("")
+        searchBar?.visibility = View.GONE
+        searchToggle?.visibility = View.VISIBLE
+        menuToggleView?.visibility = View.VISIBLE
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(searchInput?.windowToken, 0)
+    }
+
+    private fun isSearchBarVisible(): Boolean = searchBar?.visibility == View.VISIBLE
+
+    private fun applyFilterToFragment(query: String) {
+        val fragment = supportFragmentManager
+                .findFragmentById(R.id.preference_container) as? SettingsFragment
+        fragment?.applySearchFilter(query)
     }
 
     /**
@@ -607,6 +671,12 @@ class StreamSettings : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        // 搜索栏可见时，优先关闭搜索而不是退出
+        if (isSearchBarVisible()) {
+            hideSearchBar()
+            return
+        }
+
         super.onBackPressed()
         if (handleBackForDrawer()) {
             return
@@ -932,6 +1002,65 @@ class StreamSettings : AppCompatActivity() {
                     return
                 }
             }
+        }
+
+        /**
+         * 记录每个折叠分组的原始 initialExpandedChildrenCount，
+         * 搜索时全部展开，清空搜索时还原。
+         */
+        private val originalCollapseCounts = mutableMapOf<String, Int>()
+
+        /**
+         * 应用搜索过滤。空查询恢复全部可见性 + 原始折叠状态；
+         * 非空查询仅显示匹配的项，匹配类的整组也展开。
+         */
+        fun applySearchFilter(query: String) {
+            val screen = preferenceScreen ?: return
+            val q = query.trim().lowercase(Locale.getDefault())
+            val isSearching = q.isNotEmpty()
+
+            for (i in 0 until screen.preferenceCount) {
+                val category = screen.getPreference(i) as? PreferenceCategory ?: continue
+                val catKey = category.key ?: "category_$i"
+
+                // 一次性记录原始折叠数（仅首次进入搜索时）
+                if (isSearching && !originalCollapseCounts.containsKey(catKey)) {
+                    originalCollapseCounts[catKey] = category.initialExpandedChildrenCount
+                }
+
+                if (!isSearching) {
+                    // 还原
+                    category.isVisible = true
+                    for (j in 0 until category.preferenceCount) {
+                        category.getPreference(j).isVisible = true
+                    }
+                    originalCollapseCounts[catKey]?.let { category.initialExpandedChildrenCount = it }
+                    continue
+                }
+
+                // 搜索中：完全展开（避免折叠掉匹配项）
+                category.initialExpandedChildrenCount = Int.MAX_VALUE
+
+                val categoryMatches = category.title?.toString()?.lowercase(Locale.getDefault())?.contains(q) == true
+                var anyChildMatches = false
+                for (j in 0 until category.preferenceCount) {
+                    val child = category.getPreference(j)
+                    val childMatches = categoryMatches || preferenceMatches(child, q)
+                    child.isVisible = childMatches
+                    if (childMatches) anyChildMatches = true
+                }
+                category.isVisible = categoryMatches || anyChildMatches
+            }
+        }
+
+        private fun preferenceMatches(p: Preference, q: String): Boolean {
+            val title = p.title?.toString()?.lowercase(Locale.getDefault())
+            if (title != null && title.contains(q)) return true
+            val summary = p.summary?.toString()?.lowercase(Locale.getDefault())
+            if (summary != null && summary.contains(q)) return true
+            val key = p.key?.lowercase(Locale.getDefault())
+            if (key != null && key.contains(q)) return true
+            return false
         }
 
         /**

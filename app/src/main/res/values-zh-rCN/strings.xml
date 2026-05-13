@@ -1049,6 +1049,9 @@
     <string name="float_ball_action_toggle_visibility">切换悬浮球显隐</string>
     <string name="game_menu_toggle_all_keyboard">切换电脑键盘</string>
     <string name="menu">菜单</string>
+    <string name="settings_search_hint">搜索设置项…</string>
+    <string name="settings_search_close">关闭搜索</string>
+    <string name="settings_search_no_results">没有匹配的设置</string>
     <string name="no_app_found_for_streaming">未找到可串流的应用</string>
     <string name="notification_icon">通知图标</string>
     <string name="pacing_precise_sync">精确同步</string>
