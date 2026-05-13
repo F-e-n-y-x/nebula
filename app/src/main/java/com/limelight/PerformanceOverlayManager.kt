@@ -478,9 +478,8 @@ class PerformanceOverlayManager(
 
     @SuppressLint("DefaultLocale")
     private fun updateNetworkLatencyText(view: TextView, performanceInfo: PerformanceInfo) {
-        val showPacketLoss = getPerformanceItemView(PerformanceItem.PACKET_LOSS)?.visibility == View.VISIBLE
-        // 与鸿蒙保持一致：有丢包行时不重复画 WiFi 图标
-        val iconRes: Int? = if (showPacketLoss) null else R.drawable.phc_perf_wifi
+        // 带宽用 gauge 仪表盘图标更直观，始终显示
+        val iconRes: Int = R.drawable.phc_perf_gauge
         val bandwidthAndLatency = String.format("%s   %d ± %d",
             performanceInfo.bandWidth,
             (performanceInfo.rttInfo shr 32).toInt(),
@@ -532,16 +531,16 @@ class PerformanceOverlayManager(
     private fun updateOnePercentLowText(view: TextView, performanceInfo: PerformanceInfo) {
         val lowFps = performanceInfo.onePercentLowFps
         if (lowFps <= 0) {
-            view.text = createStyledText(R.drawable.phc_perf_gauge, "—", "FPS", 0xFFFF7043.toInt(), textSizePx = view.textSize)
+            view.text = createStyledText(null, "1%Low —", "FPS", 0xFFFF7043.toInt(), textSizePx = view.textSize)
             return
         }
-        val value = String.format("%.1f", lowFps)
+        val value = String.format("1%%Low %.1f", lowFps)
         val color = when {
             lowFps >= performanceInfo.renderedFps * 0.9f -> 0xFF90EE90.toInt()
             lowFps >= performanceInfo.renderedFps * 0.7f -> 0xFFFFD740.toInt()
             else -> 0xFFFF7043.toInt()
         }
-        view.text = createStyledText(R.drawable.phc_perf_gauge, value, "1%Low", color, textSizePx = view.textSize)
+        view.text = createStyledText(null, value, "FPS", color, textSizePx = view.textSize)
     }
 
     private fun showBatteryInfo() {
@@ -617,10 +616,27 @@ class PerformanceOverlayManager(
         val layoutParams = overlay.layoutParams as FrameLayout.LayoutParams
 
         val isPortrait = activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-        if (isEffectiveVerticalLayout()) {
+        val isVertical = isEffectiveVerticalLayout()
+        if (isVertical) {
             overlay.orientation = LinearLayout.VERTICAL
         } else {
             overlay.orientation = LinearLayout.HORIZONTAL
+        }
+        // 同步每个性能 TextView 的宽度模式：
+        // - 垂直布局保留 match_parent 让 gravity 右对齐生效
+        // - 水平布局必须 wrap_content，否则 LinearLayout 二次测量会让子项保留之前的最大宽度，
+        //   数字位数缩短后无法回退，导致 item 间距残留。
+        val targetWidth = if (isVertical)
+            LinearLayout.LayoutParams.MATCH_PARENT
+        else
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        for (itemInfo in performanceItems) {
+            val view = itemInfo.view ?: continue
+            val lp = view.layoutParams as? LinearLayout.LayoutParams ?: continue
+            if (lp.width != targetWidth) {
+                lp.width = targetWidth
+                view.layoutParams = lp
+            }
         }
         overlay.setBackgroundColor(getOverlayBackgroundColor())
 
