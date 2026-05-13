@@ -7,14 +7,14 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Vibrator
-import android.text.Editable
-import android.text.TextWatcher
 import android.util.DisplayMetrics
 import android.view.Display
 import android.view.DisplayCutout
@@ -30,6 +30,10 @@ import android.widget.TextView
 import android.widget.Toast
 
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
+import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
@@ -42,6 +46,13 @@ import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.MultiTransformation
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
 import com.limelight.LimeLog
 import com.limelight.PcView
 import com.limelight.R
@@ -54,25 +65,14 @@ import com.limelight.utils.Dialog
 import com.limelight.utils.UiHelper
 import com.limelight.utils.UpdateManager
 
+import jp.wasabeef.glide.transformations.BlurTransformation
+import jp.wasabeef.glide.transformations.ColorFilterTransformation
+
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
 import java.util.*
 
-import android.graphics.Bitmap
-import android.graphics.drawable.Drawable
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.MultiTransformation
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
-import com.bumptech.glide.request.RequestOptions
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
-import jp.wasabeef.glide.transformations.BlurTransformation
-import jp.wasabeef.glide.transformations.ColorFilterTransformation
-import androidx.core.graphics.toColorInt
-import androidx.core.content.edit
-import androidx.core.net.toUri
 import kotlin.math.roundToInt
 
 class StreamSettings : AppCompatActivity() {
@@ -123,6 +123,7 @@ class StreamSettings : AppCompatActivity() {
                 "category_connection_settings" -> "🔗"  // 连接
                 "category_ui_settings" -> "🎨"         // 界面
                 "category_advanced_settings" -> "🔧"   // 高级(legacy)
+                "category_advanced_features" -> "⚡"   // 性能与流畅度
                 "category_help" -> "❓"                // 帮助
                 else -> "📋"
             }
@@ -185,15 +186,12 @@ class StreamSettings : AppCompatActivity() {
      */
     @SuppressLint("SetTextI18n")
     private fun setupVersionInfo() {
-        val versionText = findViewById<TextView>(R.id.drawer_version)
-        if (versionText != null) {
-            try {
-                val versionName = packageManager
-                        .getPackageInfo(packageName, 0).versionName
-                versionText.text = "v$versionName"
-            } catch (e: PackageManager.NameNotFoundException) {
-                versionText.visibility = View.GONE
-            }
+        val versionText = findViewById<TextView>(R.id.drawer_version) ?: return
+        try {
+            val versionName = packageManager.getPackageInfo(packageName, 0).versionName
+            versionText.text = "v$versionName"
+        } catch (e: PackageManager.NameNotFoundException) {
+            versionText.visibility = View.GONE
         }
     }
 
@@ -218,12 +216,10 @@ class StreamSettings : AppCompatActivity() {
      * 设置菜单按钮（仅竖屏有效）
      */
     private fun setupMenuToggle() {
-        val menuToggle = findViewById<ImageView>(R.id.settings_menu_toggle)
-        if (menuToggle != null) {
-            menuToggle.setOnClickListener { openDrawer() }
-            menuToggle.isFocusable = true
-            menuToggle.isFocusableInTouchMode = false
-        }
+        val menuToggle = findViewById<ImageView>(R.id.settings_menu_toggle) ?: return
+        menuToggle.setOnClickListener { openDrawer() }
+        menuToggle.isFocusable = true
+        menuToggle.isFocusableInTouchMode = false
     }
 
     /**
@@ -243,19 +239,36 @@ class StreamSettings : AppCompatActivity() {
         searchToggle?.setOnClickListener { showSearchBar() }
         closeBtn?.setOnClickListener { hideSearchBar() }
 
-        searchInput?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                applyFilterToFragment(s?.toString().orEmpty())
-            }
-        })
+        searchInput?.doAfterTextChanged { applyFilterToFragment(it?.toString().orEmpty()) }
+
+        // IME 回车：仅收起键盘，保留过滤结果
+        searchInput?.setOnEditorActionListener { v, _, _ ->
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.hideSoftInputFromWindow(v.windowToken, 0)
+            v.clearFocus()
+            true
+        }
+    }
+
+    private val isSearchBarVisible: Boolean
+        get() = searchBar?.visibility == View.VISIBLE
+
+    private fun fadeIn(v: View?) {
+        v ?: return
+        v.alpha = 0f
+        v.visibility = View.VISIBLE
+        v.animate().alpha(1f).setDuration(180L).start()
+    }
+
+    private fun fadeOut(v: View?) {
+        v ?: return
+        v.animate().alpha(0f).setDuration(140L).withEndAction { v.visibility = View.GONE }.start()
     }
 
     private fun showSearchBar() {
-        searchBar?.visibility = View.VISIBLE
-        searchToggle?.visibility = View.GONE
-        menuToggleView?.visibility = View.GONE
+        fadeOut(searchToggle)
+        fadeOut(menuToggleView)
+        fadeIn(searchBar)
         searchInput?.requestFocus()
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT)
@@ -264,14 +277,12 @@ class StreamSettings : AppCompatActivity() {
     private fun hideSearchBar() {
         searchInput?.setText("")
         applyFilterToFragment("")
-        searchBar?.visibility = View.GONE
-        searchToggle?.visibility = View.VISIBLE
-        menuToggleView?.visibility = View.VISIBLE
+        fadeOut(searchBar)
+        fadeIn(searchToggle)
+        fadeIn(menuToggleView)
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.hideSoftInputFromWindow(searchInput?.windowToken, 0)
     }
-
-    private fun isSearchBarVisible(): Boolean = searchBar?.visibility == View.VISIBLE
 
     private fun applyFilterToFragment(query: String) {
         val fragment = supportFragmentManager
@@ -283,13 +294,12 @@ class StreamSettings : AppCompatActivity() {
      * 设置分类列表
      */
     private fun setupCategoryList() {
-        if (categoryList != null) {
-            categoryList?.layoutManager = LinearLayoutManager(this)
-            categoryAdapter = CategoryAdapter()
-            categoryList?.adapter = categoryAdapter
-            categoryList?.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
-            categoryList?.isFocusable = true
-        }
+        val list = categoryList ?: return
+        list.layoutManager = LinearLayoutManager(this)
+        categoryAdapter = CategoryAdapter()
+        list.adapter = categoryAdapter
+        list.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        list.isFocusable = true
     }
 
     /**
@@ -313,9 +323,7 @@ class StreamSettings : AppCompatActivity() {
      * 打开抽屉（仅竖屏有效）
      */
     private fun openDrawer() {
-        if (drawerLayout != null) {
-            drawerLayout?.openDrawer(findViewById(R.id.drawer_menu))
-        }
+        drawerLayout?.openDrawer(findViewById(R.id.drawer_menu))
     }
 
     /**
@@ -489,17 +497,15 @@ class StreamSettings : AppCompatActivity() {
      * 更新选中的分类
      */
     fun updateSelectedCategory(index: Int) {
-        if (index != selectedCategoryIndex && index >= 0 && index < categories.size) {
-            val oldIndex = selectedCategoryIndex
-            selectedCategoryIndex = index
-            if (categoryAdapter != null) {
-                // 确保 oldIndex 有效再通知更新
-                if (oldIndex in 0 until categories.size) {
-                    categoryAdapter?.notifyItemChanged(oldIndex)
-                }
-                categoryAdapter?.notifyItemChanged(selectedCategoryIndex)
-            }
+        if (index == selectedCategoryIndex || index < 0 || index >= categories.size) return
+
+        val oldIndex = selectedCategoryIndex
+        selectedCategoryIndex = index
+        // 确保 oldIndex 有效再通知更新
+        if (oldIndex in 0 until categories.size) {
+            categoryAdapter?.notifyItemChanged(oldIndex)
         }
+        categoryAdapter?.notifyItemChanged(selectedCategoryIndex)
     }
 
     /**
@@ -662,17 +668,14 @@ class StreamSettings : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-
-        if (externalDisplayManager != null) {
-            externalDisplayManager?.cleanup()
-            externalDisplayManager = null
-        }
+        externalDisplayManager?.cleanup()
+        externalDisplayManager = null
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         // 搜索栏可见时，优先关闭搜索而不是退出
-        if (isSearchBarVisible()) {
+        if (isSearchBarVisible) {
             hideSearchBar()
             return
         }
@@ -784,11 +787,8 @@ class StreamSettings : AppCompatActivity() {
             val newValue = "${nativeWidth}x${nativeHeight}"
 
             // Check if the native resolution is already present
-            for (value in pref.entryValues) {
-                if (newValue == value.toString()) {
-                    // It is present in the default list, so don't add it again
-                    return
-                }
+            if (pref.entryValues.any { it.toString() == newValue }) {
+                return
             }
 
             if (pref.entryValues.size < nativeResolutionStartIndex) {
@@ -869,12 +869,9 @@ class StreamSettings : AppCompatActivity() {
                     " (" + fpsValue + " " + resources.getString(R.string.fps_suffix_fps) + ")"
 
             // Check if the native frame rate is already present
-            for (value in pref.entryValues) {
-                if (fpsValue == value.toString()) {
-                    // It is present in the default list, so don't add it again
-                    nativeFramerateShown = false
-                    return
-                }
+            if (pref.entryValues.any { it.toString() == fpsValue }) {
+                nativeFramerateShown = false
+                return
             }
 
             appendPreferenceEntry(pref, fpsName, fpsValue)
@@ -1061,6 +1058,25 @@ class StreamSettings : AppCompatActivity() {
             val key = p.key?.lowercase(Locale.getDefault())
             if (key != null && key.contains(q)) return true
             return false
+        }
+
+        /**
+         * 查询全部高级配置档案，返回 id->name 映射。
+         * 供 export / merge / import-refresh 三处复用。
+         */
+        private fun loadConfigMap(helper: SuperConfigDatabaseHelper): MutableMap<String, String> {
+            val map = LinkedHashMap<String, String>()
+            for (id in helper.queryAllConfigIds()) {
+                val name = helper.queryConfigAttribute(
+                        id, PageConfigController.COLUMN_STRING_CONFIG_NAME, "default") as String
+                map[id.toString()] = name
+            }
+            return map
+        }
+
+        private fun applyConfigEntries(pref: ListPreference, map: Map<String, String>) {
+            pref.entries = map.values.toTypedArray<CharSequence>()
+            pref.entryValues = map.keys.toTypedArray<CharSequence>()
         }
 
         /**
@@ -1324,10 +1340,7 @@ class StreamSettings : AppCompatActivity() {
             }
 
             // Fire TV apps are not allowed to use WebViews or browsers, so hide the Help category
-            /*if (requireActivity().packageManager.hasSystemFeature("amazon.hardware.fire_tv")) {
-                val category = findPreference<PreferenceCategory>("category_help")!!
-                screen.removePreference(category)
-            }*/
+            // (currently disabled — keep Help category visible on all builds)
             val categoryGamepadSettings = findPreference<PreferenceCategory>("category_gamepad_settings")!!
             // Remove the vibration options if the device can't vibrate
             if (!(requireActivity().getSystemService(VIBRATOR_SERVICE) as Vibrator).hasVibrator()) {
@@ -1417,8 +1430,6 @@ class StreamSettings : AppCompatActivity() {
 
                 val avcDecoder = MediaCodecHelper.findProbableSafeDecoder("video/avc", -1)
                 val hevcDecoder = MediaCodecHelper.findProbableSafeDecoder("video/hevc", -1)
-
-                @Suppress("UNUSED_VARIABLE")
 
                 if (avcDecoder != null) {
                     val avcWidthRange = avcDecoder.getCapabilitiesForType("video/avc").videoCapabilities?.supportedWidths
@@ -1567,28 +1578,10 @@ class StreamSettings : AppCompatActivity() {
                 val targetDisplay = getTargetDisplay()
                 val hdrCaps = targetDisplay.hdrCapabilities
 
-                // We must now ensure our display is compatible with HDR10
-                var foundHdr10 = false
-                if (hdrCaps != null) {
-                    // getHdrCapabilities() returns null on Lenovo Lenovo Mirage Solo (vega), Android 8.0
-                    for (hdrType in hdrCaps.supportedHdrTypes) {
-                        if (hdrType == Display.HdrCapabilities.HDR_TYPE_HDR10) {
-                            foundHdr10 = true
-                            break
-                        }
-                    }
-                }
-
-                // Check for HLG support as well
-                var foundHlg = false
-                if (hdrCaps != null) {
-                    for (hdrType in hdrCaps.supportedHdrTypes) {
-                        if (hdrType == Display.HdrCapabilities.HDR_TYPE_HLG) {
-                            foundHlg = true
-                            break
-                        }
-                    }
-                }
+                // We must now ensure our display is compatible with HDR10 / HLG
+                val supportedHdrTypes = hdrCaps?.supportedHdrTypes
+                val foundHdr10 = supportedHdrTypes?.any { it == Display.HdrCapabilities.HDR_TYPE_HDR10 } == true
+                val foundHlg = supportedHdrTypes?.any { it == Display.HdrCapabilities.HDR_TYPE_HLG } == true
 
                 val category = findPreference<PreferenceCategory>("category_screen_position")!!
                 val hdrPref = findPreference<CheckBoxPreference>("checkbox_enable_hdr")
@@ -1720,17 +1713,8 @@ class StreamSettings : AppCompatActivity() {
             val exportPreference = findPreference<ListPreference>(PreferenceConfiguration.EXPORT_CONFIG_STRING)!!
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val superConfigDatabaseHelper = SuperConfigDatabaseHelper(context)
-                val configIdList = superConfigDatabaseHelper.queryAllConfigIds()
-                val configMap: MutableMap<String, String> = HashMap()
-                for (configId in configIdList) {
-                    val configName = superConfigDatabaseHelper.queryConfigAttribute(configId, PageConfigController.COLUMN_STRING_CONFIG_NAME, "default") as String
-                    val configIdString = configId.toString()
-                    configMap[configIdString] = configName
-                }
-                val nameEntries = configMap.values.toTypedArray<CharSequence>()
-                val nameEntryValues = configMap.keys.toTypedArray<CharSequence>()
-                exportPreference.entries = nameEntries
-                exportPreference.entryValues = nameEntryValues
+                val configMap = loadConfigMap(superConfigDatabaseHelper)
+                applyConfigEntries(exportPreference, configMap)
 
                 exportPreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
                     exportConfigString = superConfigDatabaseHelper.exportConfig((newValue as String).toLong())
@@ -1749,17 +1733,7 @@ class StreamSettings : AppCompatActivity() {
             val mergePreference = findPreference<ListPreference>(PreferenceConfiguration.MERGE_CONFIG_STRING)!!
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val superConfigDatabaseHelper = SuperConfigDatabaseHelper(context)
-                val configIdList = superConfigDatabaseHelper.queryAllConfigIds()
-                val configMap: MutableMap<String, String> = HashMap()
-                for (configId in configIdList) {
-                    val configName = superConfigDatabaseHelper.queryConfigAttribute(configId, PageConfigController.COLUMN_STRING_CONFIG_NAME, "default") as String
-                    val configIdString = configId.toString()
-                    configMap[configIdString] = configName
-                }
-                val nameEntries = configMap.values.toTypedArray<CharSequence>()
-                val nameEntryValues = configMap.keys.toTypedArray<CharSequence>()
-                mergePreference.entries = nameEntries
-                mergePreference.entryValues = nameEntryValues
+                applyConfigEntries(mergePreference, loadConfigMap(superConfigDatabaseHelper))
 
                 mergePreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
                     exportConfigString = newValue as String
@@ -1816,77 +1790,21 @@ class StreamSettings : AppCompatActivity() {
             }
 
             // 添加本地鼠标模式预设选择监听器
+            // 每种预设对应 (enhancedTouch, trackpad, nativePointer) 三元组
+            val touchPresetMap = mapOf(
+                    "enhanced" to Triple(true,  false, false),
+                    "classic"  to Triple(false, false, false),
+                    "trackpad" to Triple(false, true,  false),
+                    "native"   to Triple(false, false, true)
+            )
             mouseModePresetPref.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
                 val preset = newValue as String
+                val flags = touchPresetMap[preset] ?: return@OnPreferenceChangeListener true
                 val prefs = PreferenceManager.getDefaultSharedPreferences(this@SettingsFragment.requireActivity())
                 prefs.edit {
-
-                    // 根据预设值自动设置相关配置
-                    when (preset) {
-                        "enhanced" -> {
-                            // 增强式多点触控
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
-                                true
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
-                                false
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
-                                false
-                            )
-                        }
-
-                        "classic" -> {
-                            // 经典鼠标模式
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
-                                false
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
-                                false
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
-                                false
-                            )
-                        }
-
-                        "trackpad" -> {
-                            // 触控板模式
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
-                                false
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
-                                true
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
-                                false
-                            )
-                        }
-
-                        "native" -> {
-                            // 本地鼠标指针
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING,
-                                false
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING,
-                                false
-                            )
-                            putBoolean(
-                                PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING,
-                                true
-                            )
-                        }
-                    }
+                    putBoolean(PreferenceConfiguration.ENABLE_ENHANCED_TOUCH_PREF_STRING, flags.first)
+                    putBoolean(PreferenceConfiguration.TOUCHSCREEN_TRACKPAD_PREF_STRING, flags.second)
+                    putBoolean(PreferenceConfiguration.ENABLE_NATIVE_MOUSE_POINTER_PREF_STRING, flags.third)
                 }
 
                 // 显示提示信息
@@ -1978,17 +1896,7 @@ class StreamSettings : AppCompatActivity() {
                                         Toast.makeText(context, "导入配置文件成功", Toast.LENGTH_SHORT).show()
                                         //更新导出配置文件列表
                                         val exportPref = findPreference<ListPreference>(PreferenceConfiguration.EXPORT_CONFIG_STRING)!!
-                                        val configIdList = superConfigDatabaseHelper.queryAllConfigIds()
-                                        val configMap: MutableMap<String, String> = HashMap()
-                                        for (configId in configIdList) {
-                                            val configName = superConfigDatabaseHelper.queryConfigAttribute(configId, PageConfigController.COLUMN_STRING_CONFIG_NAME, "default") as String
-                                            val configIdString = configId.toString()
-                                            configMap[configIdString] = configName
-                                        }
-                                        val nameEntries = configMap.values.toTypedArray<CharSequence>()
-                                        val nameEntryValues = configMap.keys.toTypedArray<CharSequence>()
-                                        exportPref.entries = nameEntries
-                                        exportPref.entryValues = nameEntryValues
+                                        applyConfigEntries(exportPref, loadConfigMap(superConfigDatabaseHelper))
                                     }
                                     -1, -2 -> Toast.makeText(context, "读取配置文件失败", Toast.LENGTH_SHORT).show()
                                     -3 -> Toast.makeText(context, "配置文件版本不匹配", Toast.LENGTH_SHORT).show()
