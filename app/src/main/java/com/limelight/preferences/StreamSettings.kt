@@ -54,6 +54,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.MultiTransformation
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
@@ -81,6 +82,7 @@ import java.io.InputStreamReader
 import java.util.*
 
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 class StreamSettings : AppCompatActivity() {
 
@@ -2014,21 +2016,51 @@ class StreamSettings : AppCompatActivity() {
         }
     }
 
+    /**
+     * 计算设置页背景图允许的解码尺寸（RGB_565，每像素 2 字节）：
+     * - 预算取 min(maxMemory/12, freeMemory*0.4)，更贴近运行期实际可用堆
+     * - 仍超出预算则按平方根缩小到目标像素数
+     * - 返回 null 表示当前堆压力过大、放弃加载背景图（避免 OOM）
+     */
+    private fun computeBackgroundDecodeSize(): Pair<Int, Int>? {
+        val rt = Runtime.getRuntime()
+        val freeBytes = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())
+        // 极端低内存：直接放弃，避免 Glide native decode 第一步就 OOM
+        if (freeBytes < 8L * 1024 * 1024) return null
+        val dispW = resources.displayMetrics.widthPixels.coerceAtLeast(1)
+        val dispH = resources.displayMetrics.heightPixels.coerceAtLeast(1)
+        val needPixels = dispW.toLong() * dispH
+        val budgetBytes = minOf(rt.maxMemory() / 12L, (freeBytes * 4L) / 10L)
+        val maxPixels = budgetBytes / 2L  // RGB_565 每像素 2 字节
+        if (needPixels <= maxPixels) {
+            return dispW to dispH
+        }
+        val scale = sqrt(maxPixels.toDouble() / needPixels.toDouble())
+        val w = (dispW * scale).toInt().coerceAtLeast(1)
+        val h = (dispH * scale).toInt().coerceAtLeast(1)
+        return w to h
+    }
+
     private fun loadBackgroundImage() {
         val imageView = findViewById<ImageView>(R.id.settingsBackgroundImage)
 
-        // Limit decoded bitmap size to screen dimensions to avoid
-        // "Canvas: trying to draw too large bitmap" on older devices
-        val width = resources.displayMetrics.widthPixels.coerceAtLeast(1)
-        val height = resources.displayMetrics.heightPixels.coerceAtLeast(1)
+        // 解码尺寸根据当前可用堆按比例约束（详见 computeBackgroundDecodeSize）：
+        // - 4K 电视 + 大堆设备保持原分辨率
+        // - 低堆设备（典型场景：xiaomi MiTV4 SDK 23 maxMemory ≈ 100 MB）
+        //   自动缩到安全尺寸
+        // - 极端低剩余堆直接放弃背景图（保守不渲染，避免 OOM）
+        val size = computeBackgroundDecodeSize() ?: return
+        val (width, height) = size
 
         // 模糊 + 半透明黑色蒙版，单次解码完成（合并到一个 Glide pipeline）
+        // 强制 RGB_565：每像素 2 字节，整张图内存减半，模糊背景视觉无损
         val transformations = MultiTransformation<Bitmap>(
                 BlurTransformation(2, 3),
                 ColorFilterTransformation(Color.argb(120, 0, 0, 0))
         )
         val options = RequestOptions()
                 .override(width, height)
+                .format(DecodeFormat.PREFER_RGB_565)
                 .transform(transformations)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
 
