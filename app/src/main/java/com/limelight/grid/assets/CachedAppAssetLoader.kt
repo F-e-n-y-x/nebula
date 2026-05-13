@@ -89,6 +89,7 @@ class CachedAppAssetLoader(
     /**
      * 统一的全分辨率大图加载方法：内存缓存 → 异步磁盘加载 → 回调
      * 如果内存缓存命中，直接在当前线程回调；否则异步从磁盘加载后在主线程回调。
+     * 解码尺寸按屏幕短边截断，避免低内存设备 OOM。
      */
     fun loadFullBitmap(app: NvApp, callback: FullBitmapCallback) {
         // 先查内存缓存
@@ -98,9 +99,13 @@ class CachedAppAssetLoader(
             return
         }
 
+        // 按屏幕长边作为解码上限（背景显示再大也无意义且爆内存）
+        val dm = context.resources.displayMetrics
+        val maxDim = max(dm.widthPixels, dm.heightPixels).coerceAtMost(1920)
+
         // 异步从磁盘加载
         foregroundExecutor.execute {
-            val diskBitmap = diskLoader.loadFullBitmapFromCache(computer.uuid!!, app.appId)
+            val diskBitmap = diskLoader.loadFullBitmapFromCache(computer.uuid!!, app.appId, maxDim)
             if (diskBitmap != null) {
                 AppIconCache.instance.putFullIcon(computer, app, diskBitmap)
                 Handler(Looper.getMainLooper()).post { callback.onBitmapLoaded(diskBitmap) }

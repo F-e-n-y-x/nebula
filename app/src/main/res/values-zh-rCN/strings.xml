@@ -751,6 +751,7 @@
     <string name="background_refreshed_with_remaining">背景刷新成功！(今日剩余 %1$d 次)</string>
     <string name="refresh_failed_please_retry">刷新失败，请重试</string>
     <string name="refresh_failed_with_error">刷新失败: %1$s</string>
+    <string name="refresh_failed_network">网络不可用，暂时无法获取背景</string>
 
     <string name="game_menu_toggle_remote_mouse">显示/隐藏远程鼠标</string>
     <string name="toast_remote_mouse_toast">远程鼠标已显示/隐藏。</string>

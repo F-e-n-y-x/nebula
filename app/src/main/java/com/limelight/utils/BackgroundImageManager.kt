@@ -13,13 +13,17 @@ import java.util.concurrent.Executors
 import com.limelight.R
 
 /**
- * 背景图片管理器，用于处理AppView背景图片的平滑切换
- * 模糊背景填满屏幕 + 中间完整清晰图片
+ * 背景图片管理器，用于处理AppView背景图片的平滑切换。
+ * - 横屏：模糊层(blurImageView) + 清晰层(clearImageView) 双层视觉。
+ * - 竖屏 / 单层模式：blurImageView 传 null + blurOnly=true，使用 clearImageView 作为
+ *   唯一画布并对其应用模糊效果，铺满屏幕。
+ * 仅通过 imageAlpha 调整透明度，不再为每张图复制 Bitmap。
  */
 class BackgroundImageManager(
     private val context: Context,
-    private val blurImageView: ImageView,
-    private val clearImageView: ImageView
+    private val blurImageView: ImageView?,
+    private val clearImageView: ImageView,
+    private val blurOnly: Boolean = false
 ) {
     var currentBackground: Bitmap? = null
         private set
@@ -41,10 +45,9 @@ class BackgroundImageManager(
         // 如果当前没有背景图片，直接设置
         if (currentBackground == null) {
             currentBackground = newBackground
-            setBlurredBitmap(blurImageView, newBackground, BLUR_IMAGE_ALPHA)
-            clearImageView.setImageBitmap(applyAlpha(newBackground, CLEAR_IMAGE_ALPHA))
+            applyBitmap(newBackground)
             val fadeIn = AnimationUtils.loadAnimation(context, R.anim.background_fadein)
-            blurImageView.startAnimation(fadeIn)
+            blurImageView?.startAnimation(fadeIn)
             clearImageView.startAnimation(AnimationUtils.loadAnimation(context, R.anim.background_fadein))
             return
         }
@@ -56,18 +59,34 @@ class BackgroundImageManager(
 
             override fun onAnimationEnd(animation: Animation) {
                 currentBackground = newBackground
-                setBlurredBitmap(blurImageView, newBackground, BLUR_IMAGE_ALPHA)
-                clearImageView.setImageBitmap(applyAlpha(newBackground, CLEAR_IMAGE_ALPHA))
+                applyBitmap(newBackground)
                 val fadeIn = AnimationUtils.loadAnimation(context, R.anim.background_fadein)
-                blurImageView.startAnimation(fadeIn)
+                blurImageView?.startAnimation(fadeIn)
                 clearImageView.startAnimation(AnimationUtils.loadAnimation(context, R.anim.background_fadein))
             }
 
             override fun onAnimationRepeat(animation: Animation) {}
         })
 
-        blurImageView.startAnimation(fadeOutAnimation)
-        clearImageView.startAnimation(AnimationUtils.loadAnimation(context, R.anim.background_fadeout))
+        (blurImageView ?: clearImageView).startAnimation(fadeOutAnimation)
+        if (blurImageView != null) {
+            clearImageView.startAnimation(AnimationUtils.loadAnimation(context, R.anim.background_fadeout))
+        }
+    }
+
+    /** 同一张 Bitmap 同时驱动模糊层与清晰层；仅通过 imageAlpha 调整透明度，零额外 Bitmap 分配。 */
+    private fun applyBitmap(bitmap: Bitmap) {
+        // 横屏双层：blur 层用更大半径与更低 alpha，让中间清晰大图更突出
+        blurImageView?.let {
+            setBlurredBitmap(it, bitmap, BLUR_IMAGE_ALPHA_PAIRED, RENDER_EFFECT_RADIUS_PAIRED, BLUR_RADIUS_PAIRED)
+        }
+        if (blurOnly) {
+            // 单层模式：clearImageView 作为唯一画布并应用默认强度模糊
+            setBlurredBitmap(clearImageView, bitmap, BLUR_IMAGE_ALPHA)
+        } else {
+            clearImageView.setImageBitmap(bitmap)
+            clearImageView.imageAlpha = CLEAR_IMAGE_ALPHA
+        }
     }
 
     /**
@@ -80,9 +99,9 @@ class BackgroundImageManager(
                 override fun onAnimationStart(animation: Animation) {}
 
                 override fun onAnimationEnd(animation: Animation) {
-                    blurImageView.setImageBitmap(null)
+                    blurImageView?.setImageBitmap(null)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        blurImageView.setRenderEffect(null)
+                        blurImageView?.setRenderEffect(null)
                     }
                     clearImageView.setImageBitmap(null)
                     currentBackground = null
@@ -91,14 +110,20 @@ class BackgroundImageManager(
                 override fun onAnimationRepeat(animation: Animation) {}
             })
 
-            blurImageView.startAnimation(fadeOutAnimation)
-            clearImageView.startAnimation(AnimationUtils.loadAnimation(context, R.anim.background_fadeout))
+            (blurImageView ?: clearImageView).startAnimation(fadeOutAnimation)
+            if (blurImageView != null) {
+                clearImageView.startAnimation(AnimationUtils.loadAnimation(context, R.anim.background_fadeout))
+            }
         }
     }
 
     companion object {
         private const val CLEAR_IMAGE_ALPHA = 160 // ~63%
         private const val BLUR_IMAGE_ALPHA = 160  // ~63%
+        // 横屏双层下的 blur 背景：更朗弱且更胧胧朝朝，让中间清晰大图更突出
+        private const val BLUR_IMAGE_ALPHA_PAIRED = 100      // ~39%
+        private const val RENDER_EFFECT_RADIUS_PAIRED = 60f  // 原 25f
+        private const val BLUR_RADIUS_PAIRED = 22            // 原 10
         const val OVERLAY_IMAGE_ALPHA = 160       // ~63%
         private const val BLUR_RADIUS = 10
         private const val RENDER_EFFECT_RADIUS = 25f
@@ -112,13 +137,19 @@ class BackgroundImageManager(
          * Android 12+: GPU加速的RenderEffect，零额外内存分配
          * 低版本: 后台线程StackBlur
          */
-        fun setBlurredBitmap(imageView: ImageView, bitmap: Bitmap, alpha: Int) {
+        fun setBlurredBitmap(
+            imageView: ImageView,
+            bitmap: Bitmap,
+            alpha: Int,
+            renderEffectRadius: Float = RENDER_EFFECT_RADIUS,
+            stackBlurRadius: Int = BLUR_RADIUS
+        ) {
             if (bitmap.isRecycled) return
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 imageView.setImageBitmap(bitmap)
                 imageView.setRenderEffect(
                     android.graphics.RenderEffect.createBlurEffect(
-                        RENDER_EFFECT_RADIUS, RENDER_EFFECT_RADIUS,
+                        renderEffectRadius, renderEffectRadius,
                         android.graphics.Shader.TileMode.CLAMP
                     )
                 )
@@ -127,7 +158,7 @@ class BackgroundImageManager(
                 imageView.tag = bitmap
                 blurExecutor.execute {
                     if (bitmap.isRecycled) return@execute
-                    val blurred = stackBlur(bitmap, BLUR_RADIUS)
+                    val blurred = stackBlur(bitmap, stackBlurRadius)
                     mainHandler.post {
                         if (imageView.tag === bitmap) {
                             imageView.setImageBitmap(blurred)
@@ -162,33 +193,6 @@ class BackgroundImageManager(
             } else {
                 imageView.setImageDrawable(drawable)
                 imageView.imageAlpha = alpha
-            }
-        }
-
-        /**
-         * 给Bitmap应用全局透明度，并在下方填充背景色，
-         * 使fitCenter的图像区域不透过底层模糊层
-         */
-        fun applyAlpha(original: Bitmap, alpha: Int): Bitmap {
-            if (original.isRecycled) return original
-            return try {
-                val src = if (Build.VERSION.SDK_INT >= 26 &&
-                    original.config == Bitmap.Config.HARDWARE) {
-                    original.copy(Bitmap.Config.ARGB_8888, false)
-                } else {
-                    original
-                }
-                val result = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-                val canvas = android.graphics.Canvas(result)
-                canvas.drawColor(BG_COLOR)
-                val paint = android.graphics.Paint()
-                paint.alpha = alpha
-                paint.isFilterBitmap = true
-                canvas.drawBitmap(src, 0f, 0f, paint)
-                if (src !== original) src.recycle()
-                result
-            } catch (e: Throwable) {
-                original
             }
         }
 

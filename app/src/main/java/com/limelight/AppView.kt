@@ -344,7 +344,15 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         // Initialize background image views
         appBackgroundImageBlur = findViewById(R.id.appBackgroundImageBlur)
         appBackgroundImageClear = findViewById(R.id.appBackgroundImageClear)
-        backgroundImageManager = BackgroundImageManager(this, appBackgroundImageBlur!!, appBackgroundImageClear)
+        // 竖屏：仅保留模糊层铺满屏幕（blur 图本身经 RenderEffect / StackBlur 处理后已是装饰性背景）
+        // 横屏：保留双层（模糊+清晰）原视觉
+        val isPortrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        backgroundImageManager = if (isPortrait) {
+            appBackgroundImageClear.visibility = View.GONE
+            BackgroundImageManager(this, null, appBackgroundImageBlur!!, blurOnly = true)
+        } else {
+            BackgroundImageManager(this, appBackgroundImageBlur, appBackgroundImageClear)
+        }
 
         // Initialize app settings manager and UI components
         appSettingsManager = AppSettingsManager(this)

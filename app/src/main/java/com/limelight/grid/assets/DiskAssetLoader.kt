@@ -111,9 +111,12 @@ class DiskAssetLoader(context: Context) {
     }
 
     /**
-     * 从磁盘缓存加载原始分辨率的Bitmap（不缩放、不压缩），用于背景图显示
+     * 从磁盘缓存加载Bitmap用于背景图显示。
+     * @param maxDimension 目标最大边长（像素）。0 或负数表示不下采样。
+     *                     超大原图会被 inSampleSize / setTargetSize 缩到 <= maxDimension，
+     *                     避免低内存设备 OOM（典型 4K TV/低端机 SDK 23）。
      */
-    fun loadFullBitmapFromCache(computerUuid: String, appId: Int): Bitmap? {
+    fun loadFullBitmapFromCache(computerUuid: String, appId: Int, maxDimension: Int = 0): Bitmap? {
         val file = getFile(computerUuid, appId)
         if (!file.exists() || file.length() > MAX_ASSET_SIZE) {
             return null
@@ -122,12 +125,34 @@ class DiskAssetLoader(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 ImageDecoder.decodeBitmap(
                     ImageDecoder.createSource(file)
-                ) { decoder, _, _ ->
+                ) { decoder, info, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    if (maxDimension > 0) {
+                        val w = info.size.width
+                        val h = info.size.height
+                        val longSide = max(w, h)
+                        if (longSide > maxDimension) {
+                            val scale = maxDimension.toFloat() / longSide
+                            decoder.setTargetSize(
+                                max(1, (w * scale).toInt()),
+                                max(1, (h * scale).toInt())
+                            )
+                        }
+                    }
                 }
             } else {
+                // 两遍解码：先读 bounds 算 inSampleSize
+                val sampleSize = if (maxDimension > 0) {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(file.absolutePath, bounds)
+                    val longSide = max(bounds.outWidth, bounds.outHeight)
+                    var s = 1
+                    while (longSide > 0 && (longSide / s) > maxDimension) s *= 2
+                    s
+                } else 1
                 val options = BitmapFactory.Options().apply {
-                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                    inPreferredConfig = if (isLowRamDevice) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
+                    inSampleSize = sampleSize
                 }
                 BitmapFactory.decodeFile(file.absolutePath, options)
             }

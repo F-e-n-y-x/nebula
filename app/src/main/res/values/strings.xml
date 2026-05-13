@@ -831,6 +831,7 @@
     <string name="background_refreshed_with_remaining">Background refreshed! (%1$d left today)</string>
     <string name="refresh_failed_please_retry">Refresh failed, please retry</string>
     <string name="refresh_failed_with_error">Refresh failed: %1$s</string>
+    <string name="refresh_failed_network">Network unavailable, can’t fetch background right now</string>
 
     <string name="game_menu_toggle_remote_mouse">Show/Hide Remote Mouse</string>
     <string name="toast_remote_mouse_toast">Remote mouse displayed/hidden</string>

@@ -705,8 +705,22 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 // superseded
             } catch (e: Exception) {
                 e.printStackTrace()
-                showToast(getString(R.string.refresh_failed_with_error, e.message))
+                showToast(getString(R.string.refresh_failed_with_error, friendlyNetworkError(e)))
             }
+        }
+    }
+
+    /** 把 Glide / 网络异常翻译成给用户看的简短提示，避免展示 stack trace 风格的英文。 */
+    private fun friendlyNetworkError(e: Throwable): String {
+        // 拆掉 ExecutionException 包装
+        val cause = (e as? ExecutionException)?.cause ?: e
+        val msg = cause.message ?: ""
+        return when {
+            msg.contains("HttpException") || msg.contains("status code") ||
+            msg.contains("SocketException") || msg.contains("UnknownHost") ||
+            msg.contains("timeout", ignoreCase = true) ->
+                getString(R.string.refresh_failed_network)
+            else -> cause.javaClass.simpleName
         }
     }
 
