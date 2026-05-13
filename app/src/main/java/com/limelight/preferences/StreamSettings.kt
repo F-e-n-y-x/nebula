@@ -104,28 +104,28 @@ class StreamSettings : AppCompatActivity() {
         private const val SETTINGS_BG_URL = "https://raw.githubusercontent.com/qiin2333/qiin.github.io/assets/img/moonlight-bg2.webp"
 
         /**
-         * 获取分类对应的 emoji（每个分类唯一）
+         * 获取分类对应的 Phosphor 矢量图标资源 ID（与鸿蒙项目一致）。
          */
-        private fun getEmojiForCategory(key: String): String {
+        private fun getIconForCategory(key: String): Int {
             return when (key) {
-                "category_basic_settings" -> "⚙️"      // 基本设置
-                "category_screen_position" -> "📐"     // 屏幕位置
-                "category_audio_settings" -> "🔊"      // 音频
-                "category_mic_settings" -> "🎤"        // 麦克风
-                "category_audio_vibration" -> "📳"     // 音频振动
-                "category_gamepad_settings" -> "🎮"    // 手柄
-                "category_input_settings" -> "⌨️"      // 输入
-                "category_enhanced_touch" -> "👆"      // 触摸增强
-                "category_onscreen_controls" -> "🎛️"   // 屏幕控制
-                "category_float_ball" -> "⚽"           // 悬浮球
-                "category_crown_features" -> "👑"      // 皇冠功能
-                "category_host_settings" -> "🖥️"       // 主机
-                "category_connection_settings" -> "🔗"  // 连接
-                "category_ui_settings" -> "🎨"         // 界面
-                "category_advanced_settings" -> "🔧"   // 高级(legacy)
-                "category_advanced_features" -> "⚡"   // 性能与流畅度
-                "category_help" -> "❓"                // 帮助
-                else -> "📋"
+                "category_basic_settings" -> R.drawable.phc_settings
+                "category_screen_position" -> R.drawable.phc_display
+                "category_audio_settings" -> R.drawable.phc_audio
+                "category_mic_settings" -> R.drawable.phc_microphone
+                "category_audio_vibration" -> R.drawable.phc_pulse
+                "category_gamepad_settings" -> R.drawable.phc_gamepad
+                "category_input_settings" -> R.drawable.phc_keyboard
+                "category_enhanced_touch" -> R.drawable.phc_touch
+                "category_onscreen_controls" -> R.drawable.phc_game_controller
+                "category_float_ball" -> R.drawable.phc_eye
+                "category_crown_features" -> R.drawable.phc_crown
+                "category_host_settings" -> R.drawable.phc_host
+                "category_connection_settings" -> R.drawable.phc_plug
+                "category_ui_settings" -> R.drawable.phc_lightbulb
+                "category_advanced_settings" -> R.drawable.phc_settings    // legacy
+                "category_advanced_features" -> R.drawable.phc_lightning   // 性能与流畅度
+                "category_help" -> R.drawable.phc_info
+                else -> R.drawable.phc_list
             }
         }
     }
@@ -160,9 +160,15 @@ class StreamSettings : AppCompatActivity() {
         // 设置自定义布局
         setContentView(R.layout.activity_stream_settings)
 
-        // 确保状态栏透明
+        // 启用沉浸式顶栏：内容延伸到状态栏/导航栏下方，系统栏完全透明
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
-        window.addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+        window.navigationBarColor = Color.TRANSPARENT
+        // 深色背景图 → 状态栏 / 导航栏图标使用浅色
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
 
         UiHelper.notifyNewRootView(this)
 
@@ -363,7 +369,7 @@ class StreamSettings : AppCompatActivity() {
     /**
      * 分类数据项
      */
-    class CategoryItem(var key: String, var title: String, var emoji: String)
+    class CategoryItem(var key: String, var title: String, var iconRes: Int)
 
     /**
      * 分类菜单适配器
@@ -372,6 +378,7 @@ class StreamSettings : AppCompatActivity() {
 
         inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
             val title: TextView = itemView.findViewById(R.id.category_title)
+            val icon: ImageView = itemView.findViewById(R.id.category_icon)
             val indicator: View = itemView.findViewById(R.id.category_indicator)
             val root: View = itemView.findViewById(R.id.category_item_root)
         }
@@ -384,8 +391,9 @@ class StreamSettings : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val item = categories[position]
-            // 抽屉菜单显示 emoji + 标题
-            holder.title.text = "${item.emoji} ${item.title}"
+            // Phosphor 矢量图标 + 文本（图标颜色随选中态在 updateItemAppearance 中切换）
+            holder.icon.setImageResource(item.iconRes)
+            holder.title.text = item.title
 
             // 高亮选中项
             val isSelected = position == selectedCategoryIndex
@@ -414,17 +422,17 @@ class StreamSettings : AppCompatActivity() {
             // 指示器显示（小圆点）
             holder.indicator.visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
 
-            // 文字颜色和样式
-            if (isSelected) {
-                holder.title.setTextColor(white)
-                holder.title.alpha = 1.0f
-            } else if (hasFocus) {
-                holder.title.setTextColor(pinkPrimary)
-                holder.title.alpha = 1.0f
-            } else {
-                holder.title.setTextColor(lightGray)
-                holder.title.alpha = 0.9f
+            // 文字 + 图标颜色三态切换
+            val textColor: Int; val textAlpha: Float; val iconColor: Int; val iconAlpha: Float
+            when {
+                isSelected -> { textColor = white;       textAlpha = 1.0f; iconColor = pinkPrimary; iconAlpha = 1.0f }
+                hasFocus   -> { textColor = pinkPrimary; textAlpha = 1.0f; iconColor = pinkPrimary; iconAlpha = 0.95f }
+                else       -> { textColor = lightGray;   textAlpha = 0.9f; iconColor = lightGray;   iconAlpha = 0.7f }
             }
+            holder.title.setTextColor(textColor)
+            holder.title.alpha = textAlpha
+            holder.icon.setColorFilter(iconColor)
+            holder.icon.alpha = iconAlpha
 
             // 箭头透明度和颜色
             val arrow = holder.root.findViewById<ImageView>(R.id.category_arrow)
@@ -969,10 +977,10 @@ class StreamSettings : AppCompatActivity() {
 
                 val title = pref.title.toString()
                 val key = pref.key ?: "category_$i"
-                val emoji = getEmojiForCategory(key)
+                val iconRes = getIconForCategory(key)
 
                 categoryList.add(pref)
-                items.add(CategoryItem(key, title, emoji))
+                items.add(CategoryItem(key, title, iconRes))
             }
 
             // 通知 Activity 分类已加载
