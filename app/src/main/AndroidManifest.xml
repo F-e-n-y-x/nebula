@@ -143,6 +143,10 @@
             android:name=".PcView"
             android:exported="true"
             android:resizeableActivity="true"
+            android:banner="@drawable/atv_banner"
+            android:icon="@mipmap/ic_launcher_saba"
+            android:roundIcon="@mipmap/ic_launcher_saba"
+            android:label="@string/app_label"
             android:theme="@style/Theme.App.Starting"
             android:enableOnBackInvokedCallback="true"
             android:configChanges="mcc|mnc|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|screenSize|smallestScreenSize|layoutDirection">
