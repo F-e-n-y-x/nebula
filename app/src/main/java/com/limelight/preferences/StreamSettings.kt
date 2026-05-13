@@ -1644,6 +1644,10 @@ class StreamSettings : AppCompatActivity() {
                 LimeLog.info("Excluding HDR toggle based on OS")
                 val category = findPreference<PreferenceCategory>("category_screen_position")!!
                 // 必须先移除依赖项，再移除被依赖的项，否则会崩溃
+                val hdrModePref = findPreference<Preference>("list_hdr_mode")
+                if (hdrModePref != null) {
+                    category.removePreference(hdrModePref)
+                }
                 val hdrHighBrightnessPref = findPreference<Preference>("checkbox_enable_hdr_high_brightness")
                 if (hdrHighBrightnessPref != null) {
                     category.removePreference(hdrHighBrightnessPref)
