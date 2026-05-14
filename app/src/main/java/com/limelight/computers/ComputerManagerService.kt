@@ -526,12 +526,19 @@ class ComputerManagerService : Service() {
     private fun tryPollIp(details: ComputerDetails, address: ComputerDetails.AddressTuple): ComputerDetails? {
         val startTime = System.currentTimeMillis()
         try {
-            val portMatchesActiveAddress = details.state == ComputerDetails.State.ONLINE &&
-                    details.activeAddress != null && address.port == details.activeAddress?.port
+            // 复用持久化的 HTTPS 端口可以让冷启动 first-poll 跳过"明文 serverinfo
+            // 拿端口"那一次往返，直接走 HTTPS。守卫条件：
+            //   - 必须有缓存值（httpsPort > 0）——新 PC / 旧记录退化到原路径
+            //   - 当前探测的 address 必须就是上次成功的 activeAddress（同地址同端口）
+            //     —— 跨地址复用是不安全的（同一台机器的 LAN/WAN 可能映射到不同 https 口）
+            //
+            // 老的 state == ONLINE 守卫是进程内热路径才有效，DB 加载后 state 是
+            // UNKNOWN，会退化。现在 activeAddress 也持久化了，冷启动也能命中。
+            val httpsPortReusable = details.httpsPort != 0 && address == details.activeAddress
 
             val http = NvHTTP(
                 address,
-                if (portMatchesActiveAddress) details.httpsPort else 0,
+                if (httpsPortReusable) details.httpsPort else 0,
                 idManager.uniqueId, "", details.serverCert,
                 PlatformBinding.getCryptoProvider(this)
             )

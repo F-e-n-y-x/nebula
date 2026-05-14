@@ -1,12 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    PcItem 入场动画：从下方轻浮 + 微缩放“绽放” + 渐显。
+    使用 fast_out_slow_in（Material 标准缓动）替代纯 decelerate，
+    起手快、结尾慢但收尾更软，避免“一刀切”的生硬感。
+    叠加 scale 0.94 → 1.0 让卡片像“浮现”而非“被推上来”，弱化 translate 的机械感。
+    duration 380ms，alpha 比位移略快收尾以防尾巴拖泥带水。
+-->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
-    android:interpolator="@android:anim/decelerate_interpolator">
+    android:interpolator="@android:interpolator/fast_out_slow_in"
+    android:shareInterpolator="true">
     <translate
-        android:fromYDelta="30%"
+        android:fromYDelta="10%"
         android:toYDelta="0%"
-        android:duration="500" />
+        android:duration="380" />
+    <scale
+        android:fromXScale="0.94"
+        android:toXScale="1.0"
+        android:fromYScale="0.94"
+        android:toYScale="1.0"
+        android:pivotX="50%"
+        android:pivotY="50%"
+        android:duration="380" />
     <alpha
         android:fromAlpha="0.0"
         android:toAlpha="1.0"
-        android:duration="500" />
+        android:duration="280" />
 </set>

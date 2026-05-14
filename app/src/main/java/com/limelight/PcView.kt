@@ -97,7 +97,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.animation.ObjectAnimator
 import android.animation.AnimatorSet
 import androidx.core.animation.doOnEnd
-import android.view.animation.AnticipateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.provider.Settings
 import android.util.LruCache
 import android.view.ContextMenu
@@ -218,13 +218,22 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         override fun onServiceConnected(className: ComponentName, binder: IBinder) {
             val localBinder = binder as ComputerManagerService.ComputerManagerBinder
 
-            uiScope.launch {
-                withContext(Dispatchers.IO) {
-                    localBinder.waitForReady()
-                    AndroidCryptoProvider(this@PcView).getClientCertificate()
-                }
-                managerBinder = localBinder
-                startComputerUpdates()
+            // 立即赋值并启动轮询，让 first-poll 的 SSL 握手与下面的预热并行——
+            // pollComputer 路径只依赖 idManager.uniqueId（service.onCreate 已同步初始化），
+            // 证书在 NvHTTP 第一次握手时才需要。原本在这里串行 waitForReady() +
+            // getClientCertificate() 会把证书 IO/RSA keygen 的 100~2000ms 全部摞在
+            // "PC 卡片亮起绿点" 的关键路径上，没必要。
+            //
+            // 即便预热慢于首次 tryPollIp，也只是把"加密初始化"这段时间从串行变成
+            // 与网络往返重叠，最坏情况持平、最佳情况节省整段证书时间。
+            managerBinder = localBinder
+            startComputerUpdates()
+
+            // 后台预热：等 DiscoveryService bind（mDNS 可能还没好），并把客户端证书
+            // 提到内存。这两件事都不在已知 PC 的 first-poll 关键路径上。
+            uiScope.launch(Dispatchers.IO) {
+                localBinder.waitForReady()
+                AndroidCryptoProvider(this@PcView).getClientCertificate()
             }
         }
 
@@ -251,8 +260,10 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         splashScreen.setKeepOnScreenCondition {
             !completeOnCreateCalled && SystemClock.uptimeMillis() < splashDeadline
         }
-        // Custom exit transition: cross-fade the entire splash overlay (icon + bg)
-        // into PcView so the color/content handoff is seamless.
+        // 自定义退场：纯淡出 + 极轻微的放大（1f→1.04f），用 Decelerate 收尾。
+        // 之前的 AnticipateInterpolator(1.2f) + scale 1→1.15→0.7 是“反向回弹再急速缩小”
+        // 的弹射动画，与 PcView 内容淡入并行时观感非常跳。改为单调减速、轻位移，
+        // 让 splash 静静淡出、PcView 同步淡入，形成连贯的 cross-fade。
         splashScreen.setOnExitAnimationListener { provider ->
             val splashView = provider.view
             // provider.iconView is declared non-null in androidx core-splashscreen,
@@ -264,13 +275,13 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 ObjectAnimator.ofFloat(splashView, View.ALPHA, 1f, 0f)
             )
             if (icon != null) {
-                animators += ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.15f, 0.7f)
-                animators += ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.15f, 0.7f)
+                animators += ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.04f)
+                animators += ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.04f)
                 animators += ObjectAnimator.ofFloat(icon, View.ALPHA, 1f, 0f)
             }
             val set = AnimatorSet().apply {
-                duration = 380L
-                interpolator = AnticipateInterpolator(1.2f)
+                duration = 280L
+                interpolator = DecelerateInterpolator(1.6f)
                 playTogether(animators)
             }
             set.doOnEnd { provider.remove() }
@@ -424,16 +435,19 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         setContentView(R.layout.activity_pc_view)
         UiHelper.notifyNewRootView(this)
 
-        // Fade the entire root in to mask any frame the splash backport might have
-        // exposed during the theme handoff. Since splash_bg matches advance_setting_background,
-        // even an early-revealed window background looks identical — only widget content
-        // (icons, text, list) needs to fade in to feel smooth instead of "popping".
-        // Only do this on the first inflation; rotation/config changes should not re-fade.
+        // PcView 根布局从 0 淡入，与 splash 退场同时开始，形成 cross-fade：
+        // - splash 退场 280ms，内容淡入 320ms + Decelerate，后者略长以接住视觉重量
+        // - splash_bg 与 advance_setting_background 同色，背景层不会闪烁
+        // - 仅首次 inflation 执行，旋转/配置变化不重复
         if (pendingSplashFadeIn) {
             pendingSplashFadeIn = false
             findViewById<View>(R.id.pcViewRootLayout)?.let { root ->
                 root.alpha = 0f
-                root.animate().alpha(1f).setDuration(260L).start()
+                root.animate()
+                    .alpha(1f)
+                    .setDuration(320L)
+                    .setInterpolator(DecelerateInterpolator(1.4f))
+                    .start()
             }
         }
 
@@ -1012,11 +1026,81 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         }
 
         pendingRefreshRunnable = Runnable {
-            pcGridAdapter.notifyDataSetChanged()
+            // FLIP 重排动画：对当前可见 item 在 notifyDataSetChanged 前后做位置 diff，
+            // 把"被搬走"的 view 先视觉上拉回旧位置，再 animate 到新位置，O(可见数) 开销。
+            animateReorderAndNotify()
             pendingRefreshRunnable = null
         }
 
         refreshHandler.postDelayed(pendingRefreshRunnable!!, REFRESH_DEBOUNCE_DELAY)
+    }
+
+    private fun animateReorderAndNotify() {
+        val listView = pcListView
+        if (listView == null || isFirstLoad) {
+            pcGridAdapter.notifyDataSetChanged()
+            return
+        }
+
+        // 1. 快照可见 item 的顺序与位置：UUID -> (left, top)（含 translation 兼容上一轮 FLIP）
+        // 注意：GridView 同行交换 top 不变，必须同时记录 left 才能感知水平位移
+        // ⚠️ UUID 必须从 view.tag 反查（pc_grid_item 在 getView 中绑定），不能调 adapter.getItem(pos)
+        //     —— 调用方在 resort() 之后才进来，此时 itemList 已经是 NEW 顺序，但可见 children 还在旧布局
+        val firstVisible = listView.firstVisiblePosition
+        val visibleCount = listView.childCount
+        val oldPositions = HashMap<String, IntArray>(visibleCount)
+        val oldOrder = ArrayList<String>(visibleCount)
+        for (i in 0 until visibleCount) {
+            val v = listView.getChildAt(i)
+            val uuid = v.getTag(R.id.grid_text) as? String ?: continue
+            oldPositions[uuid] = intArrayOf(
+                v.left + v.translationX.toInt(),
+                v.top + v.translationY.toInt()
+            )
+            oldOrder.add(uuid)
+        }
+
+        pcGridAdapter.notifyDataSetChanged()
+
+        if (oldOrder.isEmpty()) return
+
+        // 早退：可见区 UUID 顺序未变 → 跳过 FLIP（绝大多数轮询通知都走这条路）
+        var orderChanged = false
+        for (i in oldOrder.indices) {
+            val pos = firstVisible + i
+            val item = pcGridAdapter.getItem(pos) as? ComputerObject
+            if (item?.details?.uuid != oldOrder[i]) {
+                orderChanged = true
+                break
+            }
+        }
+        if (!orderChanged) return
+
+        // 2. 下一帧布局完成时：把每个仍可见的旧 UUID 视图先拉到旧位置，再动画归零
+        listView.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                listView.viewTreeObserver.removeOnPreDrawListener(this)
+                for (i in 0 until listView.childCount) {
+                    val view = listView.getChildAt(i)
+                    val uuid = view.getTag(R.id.grid_text) as? String ?: continue
+                    val old = oldPositions[uuid] ?: continue
+                    val dx = old[0] - view.left
+                    val dy = old[1] - view.top
+                    if (dx == 0 && dy == 0) continue
+                    // 取消上一轮 FLIP 动画，避免叠加导致跳变
+                    view.animate().cancel()
+                    view.translationX = dx.toFloat()
+                    view.translationY = dy.toFloat()
+                    view.animate()
+                        .translationX(0f)
+                        .translationY(0f)
+                        .setDuration(280L)
+                        .setInterpolator(android.view.animation.PathInterpolator(0.2f, 0f, 0f, 1f))
+                        .start()
+                }
+                return true
+            }
+        })
     }
 
     private fun updateComputer(details: ComputerDetails) {
@@ -2123,8 +2207,10 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     }
 
     private fun setupListAnimation(listView: AbsListView) {
+        // stagger 0.08：在 splash 退场窗口（~280ms）内启动级联，留一点呼吸感避免“齐刷刷”僵硬。
+        // 单卡 380ms，整体在 splash 收尾后再多 120ms 内完成 — 视觉接力而非二段式。
         val controller = LayoutAnimationController(
-                AnimationUtils.loadAnimation(this, R.anim.pc_grid_item_sort), 0.12f)
+                AnimationUtils.loadAnimation(this, R.anim.pc_grid_item_sort), 0.08f)
         controller.order = LayoutAnimationController.ORDER_NORMAL
         listView.layoutAnimation = controller
     }
@@ -2132,15 +2218,13 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
     private fun handleFirstLoadAnimation(listView: AbsListView) {
         if (!isFirstLoad) return
 
-        listView.alpha = 0f
-        listView.postDelayed({
-            if (isFirstLoad && pcListView != null && pcListView?.alpha == 0f) {
-                pcGridAdapter.notifyDataSetChanged()
-                pcListView?.scheduleLayoutAnimation()
-                pcListView?.animate()?.alpha(1f)?.setDuration(200)?.start()
-                isFirstLoad = false
-            }
-        }, 250)
+        // 首屏不再额外加 listView 整体淡入（之前 250ms postDelayed + 200ms alpha）——
+        // 那样会让卡片在 splash 退完后才入场，造成明显脱节。
+        // 现在直接调度 layoutAnimation，让卡片与 splash 退场同步澌起。
+        listView.alpha = 1f
+        pcGridAdapter.notifyDataSetChanged()
+        listView.scheduleLayoutAnimation()
+        isFirstLoad = false
     }
 
     private fun setupListItemClick(listView: AbsListView) {

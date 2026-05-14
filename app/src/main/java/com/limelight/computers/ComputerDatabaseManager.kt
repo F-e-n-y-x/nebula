@@ -35,6 +35,13 @@ class ComputerDatabaseManager(c: Context) {
             const val IPv6_DISABLED = "ipv6Disabled"
             const val ADDRESS = "address"
             const val PORT = "port"
+            // 持久化最后一次成功探测到的 HTTPS 端口 + 对应的 active 地址。
+            // 冷启动 first-poll 之前 details.state == UNKNOWN 且 activeAddress 为 null，
+            // 原本会触发 NvHTTP 走"明文 serverinfo 拿端口 → 再 HTTPS"的两次往返。
+            // 把上次成功值持久化到同一 JSON blob 里（无需 schema migration），让首次
+            // poll 的端口守卫命中、直接走 HTTPS。
+            const val HTTPS_PORT = "httpsPort"
+            const val LAST_ACTIVE = "lastActive"
         }
     }
 
@@ -89,6 +96,13 @@ class ComputerDatabaseManager(c: Context) {
             addresses.put(AddressFields.MANUAL, tupleToJson(details.manualAddress))
             addresses.put(AddressFields.IPv6, tupleToJson(details.ipv6Address))
             addresses.put(AddressFields.IPv6_DISABLED, details.ipv6Disabled)
+            // 仅持久化非默认值，保持 JSON 紧凑；读取端会 fallback 到 0/null。
+            if (details.httpsPort != 0) {
+                addresses.put(AddressFields.HTTPS_PORT, details.httpsPort)
+            }
+            tupleToJson(details.activeAddress)?.let {
+                addresses.put(AddressFields.LAST_ACTIVE, it)
+            }
             values.put(ADDRESSES_COLUMN_NAME, addresses.toString())
         } catch (e: JSONException) {
             throw RuntimeException(e)
@@ -122,6 +136,10 @@ class ComputerDatabaseManager(c: Context) {
             details.manualAddress = tupleFromJson(addresses, AddressFields.MANUAL)
             details.ipv6Address = tupleFromJson(addresses, AddressFields.IPv6)
             details.ipv6Disabled = addresses.optBoolean(AddressFields.IPv6_DISABLED, false)
+            // 旧记录没有这两个字段，fallback 到 0 / null 让 first-poll 走原本的慢路径，
+            // 然后 updateComputer 会把新值写回，下次冷启动起就能命中快路径。
+            details.httpsPort = addresses.optInt(AddressFields.HTTPS_PORT, 0)
+            details.activeAddress = tupleFromJson(addresses, AddressFields.LAST_ACTIVE)
         } catch (e: JSONException) {
             throw RuntimeException(e)
         }

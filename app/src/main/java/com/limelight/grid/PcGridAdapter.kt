@@ -227,6 +227,9 @@ class PcGridAdapter(
         val spinnerView = view.findViewById<View>(R.id.grid_spinner)
 
         val computer = filtered[i]
+        // 把 UUID 挂到 view tag 上，PcView FLIP 重排动画需要从可见 view 反查"当前显示的 PC"
+        // —— 不能依赖 adapter.getItem(pos) 因为 itemList 在 sortList() 后已同步重排
+        view.setTag(R.id.grid_text, computer.details?.uuid)
         populateView(view, imgView, spinnerView, txtView, overlayView, computer)
 
         if (imgView != null) {
