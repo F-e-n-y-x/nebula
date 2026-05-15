@@ -29,12 +29,18 @@ import com.limelight.R
 import org.json.JSONObject
 
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import java.util.regex.Pattern
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorCompletionService
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.core.content.edit
 import androidx.core.net.toUri
@@ -62,6 +68,10 @@ object UpdateManager {
     // SharedPreferences 中存储下载信息的 key
     private const val PREF_DOWNLOAD_ID = "update_download_id"
     private const val PREF_DOWNLOAD_APK_NAME = "update_download_apk_name"
+    // 预期 SHA256（从 release body 提取），下载完成后用于完整性校验
+    private const val PREF_DOWNLOAD_SHA256 = "update_download_sha256"
+    // 用户主动跳过的版本：同名版本下次启动检查不弹对话框（手动检查仍会弹）
+    private const val PREF_SKIPPED_VERSION = "update_skipped_version"
 
     // 安装权限请求码（供 Activity 的 onActivityResult 使用）
     const val INSTALL_PERMISSION_REQUEST_CODE = 9527
@@ -84,6 +94,10 @@ object UpdateManager {
 
     fun checkForUpdates(context: Context, showToast: Boolean) {
         if (isChecking.getAndSet(true)) {
+            // 连点防抖：手动检查时反馈 toast，避免用户以为点了没反应
+            if (showToast) {
+                Toast.makeText(context, context.getString(R.string.toast_check_update_in_progress), Toast.LENGTH_SHORT).show()
+            }
             return
         }
         executor.execute(UpdateCheckTask(context, showToast))
@@ -127,11 +141,13 @@ object UpdateManager {
         }
 
         val apkName = prefs.getString(PREF_DOWNLOAD_APK_NAME, "update.apk")
+        val expectedSha256 = prefs.getString(PREF_DOWNLOAD_SHA256, null)
 
         // 清除已保存的下载信息
         prefs.edit {
             remove(PREF_DOWNLOAD_ID)
                 .remove(PREF_DOWNLOAD_APK_NAME)
+                .remove(PREF_DOWNLOAD_SHA256)
         }
 
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager ?: return
@@ -146,6 +162,21 @@ object UpdateManager {
                     val status = cursor.getInt(statusIndex)
                     if (status == DownloadManager.STATUS_SUCCESSFUL) {
                         Log.d(TAG, "下载成功，准备安装: $apkName")
+                        // 完整性校验：如 release notes 提供了 SHA256 则必须匹配
+                        if (expectedSha256 != null) {
+                            val downloadedUri = dm.getUriForDownloadedFile(completedDownloadId)
+                            val actualSha256 = if (downloadedUri != null) computeFileSha256(context, downloadedUri) else null
+                            if (actualSha256 == null || !actualSha256.equals(expectedSha256, ignoreCase = true)) {
+                                Log.e(TAG, "SHA256 不匹配！expected=$expectedSha256 actual=$actualSha256")
+                                // 删除不可信文件并提示用户
+                                try { dm.remove(completedDownloadId) } catch (_: Exception) {}
+                                Toast.makeText(context, context.getString(R.string.toast_update_sha256_mismatch), Toast.LENGTH_LONG).show()
+                                return
+                            }
+                            Log.d(TAG, "SHA256 校验通过")
+                        } else {
+                            Log.w(TAG, "release 未提供 SHA256，跳过完整性校验（不推荐）")
+                        }
                         installApk(context, completedDownloadId)
                         return
                     }
@@ -173,72 +204,94 @@ object UpdateManager {
     private class UpdateCheckTask(private val context: Context, private val showToast: Boolean) : Runnable {
 
         override fun run() {
-            if (shouldUpdateProxyList(context)) {
-                updateProxyList(context)
-            }
-
             var updateInfo: UpdateInfo? = null
+            var releaseHandled = false
             try {
-                val json = httpGetWithProxies(GITHUB_API_URL)
-                if (json != null) {
-                    val jsonResponse = JSONObject(json)
-                    val latestVersion = jsonResponse.optString("tag_name", "").removePrefix("v")
-                    val releaseNotes = jsonResponse.optString("body", "")
+                if (shouldUpdateProxyList(context)) {
+                    updateProxyList(context)
+                }
 
-                    // 解析资产，优先选择APK
-                    var apkUrl: String? = null
-                    var apkName: String? = null
-                    val assets = jsonResponse.optJSONArray("assets")
-                    if (assets != null) {
-                        val apkAssets = ArrayList<JSONObject>()
-                        for (i in 0 until assets.length()) {
-                            val a = assets.optJSONObject(i)
-                            if (a != null) {
-                                val name = a.optString("name", "")
-                                val url = a.optString("browser_download_url", "")
-                                if (name.endsWith(".apk") && url.startsWith("http")) {
-                                    apkAssets.add(a)
+                try {
+                    val json = httpGetWithProxies(GITHUB_API_URL)
+                    if (json != null) {
+                        val jsonResponse = JSONObject(json)
+                        val latestVersion = jsonResponse.optString("tag_name", "").replaceFirst("^[Vv]".toRegex(), "")
+                        val releaseNotes = jsonResponse.optString("body", "")
+
+                        // 解析资产，优先选择APK
+                        var apkUrl: String? = null
+                        var apkName: String? = null
+                        val assets = jsonResponse.optJSONArray("assets")
+                        if (assets != null) {
+                            val apkAssets = ArrayList<JSONObject>()
+                            for (i in 0 until assets.length()) {
+                                val a = assets.optJSONObject(i)
+                                if (a != null) {
+                                    val name = a.optString("name", "")
+                                    val url = a.optString("browser_download_url", "")
+                                    if (name.endsWith(".apk") && url.startsWith("http")) {
+                                        apkAssets.add(a)
+                                    }
                                 }
                             }
-                        }
-                        // 优先匹配root/nonRoot
-                        for (a in apkAssets) {
-                            val name = a.optString("name", "")
-                            val isRootApk = name.lowercase().contains("root")
-                            if (!isRootApk) {
-                                apkName = name
+                            // 优先匹配root/nonRoot
+                            for (a in apkAssets) {
+                                val name = a.optString("name", "")
+                                val isRootApk = name.lowercase().contains("root")
+                                if (!isRootApk) {
+                                    apkName = name
+                                    apkUrl = a.opt("browser_download_url") as? String
+                                    break
+                                }
+                            }
+                            // 若没匹配到，退而求其次取第一个APK
+                            if (apkUrl == null && apkAssets.isNotEmpty()) {
+                                val a = apkAssets[0]
+                                apkName = a.opt("name") as? String
                                 apkUrl = a.opt("browser_download_url") as? String
-                                break
                             }
                         }
-                        // 若没匹配到，退而求其次取第一个APK
-                        if (apkUrl == null && apkAssets.isNotEmpty()) {
-                            val a = apkAssets[0]
-                            apkName = a.opt("name") as? String
-                            apkUrl = a.opt("browser_download_url") as? String
-                        }
+
+                        val sha256 = extractSha256ForApk(releaseNotes, apkName)
+                        updateInfo = UpdateInfo(latestVersion, releaseNotes, apkName, apkUrl, sha256)
                     }
-
-                    updateInfo = UpdateInfo(latestVersion, releaseNotes, apkName, apkUrl)
+                } catch (e: Exception) {
+                    Log.e(TAG, "检查更新失败", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "检查更新失败", e)
-            }
 
-            val finalUpdateInfo = updateInfo
+                val finalUpdateInfo = updateInfo
+                val runner = Runnable {
+                    try { handleUpdateResult(finalUpdateInfo) }
+                    finally { isChecking.set(false) }
+                }
 
-            if (context is Activity) {
-                context.runOnUiThread { handleUpdateResult(finalUpdateInfo) }
+                if (context is Activity) {
+                    if (context.isFinishing || context.isDestroyed) {
+                        // 页面已销毁，不能跳 UI；仅走 SP 写入逻辑并释放锁
+                        runner.run()
+                    } else {
+                        context.runOnUiThread(runner)
+                    }
+                } else {
+                    runner.run()
+                }
+                releaseHandled = true
+            } finally {
+                // 其他异常路径兑底，保证 isChecking 不会被永久占据
+                if (!releaseHandled) {
+                    isChecking.set(false)
+                }
             }
         }
 
         private fun handleUpdateResult(updateInfo: UpdateInfo?) {
-            isChecking.set(false)
-
-            context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
-                    .edit {
-                        putLong("last_check_time", System.currentTimeMillis())
-                    }
+            // 仅在检查成功时写入 lastCheckTime，避免失败后 4 小时内拒不重试
+            if (updateInfo != null) {
+                context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+                        .edit {
+                            putLong("last_check_time", System.currentTimeMillis())
+                        }
+            }
 
             if (updateInfo == null) {
                 if (showToast) {
@@ -249,6 +302,15 @@ object UpdateManager {
 
             val currentVersion = getCurrentVersion(context)
             if (isNewVersionAvailable(currentVersion, updateInfo.version)) {
+                // 后台启动检查时如果用户已跳过该版本，不要打扰；手动检查仍弹
+                if (!showToast) {
+                    val skipped = context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+                            .getString(PREF_SKIPPED_VERSION, null)
+                    if (skipped != null && skipped == updateInfo.version) {
+                        Log.d(TAG, "用户已跳过版本 $skipped，启动检查不弹窗")
+                        return
+                    }
+                }
                 showUpdateDialog(context, updateInfo)
             } else if (showToast) {
                 showLatestVersionDialog(context, currentVersion, updateInfo.releaseNotes)
@@ -346,7 +408,19 @@ object UpdateManager {
 
             builder.setNegativeButton(context.getString(R.string.update_btn_later), null)
             builder.setCancelable(true)
-            builder.show()
+            val dialog = builder.show()
+            // “稍后”按钮长按 = 跳过此版本（启动检查不再弹，手动检查仍弹）
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setOnLongClickListener {
+                context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
+                        .edit { putString(PREF_SKIPPED_VERSION, updateInfo.version) }
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.toast_update_skipped_version, updateInfo.version),
+                    Toast.LENGTH_SHORT
+                ).show()
+                dialog.dismiss()
+                true
+            }
         }
     }
 
@@ -445,6 +519,11 @@ object UpdateManager {
                     // 保存完整候选 URL 列表用于重试
                     .putString("update_download_candidates", joinStrings(candidates))
                     .putInt("update_download_candidate_index", 0)
+                if (info.expectedSha256 != null) {
+                    putString(PREF_DOWNLOAD_SHA256, info.expectedSha256)
+                } else {
+                    remove(PREF_DOWNLOAD_SHA256)
+                }
             }
 
             // 如果当前在 Activity 中，显示应用内进度对话框
@@ -688,8 +767,9 @@ object UpdateManager {
 
     private fun isNewVersionAvailable(currentVersion: String, latestVersion: String): Boolean {
         try {
-            val current = currentVersion.replaceFirst("^[Vv]".toRegex(), "")
-            val latest = latestVersion.replaceFirst("^[Vv]".toRegex(), "")
+            // 去除 v/V 前缀及 "-beta" / "-rc1" / "+build" 等语义后缀，仅比较点分数字段
+            val current = currentVersion.replaceFirst("^[Vv]".toRegex(), "").split('-', '+', ' ', '_')[0]
+            val latest = latestVersion.replaceFirst("^[Vv]".toRegex(), "").split('-', '+', ' ', '_')[0]
 
             val currentParts = current.split(".")
             val latestParts = latest.split(".")
@@ -697,8 +777,9 @@ object UpdateManager {
             val maxLength = currentParts.size.coerceAtLeast(latestParts.size)
 
             for (i in 0 until maxLength) {
-                val currentPart = if (i < currentParts.size) currentParts[i].toInt() else 0
-                val latestPart = if (i < latestParts.size) latestParts[i].toInt() else 0
+                // 非数字段忍耐为 0，避免 NumberFormatException 倒致“看不到新版本”
+                val currentPart = if (i < currentParts.size) currentParts[i].toIntOrNull() ?: 0 else 0
+                val latestPart = if (i < latestParts.size) latestParts[i].toIntOrNull() ?: 0 else 0
 
                 if (latestPart > currentPart) {
                     return true
@@ -707,7 +788,7 @@ object UpdateManager {
                 }
             }
             return false
-        } catch (e: NumberFormatException) {
+        } catch (e: Exception) {
             Log.e(TAG, "版本号格式错误: current=$currentVersion, latest=$latestVersion", e)
             return false
         }
@@ -896,44 +977,69 @@ object UpdateManager {
     }
 
     private fun httpGetWithProxies(url: String): String? {
-        val tries = buildProxiedUrls(url)
+        val tries = buildProxiedUrls(url).take(6)
+        if (tries.isEmpty()) return null
+        // 并发竞速：同时发起多个候选（代理 + 直连），取首个成功响应
+        val pool = Executors.newFixedThreadPool(tries.size)
+        val cs = ExecutorCompletionService<String?>(pool)
+        val futures = ArrayList<Future<String?>>()
+        try {
+            for (u in tries) {
+                futures.add(cs.submit(Callable { fetchSingleUrl(u) }))
+            }
+            val deadline = System.currentTimeMillis() + 6000L // 总超时 6s
+            for (i in tries.indices) {
+                val remaining = deadline - System.currentTimeMillis()
+                if (remaining <= 0) break
+                val f = cs.poll(remaining, TimeUnit.MILLISECONDS) ?: break
+                val res = try { f.get() } catch (e: Exception) { null }
+                if (res != null) {
+                    return res
+                }
+            }
+            return null
+        } finally {
+            for (f in futures) f.cancel(true)
+            pool.shutdownNow()
+        }
+    }
 
-        val maxTries = tries.size.coerceAtMost(3)
-        for (i in 0 until maxTries) {
-            val u = tries[i]
-            try {
-                val connection = URL(u).openConnection() as HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.setRequestProperty("User-Agent", "Moonlight-Android")
-                connection.connectTimeout = 3000
-                connection.readTimeout = 3000
-                val responseCode = connection.responseCode
-                if (responseCode == HttpURLConnection.HTTP_OK) {
-                    val reader = BufferedReader(InputStreamReader(connection.inputStream))
+    private fun fetchSingleUrl(u: String): String? {
+        var connection: HttpURLConnection? = null
+        try {
+            connection = URL(u).openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("User-Agent", "Moonlight-Android")
+            connection.connectTimeout = 3000
+            connection.readTimeout = 3000
+            val responseCode = connection.responseCode
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
                     val response = StringBuilder()
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {
                         response.append(line)
                     }
-                    reader.close()
                     return response.toString()
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Request failed, trying next: $u - ${e.message}")
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Request failed: $u - ${e.message}")
+        } finally {
+            connection?.disconnect()
         }
         return null
     }
 
     /**
-     * Build a list of candidate URLs: original first, then proxied variants.
+     * Build a list of candidate URLs: proxied variants first (faster in CN), direct as fallback.
      */
     fun buildProxiedUrls(url: String): List<String> {
         val tries = ArrayList<String>()
-        tries.add(url)
         for (p in PROXY_PREFIXES) {
             tries.add(p + url)
         }
+        tries.add(url) // 直连兌底
         return tries
     }
 
@@ -960,6 +1066,54 @@ object UpdateManager {
         return sb.toString()
     }
 
+    /**
+     * 从 release notes 中提取目标 APK 的 SHA256（hex 64 位）。
+     * 兼容常见格式：
+     *   - "<sha256>  <apkName>"（sha256sum 标准格式）
+     *   - "<apkName>: <sha256>" / "<apkName> <sha256>"
+     *   - 代码块内同上
+     */
+    private fun extractSha256ForApk(notes: String?, apkName: String?): String? {
+        if (notes.isNullOrEmpty() || apkName.isNullOrEmpty()) return null
+        try {
+            val nameQ = Pattern.quote(apkName)
+            val patterns = arrayOf(
+                Pattern.compile("([a-fA-F0-9]{64})\\s+\\*?$nameQ", Pattern.CASE_INSENSITIVE),
+                Pattern.compile("$nameQ\\s*[:=\\-]?\\s*([a-fA-F0-9]{64})", Pattern.CASE_INSENSITIVE)
+            )
+            for (p in patterns) {
+                val m = p.matcher(notes)
+                if (m.find()) {
+                    return m.group(1)?.lowercase()
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "解析 SHA256 失败: ${e.message}")
+        }
+        return null
+    }
+
+    /**
+     * 计算下载文件的 SHA256 hex（小写）。失败返回 null。
+     */
+    private fun computeFileSha256(context: Context, uri: Uri): String? {
+        return try {
+            val md = MessageDigest.getInstance("SHA-256")
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                val buf = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buf)
+                    if (n <= 0) break
+                    md.update(buf, 0, n)
+                }
+            } ?: return null
+            md.digest().joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        } catch (e: Exception) {
+            Log.e(TAG, "computeFileSha256 失败", e)
+            null
+        }
+    }
+
     // ------------------------------------------------------------------
     // 数据类
     // ------------------------------------------------------------------
@@ -968,6 +1122,7 @@ object UpdateManager {
             val version: String,
             val releaseNotes: String?,
             val apkName: String?,
-            val apkDownloadUrl: String?
+            val apkDownloadUrl: String?,
+            val expectedSha256: String? = null
     )
 }

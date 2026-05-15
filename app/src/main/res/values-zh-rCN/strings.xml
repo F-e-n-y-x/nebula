@@ -1133,6 +1133,9 @@
     <string name="update_btn_direct_download">直接下载</string>
     <string name="toast_cannot_get_install_permission">无法获得安装权限</string>
     <string name="update_btn_later">稍后</string>
+    <string name="toast_update_skipped_version">已跳过 v%s。手动点“检查更新”可重新根据提醒。</string>
+    <string name="toast_update_sha256_mismatch">更新文件完整性校验失败（SHA256 不匹配），为安全已中止安装。</string>
+    <string name="toast_check_update_in_progress">正在检查中，请稍候…</string>
     <string name="toast_need_install_permission">需要安装权限才能自动安装更新</string>
     <string name="update_install_permission_title">需要安装权限</string>
     <string name="update_install_permission_msg">为了自动安装更新，需要授予应用安装权限。\n\n点击确定前往设置页面开启权限，返回后将自动开始下载。</string>

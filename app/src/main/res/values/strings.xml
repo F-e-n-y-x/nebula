@@ -1186,6 +1186,9 @@
     <string name="update_btn_direct_download">Direct Download</string>
     <string name="toast_cannot_get_install_permission">Cannot obtain install permission</string>
     <string name="update_btn_later">Later</string>
+    <string name="toast_update_skipped_version">Skipped v%s. Use “Check for Updates” to enable again.</string>
+    <string name="toast_update_sha256_mismatch">Update file integrity check failed (SHA256 mismatch). Aborted for safety.</string>
+    <string name="toast_check_update_in_progress">Already checking, please wait…</string>
     <string name="toast_need_install_permission">Install permission needed for auto-update</string>
     <string name="update_install_permission_title">Install Permission Required</string>
     <string name="update_install_permission_msg">To auto-install updates, please grant install permission.\n\nTap OK to open settings. Download will start automatically after you return.</string>

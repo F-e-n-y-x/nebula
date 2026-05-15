@@ -416,7 +416,12 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
         analyticsManager = AnalyticsManager.getInstance(this)
         analyticsManager?.logAppLaunch()
-        UpdateManager.checkForUpdatesOnStartup(this)
+        // 延后 5 秒再做更新检查，避免一打开 PcView 就被对话框打断浏览
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                UpdateManager.checkForUpdatesOnStartup(this)
+            }
+        }, 5000)
 
         bindService(Intent(this, ComputerManagerService::class.java), serviceConnection,
             BIND_AUTO_CREATE
