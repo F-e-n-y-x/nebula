@@ -402,6 +402,7 @@
     <string name="float_ball_action_lock_screen">Lock Screen</string>
 
     <string name="category_ui_settings">UI Settings</string>
+    <string name="category_display_behavior">Display</string>
     <string name="title_checkbox_enable_pip">Enable Picture-in-Picture observer mode</string>
     <string name="summary_checkbox_enable_pip">Allows the stream to be viewed (but not controlled) while multitasking</string>
     <string name="title_checkbox_enable_background_audio">Background Audio Mode</string>
@@ -477,8 +478,6 @@
     <string name="mic_stats_continuity">Audio continuity: %1$.1f%% (Captured:%2$d Encoded:%3$d Sent:%4$d Dropped:%5$d)</string>
 
     <string name="category_help">Help</string>
-    <string name="category_mic_settings">Microphone Settings</string>
-    <string name="category_audio_vibration_settings">Audio Vibration</string>
     <string name="title_checkbox_enable_audio_passthrough">Enable audio passthrough</string>
     <string name="summary_checkbox_enable_audio_passthrough">Forward PCM/AC3/E-AC3 audio bit-perfect to the AVR when supported. Disable to always decode locally.</string>
     <string name="title_list_audio_codec">Passthrough codec</string>
@@ -563,7 +562,7 @@
     <string name="mic_permission_required">Microphone permission required</string>
     
     <!-- Screen position settings -->
-    <string name="category_screen_position_settings">Screen Settings</string>
+    <string name="category_screen_position_settings">Video Settings</string>
     <string name="title_screen_position">Screen Position</string>
     <string name="summary_screen_position">Choose the position of the screen when using non-fullscreen resolution</string>
     <string name="title_screen_offset_x">Horizontal Offset</string>

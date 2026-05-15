@@ -118,10 +118,9 @@ class StreamSettings : AppCompatActivity() {
         private fun getIconForCategory(key: String): Int {
             return when (key) {
                 "category_basic_settings" -> R.drawable.phc_settings
-                "category_screen_position" -> R.drawable.phc_display
+                "category_screen_position" -> R.drawable.phc_video_camera
+                "category_display_behavior" -> R.drawable.phc_perf_resolution
                 "category_audio_settings" -> R.drawable.phc_audio
-                "category_mic_settings" -> R.drawable.phc_microphone
-                "category_audio_vibration" -> R.drawable.phc_pulse
                 "category_gamepad_settings" -> R.drawable.phc_gamepad
                 "category_input_settings" -> R.drawable.phc_keyboard
                 "category_enhanced_touch" -> R.drawable.phc_touch

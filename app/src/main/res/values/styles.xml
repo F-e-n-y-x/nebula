@@ -155,7 +155,37 @@
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+        <item name="preferenceTheme">@style/MyPreferenceThemeOverlay</item>
+    </style>
+
+    <!-- 自定义 Preference 主题：紧凑左缩进 (无 icon 不预留空间) -->
+    <style name="MyPreferenceThemeOverlay" parent="@style/PreferenceThemeOverlay">
+        <item name="preferenceStyle">@style/MyPreferenceCompact</item>
+        <item name="checkBoxPreferenceStyle">@style/MyCheckBoxPreferenceCompact</item>
+        <item name="switchPreferenceStyle">@style/MySwitchPreferenceCompact</item>
+        <item name="switchPreferenceCompatStyle">@style/MySwitchPreferenceCompact</item>
+        <item name="dialogPreferenceStyle">@style/MyDialogPreferenceCompact</item>
+        <item name="editTextPreferenceStyle">@style/MyEditTextPreferenceCompact</item>
+        <item name="dropdownPreferenceStyle">@style/MyDropDownPreferenceCompact</item>
+    </style>
+
+    <style name="MyPreferenceCompact" parent="@style/Preference.Material">
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="MyCheckBoxPreferenceCompact" parent="@style/Preference.CheckBoxPreference.Material">
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="MySwitchPreferenceCompact" parent="@style/Preference.SwitchPreferenceCompat.Material">
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="MyDialogPreferenceCompact" parent="@style/Preference.DialogPreference.Material">
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="MyEditTextPreferenceCompact" parent="@style/Preference.DialogPreference.EditTextPreference.Material">
+        <item name="iconSpaceReserved">false</item>
+    </style>
+    <style name="MyDropDownPreferenceCompact" parent="@style/Preference.DropDown.Material">
+        <item name="iconSpaceReserved">false</item>
     </style>
 
     <style name="PreferenceThemeWithShadow" parent="SettingsThemeCompat">

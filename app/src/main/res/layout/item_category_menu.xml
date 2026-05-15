@@ -14,6 +14,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
+        android:baselineAligned="false"
         android:paddingLeft="16dp"
         android:paddingRight="16dp"
         android:paddingTop="14dp"
@@ -53,6 +54,7 @@
             android:textColor="#BBBBBB"
             android:singleLine="true"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:letterSpacing="0.03"
             android:fontFamily="sans-serif-medium" />
 
