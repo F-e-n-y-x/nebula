@@ -144,10 +144,12 @@ object NetHelper {
         val rxBytesPerDifference = rxBytesDifference / 1024
         val speedKBps = rxBytesPerDifference / (timeInterval / 1000.0)
 
+        // 单位之间使用 NBSP (\u00A0)，斜杠两侧使用 Word Joiner (\u2060, zero-width)
+        // 防止性能覆盖层 TextView 在空格或斜杠处断行（UAX#14 中 / 属 Slash 类是断行机会）
         return if (speedKBps < 1024) {
-            String.format("%.0f K/s", speedKBps)
+            String.format("%.0f\u00A0K\u2060/\u2060s", speedKBps)
         } else {
-            String.format("%.2f M/s", speedKBps / 1024)
+            String.format("%.2f\u00A0M\u2060/\u2060s", speedKBps / 1024)
         }
     }
 
