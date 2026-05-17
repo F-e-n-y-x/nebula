@@ -53,4 +53,12 @@ class NvApp {
             if (cmdList != null) append("Super CMDs: ").append(cmdList.toString()).append("\n")
         }
     }
+
+    companion object {
+        // Foundation Sunshine PR #628 (commit b1c9888) defines this as proc::DESKTOP_APP_ID and
+        // advertises support with /serverinfo DesktopSpecialAppSupport=1:
+        // https://github.com/AlkaidLab/foundation-sunshine/pull/628
+        const val DESKTOP_APP_ID = Int.MAX_VALUE
+        const val DESKTOP_APP_NAME = "Desktop"
+    }
 }

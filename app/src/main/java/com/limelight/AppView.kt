@@ -434,7 +434,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
                 for (i in 0 until (appGridAdapter?.count ?: 0)) {
                     val app = appGridAdapter?.getItem(i) as AppObject
                     if (app.app.appId == lastRunningAppId) {
-                        startStreamWithLastSettingsIfEnabled(app)
+                            startStreamWithLastSettingsIfEnabled(app, forceResumeCurrentSession = true)
                         break
                     }
                 }
@@ -665,7 +665,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
      *
      * @param app 应用对象
      */
-    private fun startStreamWithLastSettingsIfEnabled(app: AppObject) {
+    private fun startStreamWithLastSettingsIfEnabled(app: AppObject, forceResumeCurrentSession: Boolean = false) {
         var displayGuid: String? = null
         var useVdd = false
 
@@ -682,7 +682,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         // 设置useVdd标志
         computer?.useVdd = useVdd
 
-        doStartStream(app, displayGuid, useVdd)
+            doStartStream(app, displayGuid, useVdd, forceResumeCurrentSession)
     }
 
     // ==================== 顶部下拉面板 ====================
@@ -838,7 +838,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
      * @param displayName 选择的显示器名称，如果为null则不指定显示器
      * @param useVdd 是否使用VDD虚拟显示器
      */
-    private fun doStartStream(app: AppObject, displayName: String?, useVdd: Boolean) {
+    private fun doStartStream(app: AppObject, displayName: String?, useVdd: Boolean, forceResumeCurrentSession: Boolean = false) {
         val comp = computer ?: run {
             Toast.makeText(this, resources.getText(R.string.lost_connection), Toast.LENGTH_SHORT).show()
             return
@@ -851,7 +851,8 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         if (appSettingsManager != null) {
             // 使用AppSettingsManager统一管理启动逻辑
             val startIntent = appSettingsManager?.createStartIntentWithLastSettingsIfEnabled(
-                    this, app.app, comp, binder)
+                    this, app.app, comp, binder,
+                    forceResumeCurrentSession = forceResumeCurrentSession)
             if (displayName != null) {
                 startIntent?.putExtra(Game.EXTRA_DISPLAY_NAME, displayName)
             }
@@ -860,14 +861,14 @@ class AppView : Activity(), AdapterFragmentCallbacks {
             startIntent?.let { startActivity(it) }
         } else {
             // 回退到默认方式启动
+            val startIntent = ServerHelper.createStartIntent(
+                    this, app.app, comp, binder,
+                    forceResumeCurrentSession = forceResumeCurrentSession)
             if (displayName != null) {
-                val startIntent = ServerHelper.createStartIntent(this, app.app, comp, binder)
                 startIntent.putExtra(Game.EXTRA_DISPLAY_NAME, displayName)
-                addScreenCombinationModeToIntent(startIntent, useVdd)
-                startActivity(startIntent)
-            } else {
-                ServerHelper.doStart(this, app.app, comp, binder)
             }
+            addScreenCombinationModeToIntent(startIntent, useVdd)
+            startActivity(startIntent)
         }
     }
 
@@ -1179,8 +1180,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
             }
 
             START_OR_RESUME_ID -> {
-                // Resume is the same as start for us
-                startStreamWithLastSettingsIfEnabled(app)
+                startStreamWithLastSettingsIfEnabled(app, forceResumeCurrentSession = true)
                 return true
             }
 

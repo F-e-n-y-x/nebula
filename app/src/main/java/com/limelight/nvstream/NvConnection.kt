@@ -25,11 +25,13 @@ import javax.crypto.SecretKey
 import org.xmlpull.v1.XmlPullParserException
 
 import com.limelight.LimeLog
+import com.limelight.R
 import com.limelight.nvstream.av.audio.AudioRenderer
 import com.limelight.nvstream.av.video.VideoDecoderRenderer
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.HostHttpResponseException
 import com.limelight.nvstream.http.LimelightCryptoProvider
+import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
 import com.limelight.nvstream.http.PairingManager
 import com.limelight.nvstream.input.MouseButtonPacket
@@ -44,7 +46,8 @@ open class NvConnection(
     config: StreamConfiguration,
     private val cryptoProvider: LimelightCryptoProvider,
     serverCert: X509Certificate?,
-    displayName: String? = null
+    displayName: String? = null,
+    forceResumeCurrentSession: Boolean = false
 ) {
     private val clientName: String =
         pairName.ifEmpty {
@@ -62,6 +65,7 @@ open class NvConnection(
         context.streamConfig = config
         context.serverCert = serverCert
         context.displayName = displayName
+        context.forceResumeCurrentSession = forceResumeCurrentSession
 
         context.riKey = generateRiAesKey()
         context.riKeyId = generateRiKeyId()
@@ -198,6 +202,7 @@ open class NvConnection(
 
         val details = h.getComputerDetails(serverInfo)
         context.isNvidiaServerSoftware = details.nvidiaServer
+        context.supportsDesktopSpecialApp = details.supportsDesktopSpecialApp
 
         context.serverGfeVersion = h.getGfeVersion(serverInfo)
 
@@ -253,47 +258,70 @@ open class NvConnection(
             }
         }
 
-        if (h.getCurrentGame(serverInfo) != 0) {
-            try {
-                if (h.getCurrentGame(serverInfo) == app.appId) {
-                    if (!h.launchApp(context, "resume", app.appId, context.negotiatedHdr)) {
-                        connListener.displayMessage("Failed to resume existing session")
-                        return false
-                    }
-                } else {
-                    return quitAndLaunch(h, context)
-                }
-            } catch (e: HostHttpResponseException) {
-                when (e.getErrorCode()) {
-                    470 -> {
-                        connListener.displayMessage(
-                            "This session wasn't started by this device," +
-                                    " so it cannot be resumed. End streaming on the original " +
-                                    "device or the PC itself and try again. (Error code: ${e.getErrorCode()})"
-                        )
-                        return false
-                    }
-                    525 -> {
-                        connListener.displayMessage(
-                            "The application is minimized. Resume it on the PC manually or " +
-                                    "quit the session and start streaming again."
-                        )
-                        return false
-                    }
-                    else -> throw e
-                }
-            }
+        val currentGameId = h.getCurrentGame(serverInfo)
 
-            LimeLog.info("Resumed existing game session")
-            return true
-        } else {
-            return launchNotRunningApp(h, context)
+        if (context.forceResumeCurrentSession) {
+            val resumeAppId = if (currentGameId != 0) currentGameId else app.appId
+            return resumeExistingSession(h, context, resumeAppId)
         }
+
+        if (currentGameId != 0) {
+            return if (currentGameId == app.appId) {
+                resumeExistingSession(h, context, app.appId)
+            } else {
+                quitAndLaunch(h, context)
+            }
+        }
+
+        return launchNotRunningApp(h, context)
+    }
+
+    @Throws(IOException::class, XmlPullParserException::class, InterruptedException::class)
+    private fun resumeExistingSession(h: NvHTTP, context: ConnectionContext, appId: Int): Boolean {
+        val connListener = context.connListener
+
+        if (!ensureDesktopSpecialAppSupported(context, appId)) {
+            return false
+        }
+
+        try {
+            if (!h.launchApp(context, "resume", appId, context.negotiatedHdr)) {
+                connListener.displayMessage("Failed to resume existing session")
+                return false
+            }
+        } catch (e: HostHttpResponseException) {
+            when (e.getErrorCode()) {
+                470 -> {
+                    connListener.displayMessage(
+                        "This session wasn't started by this device," +
+                                " so it cannot be resumed. End streaming on the original " +
+                                "device or the PC itself and try again. (Error code: ${e.getErrorCode()})"
+                    )
+                    return false
+                }
+                525 -> {
+                    connListener.displayMessage(
+                        "The application is minimized. Resume it on the PC manually or " +
+                                "quit the session and start streaming again."
+                    )
+                    return false
+                }
+                else -> throw e
+            }
+        }
+
+        LimeLog.info("Resumed existing game session")
+        return true
     }
 
     @Throws(IOException::class, XmlPullParserException::class, InterruptedException::class)
     protected fun quitAndLaunch(h: NvHTTP, context: ConnectionContext): Boolean {
         val connListener = context.connListener
+
+        if (!ensureDesktopSpecialAppSupported(context, context.streamConfig.app.appId)) {
+            return false
+        }
+
         try {
             if (!h.quitApp()) {
                 connListener.displayMessage("Failed to quit previous session! You must quit it manually")
@@ -317,6 +345,10 @@ open class NvConnection(
 
     @Throws(IOException::class, XmlPullParserException::class, InterruptedException::class)
     private fun launchNotRunningApp(h: NvHTTP, context: ConnectionContext): Boolean {
+        if (!ensureDesktopSpecialAppSupported(context, context.streamConfig.app.appId)) {
+            return false
+        }
+
         if (!h.launchApp(context, "launch", context.streamConfig.app.appId, context.negotiatedHdr)) {
             context.connListener.displayMessage("Failed to launch application")
             return false
@@ -324,6 +356,15 @@ open class NvConnection(
 
         LimeLog.info("Launched new game session")
         return true
+    }
+
+    private fun ensureDesktopSpecialAppSupported(context: ConnectionContext, appId: Int): Boolean {
+        if (appId != NvApp.DESKTOP_APP_ID || context.supportsDesktopSpecialApp) {
+            return true
+        }
+
+        context.connListener.displayMessage(appContext.getString(R.string.error_desktop_special_app_unsupported))
+        return false
     }
 
     fun start(audioRenderer: AudioRenderer, videoDecoderRenderer: VideoDecoderRenderer, connectionListener: NvConnectionListener) {

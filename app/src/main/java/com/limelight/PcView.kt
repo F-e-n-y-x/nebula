@@ -1707,7 +1707,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 if (computer.runningGameId != 0)
                     getNvAppById(computer.runningGameId, computer.uuid!!)
                 else
-                    getFirstAppFromCache(computer.uuid!!)
+                    getDefaultQuickStartApp(computer)
             }
 
             if (targetApp == null) {
@@ -1726,7 +1726,12 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 return@launch
             }
 
-            ServerHelper.doStart(this@PcView, targetApp, targetComputer, managerBinder!!)
+            ServerHelper.doStart(
+                this@PcView,
+                targetApp,
+                targetComputer,
+                managerBinder!!
+            )
         }
     }
 
@@ -1748,7 +1753,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 if (computer.runningGameId != 0)
                     getNvAppById(computer.runningGameId, computer.uuid!!)
                 else
-                    getFirstAppFromCache(computer.uuid!!)
+                    getDefaultQuickStartApp(computer)
             }
 
             if (targetApp == null) {
@@ -1767,7 +1772,13 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
                 return@launch
             }
 
-            val intent = ServerHelper.createStartIntent(this@PcView, targetApp, targetComputer, managerBinder!!, null)
+            val intent = ServerHelper.createStartIntent(
+                this@PcView,
+                targetApp,
+                targetComputer,
+                managerBinder!!,
+                lastSettings = null
+            )
             if (screenMode != -1) {
                 if (targetComputer.useVdd) {
                     intent.putExtra(Game.EXTRA_VDD_SCREEN_COMBINATION_MODE, screenMode)
@@ -1790,6 +1801,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
 
     private fun fallbackToAppList(computer: ComputerDetails) {
         runOnUiThread {
+            showToast(getString(R.string.quick_start_load_app_list_first))
             val target = prepareComputerWithAddress(computer)
             doAppList(target ?: computer, newlyPaired = false, showHiddenGames = false)
         }
@@ -1811,8 +1823,12 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         }
     }
 
-    private fun getFirstAppFromCache(uuid: String): NvApp? {
-        val appList = getAppListFromCache(uuid)
+    private fun getDefaultQuickStartApp(computer: ComputerDetails): NvApp? {
+        if (computer.supportsDesktopSpecialApp) {
+            return NvApp(NvApp.DESKTOP_APP_NAME, NvApp.DESKTOP_APP_ID, false)
+        }
+
+        val appList = getAppListFromCache(computer.uuid!!)
         return if (!appList.isNullOrEmpty()) appList[0] else null
     }
 
@@ -1857,7 +1873,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         }
 
         showToast(getString(R.string.restoring_session, target.name))
-        ServerHelper.doStart(this, app, target, managerBinder!!)
+        ServerHelper.doStart(this, app, target, managerBinder!!, forceResumeCurrentSession = true)
     }
 
     private fun showAddressSelectionDialog(computer: ComputerDetails) {
@@ -2109,7 +2125,7 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         if (app == null) {
             app = NvApp("app", details.runningGameId, false)
         }
-        ServerHelper.doStart(this, app, details, managerBinder!!)
+        ServerHelper.doStart(this, app, details, managerBinder!!, forceResumeCurrentSession = true)
     }
 
     private fun handleQuit(details: ComputerDetails) {
