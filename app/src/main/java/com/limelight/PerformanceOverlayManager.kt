@@ -404,8 +404,7 @@ class PerformanceOverlayManager(
         if (!value.isNullOrEmpty()) {
             val valueStart = builder.length
             builder.append(value)
-            // monospace 让数字 0-9 等宽，宽度变化平滑可预测，避免数字位数跳变时整体宽度抖动
-            builder.setSpan(TypefaceSpan("monospace"), valueStart, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            builder.setSpan(TypefaceSpan("sans-serif-medium"), valueStart, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             builder.setSpan(RelativeSizeSpan(1.0f), valueStart, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             if (valueColor != null) {
                 builder.setSpan(ForegroundColorSpan(valueColor), valueStart, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
