@@ -93,6 +93,19 @@
             android:exported="false">
         </provider>
 
+        <!--
+            禁用 Firebase 自动初始化（issue #310）。
+            FirebaseInitProvider 在 Application.onCreate 之前运行，会触发
+            PackageManager.addOnPermissionsChangeListener（需 OBSERVE_GRANT_REVOKE_PERMISSIONS
+            系统级权限），在无 GMS 框架的 ROM（峰米投影仪 / 国产盒子 / 车机等）上
+            抛 SecurityException 导致 app 启动闪退。改为在 LimelightApplication.onCreate
+            中用 try-catch 包装手动调用 FirebaseApp.initializeApp()。
+        -->
+        <provider
+            android:name="com.google.firebase.provider.FirebaseInitProvider"
+            android:authorities="${applicationId}.firebaseinitprovider"
+            tools:node="remove" />
+
         <!-- FileProvider for APK installation -->
         <provider
             android:name="androidx.core.content.FileProvider"
