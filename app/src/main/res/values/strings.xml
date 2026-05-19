@@ -629,9 +629,21 @@
     <string name="crash_report_dialog_message">Send the diagnostic log to the developer to help fix it?\n\n%1$s</string>
     <string name="crash_report_share">Share log</string>
     <string name="crash_report_copy">Copy</string>
+    <string name="crash_report_photo">Photo summary</string>
     <string name="crash_report_copied">Crash log copied to clipboard</string>
     <string name="crash_report_dismiss">Ignore</string>
     <string name="crash_report_subject">Moonlight crash report</string>
+    <string name="crash_report_photo_title">Photo-friendly crash summary</string>
+    <string name="crash_report_photo_hint">Take a photo of this screen and send it to the developer.</string>
+    <string name="crash_report_photo_id">Report ID</string>
+    <string name="crash_report_photo_time">Time</string>
+    <string name="crash_report_photo_version">Version</string>
+    <string name="crash_report_photo_device">Device</string>
+    <string name="crash_report_photo_android">Android</string>
+    <string name="crash_report_photo_thread">Thread</string>
+    <string name="crash_report_photo_error">Error</string>
+    <string name="crash_report_photo_frames">Top frames</string>
+    <string name="crash_report_unknown">Unknown</string>
     
     <!-- Local image picker -->
     <string name="title_local_image_picker">Select Local Image</string>

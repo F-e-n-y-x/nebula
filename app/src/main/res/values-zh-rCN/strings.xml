@@ -565,9 +565,21 @@
     <string name="crash_report_dialog_message">把诊断日志发送给开发者帮忙排查吗？\n\n%1$s</string>
     <string name="crash_report_share">发送日志</string>
     <string name="crash_report_copy">复制</string>
+    <string name="crash_report_photo">拍照摘要</string>
     <string name="crash_report_copied">崩溃日志已复制到剪贴板</string>
     <string name="crash_report_dismiss">忽略</string>
     <string name="crash_report_subject">Moonlight 崩溃日志</string>
+    <string name="crash_report_photo_title">适合拍照发送的崩溃摘要</string>
+    <string name="crash_report_photo_hint">请拍下此页面并发送给开发者，方便快速定位问题。</string>
+    <string name="crash_report_photo_id">报告 ID</string>
+    <string name="crash_report_photo_time">时间</string>
+    <string name="crash_report_photo_version">版本</string>
+    <string name="crash_report_photo_device">设备</string>
+    <string name="crash_report_photo_android">系统</string>
+    <string name="crash_report_photo_thread">线程</string>
+    <string name="crash_report_photo_error">异常</string>
+    <string name="crash_report_photo_frames">关键堆栈</string>
+    <string name="crash_report_unknown">未知</string>
 
     <!-- Local image picker -->
     <string name="title_local_image_picker">选择本地图片</string>
