@@ -2,3 +2,7 @@
 	path = app/src/main/jni/moonlight-core/moonlight-common-c
 	url = https://github.com/qiin2333/moonlight-common-c.git
 	branch = mic
+[submodule "framegen/src/main/cpp/lsfg-vk-android"]
+	path = framegen/src/main/cpp/lsfg-vk-android
+	url = https://github.com/FrankBarretta/lsfg-vk-android.git
+	branch = release
