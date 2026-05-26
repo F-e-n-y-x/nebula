@@ -897,6 +897,27 @@ class GameMenu(
             setOnClickListener { onClick() }
         }
 
+    private fun createQuickButtonWrapper(): FrameLayout = FrameLayout(game).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { marginEnd = dpToPx(2) }
+        clipChildren = false
+        clipToPadding = false
+    }
+
+    private fun createQuickActionButton(label: String, iconRes: Int): Button =
+        Button(game, null, 0, R.style.GameMenuButtonStyle).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            text = label
+            gravity = android.view.Gravity.CENTER
+            includeFontPadding = false
+            setUniformIcon(iconRes)
+        }
+
     /** 正常模式：可点击按钮 + 末尾编辑入口 */
     @SuppressLint("ClickableViewAccessibility")
     private fun buildNormalModeButtons(
@@ -907,19 +928,13 @@ class GameMenu(
         val scaleUp = AnimationUtils.loadAnimation(game, R.anim.button_scale_restore)
         val customKeys = getSavedCustomKeys()
 
-        val buttons = mutableListOf<Button>()
+        val buttonWrappers = mutableListOf<FrameLayout>()
 
         for (id in actionIds) {
             val (label, iconRes) = resolveAction(id) ?: continue
 
-            val btn = Button(game, null, 0, R.style.GameMenuButtonStyle).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                text = label
-                setUniformIcon(iconRes)
-            }
+            val wrapper = createQuickButtonWrapper()
+            val btn = createQuickActionButton(label, iconRes)
 
             val action = QuickActionRegistry.getBuiltin(id)
             if (id == "toggle_mic" && !game.prefConfig.enableMic) {
@@ -936,12 +951,13 @@ class GameMenu(
                 }
             }
 
-            container.addView(btn)
-            buttons.add(btn)
+            wrapper.addView(btn)
+            container.addView(wrapper)
+            buttonWrappers.add(wrapper)
         }
 
         // 布局完成后，按 scrollView 可见宽度均分功能按钮
-        distributeButtonsEvenly(container, buttons)
+        distributeButtonsEvenly(container, buttonWrappers)
     }
 
     /** 编辑模式：抖动 + ×删除 + 拖拽排序 */
@@ -965,19 +981,9 @@ class GameMenu(
         for ((index, id) in actionIds.withIndex()) {
             val (label, iconRes) = resolveAction(id) ?: continue
 
-            val wrapper = FrameLayout(game).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { marginEnd = dpToPx(2) }
-                clipChildren = false
-                clipToPadding = false
-            }
+            val wrapper = createQuickButtonWrapper()
 
-            val btn = Button(game, null, 0, R.style.GameMenuButtonStyle).apply {
-                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
-                text = label
-                setUniformIcon(iconRes)
+            val btn = createQuickActionButton(label, iconRes).apply {
                 startAnimation(wiggle)
                 setOnClickListener { }
             }
