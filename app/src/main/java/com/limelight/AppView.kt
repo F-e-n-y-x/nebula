@@ -140,6 +140,7 @@ class AppView : Activity(), AdapterFragmentCallbacks {
     private var selectionAnimator: SelectionIndicatorAnimator? = null
     private var currentRecyclerView: RecyclerView? = null
     private var currentAdapterBridge: AdapterRecyclerBridge? = null
+    private var pendingAdapterFragmentView: View? = null
     private var selectedPosition = -1
     private var isFirstFocus = true
 
@@ -208,10 +209,17 @@ class AppView : Activity(), AdapterFragmentCallbacks {
                 populateAppGridWithCache()
                 startComputerUpdates()
 
+                pendingAdapterFragmentView?.let { pendingView ->
+                    pendingAdapterFragmentView = null
+                    receiveAdapterView(pendingView)
+                }
+
                 try {
-                    fragmentManager.beginTransaction()
-                            .replace(R.id.appFragmentContainer, AdapterFragment())
-                            .commitAllowingStateLoss()
+                    if (fragmentManager.findFragmentById(R.id.appFragmentContainer) == null) {
+                        fragmentManager.beginTransaction()
+                                .replace(R.id.appFragmentContainer, AdapterFragment())
+                                .commitAllowingStateLoss()
+                    }
                 } catch (e: IllegalStateException) {
                     e.printStackTrace()
                 }
@@ -1443,6 +1451,14 @@ class AppView : Activity(), AdapterFragmentCallbacks {
 
     // New generalized receiver to accept RecyclerView or legacy AbsListView
     fun receiveAdapterView(view: View) {
+        if (appGridAdapter == null) {
+            pendingAdapterFragmentView = view
+            LimeLog.warning("AdapterFragment callback arrived before AppView adapter initialization; deferring setup")
+            return
+        }
+
+        pendingAdapterFragmentView = null
+
         if (view is RecyclerView) {
             setupRecyclerView(view)
         } else if (view is AbsListView) {
@@ -1453,10 +1469,15 @@ class AppView : Activity(), AdapterFragmentCallbacks {
     // ==================== RecyclerView 设置 ====================
 
     private fun setupRecyclerView(rv: RecyclerView) {
+        val adapter = appGridAdapter ?: run {
+            pendingAdapterFragmentView = rv
+            return
+        }
+
         currentRecyclerView = rv
 
         // 更新selectionAnimator的RecyclerView和Adapter引用
-        selectionAnimator?.updateReferences(rv, appGridAdapter!!)
+        selectionAnimator?.updateReferences(rv, adapter)
 
         // 创建并设置bridge adapter
         setupBridgeAdapter(rv)
@@ -1713,9 +1734,14 @@ class AppView : Activity(), AdapterFragmentCallbacks {
     }
 
     private fun setupAbsListView(listView: AbsListView) {
-        listView.setAdapter(appGridAdapter)
+        val adapter = appGridAdapter ?: run {
+            pendingAdapterFragmentView = listView
+            return
+        }
+
+        listView.setAdapter(adapter)
         listView.setOnItemClickListener { _, _, pos, _ ->
-            val app = appGridAdapter?.getItem(pos) as AppObject
+            val app = adapter.getItem(pos) as AppObject
             handleSelectionChange(pos, app)
 
             if (lastRunningAppId != 0) {
