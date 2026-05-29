@@ -32,6 +32,10 @@ class AdapterFragment : Fragment() {
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         // Pass the view (could be a GridView or RecyclerView) to the activity
-        callbacks.receiveAbsListView(view!!.findViewById(R.id.fragmentView))
+        val fragmentRoot = view ?: return
+        callbacks.receiveAbsListView(
+            fragmentRoot.findViewById(R.id.fragmentView)
+                ?: fragmentRoot.takeIf { it.id == R.id.fragmentView }
+        )
     }
 }

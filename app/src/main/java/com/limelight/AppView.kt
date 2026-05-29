@@ -1444,8 +1444,13 @@ class AppView : Activity(), AdapterFragmentCallbacks {
         receiveAdapterView(listView)
     }
 
-    override fun receiveAbsListView(gridView: View) {
+    override fun receiveAbsListView(gridView: View?) {
         // Implementation for the generalized interface method
+        if (gridView == null) {
+            LimeLog.warning("AdapterFragment callback did not include a fragment view; ignoring setup")
+            return
+        }
+
         receiveAdapterView(gridView)
     }
 

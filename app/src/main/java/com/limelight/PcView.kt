@@ -2204,7 +2204,9 @@ class PcView : Activity(), AdapterFragmentCallbacks, ShakeDetector.Listener, Eas
         return R.layout.pc_grid_view
     }
 
-    override fun receiveAbsListView(gridView: View) {
+    override fun receiveAbsListView(gridView: View?) {
+        if (gridView == null) return
+
         receiveAdapterView(gridView)
     }
 
