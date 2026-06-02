@@ -51,6 +51,21 @@
 
     <!-- 主题蓝色 -->
     <color name="theme_blue_primary">#3CA4E0</color>
+
+    <!-- Crown side panel -->
+    <color name="crown_panel_background">#F21B1B22</color>
+    <color name="crown_panel_border">#3DFFFFFF</color>
+    <color name="crown_section_background">#CC252833</color>
+    <color name="crown_section_border">#1FFFFFFF</color>
+    <color name="crown_input_background">#E62F3340</color>
+    <color name="crown_input_border">#2EFFFFFF</color>
+    <color name="crown_accent">#E881A8</color>
+    <color name="crown_accent_pressed">#33E881A8</color>
+    <color name="crown_alignment_guide">#F7E881A8</color>
+    <color name="crown_text_primary">#F7F3F7</color>
+    <color name="crown_text_secondary">#C9D0D8</color>
+    <color name="crown_button_pressed">#2AE881A8</color>
+    <color name="crown_button_focused">#22FFFFFF</color>
     
     <!-- 通用对话框颜色 -->
     <color name="app_dialog_title_color">#2C2C2E</color>

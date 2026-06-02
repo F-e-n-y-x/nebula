@@ -34,7 +34,6 @@ import com.limelight.binding.input.advance_setting.PageDeviceController;
 import com.limelight.binding.input.advance_setting.superpage.ElementEditText;
 import com.limelight.binding.input.advance_setting.superpage.NumberSeekbar;
 import com.limelight.binding.input.advance_setting.superpage.SuperPageLayout;
-import com.limelight.utils.ColorPickerDialog;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -740,6 +739,7 @@ public class WheelPad extends Element {
 
         NumberSeekbar textSizeNumberSeekbar = wheelPadPage.findViewById(R.id.page_wheel_pad_text_size);
         ElementEditText normalTextColorElementEditText = wheelPadPage.findViewById(R.id.page_wheel_pad_normal_text_color);
+        ElementEditText pressedTextColorElementEditText = wheelPadPage.findViewById(R.id.page_wheel_pad_pressed_text_color);
         NumberSeekbar centerTextSizeNumberSeekbar = wheelPadPage.findViewById(R.id.page_wheel_pad_center_text_size);
         ElementEditText centerTextColorElementEditText = wheelPadPage.findViewById(R.id.page_wheel_pad_center_text_color);
         NumberSeekbar triggerTextSizeNumberSeekbar = wheelPadPage.findViewById(R.id.page_wheel_pad_trigger_text_size);
@@ -854,11 +854,15 @@ public class WheelPad extends Element {
             }
         });
 
-        setupColorPickerButton(normalTextColorElementEditText, () -> this.normalTextColor, color -> {
+        CrownColorPickerBinder.bind(this, normalTextColorElementEditText, () -> this.normalTextColor, color -> {
             this.normalTextColor = color;
             invalidate();
         });
-        setupColorPickerButton(centerTextColorElementEditText, () -> this.centerTextColor, color -> {
+        CrownColorPickerBinder.bind(this, pressedTextColorElementEditText, () -> this.pressedTextColor, color -> {
+            this.pressedTextColor = color;
+            invalidate();
+        });
+        CrownColorPickerBinder.bind(this, centerTextColorElementEditText, () -> this.centerTextColor, color -> {
             this.centerTextColor = color;
             invalidate();
         });
@@ -906,6 +910,7 @@ public class WheelPad extends Element {
 
         JsonObject extraAttrs = new JsonObject();
         extraAttrs.addProperty("normalTextColor", this.normalTextColor);
+        extraAttrs.addProperty("pressedTextColor", this.pressedTextColor);
         extraAttrs.addProperty("centerTextColor", this.centerTextColor);
         extraAttrs.addProperty("textSizePercent", this.textSizePercent);
         extraAttrs.addProperty("centerTextSizePercent", this.centerTextSizePercent);
@@ -1058,9 +1063,9 @@ public class WheelPad extends Element {
             }
         });
 
-        setupColorPickerButton(normalColor, () -> this.normalColor, this::setElementNormalColor);
-        setupColorPickerButton(pressedColor, () -> this.pressedColor, this::setElementPressedColor);
-        setupColorPickerButton(backgroundColor, () -> this.backgroundColor, this::setElementBackgroundColor);
+        CrownColorPickerBinder.bind(this, normalColor, () -> this.normalColor, this::setElementNormalColor);
+        CrownColorPickerBinder.bind(this, pressedColor, () -> this.pressedColor, this::setElementPressedColor);
+        CrownColorPickerBinder.bind(this, backgroundColor, () -> this.backgroundColor, this::setElementBackgroundColor);
 
         copy.setOnClickListener(v -> {
             ContentValues cv = new ContentValues();
@@ -1162,6 +1167,21 @@ public class WheelPad extends Element {
 
     protected void setElementBackgroundColor(int backgroundColor) {
         this.backgroundColor = backgroundColor;
+        invalidate();
+    }
+
+    protected void setElementNormalTextColor(int normalTextColor) {
+        this.normalTextColor = normalTextColor;
+        invalidate();
+    }
+
+    protected void setElementPressedTextColor(int pressedTextColor) {
+        this.pressedTextColor = pressedTextColor;
+        invalidate();
+    }
+
+    protected void setElementCenterTextColor(int centerTextColor) {
+        this.centerTextColor = centerTextColor;
         invalidate();
     }
 
@@ -1491,38 +1511,4 @@ public class WheelPad extends Element {
         }
     }
 
-    private interface IntSupplier {
-        int get();
-    }
-
-    private interface IntConsumer {
-        void accept(int value);
-    }
-
-    private void updateColorDisplay(ElementEditText colorDisplay, int color) {
-        colorDisplay.setTextWithNoTextChangedCallBack(String.format("%08X", color));
-        colorDisplay.setBackgroundColor(color);
-        double luminance = (0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)) / 255;
-        colorDisplay.setTextColor(luminance > 0.5 ? Color.BLACK : Color.WHITE);
-        colorDisplay.setGravity(Gravity.CENTER);
-    }
-
-    private void setupColorPickerButton(ElementEditText colorDisplay, IntSupplier initialColorFetcher, IntConsumer colorUpdater) {
-        colorDisplay.setFocusable(false);
-        colorDisplay.setCursorVisible(false);
-        colorDisplay.setKeyListener(null);
-        updateColorDisplay(colorDisplay, initialColorFetcher.get());
-        colorDisplay.setOnClickListener(v -> {
-            new ColorPickerDialog(
-                    getContext(),
-                    initialColorFetcher.get(),
-                    true,
-                    newColor -> {
-                        colorUpdater.accept(newColor);
-                        save();
-                        updateColorDisplay(colorDisplay, newColor);
-                    }
-            ).show();
-        });
-    }
 }
