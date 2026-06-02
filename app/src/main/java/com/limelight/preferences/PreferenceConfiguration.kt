@@ -536,10 +536,7 @@ class PreferenceConfiguration {
         const val AUDIO_PASSTHROUGH_BUFFER_PREF_STRING = "list_audio_passthrough_buffer"
         const val DEFAULT_AUDIO_PASSTHROUGH_BUFFER = "normal"
         const val UNLOCK_FPS_STRING = "checkbox_unlock_fps"
-        const val IMPORT_CONFIG_STRING = "import_super_config"
-        const val EXPORT_CONFIG_STRING = "export_super_config"
-        const val MERGE_CONFIG_STRING = "merge_super_config"
-        const val ABOUT_AUTHOR = "about_author"
+        const val CROWN_CONFIG_MANAGEMENT_STRING = "crown_config_management"
 
         // ---- Default values (package-private promoted to public) ----
         const val DEFAULT_RESOLUTION = "1920x1080"

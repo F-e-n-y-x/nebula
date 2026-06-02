@@ -299,7 +299,6 @@
     <string name="accessibility_service_description">Para proporcionar una experiencia completa de juegos de PC con tu teclado externo, este servicio necesita capturar todas las teclas del teclado.\n\nUna vez habilitado, podrás usar todos los atajos del sistema como las teclas Win/Command, Alt+Tab, etc., igual que en tu computadora.\n\nTen la seguridad de que este servicio solo se usa para enviar operaciones de teclas directamente a tu computadora, y no grabaremos ni subiremos ningún contenido de tu entrada.</string>
     <string name="add_resolution">Agregar Resolución</string>
     <string name="applist_menu_start_with_vdd"> Iniciar Con Pantalla Virtual </string>
-    <string name="author_web">https://space.bilibili.com/393593468</string>
     <string name="category_crown_features">Área de Características Crown</string>
     <string name="category_enhanced_touch_settings">👆 Toque Multi-Punto Mejorado</string>
     <string name="category_screen_position_settings">Configuración de Pantalla</string>
@@ -414,7 +413,6 @@
     <string name="suffix_seekbar_flat_region_pixels">píxeles</string>
     <string name="suffix_seekbar_keyboard_toggle_fingers_native_touch"> </string>
     <string name="suffix_seekbar_mic_bitrate_kbps">kbps</string>
-    <string name="summary_about_author">Crown\'s Bilibili: XiguaHub, por favor síguelos. GitHub: https://github.com/WACrown/moonlight-android</string>
     <string name="summary_about_mode">Ver información de la aplicación y detalles del proyecto</string>
     <string name="summary_background_image_api">Ingresa una API de imagen de fondo personalizada, o una URL de imagen única. Deja vacío para ver imágenes aleatorias</string>
     <string name="summary_check_for_updates">Verificar si hay una nueva versión disponible</string>
@@ -465,7 +463,6 @@
     <string name="tip_virtual_display">💡 Consejo: La función de pantalla virtual puede crear espacios de pantalla independientes, especialmente adecuada para escenarios de multi-tarea, haciendo la transmisión más flexible~</string>
     <string name="tip_volume_keys">💡 Consejo: Usar WiFi de 5GHz proporciona una mejor experiencia, ¡velocidades súper rápidas~</string>
     <string name="tip_wallpaper_change">💡 Consejo: La opción de API de fondo de pantalla puede establecer la API para fuentes de fondo de pantalla aleatorias, o una dirección de imagen única</string>
-    <string name="title_about_author">Esto es V+ X Royal Edition</string>
     <string name="title_about_mode">Acerca de</string>
     <string name="title_background_image_api">API de Imagen de Fondo</string>
     <string name="title_checkbox_enable_enhanced_touch">Habilitar toque mejorado</string>

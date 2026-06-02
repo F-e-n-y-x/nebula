@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="author_web">https://space.bilibili.com/393593468</string>
 
     <!-- Shortcut strings -->
     <string name="scut_deleted_pc">PC deleted</string>
@@ -582,8 +581,12 @@
     <string name="summary_import_super_config">Import custom button and streaming settings configuration file</string>
     <string name="title_merge_super_config">Merge Configuration</string>
     <string name="summary_merge_super_config">Merge new configuration buttons into existing configuration</string>
-    <string name="title_about_author">This is V+ X Royal Edition</string>
-    <string name="summary_about_author">Crown\'s Bilibili: XiguaHub, please follow them. GitHub: https://github.com/WACrown/moonlight-android</string>
+    <string name="title_crown_config_management">Crown Configuration Management</string>
+    <string name="summary_crown_config_management">Import, export, or merge Crown profiles</string>
+    <string name="crown_config_action_import">Import Configuration</string>
+    <string name="crown_config_action_export">Export Configuration</string>
+    <string name="crown_config_action_merge">Merge Configuration</string>
+    <string name="crown_config_no_profiles">No Crown profiles available</string>
     
     <!-- Crown feature toggle -->
     <string name="crown_toggle_button">Crown</string>

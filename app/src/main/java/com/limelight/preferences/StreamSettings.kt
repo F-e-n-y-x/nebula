@@ -2,6 +2,7 @@
 package com.limelight.preferences
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -38,7 +39,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
-import androidx.core.net.toUri
 import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.preference.CheckBoxPreference
@@ -1150,9 +1150,78 @@ class StreamSettings : AppCompatActivity() {
             return map
         }
 
-        private fun applyConfigEntries(pref: ListPreference, map: Map<String, String>) {
-            pref.entries = map.values.toTypedArray<CharSequence>()
-            pref.entryValues = map.keys.toTypedArray<CharSequence>()
+        private fun openConfigDocument(requestCode: Int) {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            intent.addCategory(Intent.CATEGORY_OPENABLE)
+            intent.type = "*/*"
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, requestCode)
+        }
+
+        private fun createConfigDocument(fileName: String) {
+            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            intent.addCategory(Intent.CATEGORY_OPENABLE)
+            intent.type = "*/*"
+            intent.putExtra(Intent.EXTRA_TITLE, "$fileName.mdat")
+            @Suppress("DEPRECATION")
+            startActivityForResult(intent, 1)
+        }
+
+        private fun showCrownConfigManagementDialog() {
+            val options = arrayOf(
+                    getString(R.string.crown_config_action_import),
+                    getString(R.string.crown_config_action_export),
+                    getString(R.string.crown_config_action_merge)
+            )
+
+            AlertDialog.Builder(requireActivity(), R.style.AppDialogStyle)
+                    .setTitle(R.string.title_crown_config_management)
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> openConfigDocument(2)
+                            1 -> showCrownExportConfigDialog()
+                            2 -> showCrownMergeConfigDialog()
+                        }
+                    }
+                    .show()
+        }
+
+        private fun showCrownExportConfigDialog() {
+            val helper = SuperConfigDatabaseHelper(context)
+            val configMap = loadConfigMap(helper)
+            if (configMap.isEmpty()) {
+                Toast.makeText(context, R.string.crown_config_no_profiles, Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            val ids = configMap.keys.toTypedArray()
+            val names = configMap.values.toTypedArray<CharSequence>()
+            AlertDialog.Builder(requireActivity(), R.style.AppDialogStyle)
+                    .setTitle(R.string.title_export_super_config)
+                    .setItems(names) { _, which ->
+                        val id = ids[which]
+                        exportConfigString = helper.exportConfig(id.toLong())
+                        createConfigDocument(configMap[id] ?: "crown_config")
+                    }
+                    .show()
+        }
+
+        private fun showCrownMergeConfigDialog() {
+            val configMap = loadConfigMap(SuperConfigDatabaseHelper(context))
+            if (configMap.isEmpty()) {
+                Toast.makeText(context, R.string.crown_config_no_profiles, Toast.LENGTH_SHORT).show()
+                return
+            }
+
+            val ids = configMap.keys.toTypedArray()
+            val names = configMap.values.toTypedArray<CharSequence>()
+            AlertDialog.Builder(requireActivity(), R.style.AppDialogStyle)
+                    .setTitle(R.string.title_merge_super_config)
+                    .setItems(names) { _, which ->
+                        exportConfigString = ids[which]
+                        openConfigDocument(3)
+                    }
+                    .show()
         }
 
         /**
@@ -1770,59 +1839,13 @@ class StreamSettings : AppCompatActivity() {
                         // Allow the original preference change to take place
                         true
                     }
-            findPreference<Preference>(PreferenceConfiguration.IMPORT_CONFIG_STRING)!!.onPreferenceClickListener =
+            findPreference<Preference>(PreferenceConfiguration.CROWN_CONFIG_MANAGEMENT_STRING)!!.onPreferenceClickListener =
                     Preference.OnPreferenceClickListener {
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                        intent.addCategory(Intent.CATEGORY_OPENABLE)
-                        intent.type = "*/*"
-                        @Suppress("DEPRECATION")
-                        startActivityForResult(intent, 2)
-                        false
-                    }
-
-            val exportPreference = findPreference<ListPreference>(PreferenceConfiguration.EXPORT_CONFIG_STRING)!!
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val superConfigDatabaseHelper = SuperConfigDatabaseHelper(context)
-                val configMap = loadConfigMap(superConfigDatabaseHelper)
-                applyConfigEntries(exportPreference, configMap)
-
-                exportPreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
-                    exportConfigString = superConfigDatabaseHelper.exportConfig((newValue as String).toLong())
-                    val fileName = configMap[newValue]
-                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
-                    intent.addCategory(Intent.CATEGORY_OPENABLE)
-                    intent.type = "*/*"
-                    intent.putExtra(Intent.EXTRA_TITLE, "$fileName.mdat")
-                    @Suppress("DEPRECATION")
-                    startActivityForResult(intent, 1)
-                    false
-                }
-            }
-
-            addCustomResolutionsEntries()
-            val mergePreference = findPreference<ListPreference>(PreferenceConfiguration.MERGE_CONFIG_STRING)!!
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                val superConfigDatabaseHelper = SuperConfigDatabaseHelper(context)
-                applyConfigEntries(mergePreference, loadConfigMap(superConfigDatabaseHelper))
-
-                mergePreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
-                    exportConfigString = newValue as String
-                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-                    intent.addCategory(Intent.CATEGORY_OPENABLE)
-                    intent.type = "*/*"
-                    @Suppress("DEPRECATION")
-                    startActivityForResult(intent, 3)
-                    false
-                }
-            }
-
-            findPreference<Preference>(PreferenceConfiguration.ABOUT_AUTHOR)!!.onPreferenceClickListener =
-                    Preference.OnPreferenceClickListener {
-                        val intent = Intent(Intent.ACTION_VIEW,
-                            getString(R.string.author_web).toUri())
-                        startActivity(intent)
+                        showCrownConfigManagementDialog()
                         true
                     }
+
+            addCustomResolutionsEntries()
 
             // 添加检查更新选项的点击事件
             findPreference<Preference>("check_for_updates")!!.onPreferenceClickListener =
@@ -1965,8 +1988,6 @@ class StreamSettings : AppCompatActivity() {
                                     0 -> {
                                         Toast.makeText(context, "导入配置文件成功", Toast.LENGTH_SHORT).show()
                                         //更新导出配置文件列表
-                                        val exportPref = findPreference<ListPreference>(PreferenceConfiguration.EXPORT_CONFIG_STRING)!!
-                                        applyConfigEntries(exportPref, loadConfigMap(superConfigDatabaseHelper))
                                     }
                                     -1, -2 -> Toast.makeText(context, "读取配置文件失败", Toast.LENGTH_SHORT).show()
                                     -3 -> Toast.makeText(context, "配置文件版本不匹配", Toast.LENGTH_SHORT).show()

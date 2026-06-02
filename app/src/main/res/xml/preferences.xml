@@ -806,22 +806,10 @@
             android:key="checkbox_show_onscreen_keyboard"
             android:summary="@string/summary_crown_super_features"
             android:title="@string/title_crown_super_features" />
-        <ListPreference
-            android:key="export_super_config"
-            android:title="@string/title_export_super_config"
-            android:summary="@string/summary_export_super_config" />
         <Preference
-            android:key="import_super_config"
-            android:title="@string/title_import_super_config"
-            android:summary="@string/summary_import_super_config" />
-        <ListPreference
-            android:key="merge_super_config"
-            android:title="@string/title_merge_super_config"
-            android:summary="@string/summary_merge_super_config" />
-        <Preference
-            android:key="about_author"
-            android:title="@string/title_about_author"
-            android:summary="@string/summary_about_author" />
+            android:key="crown_config_management"
+            android:title="@string/title_crown_config_management"
+            android:summary="@string/summary_crown_config_management" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/category_help"
         android:key="category_help"

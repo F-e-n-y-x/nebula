@@ -514,8 +514,12 @@
     <string name="summary_import_super_config">导入自定义按钮的和串流内设置的配置文件。</string>
     <string name="title_merge_super_config">合并配置</string>
     <string name="summary_merge_super_config">将新的配置的按键合并到现有配置中。</string>
-    <string name="title_about_author">这是 V+ X 皇家版本</string>
-    <string name="summary_about_author">王冠的B站：西瓜hub，请关注TA。\ngithub： https://github.com/WACrown/moonlight-android</string>
+    <string name="title_crown_config_management">王冠配置管理</string>
+    <string name="summary_crown_config_management">导入、导出或合并王冠配置档案。</string>
+    <string name="crown_config_action_import">导入配置</string>
+    <string name="crown_config_action_export">导出配置</string>
+    <string name="crown_config_action_merge">合并配置</string>
+    <string name="crown_config_no_profiles">暂无可用的王冠配置档案</string>
 
     <!-- 王冠功能切换 -->
     <string name="crown_toggle_button">王冠</string>
