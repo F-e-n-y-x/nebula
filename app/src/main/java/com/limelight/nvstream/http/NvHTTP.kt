@@ -10,6 +10,7 @@ import java.io.StringReader
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.Proxy
+import java.net.URLEncoder
 import java.security.KeyManagementException
 import java.security.KeyStore
 import java.security.NoSuchAlgorithmException
@@ -647,8 +648,8 @@ class NvHTTP(
             queryParams += "&customVddScreenMode=$customVddScreenMode"
         }
 
-        if (!context.displayName.isNullOrEmpty()) {
-            queryParams += "&display_name=${context.displayName}"
+        context.displayName?.takeIf { it.isNotEmpty() }?.let { displayName ->
+            queryParams += "&display_name=${URLEncoder.encode(displayName, "UTF-8")}"
         }
 
         queryParams += MoonBridge.getLaunchUrlQueryParameters()
