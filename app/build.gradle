@@ -217,4 +217,6 @@ dependencies {
     implementation libs.kotlin.stdlib
     implementation libs.kotlinx.coroutines.android
     implementation libs.androidx.lifecycle.runtime.ktx
+
+    testImplementation libs.junit
 }

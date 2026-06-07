@@ -857,7 +857,7 @@ class ComputerManagerService : Service() {
         val nowMs = SystemClock.elapsedRealtime()
         val freshResult = getFreshPollResult(details, nowMs)
         if (freshResult != null) {
-            details.update(freshResult)
+            details.update(TrustedPairState.sanitizePollResult(details, freshResult))
             return true
         }
 
@@ -870,8 +870,9 @@ class ComputerManagerService : Service() {
 
             val polledDetails = pollFlight?.result
             if (polledDetails != null) {
-                details.update(polledDetails)
-                rememberPollResult(details, polledDetails, pollFlight.completedAtMs)
+                val trustedDetails = TrustedPairState.sanitizePollResult(details, polledDetails)
+                details.update(trustedDetails)
+                rememberPollResult(details, trustedDetails, pollFlight.completedAtMs)
                 LimeLog.info("Fast poll: reused in-flight result for ${details.name ?: getPrimaryPollKey(details)}")
                 return true
             }
@@ -886,9 +887,10 @@ class ComputerManagerService : Service() {
 
             if (polledDetails != null) {
                 val completedAtMs = SystemClock.elapsedRealtime()
-                details.update(polledDetails)
-                rememberPollResult(details, polledDetails, completedAtMs)
-                pollFlight?.result = ComputerDetails(polledDetails)
+                val trustedDetails = TrustedPairState.sanitizePollResult(details, polledDetails)
+                details.update(trustedDetails)
+                rememberPollResult(details, trustedDetails, completedAtMs)
+                pollFlight?.result = ComputerDetails(trustedDetails)
                 pollFlight?.completedAtMs = completedAtMs
                 return true
             }

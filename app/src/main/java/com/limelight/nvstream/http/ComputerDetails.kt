@@ -56,6 +56,7 @@ class ComputerDetails {
     var httpsPort = 0
     var externalPort = 0
     var pairState: PairingManager.PairState? = null
+    var serverInfoTrustedByCert = false
     var runningGameId = 0
     var rawAppList: String? = null
     var nvidiaServer = false
@@ -110,6 +111,7 @@ class ComputerDetails {
         this.externalPort = details.externalPort
         this.httpsPort = details.httpsPort
         this.pairState = details.pairState
+        this.serverInfoTrustedByCert = details.serverInfoTrustedByCert
         this.runningGameId = details.runningGameId
         this.nvidiaServer = details.nvidiaServer
         this.useVdd = details.useVdd

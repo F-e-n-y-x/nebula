@@ -79,6 +79,7 @@ class NvHTTP(
     private lateinit var trustManager: X509TrustManager
     private lateinit var keyManager: X509KeyManager
     internal var serverCert: X509Certificate? = null
+    private var lastServerInfoTrustedByCert = false
 
     data class TimeoutConfig(
         val connectTimeoutMs: Int,
@@ -242,6 +243,7 @@ class NvHTTP(
     @Throws(IOException::class, XmlPullParserException::class, InterruptedException::class)
     fun getServerInfo(likelyOnline: Boolean): String {
         val client = if (likelyOnline) httpClientLongConnectTimeout else httpClientShortConnectTimeout
+        lastServerInfoTrustedByCert = false
 
         if (serverCert != null) {
             try {
@@ -256,6 +258,7 @@ class NvHTTP(
                     }
                 }
                 getServerVersion(resp)
+                lastServerInfoTrustedByCert = true
                 return resp
             } catch (e: HostHttpResponseException) {
                 if (e.getErrorCode() == 401) {
@@ -289,6 +292,7 @@ class NvHTTP(
         details.remoteAddress = makeTuple(getXmlString(serverInfo, "ExternalIP", false), details.externalPort)
 
         details.pairState = getPairState(serverInfo)
+        details.serverInfoTrustedByCert = lastServerInfoTrustedByCert
         details.runningGameId = getCurrentGame(serverInfo)
 
         details.nvidiaServer = getXmlString(serverInfo, "state", true)!!.contains("MJOLNIR")
