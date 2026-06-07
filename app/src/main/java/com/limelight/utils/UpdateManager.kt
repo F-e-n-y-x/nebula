@@ -767,32 +767,77 @@ object UpdateManager {
 
     private fun isNewVersionAvailable(currentVersion: String, latestVersion: String): Boolean {
         try {
-            // 去除 v/V 前缀及 "-beta" / "-rc1" / "+build" 等语义后缀，仅比较点分数字段
-            val current = currentVersion.replaceFirst("^[Vv]".toRegex(), "").split('-', '+', ' ', '_')[0]
-            val latest = latestVersion.replaceFirst("^[Vv]".toRegex(), "").split('-', '+', ' ', '_')[0]
-
-            val currentParts = current.split(".")
-            val latestParts = latest.split(".")
-
-            val maxLength = currentParts.size.coerceAtLeast(latestParts.size)
-
-            for (i in 0 until maxLength) {
-                // 非数字段忍耐为 0，避免 NumberFormatException 倒致“看不到新版本”
-                val currentPart = if (i < currentParts.size) currentParts[i].toIntOrNull() ?: 0 else 0
-                val latestPart = if (i < latestParts.size) latestParts[i].toIntOrNull() ?: 0 else 0
-
-                if (latestPart > currentPart) {
-                    return true
-                } else if (latestPart < currentPart) {
-                    return false
-                }
-            }
-            return false
+            return compareVersions(latestVersion, currentVersion) > 0
         } catch (e: Exception) {
             Log.e(TAG, "版本号格式错误: current=$currentVersion, latest=$latestVersion", e)
             return false
         }
     }
+
+    private fun compareVersions(leftVersion: String, rightVersion: String): Int {
+        val left = parseVersion(leftVersion)
+        val right = parseVersion(rightVersion)
+
+        val numberCount = left.numbers.size.coerceAtLeast(right.numbers.size)
+        for (i in 0 until numberCount) {
+            val leftNumber = left.numbers.getOrElse(i) { 0 }
+            val rightNumber = right.numbers.getOrElse(i) { 0 }
+            if (leftNumber != rightNumber) {
+                return leftNumber.compareTo(rightNumber)
+            }
+        }
+
+        if (left.qualifierRank != right.qualifierRank) {
+            return left.qualifierRank.compareTo(right.qualifierRank)
+        }
+
+        val qualifierNumberCount = left.qualifierNumbers.size.coerceAtLeast(right.qualifierNumbers.size)
+        for (i in 0 until qualifierNumberCount) {
+            val leftNumber = left.qualifierNumbers.getOrElse(i) { 0 }
+            val rightNumber = right.qualifierNumbers.getOrElse(i) { 0 }
+            if (leftNumber != rightNumber) {
+                return leftNumber.compareTo(rightNumber)
+            }
+        }
+
+        return 0
+    }
+
+    private fun parseVersion(version: String): ParsedVersion {
+        val normalized = version.trim()
+                .replaceFirst("^[Vv]".toRegex(), "")
+                .substringBefore('+')
+        val qualifierStart = normalized.indexOfFirst { it == '-' || it == '_' || it.isWhitespace() }
+        val numberPart = if (qualifierStart >= 0) normalized.substring(0, qualifierStart) else normalized
+        val qualifierPart = if (qualifierStart >= 0) normalized.substring(qualifierStart + 1) else ""
+        val numbers = numberPart.split('.')
+                .map { part -> part.toIntOrNull() ?: 0 }
+                .ifEmpty { listOf(0) }
+        val qualifierTokens = qualifierPart
+                .lowercase()
+                .split('.', '-', '_', ' ')
+                .filter { it.isNotBlank() }
+        val qualifierName = qualifierTokens.firstOrNull { token -> token.any { it.isLetter() } } ?: ""
+        val qualifierRank = when (qualifierName) {
+            "hotfix", "fix", "patch" -> 1
+            "", "stable", "release", "final" -> 0
+            "rc" -> -1
+            "beta" -> -2
+            "alpha" -> -3
+            else -> -1
+        }
+        val qualifierNumbers = qualifierTokens.mapNotNull { token ->
+            "\\d+".toRegex().find(token)?.value?.toIntOrNull()
+        }
+
+        return ParsedVersion(numbers, qualifierRank, qualifierNumbers)
+    }
+
+    private data class ParsedVersion(
+            val numbers: List<Int>,
+            val qualifierRank: Int,
+            val qualifierNumbers: List<Int>
+    )
 
     // ------------------------------------------------------------------
     // 代理相关（保持原有逻辑）
