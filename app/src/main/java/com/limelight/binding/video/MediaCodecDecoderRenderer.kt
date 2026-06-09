@@ -25,6 +25,7 @@ import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 class MediaCodecDecoderRenderer(
@@ -105,6 +106,17 @@ class MediaCodecDecoderRenderer(
     private var initialHeight = 0
     private var videoFormat = 0
     private var renderTarget: SurfaceHolder? = null
+    /**
+     * 阶段 3 framegen 注入点：非 null 时，MediaCodec.configure() 用该 Surface 替代
+     * renderTarget.surface，把解码帧导向 ImageReader 而不是直接上屏。null 表示走原路径。
+     * 仅在 decoder 未配置（[configureAndStartDecoder] 调用前）期间设置才生效；
+     * 运行中切换需要先 [pauseProcessing] / [resumeProcessing]。
+     */
+    @Volatile
+    var framegenSurface: android.view.Surface? = null
+    @Volatile
+    private var framegenOutputSwitchPending = false
+    private val framegenOutputSwitchRequested = AtomicBoolean(false)
     @Volatile
     private var stopping = false
     private var reportedCrash = false
@@ -329,6 +341,42 @@ class MediaCodecDecoderRenderer(
 
     fun setRenderTarget(renderTarget: SurfaceHolder) {
         this.renderTarget = renderTarget
+    }
+
+    private fun requestFramegenOutputSurfaceSwitch(reason: String) {
+        if (!framegenOutputSwitchPending || stopping) {
+            return
+        }
+        if (!framegenOutputSwitchRequested.compareAndSet(false, true)) {
+            return
+        }
+
+        val switchAction = Runnable {
+            val targetSurface = framegenSurface
+            val decoder = videoDecoder
+            if (!framegenOutputSwitchPending || stopping || targetSurface == null || decoder == null) {
+                framegenOutputSwitchPending = false
+                return@Runnable
+            }
+
+            val startMs = SystemClock.uptimeMillis()
+            try {
+                decoder.setOutputSurface(targetSurface)
+                framegenOutputSwitchPending = false
+                LimeLog.info(
+                    "Framegen delayed capture switch to ImageReader after $reason " +
+                        "elapsed=${SystemClock.uptimeMillis() - startMs}ms"
+                )
+            } catch (t: Throwable) {
+                framegenOutputSwitchPending = false
+                LimeLog.warning(
+                    "Framegen delayed capture switch failed after $reason: " +
+                        "${t.javaClass.simpleName}: ${t.message}; staying on direct SurfaceView"
+                )
+            }
+        }
+
+        codecCallbackHandler?.post(switchAction) ?: switchAction.run()
     }
 
     init {
@@ -675,7 +723,26 @@ class MediaCodecDecoderRenderer(
 
         LimeLog.info("Configuring with format: $format")
 
-        videoDecoder!!.configure(format, renderTarget!!.surface, null, 0)
+        // 阶段 3：framegenSurface 非空时走 ImageReader 截流路径，原 SurfaceView 不再接收帧。
+        // 注意：HDR DataSpace 设置仍作用在 renderTarget!!.surface 上 —— 阶段 3.1 暂不
+        // 关心 HDR 路径下的截流（一切 framegen 路径强制 SDR 处理）。
+        val pendingFramegenSurface = framegenSurface
+        framegenOutputSwitchRequested.set(false)
+        framegenOutputSwitchPending =
+            pendingFramegenSurface != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+        val outSurface = if (framegenOutputSwitchPending) {
+            LimeLog.info(
+                "Framegen delayed capture active: decoder starts on SurfaceView " +
+                    "and will switch to ImageReader after first direct frame"
+            )
+            renderTarget!!.surface
+        } else {
+            if (pendingFramegenSurface != null) {
+                LimeLog.info("Framegen capture surface active (decoder output redirected to ImageReader)")
+            }
+            pendingFramegenSurface ?: renderTarget!!.surface
+        }
+        videoDecoder!!.configure(format, outSurface, null, 0)
 
         // Set DataSpace on the output Surface for HDR content.
         // Equivalent to HarmonyOS OH_NativeWindow_SetColorSpace().
@@ -863,6 +930,7 @@ class MediaCodecDecoderRenderer(
                 if (!firstFrameDelivered) {
                     firstFrameDelivered = true
                     try { firstFrameCallback?.invoke() } catch (_: Throwable) {}
+                    requestFramegenOutputSurfaceSwitch("first rendered frame")
                 }
 
                 // presentationTimeUs: 我们告诉系统这一帧应该在什么时间点显示
@@ -1193,6 +1261,7 @@ class MediaCodecDecoderRenderer(
                 if (!firstFrameDelivered) {
                     firstFrameDelivered = true
                     try { firstFrameCallback?.invoke() } catch (_: Throwable) {}
+                    requestFramegenOutputSurfaceSwitch("first released frame")
                 }
             } catch (e: IllegalStateException) {
                 handleDecoderException(e)

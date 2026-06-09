@@ -21,6 +21,8 @@ import com.limelight.binding.input.driver.UsbDriverService
 import com.limelight.binding.input.evdev.EvdevListener
 import com.limelight.binding.input.virtual_controller.VirtualController
 import com.limelight.binding.video.MediaCodecDecoderRenderer
+import com.limelight.framegen.FramegenCapture
+import com.limelight.framegen.FramegenInterceptor
 import com.limelight.binding.video.MediaCodecHelper
 import com.limelight.binding.video.PerfOverlayListener
 import com.limelight.binding.video.PerformanceInfo
@@ -35,6 +37,7 @@ import com.limelight.nvstream.input.ClipboardSyncManager
 import com.limelight.nvstream.input.MouseButtonPacket
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.preferences.GlPreferences
+import com.limelight.preferences.FramegenSettings
 import com.limelight.preferences.PreferenceConfiguration
 import com.limelight.services.StreamNotificationService
 import com.limelight.ui.CursorView
@@ -69,6 +72,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.preference.PreferenceManager
 import android.util.Rational
 import android.view.Display
@@ -98,6 +102,7 @@ import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Locale
+import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 import androidx.core.content.edit
 import androidx.core.net.toUri
@@ -178,6 +183,9 @@ class Game : Activity(), SurfaceHolder.Callback,
     lateinit var keyboardInputHandler: KeyboardInputHandler
 
     private var decoderRenderer: MediaCodecDecoderRenderer? = null
+    private var framegenCapture: FramegenCapture? = null
+    private var framegenInputHdrEnabled = false
+    private var framegenEnabledToastShown = false
     private var reportedCrash = false
 
     private var highPerfWifiLock: WifiManager.WifiLock? = null
@@ -595,11 +603,31 @@ class Game : Activity(), SurfaceHolder.Callback,
         get() = PreferenceManager.getDefaultSharedPreferences(this)
             .getBoolean("checkbox_resume_stream", false)
 
+    private fun isFramegenConfigured(prefs: SharedPreferences = defaultPreferences()): Boolean =
+        FramegenInterceptor.isAvailable() && FramegenSettings.isAllowedByUser(prefs)
+
+    private fun shouldUseFramegen(prefs: SharedPreferences = defaultPreferences()): Boolean =
+        isFramegenConfigured(prefs) &&
+            FramegenSettings.isCaptureResolutionSupported(prefConfig.width, prefConfig.height)
+
+    private fun framegenPresentationFps(prefs: SharedPreferences = defaultPreferences()): Int {
+        val inputFps = prefConfig.fps
+        return if (shouldUseFramegen(prefs) && inputFps in 1..MAX_FRAMEGEN_DOUBLING_INPUT_FPS) {
+            inputFps * 2
+        } else {
+            inputFps
+        }
+    }
+
+    private fun defaultPreferences(): SharedPreferences =
+        PreferenceManager.getDefaultSharedPreferences(this)
+
     /**
      * Parse intent extras, build stream config, create NvConnection + ControllerHandler.
      * Shared by [onCreate] (first launch) and [prepareConnection] (resume reconnect).
      */
     private fun createConnectionAndHandler() {
+        framegenEnabledToastShown = false
         val host = intent.getStringExtra(EXTRA_HOST) ?: ""
         val port = intent.getIntExtra(EXTRA_PORT, NvHTTP.DEFAULT_HTTP_PORT)
         val httpsPort = intent.getIntExtra(EXTRA_HTTPS_PORT, 0)
@@ -761,6 +789,8 @@ class Game : Activity(), SurfaceHolder.Callback,
             }
         }
 
+        framegenInputHdrEnabled = willStreamHdr && prefConfig.hdrMode != MoonBridge.HDR_MODE_SDR
+
         val config = StreamConfiguration.Builder()
             .setResolution(prefConfig.width, prefConfig.height)
             .setLaunchRefreshRate(prefConfig.fps)
@@ -805,6 +835,16 @@ class Game : Activity(), SurfaceHolder.Callback,
         val config: StreamConfiguration,
         val displayRefreshRate: Float,
         val clientRefreshRateX100: Int
+    )
+
+    private data class FramegenRuntimeConfig(
+        val losslessDllPath: String,
+        val presentationFps: Int,
+        val inputHdrEnabled: Boolean,
+        val internalWidth: Int,
+        val presentMode: Int,
+        val slowFrameThresholdMs: Int,
+        val presentQueueMax: Int
     )
 
     private fun prepareConnection() {
@@ -1045,7 +1085,19 @@ class Game : Activity(), SurfaceHolder.Callback,
     private fun prepareDisplayForRendering(): Float {
         val display = currentTargetDisplay
 
-        val result = DisplayModeManager.selectBestDisplayMode(display, prefConfig)
+        val presentationFps = framegenPresentationFps()
+        val displayConfig = if (presentationFps != prefConfig.fps) {
+            prefConfig.copy().apply {
+                fps = presentationFps
+            }
+        } else {
+            prefConfig
+        }
+        if (displayConfig.fps != prefConfig.fps) {
+            LimeLog.info("Framegen display target FPS: ${prefConfig.fps} -> ${displayConfig.fps}")
+        }
+
+        val result = DisplayModeManager.selectBestDisplayMode(display, displayConfig)
 
         val windowLayoutParams = window.attributes
         if (result.preferredModeId >= 0) {
@@ -1540,6 +1592,8 @@ class Game : Activity(), SurfaceHolder.Callback,
 
     override fun setHdrMode(enabled: Boolean, hdrMetadata: ByteArray?) {
         LimeLog.info("Display HDR mode: ${if (enabled) "enabled" else "disabled"}")
+        framegenInputHdrEnabled = enabled
+        FramegenInterceptor.configureHdrEnabled(enabled)
         decoderRenderer?.setHdrMode(enabled, hdrMetadata)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -1550,12 +1604,18 @@ class Game : Activity(), SurfaceHolder.Callback,
     private fun notifySystemHdrStatus(hdrEnabled: Boolean) {
         runOnUiThread {
             try {
+                val framegenSdrOutput = willFramegenOutputSdr()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    window.colorMode = if (hdrEnabled) ActivityInfo.COLOR_MODE_HDR else ActivityInfo.COLOR_MODE_DEFAULT
+                    window.colorMode =
+                        if (hdrEnabled && !framegenSdrOutput) {
+                            ActivityInfo.COLOR_MODE_HDR
+                        } else {
+                            ActivityInfo.COLOR_MODE_DEFAULT
+                        }
                 }
 
                 val params = window.attributes
-                if (hdrEnabled) {
+                if (hdrEnabled && !framegenSdrOutput) {
                     if (prefConfig.enableHdrHighBrightness) {
                         params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
                     }
@@ -1567,12 +1627,18 @@ class Game : Activity(), SurfaceHolder.Callback,
                 }
                 window.attributes = params
 
-                LimeLog.info("ColorOS HDR notification: Window color mode and brightness updated for HDR ${if (hdrEnabled) "enabled" else "disabled"}")
+                LimeLog.info(
+                    "ColorOS HDR notification: hdr=${if (hdrEnabled) "enabled" else "disabled"} " +
+                        "framegenSdr=$framegenSdrOutput"
+                )
             } catch (e: Exception) {
                 LimeLog.warning("Failed to notify ColorOS system HDR status: ${e.message}")
             }
         }
     }
+
+    private fun willFramegenOutputSdr(): Boolean =
+        framegenCapture != null || shouldUseFramegen()
 
     override fun setMotionEventState(controllerNumber: Short, motionType: Byte, reportRateHz: Short) {
         controllerHandler.handleSetMotionEventState(controllerNumber, motionType, reportRateHz)
@@ -1646,9 +1712,103 @@ class Game : Activity(), SurfaceHolder.Callback,
         controllerHandler.handleSetControllerLED(controllerNumber, r, g, b)
     }
 
+    private fun framegenConfigForStream(): FramegenRuntimeConfig? {
+        val prefs = defaultPreferences()
+        if (!isFramegenConfigured(prefs)) {
+            return null
+        }
+        if (!FramegenSettings.isCaptureResolutionSupported(prefConfig.width, prefConfig.height)) {
+            LimeLog.warning(
+                "Framegen disabled for ${prefConfig.width}x${prefConfig.height}: " +
+                    "exceeds ${FramegenSettings.MAX_CAPTURE_PIXELS} pixels"
+            )
+            return null
+        }
+
+        val dllPath = FramegenSettings.resolveLosslessDllPath(prefs) ?: return null
+
+        return FramegenRuntimeConfig(
+            losslessDllPath = dllPath,
+            presentationFps = framegenPresentationFps(prefs),
+            inputHdrEnabled = framegenInputHdrEnabled,
+            internalWidth = FramegenSettings.resolveInternalWidth(prefs),
+            presentMode = if (prefs.getBoolean(FramegenSettings.PREF_PRESENT_REAL_FIRST, false)) 1 else 0,
+            slowFrameThresholdMs = prefs.getInt(
+                FramegenSettings.PREF_SLOW_THRESHOLD_MS,
+                FramegenSettings.DEFAULT_SLOW_THRESHOLD_MS
+            ),
+            presentQueueMax = FramegenSettings.DEFAULT_PRESENT_QUEUE_MAX
+        )
+    }
+
+    private fun prepareFramegenSurface(outputSurface: Surface, showEnabledToast: Boolean) {
+        releaseFramegenCapture()
+
+        val config = framegenConfigForStream() ?: return
+        applyFramegenConfig(config)
+
+        val capture = FramegenCapture.create(prefConfig.width, prefConfig.height)
+        if (capture == null) {
+            LimeLog.warning("Framegen capture unavailable; using direct decoder output")
+            return
+        }
+
+        framegenCapture = capture
+        decoderRenderer?.framegenSurface = capture.surface
+        FramegenInterceptor.configureOutputSurface(outputSurface)
+        prewarmFramegen()
+
+        LimeLog.info(
+            "Framegen capture armed ${prefConfig.width}x${prefConfig.height} " +
+                "fps=${config.presentationFps} hdrIn=${config.inputHdrEnabled}"
+        )
+        if (showEnabledToast && !framegenEnabledToastShown) {
+            framegenEnabledToastShown = true
+            runOnUiThread {
+                Toast.makeText(this, R.string.toast_framegen_stream_enabled, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun applyFramegenConfig(config: FramegenRuntimeConfig) {
+        FramegenInterceptor.configureLosslessDllPath(config.losslessDllPath)
+        FramegenInterceptor.configureHdrEnabled(config.inputHdrEnabled)
+        FramegenInterceptor.configureOutputFrameRate(config.presentationFps)
+        FramegenInterceptor.configureTuning(
+            config.internalWidth,
+            config.presentMode,
+            config.slowFrameThresholdMs,
+            config.presentQueueMax
+        )
+    }
+
+    private fun prewarmFramegen() {
+        thread(name = "FramegenPrewarm", isDaemon = true) {
+            val startedAtMs = SystemClock.uptimeMillis()
+            val ok = FramegenInterceptor.prewarmContext(prefConfig.width, prefConfig.height)
+            LimeLog.info(
+                "Framegen prewarm ok=$ok elapsed=${SystemClock.uptimeMillis() - startedAtMs}ms"
+            )
+        }
+    }
+
+    private fun releaseFramegenCapture() {
+        framegenCapture?.release()
+        framegenCapture = null
+        decoderRenderer?.framegenSurface = null
+        FramegenInterceptor.configureOutputSurface(null)
+    }
+
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         if (!surfaceCreated) {
             throw IllegalStateException("Surface changed before creation!")
+        }
+
+        if (!attemptedConnection || (connected && isExtremeResumeEnabled && framegenCapture == null)) {
+            // setRenderTarget() may start the decoder, which reads framegenSurface.
+            prepareFramegenSurface(holder.surface, !attemptedConnection)
+        } else if (framegenCapture != null) {
+            FramegenInterceptor.configureOutputSurface(holder.surface)
         }
 
         decoderRenderer?.setRenderTarget(holder)
@@ -1673,8 +1833,9 @@ class Game : Activity(), SurfaceHolder.Callback,
     override fun surfaceCreated(holder: SurfaceHolder) {
         surfaceCreated = true
 
-        val desiredFrameRate: Float = if (DisplayModeManager.mayReduceRefreshRate(prefConfig) || desiredRefreshRate < prefConfig.fps) {
-            prefConfig.fps.toFloat()
+        val outputFps = framegenPresentationFps()
+        val desiredFrameRate: Float = if (DisplayModeManager.mayReduceRefreshRate(prefConfig) || desiredRefreshRate < outputFps) {
+            outputFps.toFloat()
         } else {
             desiredRefreshRate
         }
@@ -1708,13 +1869,17 @@ class Game : Activity(), SurfaceHolder.Callback,
                     LimeLog.info("Extreme Resume: Audio muted for background.")
                 }
                 decoderRenderer?.pauseProcessing()
+                releaseFramegenCapture()
                 return
             } else {
                 decoderRenderer?.prepareForStop()
+                releaseFramegenCapture()
                 if (connected) {
                     connectionCallbackHandler.stopConnection()
                 }
             }
+        } else {
+            releaseFramegenCapture()
         }
     }
 
@@ -1819,6 +1984,7 @@ class Game : Activity(), SurfaceHolder.Callback,
     }
 
     override fun onPerfUpdateV(performanceInfo: PerformanceInfo) {
+        enrichFramegenPerformanceInfo(performanceInfo)
         performanceOverlayManager?.updatePerformanceInfo(performanceInfo)
     }
 
@@ -1827,6 +1993,7 @@ class Game : Activity(), SurfaceHolder.Callback,
     }
 
     override fun onPerfUpdateWG(performanceInfo: PerformanceInfo) {
+        enrichFramegenPerformanceInfo(performanceInfo)
         // 缓存最新性能数据，供 ABR 服务使用
         latestPerfInfo = performanceInfo
 
@@ -1858,6 +2025,18 @@ class Game : Activity(), SurfaceHolder.Callback,
                 }
             }
         }
+    }
+
+    private fun enrichFramegenPerformanceInfo(performanceInfo: PerformanceInfo) {
+        val baseFps = prefConfig.fps
+        val outputFps = framegenPresentationFps()
+        performanceInfo.framegenFps =
+            if (framegenCapture != null && baseFps > 0 && outputFps > baseFps) {
+                val multiplier = outputFps.toFloat() / baseFps.toFloat()
+                (performanceInfo.renderedFps * multiplier).coerceAtMost(outputFps.toFloat())
+            } else {
+                0f
+            }
     }
 
     fun removePerformanceInfoDisplay(display: PerformanceInfoDisplay) {
@@ -2032,5 +2211,6 @@ class Game : Activity(), SurfaceHolder.Callback,
         val EXTRA_FORCE_RESUME_CURRENT_SESSION = "ForceResumeCurrentSession"
 
         private const val KEEP_ALIVE_NOTIFICATION_ID = 1001
+        private const val MAX_FRAMEGEN_DOUBLING_INPUT_FPS = 60
     }
 }
