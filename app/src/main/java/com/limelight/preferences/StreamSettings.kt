@@ -2124,6 +2124,7 @@ class StreamSettings : AppCompatActivity() {
             setupFramegenSelfTestPreference()
             setupFramegenLosslessDllPreference()
             setupFramegenEnabledPreference()
+            setupFramegenAdaptivePreference()
             setupFramegenQualityPreference()
             refreshDeveloperFeatureGateState()
             updateFramegenDllPreferenceSummary()
@@ -2203,6 +2204,30 @@ class StreamSettings : AppCompatActivity() {
                 }
         }
 
+        private fun setupFramegenAdaptivePreference() {
+            findPreference<CheckBoxPreference>(FramegenSettings.PREF_ADAPTIVE_ENABLED)?.onPreferenceChangeListener =
+                Preference.OnPreferenceChangeListener { _, newValue ->
+                    if (newValue == true) {
+                        val ctx = requireContext()
+                        val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+                        if (!DeveloperUnlockSettings.isUnlocked(prefs)) {
+                            showDeveloperUnlockDialog()
+                            return@OnPreferenceChangeListener false
+                        }
+                        if (!FramegenSettings.isLosslessDllReady(prefs)) {
+                            Toast.makeText(ctx, R.string.toast_framegen_need_lossless_dll, Toast.LENGTH_LONG).show()
+                            updateFramegenDllPreferenceSummary()
+                            return@OnPreferenceChangeListener false
+                        }
+                        if (!com.limelight.framegen.FramegenInterceptor.isAvailable()) {
+                            Toast.makeText(ctx, R.string.toast_framegen_unavailable, Toast.LENGTH_LONG).show()
+                            return@OnPreferenceChangeListener false
+                        }
+                    }
+                    true
+                }
+        }
+
         private fun setupFramegenQualityPreference() {
             findPreference<ListPreference>(FramegenSettings.PREF_QUALITY_PRESET)?.onPreferenceChangeListener =
                 Preference.OnPreferenceChangeListener { _, newValue ->
@@ -2242,6 +2267,20 @@ class StreamSettings : AppCompatActivity() {
                         else -> R.string.summary_framegen_enabled
                     }
                 )
+            }
+
+            updateFramegenAdaptivePreferenceState(prefs, unlocked, dllReady)
+        }
+
+        private fun updateFramegenAdaptivePreferenceState(
+            prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext()),
+            unlocked: Boolean = DeveloperUnlockSettings.isUnlocked(prefs),
+            dllReady: Boolean = FramegenSettings.isLosslessDllReady(prefs)
+        ) {
+            val showAdaptive = unlocked && dllReady
+            findPreference<CheckBoxPreference>(FramegenSettings.PREF_ADAPTIVE_ENABLED)?.let { pref ->
+                pref.isVisible = showAdaptive
+                pref.isEnabled = showAdaptive
             }
         }
 

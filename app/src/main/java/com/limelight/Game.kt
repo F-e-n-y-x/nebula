@@ -22,6 +22,7 @@ import com.limelight.binding.input.evdev.EvdevListener
 import com.limelight.binding.input.virtual_controller.VirtualController
 import com.limelight.binding.video.MediaCodecDecoderRenderer
 import com.limelight.framegen.FramegenCapture
+import com.limelight.framegen.FramegenAdaptiveController
 import com.limelight.framegen.FramegenInterceptor
 import com.limelight.binding.video.MediaCodecHelper
 import com.limelight.binding.video.PerfOverlayListener
@@ -184,6 +185,7 @@ class Game : Activity(), SurfaceHolder.Callback,
 
     private var decoderRenderer: MediaCodecDecoderRenderer? = null
     private var framegenCapture: FramegenCapture? = null
+    private val framegenAdaptiveController = FramegenAdaptiveController()
     private var framegenInputHdrEnabled = false
     private var framegenEnabledToastShown = false
     private var reportedCrash = false
@@ -603,16 +605,24 @@ class Game : Activity(), SurfaceHolder.Callback,
         get() = PreferenceManager.getDefaultSharedPreferences(this)
             .getBoolean("checkbox_resume_stream", false)
 
-    private fun isFramegenConfigured(prefs: SharedPreferences = defaultPreferences()): Boolean =
-        FramegenInterceptor.isAvailable() && FramegenSettings.isAllowedByUser(prefs)
+    private fun isFramegenReady(prefs: SharedPreferences = defaultPreferences()): Boolean =
+        FramegenInterceptor.isAvailable() && FramegenSettings.isReadyForUser(prefs)
+
+    private fun shouldUseRegularFramegen(prefs: SharedPreferences = defaultPreferences()): Boolean =
+        isFramegenReady(prefs) &&
+            FramegenSettings.isUserEnabled(prefs) &&
+            prefConfig.fps in 1..MAX_FRAMEGEN_DOUBLING_INPUT_FPS
+
+    private fun shouldUseWeakNetworkFramegen(prefs: SharedPreferences = defaultPreferences()): Boolean =
+        isFramegenReady(prefs) && FramegenSettings.isAdaptiveEnabled(prefs)
 
     private fun shouldUseFramegen(prefs: SharedPreferences = defaultPreferences()): Boolean =
-        isFramegenConfigured(prefs) &&
+        (shouldUseRegularFramegen(prefs) || shouldUseWeakNetworkFramegen(prefs)) &&
             FramegenSettings.isCaptureResolutionSupported(prefConfig.width, prefConfig.height)
 
     private fun framegenPresentationFps(prefs: SharedPreferences = defaultPreferences()): Int {
         val inputFps = prefConfig.fps
-        return if (shouldUseFramegen(prefs) && inputFps in 1..MAX_FRAMEGEN_DOUBLING_INPUT_FPS) {
+        return if (shouldUseRegularFramegen(prefs)) {
             inputFps * 2
         } else {
             inputFps
@@ -841,6 +851,8 @@ class Game : Activity(), SurfaceHolder.Callback,
         val losslessDllPath: String,
         val presentationFps: Int,
         val inputHdrEnabled: Boolean,
+        val adaptiveEnabled: Boolean,
+        val allowAdaptiveWithoutDoubling: Boolean,
         val internalWidth: Int,
         val presentMode: Int,
         val slowFrameThresholdMs: Int,
@@ -1714,7 +1726,12 @@ class Game : Activity(), SurfaceHolder.Callback,
 
     private fun framegenConfigForStream(): FramegenRuntimeConfig? {
         val prefs = defaultPreferences()
-        if (!isFramegenConfigured(prefs)) {
+        if (!isFramegenReady(prefs)) {
+            return null
+        }
+        val regularEnabled = shouldUseRegularFramegen(prefs)
+        val adaptiveEnabled = FramegenSettings.isAdaptiveEnabled(prefs)
+        if (!regularEnabled && !adaptiveEnabled) {
             return null
         }
         if (!FramegenSettings.isCaptureResolutionSupported(prefConfig.width, prefConfig.height)) {
@@ -1731,6 +1748,8 @@ class Game : Activity(), SurfaceHolder.Callback,
             losslessDllPath = dllPath,
             presentationFps = framegenPresentationFps(prefs),
             inputHdrEnabled = framegenInputHdrEnabled,
+            adaptiveEnabled = adaptiveEnabled,
+            allowAdaptiveWithoutDoubling = adaptiveEnabled && !regularEnabled,
             internalWidth = FramegenSettings.resolveInternalWidth(prefs),
             presentMode = if (prefs.getBoolean(FramegenSettings.PREF_PRESENT_REAL_FIRST, false)) 1 else 0,
             slowFrameThresholdMs = prefs.getInt(
@@ -1778,7 +1797,20 @@ class Game : Activity(), SurfaceHolder.Callback,
             config.internalWidth,
             config.presentMode,
             config.slowFrameThresholdMs,
-            config.presentQueueMax
+            config.presentQueueMax,
+            config.allowAdaptiveWithoutDoubling
+        )
+        framegenAdaptiveController.configure(
+            FramegenAdaptiveController.Config(
+                inputFps = prefConfig.fps,
+                presentationFps = config.presentationFps,
+                adaptiveEnabled = config.adaptiveEnabled,
+                allowAdaptiveWithoutDoubling = config.allowAdaptiveWithoutDoubling,
+                internalWidth = config.internalWidth,
+                presentMode = config.presentMode,
+                slowFrameThresholdMs = config.slowFrameThresholdMs,
+                presentQueueMax = config.presentQueueMax
+            )
         )
     }
 
@@ -1795,6 +1827,7 @@ class Game : Activity(), SurfaceHolder.Callback,
     private fun releaseFramegenCapture() {
         framegenCapture?.release()
         framegenCapture = null
+        framegenAdaptiveController.reset()
         decoderRenderer?.framegenSurface = null
         FramegenInterceptor.configureOutputSurface(null)
     }
@@ -1984,6 +2017,9 @@ class Game : Activity(), SurfaceHolder.Callback,
     }
 
     override fun onPerfUpdateV(performanceInfo: PerformanceInfo) {
+        if (framegenCapture != null) {
+            framegenAdaptiveController.onPerformanceInfo(performanceInfo)
+        }
         enrichFramegenPerformanceInfo(performanceInfo)
         performanceOverlayManager?.updatePerformanceInfo(performanceInfo)
     }
@@ -2014,6 +2050,13 @@ class Game : Activity(), SurfaceHolder.Callback,
                 perfAttrs[getString(R.string.perf_decoder)] = performanceInfo.decoder ?: ""
                 perfAttrs[getString(R.string.perf_resolution)] = "${performanceInfo.initialWidth}x${performanceInfo.initialHeight}"
                 perfAttrs[getString(R.string.perf_fps)] = String.format("%.0f", performanceInfo.totalFps)
+                perfAttrs[getString(R.string.perf_rx_fps)] = String.format("%.0f", performanceInfo.receivedFps)
+                perfAttrs[getString(R.string.perf_rd_fps)] = String.format("%.0f", performanceInfo.renderedFps)
+                perfAttrs[getString(R.string.perf_fg_fps)] = if (performanceInfo.framegenFps > 0.5f) {
+                    String.format("%.0f", performanceInfo.framegenFps)
+                } else {
+                    "0"
+                }
                 perfAttrs[getString(R.string.perf_frame_loss)] = String.format("%.1f", performanceInfo.lostFrameRate)
                 perfAttrs[getString(R.string.perf_network_rtt)] = String.format("%d", (performanceInfo.rttInfo shr 32).toInt())
                 perfAttrs[getString(R.string.perf_host_latency)] = String.format("%.2f", performanceInfo.aveHostProcessingLatency)
@@ -2027,13 +2070,30 @@ class Game : Activity(), SurfaceHolder.Callback,
         }
     }
 
+    override fun onVideoFrameLoss(framesLost: Int, frameNumber: Int) {
+        if (framegenCapture != null) {
+            framegenAdaptiveController.onFrameLossEvent(framesLost, frameNumber)
+        }
+    }
+
     private fun enrichFramegenPerformanceInfo(performanceInfo: PerformanceInfo) {
         val baseFps = prefConfig.fps
-        val outputFps = framegenPresentationFps()
+        val outputFps = framegenAdaptiveController.activePresentationFps
+            .takeIf { it > 0 }
+            ?: framegenPresentationFps()
         performanceInfo.framegenFps =
-            if (framegenCapture != null && baseFps > 0 && outputFps > baseFps) {
-                val multiplier = outputFps.toFloat() / baseFps.toFloat()
-                (performanceInfo.renderedFps * multiplier).coerceAtMost(outputFps.toFloat())
+            if (framegenCapture != null && baseFps > 0 && outputFps > 0) {
+                if (outputFps > baseFps) {
+                    val multiplier = outputFps.toFloat() / baseFps.toFloat()
+                    (performanceInfo.renderedFps * multiplier).coerceAtMost(outputFps.toFloat())
+                } else {
+                    val targetFps = outputFps.toFloat()
+                    if (performanceInfo.renderedFps >= targetFps * 0.95f) {
+                        0f
+                    } else {
+                        (performanceInfo.renderedFps * 2f).coerceAtMost(targetFps)
+                    }
+                }
             } else {
                 0f
             }
