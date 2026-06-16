@@ -2827,9 +2827,9 @@ class StreamSettings : AppCompatActivity() {
         }
 
         private fun setupFramegenPreferences() {
-            DeveloperUnlockSettings.migrateLegacyPrefs(
-                PreferenceManager.getDefaultSharedPreferences(requireContext())
-            )
+            val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+            DeveloperUnlockSettings.migrateLegacyPrefs(prefs)
+            FramegenSettings.migrateLegacyCustomScale(prefs, getSelectedStreamWidth(prefs))
             setupDeveloperUnlockPreference()
             setupFramegenSelfTestPreference()
             setupFramegenLosslessDllPreference()
@@ -2838,6 +2838,15 @@ class StreamSettings : AppCompatActivity() {
             setupFramegenQualityPreference()
             refreshDeveloperFeatureGateState()
             updateFramegenDllPreferenceSummary()
+        }
+
+        private fun getSelectedStreamWidth(prefs: SharedPreferences): Int {
+            val resolution = prefs.getString(
+                PreferenceConfiguration.RESOLUTION_PREF_STRING,
+                PreferenceConfiguration.DEFAULT_RESOLUTION
+            ) ?: PreferenceConfiguration.DEFAULT_RESOLUTION
+            return resolution.substringBefore('x').toIntOrNull()
+                ?: PreferenceConfiguration.DEFAULT_RESOLUTION.substringBefore('x').toInt()
         }
 
         private fun setupDeveloperUnlockPreference() {
