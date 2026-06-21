@@ -20,6 +20,11 @@
 #include <android/log.h>
 
 #define EVDEV_MAX_EVENT_SIZE 24
+#define EVDEV_PACKET_VERSION 1
+
+#define EVDEV_DEVICE_MOUSE 0x01
+#define EVDEV_DEVICE_KEYBOARD 0x02
+#define EVDEV_DEVICE_TOUCHPAD 0x04
 
 #define REL_X 0x00
 #define REL_Y 0x01
@@ -27,15 +32,37 @@
 #define BTN_LEFT 0x110
 #define BTN_GAMEPAD 0x130
 
+struct EvdevWirePacket {
+    int version;
+    int deviceId;
+    int deviceClass;
+    int eventSize;
+    int absXMin;
+    int absXMax;
+    int absYMin;
+    int absYMax;
+    int absXResolution;
+    int absYResolution;
+    char eventData[EVDEV_MAX_EVENT_SIZE];
+};
+
 struct DeviceEntry {
     struct DeviceEntry *next;
     pthread_t thread;
     int fd;
+    int deviceId;
+    int deviceClass;
+    struct input_absinfo absX;
+    struct input_absinfo absY;
     char devName[128];
 };
 
 static struct DeviceEntry *DeviceListHead;
 static int grabbing = 1;
+// When 0, hardware touchpads are left to Android's input stack (native mouse
+// behavior) instead of being grabbed and streamed as a precision touchpad.
+static int optimizeTouchpad = 1;
+static int NextDeviceId = 1;
 static pthread_mutex_t DeviceListLock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t SocketSendLock = PTHREAD_MUTEX_INITIALIZER;
 static int sock;
@@ -49,31 +76,66 @@ static int sock;
 #define test_bit(bit, array)    (array[bit/8] & (1<<(bit%8)))
 
 static int hasRelAxis(int fd, short axis) {
-    unsigned char relBitmask[(REL_MAX + 1) / 8];
+    unsigned char relBitmask[(REL_MAX + 8) / 8];
 
+    memset(relBitmask, 0, sizeof(relBitmask));
     ioctl(fd, EVIOCGBIT(EV_REL, sizeof(relBitmask)), relBitmask);
 
     return test_bit(axis, relBitmask);
 }
 
 static int hasKey(int fd, short key) {
-    unsigned char keyBitmask[(KEY_MAX + 1) / 8];
+    unsigned char keyBitmask[(KEY_MAX + 8) / 8];
 
+    memset(keyBitmask, 0, sizeof(keyBitmask));
     ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keyBitmask)), keyBitmask);
 
     return test_bit(key, keyBitmask);
 }
 
-static void outputEvdevData(char *data, int dataSize) {
-    char packetBuffer[EVDEV_MAX_EVENT_SIZE + sizeof(dataSize)];
+static int hasAbsAxis(int fd, short axis) {
+    unsigned char absBitmask[(ABS_MAX + 8) / 8];
+
+    memset(absBitmask, 0, sizeof(absBitmask));
+    ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absBitmask)), absBitmask);
+
+    return test_bit(axis, absBitmask);
+}
+
+static int hasInputProp(int fd, short prop) {
+    unsigned char propBitmask[(INPUT_PROP_MAX + 8) / 8];
+
+    memset(propBitmask, 0, sizeof(propBitmask));
+    ioctl(fd, EVIOCGPROP(sizeof(propBitmask)), propBitmask);
+
+    return test_bit(prop, propBitmask);
+}
+
+static void outputEvdevData(struct DeviceEntry *device, char *data, int dataSize) {
+    struct EvdevWirePacket packet;
+    int packetSize = sizeof(packet);
+    char packetBuffer[sizeof(packet) + sizeof(packetSize)];
+
+    memset(&packet, 0, sizeof(packet));
+    packet.version = EVDEV_PACKET_VERSION;
+    packet.deviceId = device->deviceId;
+    packet.deviceClass = device->deviceClass;
+    packet.eventSize = dataSize;
+    packet.absXMin = device->absX.minimum;
+    packet.absXMax = device->absX.maximum;
+    packet.absYMin = device->absY.minimum;
+    packet.absYMax = device->absY.maximum;
+    packet.absXResolution = device->absX.resolution;
+    packet.absYResolution = device->absY.resolution;
+    memcpy(packet.eventData, data, dataSize);
 
     // Copy the full packet into our buffer
-    memcpy(packetBuffer, &dataSize, sizeof(dataSize));
-    memcpy(&packetBuffer[sizeof(dataSize)], data, dataSize);
+    memcpy(packetBuffer, &packetSize, sizeof(packetSize));
+    memcpy(&packetBuffer[sizeof(packetSize)], &packet, packetSize);
 
     // Lock to prevent other threads from sending at the same time
     pthread_mutex_lock(&SocketSendLock);
-    send(sock, packetBuffer, dataSize + sizeof(dataSize), 0);
+    send(sock, packetBuffer, packetSize + sizeof(packetSize), 0);
     pthread_mutex_unlock(&SocketSendLock);
 }
 
@@ -119,7 +181,7 @@ void* pollThreadFunc(void* context) {
             }
             else if (grabbing) {
                 // Write out the data to our client
-                outputEvdevData(data, ret);
+                outputEvdevData(device, data, ret);
             }
         }
         else {
@@ -178,6 +240,8 @@ static int precheckDeviceForPolling(int fd) {
     int isMouse;
     int isKeyboard;
     int isGamepad;
+    int isTouchpad;
+    int deviceClass = 0;
 
     // This is the same check that Android does in EventHub.cpp
     isMouse = hasRelAxis(fd, REL_X) &&
@@ -189,14 +253,34 @@ static int precheckDeviceForPolling(int fd) {
 
     isGamepad = hasKey(fd, BTN_GAMEPAD);
 
-    // We only handle keyboards and mice that aren't gamepads
-    return (isMouse || isKeyboard) && !isGamepad;
+    isTouchpad = hasAbsAxis(fd, ABS_MT_SLOT) &&
+            hasAbsAxis(fd, ABS_MT_TRACKING_ID) &&
+            hasAbsAxis(fd, ABS_MT_POSITION_X) &&
+            hasAbsAxis(fd, ABS_MT_POSITION_Y) &&
+            hasInputProp(fd, INPUT_PROP_POINTER);
+
+    if (isMouse) {
+        deviceClass |= EVDEV_DEVICE_MOUSE;
+    }
+    if (isKeyboard) {
+        deviceClass |= EVDEV_DEVICE_KEYBOARD;
+    }
+    if (isTouchpad && optimizeTouchpad) {
+        deviceClass |= EVDEV_DEVICE_TOUCHPAD;
+    }
+
+    // We only handle keyboards, mice, and touchpads that aren't gamepads.
+    // When touchpad optimization is disabled, a pure touchpad (no REL/key mouse
+    // capabilities) reports deviceClass 0 here, so we leave it untouched and
+    // Android handles it as a normal pointer device.
+    return isGamepad ? 0 : deviceClass;
 }
 
 static void startPollForDevice(char* deviceName) {
     struct DeviceEntry *currentEntry;
     char fullPath[256];
     int fd;
+    int deviceClass;
 
     // Lock the device list
     pthread_mutex_lock(&DeviceListLock);
@@ -227,16 +311,24 @@ static void startPollForDevice(char* deviceName) {
         goto unlock;
     }
 
-    // Populate context
-    currentEntry->fd = fd;
-    strcpy(currentEntry->devName, deviceName);
-
     // Check if we support polling this device
-    if (!precheckDeviceForPolling(fd)) {
+    deviceClass = precheckDeviceForPolling(fd);
+    if (!deviceClass) {
         // Nope, get out
         free(currentEntry);
         close(fd);
         goto unlock;
+    }
+
+    // Populate context
+    memset(currentEntry, 0, sizeof(*currentEntry));
+    currentEntry->fd = fd;
+    currentEntry->deviceId = NextDeviceId++;
+    currentEntry->deviceClass = deviceClass;
+    strcpy(currentEntry->devName, deviceName);
+    if (deviceClass & EVDEV_DEVICE_TOUCHPAD) {
+        ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &currentEntry->absX);
+        ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &currentEntry->absY);
     }
 
     // Start the polling thread
@@ -330,6 +422,14 @@ int main(int argc, char* argv[]) {
 
     port = atoi(argv[1]);
     __android_log_print(ANDROID_LOG_INFO, "EvdevReader", "Requested port number: %d", port);
+
+    // Optional second argument: 1 to stream hardware touchpads, 0 to leave them
+    // to Android (native mouse). Defaults to enabled for backward compatibility.
+    if (argc > 2) {
+        optimizeTouchpad = atoi(argv[2]);
+    }
+    __android_log_print(ANDROID_LOG_INFO, "EvdevReader", "Touchpad optimization: %s",
+        optimizeTouchpad ? "enabled" : "disabled");
 
     // Connect to the app's socket
     ret = connectSocket(port);

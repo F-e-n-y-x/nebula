@@ -1356,6 +1356,9 @@ class Game : Activity(), SurfaceHolder.Callback,
                 inputCaptureProvider.showCursor()
             }
         } else {
+            if (::touchInputHandler.isInitialized) {
+                touchInputHandler.cancelNonRootTouchpad()
+            }
             inputCaptureProvider.disableCapture()
         }
         setMetaKeyCaptureState(grab)
@@ -1405,6 +1408,9 @@ class Game : Activity(), SurfaceHolder.Callback,
         prefConfig.enableNativeMousePointer = enable
 
         if (enable) {
+            if (::touchInputHandler.isInitialized) {
+                touchInputHandler.cancelNonRootTouchpad()
+            }
             inputCaptureProvider.disableCapture()
             cursorVisible = true
             inputCaptureProvider.showCursor()
@@ -2000,6 +2006,45 @@ class Game : Activity(), SurfaceHolder.Callback,
 
     override fun keyboardEvent(buttonDown: Boolean, keyCode: Short) {
         keyboardInputHandler.keyboardEvent(buttonDown, keyCode)
+    }
+
+    override fun touchpadEvent(
+        eventType: Byte,
+        pointerId: Int,
+        x: Float,
+        y: Float,
+        pressure: Float,
+        contactAreaMajor: Float,
+        contactAreaMinor: Float,
+        rotation: Short,
+        deviceWidthMm: Short,
+        deviceHeightMm: Short,
+        buttonState: Byte
+    ) {
+        conn?.sendTouchpadEvent(
+            eventType, pointerId, x, y, pressure,
+            contactAreaMajor, contactAreaMinor, rotation,
+            deviceWidthMm, deviceHeightMm, buttonState
+        )
+    }
+
+    override fun touchpadFrameEvent(
+        contactCount: Byte,
+        eventTypes: ByteArray,
+        pointerIds: IntArray,
+        x: FloatArray,
+        y: FloatArray,
+        pressure: FloatArray,
+        rotation: Short,
+        deviceWidthMm: Short,
+        deviceHeightMm: Short,
+        buttonState: Byte
+    ): Int {
+        return conn?.sendTouchpadFrameEvent(
+            contactCount, eventTypes, pointerIds,
+            x, y, pressure, rotation,
+            deviceWidthMm, deviceHeightMm, buttonState
+        ) ?: MoonBridge.LI_ERR_UNSUPPORTED
     }
 
     @Deprecated("Deprecated in Java")

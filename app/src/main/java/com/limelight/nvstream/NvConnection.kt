@@ -554,6 +554,38 @@ open class NvConnection(
         }
     }
 
+    fun sendTouchpadEvent(
+        eventType: Byte, pointerId: Int, x: Float, y: Float, pressure: Float,
+        contactAreaMajor: Float, contactAreaMinor: Float, rotation: Short,
+        deviceWidthMm: Short, deviceHeightMm: Short, buttonState: Byte
+    ): Int {
+        return if (!isMonkey) {
+            MoonBridge.sendTouchpadEvent(
+                eventType, pointerId, x, y, pressure,
+                contactAreaMajor, contactAreaMinor, rotation,
+                deviceWidthMm, deviceHeightMm, buttonState
+            )
+        } else {
+            MoonBridge.LI_ERR_UNSUPPORTED
+        }
+    }
+
+    fun sendTouchpadFrameEvent(
+        contactCount: Byte, eventTypes: ByteArray, pointerIds: IntArray,
+        x: FloatArray, y: FloatArray, pressure: FloatArray, rotation: Short,
+        deviceWidthMm: Short, deviceHeightMm: Short, buttonState: Byte
+    ): Int {
+        return if (!isMonkey) {
+            MoonBridge.sendTouchpadFrameEvent(
+                contactCount, eventTypes, pointerIds,
+                x, y, pressure, rotation,
+                deviceWidthMm, deviceHeightMm, buttonState
+            )
+        } else {
+            MoonBridge.LI_ERR_UNSUPPORTED
+        }
+    }
+
     fun sendPenEvent(
         eventType: Byte, toolType: Byte, penButtons: Byte, x: Float, y: Float,
         pressureOrDistance: Float, contactAreaMajor: Float, contactAreaMinor: Float,
