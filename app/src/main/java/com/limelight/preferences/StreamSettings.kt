@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -24,6 +25,7 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 import android.util.DisplayMetrics
 import android.util.Log
+import android.util.TypedValue
 import android.view.Display
 import android.view.DisplayCutout
 import android.view.KeyEvent
@@ -35,6 +37,8 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
@@ -759,6 +763,9 @@ class StreamSettings : AppCompatActivity() {
     }
 
     class SettingsFragment : PreferenceFragmentCompat() {
+        private companion object {
+            private const val SCREEN_COMBINATION_MODE_PREF_KEY = "list_screen_combination_mode"
+        }
 
         private var nativeResolutionStartIndex = Int.MAX_VALUE
         private var nativeFramerateShown = false
@@ -3321,12 +3328,110 @@ class StreamSettings : AppCompatActivity() {
                     f.show(parentFragmentManager, "StyledEditTextPreference")
                 }
                 is ListPreference -> {
-                    val f = StyledListPreferenceDialogFragment.newInstance(preference.key)
-                    @Suppress("DEPRECATION")
-                    f.setTargetFragment(this, 0)
-                    f.show(parentFragmentManager, "StyledListPreference")
+                    if (preference.key == SCREEN_COMBINATION_MODE_PREF_KEY) {
+                        showScreenCombinationModeDialog(preference)
+                    } else {
+                        val f = StyledListPreferenceDialogFragment.newInstance(preference.key)
+                        @Suppress("DEPRECATION")
+                        f.setTargetFragment(this, 0)
+                        f.show(parentFragmentManager, "StyledListPreference")
+                    }
                 }
                 else -> super.onDisplayPreferenceDialog(preference)
+            }
+        }
+
+        private fun showScreenCombinationModeDialog(preference: ListPreference) {
+            val values = preference.entryValues ?: return
+            val currentValue = preference.value ?: values.firstOrNull()?.toString().orEmpty()
+            val checkedIndex = values.indexOfFirst { it.toString() == currentValue }.let { index ->
+                if (index >= 0) index else 0
+            }
+
+            lateinit var dialog: AlertDialog
+            val dialogView = createScreenCombinationModeDialogView(preference, checkedIndex) { index ->
+                val newValue = values.getOrNull(index)?.toString() ?: return@createScreenCombinationModeDialogView
+                if (preference.callChangeListener(newValue)) {
+                    preference.value = newValue
+                }
+                dialog.dismiss()
+            }
+
+            dialog = appDialogBuilder()
+                    .setTitle(preference.title)
+                    .setView(dialogView)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .create()
+            showStyledDialog(dialog)
+        }
+
+        private fun createScreenCombinationModeDialogView(
+                preference: ListPreference,
+                checkedIndex: Int,
+                onItemSelected: (Int) -> Unit
+        ): View {
+            val entries = preference.entries ?: return View(requireContext())
+            val descriptions = resources.getStringArray(R.array.screen_combination_mode_descriptions)
+            val primaryTextColor = ContextCompat.getColor(requireContext(), R.color.ui_shell_text_primary)
+            val secondaryTextColor = ContextCompat.getColor(requireContext(), R.color.ui_shell_text_secondary)
+            val accentColor = ContextCompat.getColor(requireContext(), R.color.app_dialog_accent_color)
+            val radioTint = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(accentColor, secondaryTextColor)
+            )
+            val content = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dpToPx(24), dpToPx(4), dpToPx(24), dpToPx(4))
+                setBackgroundColor(Color.TRANSPARENT)
+            }
+
+            content.addView(TextView(requireContext()).apply {
+                text = getString(R.string.screen_combination_mode_dialog_subtitle)
+                setTextColor(secondaryTextColor)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setPadding(0, 0, 0, dpToPx(8))
+            })
+
+            entries.forEachIndexed { index, entry ->
+                val row = LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    isClickable = true
+                    isFocusable = true
+                    val typedValue = TypedValue()
+                    requireContext().theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
+                    setBackgroundResource(typedValue.resourceId)
+                    setPadding(0, dpToPx(10), 0, dpToPx(10))
+                    setOnClickListener { onItemSelected(index) }
+                }
+
+                row.addView(RadioButton(requireContext()).apply {
+                    isChecked = index == checkedIndex
+                    isClickable = false
+                    isFocusable = false
+                    buttonTintList = radioTint
+                }, LinearLayout.LayoutParams(dpToPx(48), ViewGroup.LayoutParams.WRAP_CONTENT))
+
+                row.addView(LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(TextView(requireContext()).apply {
+                        text = entry
+                        setTextColor(primaryTextColor)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                    })
+                    addView(TextView(requireContext()).apply {
+                        text = descriptions.getOrNull(index).orEmpty()
+                        setTextColor(secondaryTextColor)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                        setPadding(0, dpToPx(2), 0, 0)
+                    })
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+                content.addView(row)
+            }
+
+            return ScrollView(requireContext()).apply {
+                setBackgroundColor(Color.TRANSPARENT)
+                addView(content)
             }
         }
 
