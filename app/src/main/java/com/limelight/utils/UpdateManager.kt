@@ -340,7 +340,7 @@ object UpdateManager {
             version.text = "v$currentVersion"
 
             if (releaseNotes != null && releaseNotes.trim().isNotEmpty()) {
-                val accentColor = ContextCompat.getColor(context, R.color.theme_pink_primary)
+                val accentColor = ContextCompat.getColor(context, R.color.app_dialog_accent_color)
                 val notesScroll = view.findViewById<ScrollView>(R.id.update_notes_scroll)
                 notesScroll.visibility = View.VISIBLE
                 val notes = view.findViewById<TextView>(R.id.update_notes)
@@ -351,7 +351,8 @@ object UpdateManager {
             builder.setView(view)
             builder.setPositiveButton(context.getString(R.string.update_btn_got_it), null)
             builder.setCancelable(true)
-            builder.show()
+            val dialog = builder.show()
+            AppDialogStyler.tintTitle(dialog, context)
         }
     }
 
@@ -368,7 +369,7 @@ object UpdateManager {
             version.text = "v$curVer → v${updateInfo.version}"
 
             if (!updateInfo.releaseNotes.isNullOrEmpty()) {
-                val accentColor = ContextCompat.getColor(context, R.color.theme_pink_primary)
+                val accentColor = ContextCompat.getColor(context, R.color.app_dialog_accent_color)
                 val notesScroll = view.findViewById<ScrollView>(R.id.update_notes_scroll)
                 notesScroll.visibility = View.VISIBLE
                 val notesView = view.findViewById<TextView>(R.id.update_notes)
@@ -412,6 +413,7 @@ object UpdateManager {
             builder.setNegativeButton(context.getString(R.string.update_btn_later), null)
             builder.setCancelable(true)
             val dialog = builder.show()
+            AppDialogStyler.tintTitle(dialog, context)
             // “稍后”按钮长按 = 跳过此版本（启动检查不再弹，手动检查仍弹）
             dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setOnLongClickListener {
                 context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
@@ -448,7 +450,7 @@ object UpdateManager {
             return
         }
 
-        val builder = AlertDialog.Builder(context)
+        val builder = AlertDialog.Builder(context, R.style.AppDialogStyle)
         builder.setTitle(context.getString(R.string.update_install_permission_title))
         builder.setMessage(context.getString(R.string.update_install_permission_msg))
         builder.setPositiveButton(android.R.string.ok) { _, _ ->
@@ -470,7 +472,8 @@ object UpdateManager {
         }
         builder.setNegativeButton(android.R.string.cancel) { _, _ -> pendingUpdateInfo = null }
         builder.setCancelable(false)
-        builder.show()
+        val dialog = builder.show()
+        AppDialogStyler.apply(dialog, context)
     }
 
     // ------------------------------------------------------------------
@@ -563,6 +566,7 @@ object UpdateManager {
                 .create()
 
         dialog.show()
+        AppDialogStyler.tintTitle(dialog, activity)
         currentProgressDialog = dialog
 
         // 使用 Handler 轮询下载进度

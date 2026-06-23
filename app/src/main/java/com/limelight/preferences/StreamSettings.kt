@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -35,22 +34,21 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.RadioButton
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import androidx.core.graphics.toColorInt
 import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
+import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
@@ -81,6 +79,8 @@ import com.limelight.utils.AspectRatioConverter
 import com.limelight.utils.ConfigurationSyncManager
 import com.limelight.utils.ConfigurationSyncScheduler
 import com.limelight.utils.Dialog
+import com.limelight.utils.AppDialogStyler
+import com.limelight.ui.ScreenCombinationModePickerView
 import com.limelight.utils.UiHelper
 import com.limelight.utils.UpdateManager
 
@@ -120,6 +120,7 @@ class StreamSettings : AppCompatActivity() {
     private var searchInput: EditText? = null
     private var searchToggle: ImageView? = null
     private var menuToggleView: ImageView? = null
+    private var lastNightMode = false
 
     // 状态保存键
     companion object {
@@ -195,16 +196,13 @@ class StreamSettings : AppCompatActivity() {
 
         // 设置自定义布局
         setContentView(R.layout.activity_stream_settings)
+        lastNightMode = isNightMode()
 
         // 启用沉浸式顶栏：内容延伸到状态栏/导航栏下方，系统栏完全透明
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.TRANSPARENT
-        // 深色背景图 → 状态栏 / 导航栏图标使用浅色
-        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
-        }
+        applySettingsThemeSurfaces()
 
         UiHelper.notifyNewRootView(this)
 
@@ -221,6 +219,22 @@ class StreamSettings : AppCompatActivity() {
 
         // 设置版本号
         setupVersionInfo()
+    }
+
+    private fun isNightMode(): Boolean {
+        return (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+    }
+
+    private fun applySettingsThemeSurfaces() {
+        findViewById<View>(R.id.settingsBackgroundOverlay)?.setBackgroundColor(
+                ContextCompat.getColor(this, R.color.settings_background_overlay)
+        )
+        val useDarkSystemIcons = !isNightMode()
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = useDarkSystemIcons
+            isAppearanceLightNavigationBars = useDarkSystemIcons
+        }
     }
 
     /**
@@ -395,6 +409,53 @@ class StreamSettings : AppCompatActivity() {
         preferenceContainer?.requestFocus()
     }
 
+    fun showScreenCombinationModePicker(preference: ListPreference) {
+        val entries = preference.entries ?: return
+        val values = preference.entryValues ?: return
+        val overlay = findViewById<FrameLayout>(R.id.screen_combination_mode_overlay) ?: return
+        val currentValue = preference.value ?: values.firstOrNull()?.toString().orEmpty()
+        val checkedIndex = values.indexOfFirst { it.toString() == currentValue }.let { index ->
+            if (index >= 0) index else 0
+        }
+
+        overlay.removeAllViews()
+        overlay.addView(
+            ScreenCombinationModePickerView(
+                context = this,
+                names = Array(entries.size) { index -> entries[index].toString() },
+                descriptions = resources.getStringArray(R.array.screen_combination_mode_descriptions),
+                values = Array(values.size) { index -> values[index].toString() },
+                checkedIndex = checkedIndex,
+                onClose = { hideScreenCombinationModePicker() },
+                onModeSelected = { modeValue ->
+                    val newValue = modeValue.toString()
+                    if (preference.callChangeListener(newValue)) {
+                        preference.value = newValue
+                    }
+                    hideScreenCombinationModePicker()
+                }
+            ),
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        overlay.visibility = View.VISIBLE
+        overlay.requestFocus()
+    }
+
+    private fun hideScreenCombinationModePicker(): Boolean {
+        val overlay = findViewById<FrameLayout>(R.id.screen_combination_mode_overlay) ?: return false
+        if (overlay.visibility != View.VISIBLE) {
+            return false
+        }
+
+        overlay.visibility = View.GONE
+        overlay.removeAllViews()
+        focusPreferenceList()
+        return true
+    }
+
     /**
      * dp 转 px
      */
@@ -451,9 +512,9 @@ class StreamSettings : AppCompatActivity() {
         private fun updateItemAppearance(holder: ViewHolder, isSelected: Boolean, hasFocus: Boolean) {
             // 使用项目公共粉色主题
             val pinkPrimary = androidx.core.content.ContextCompat.getColor(this@StreamSettings, R.color.theme_pink_primary)    // #FF6B9D
-            val white = Color.WHITE
-            val lightGray = "#BBBBBB".toColorInt()
-            val dimGray = "#888888".toColorInt()
+            val primaryText = ContextCompat.getColor(this@StreamSettings, R.color.ui_shell_text_primary)
+            val secondaryText = ContextCompat.getColor(this@StreamSettings, R.color.ui_shell_text_secondary)
+            val subtleText = ContextCompat.getColor(this@StreamSettings, R.color.ui_shell_outline_strong)
 
             // 指示器显示（小圆点）
             holder.indicator.visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
@@ -461,9 +522,9 @@ class StreamSettings : AppCompatActivity() {
             // 文字 + 图标颜色三态切换
             val textColor: Int; val textAlpha: Float; val iconColor: Int; val iconAlpha: Float
             when {
-                isSelected -> { textColor = white;       textAlpha = 1.0f; iconColor = pinkPrimary; iconAlpha = 1.0f }
+                isSelected -> { textColor = primaryText; textAlpha = 1.0f; iconColor = pinkPrimary; iconAlpha = 1.0f }
                 hasFocus   -> { textColor = pinkPrimary; textAlpha = 1.0f; iconColor = pinkPrimary; iconAlpha = 0.95f }
-                else       -> { textColor = lightGray;   textAlpha = 0.9f; iconColor = lightGray;   iconAlpha = 0.7f }
+                else       -> { textColor = secondaryText; textAlpha = 0.9f; iconColor = secondaryText; iconAlpha = 0.7f }
             }
             holder.title.setTextColor(textColor)
             holder.title.alpha = textAlpha
@@ -481,7 +542,7 @@ class StreamSettings : AppCompatActivity() {
                     arrow.setColorFilter(pinkPrimary)
                 } else {
                     arrow.alpha = 0.4f
-                    arrow.setColorFilter(dimGray)
+                    arrow.setColorFilter(subtleText)
                 }
             }
         }
@@ -602,6 +663,14 @@ class StreamSettings : AppCompatActivity() {
 
         // 更新抽屉模式
         updateDrawerMode()
+        val nightModeChanged = lastNightMode != isNightMode()
+        lastNightMode = isNightMode()
+        applySettingsThemeSurfaces()
+        loadBackgroundImage()
+        var shouldReloadSettings = nightModeChanged
+        if (nightModeChanged) {
+            theme.applyStyle(R.style.PreferenceThemeWithShadow, true)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val mode = windowManager.defaultDisplay.mode
@@ -612,8 +681,11 @@ class StreamSettings : AppCompatActivity() {
             // NB: We aren't using displayId here because that stays the same (DEFAULT_DISPLAY) when
             // switching between screens on a foldable device.
             if (mode.physicalWidth * mode.physicalHeight != previousDisplayPixelCount) {
-                reloadSettings()
+                shouldReloadSettings = true
             }
+        }
+        if (shouldReloadSettings) {
+            reloadSettings()
         }
     }
 
@@ -718,6 +790,10 @@ class StreamSettings : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (hideScreenCombinationModePicker()) {
+            return
+        }
+
         // 搜索栏可见时，优先关闭搜索而不是退出
         if (isSearchBarVisible) {
             hideSearchBar()
@@ -825,11 +901,18 @@ class StreamSettings : AppCompatActivity() {
             return showStyledDialog(create())
         }
 
-        private fun showStyledDialog(dialog: AlertDialog): AlertDialog {
+        private fun AlertDialog.Builder.showStyledChoiceList(): AlertDialog {
+            return showStyledDialog(create(), styleSystemChoiceList = true)
+        }
+
+        private fun showStyledDialog(dialog: AlertDialog, styleSystemChoiceList: Boolean = false): AlertDialog {
             hideKeyboardBeforeDialog()
             dialog.show()
-            dialog.window?.setBackgroundDrawableResource(R.drawable.app_dialog_bg_cute)
-            tintSettingsDialogButtons(dialog)
+            if (styleSystemChoiceList) {
+                AppDialogStyler.applySystemChoiceList(dialog, requireContext())
+            } else {
+                AppDialogStyler.apply(dialog, requireContext())
+            }
             return dialog
         }
 
@@ -839,14 +922,6 @@ class StreamSettings : AppCompatActivity() {
             val imm = hostActivity.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.hideSoftInputFromWindow(focusedView.windowToken, 0)
             focusedView.clearFocus()
-        }
-
-        private fun tintSettingsDialogButtons(dialog: AlertDialog) {
-            val accentColor = ContextCompat.getColor(requireContext(), R.color.app_dialog_accent_color)
-            listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL)
-                .forEach { buttonId ->
-                    dialog.getButton(buttonId)?.setTextColor(accentColor)
-                }
         }
 
         private fun setValue(preferenceKey: String, value: String) {
@@ -1172,22 +1247,23 @@ class StreamSettings : AppCompatActivity() {
          */
         private fun applyListPreferenceCurrentValueSummary(group: PreferenceGroup) {
             val accent = ContextCompat.getColor(group.context, R.color.theme_pink_secondary)
-            applyHighlightedSummariesRecursively(group, accent)
+            val disabledAccent = ContextCompat.getColor(group.context, R.color.ui_shell_text_disabled_primary)
+            applyHighlightedSummariesRecursively(group, accent, disabledAccent)
         }
 
-        private fun applyHighlightedSummariesRecursively(group: PreferenceGroup, accent: Int) {
+        private fun applyHighlightedSummariesRecursively(group: PreferenceGroup, accent: Int, disabledAccent: Int) {
             for (i in 0 until group.preferenceCount) {
                 val child = group.getPreference(i)
                 when {
-                    child is PreferenceGroup -> applyHighlightedSummariesRecursively(child, accent)
+                    child is PreferenceGroup -> applyHighlightedSummariesRecursively(child, accent, disabledAccent)
                     // IconListPreference 自己重写 setSummary 维护 "(当前：xxx)"，
                     // 装 SummaryProvider 会与其 super.setSummary 调用互斥，跳过。
                     child is IconListPreference -> Unit
-                    child is ListPreference -> applyHighlightedSummary(child, accent) {
+                    child is ListPreference -> applyHighlightedSummary(child, accent, disabledAccent) {
                         val entry = it.entry?.toString()
                         if (entry.isNullOrBlank()) "—" else entry
                     }
-                    child is SeekBarPreference -> applyHighlightedSummary(child, accent) {
+                    child is SeekBarPreference -> applyHighlightedSummary(child, accent, disabledAccent) {
                         val display = it.formatDisplayValue(it.currentValue)
                         val suffix = it.suffix?.takeIf { s -> s.isNotBlank() }
                         if (suffix != null) "$display $suffix" else display
@@ -1204,6 +1280,7 @@ class StreamSettings : AppCompatActivity() {
         private inline fun <reified T : Preference> applyHighlightedSummary(
                 pref: T,
                 accent: Int,
+                disabledAccent: Int,
                 crossinline currentValueProvider: (T) -> String
         ) {
             val originalSummary = pref.summary?.toString()?.takeIf { it.isNotBlank() }
@@ -1212,7 +1289,7 @@ class StreamSettings : AppCompatActivity() {
                 val builder = SpannableStringBuilder()
                 builder.append(current)
                 builder.setSpan(
-                        ForegroundColorSpan(accent),
+                        ForegroundColorSpan(if (p.isEnabled) accent else disabledAccent),
                         0, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 builder.setSpan(
                         StyleSpan(Typeface.BOLD),
@@ -1400,10 +1477,11 @@ class StreamSettings : AppCompatActivity() {
                 updateExternalSyncDirectorySummary()
                 updateConfigSyncStatusSummary()
                 val ctx = context ?: return
-                if (PreferenceManager.getDefaultSharedPreferences(ctx)
-                        .getBoolean(ConfigurationSyncManager.PREF_BACKGROUND_SYNC_ENABLED, false) &&
+                val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+                val enabled = prefs.getBoolean(ConfigurationSyncManager.PREF_BACKGROUND_SYNC_ENABLED, false)
+                if (enabled &&
                     !ConfigurationSyncManager.hasExternalSyncPassword(ctx)) {
-                    PreferenceManager.getDefaultSharedPreferences(ctx).edit {
+                    prefs.edit {
                         putBoolean(ConfigurationSyncManager.PREF_BACKGROUND_SYNC_ENABLED, false)
                     }
                     Toast.makeText(context, R.string.toast_config_sync_password_required, Toast.LENGTH_LONG).show()
@@ -1411,11 +1489,17 @@ class StreamSettings : AppCompatActivity() {
                     updateExternalSyncDirectorySummary()
                     return
                 }
-                if (ConfigurationSyncManager.isBackgroundSyncEnabled(ctx)) {
+                prefs.edit {
+                    putBoolean(ConfigurationSyncManager.PREF_AUTO_SNAPSHOT_ENABLED, enabled)
+                    putBoolean(ConfigurationSyncManager.PREF_EXTERNAL_SNAPSHOT_ENABLED, enabled)
+                }
+                if (enabled) {
+                    requestConfigSyncAutoSnapshot(delayMs = 0L)
                     ConfigurationSyncScheduler.runNow(ctx)
                 } else {
                     ConfigurationSyncScheduler.cancel(ctx)
                 }
+                updateExternalSyncDirectorySummary()
                 return
             }
 
@@ -1856,7 +1940,7 @@ class StreamSettings : AppCompatActivity() {
                 input.requestFocus()
                 dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
             }
-            dialog.show()
+            showStyledDialog(dialog)
         }
 
         private fun showSyncImportPreview(preview: ConfigurationSyncManager.PackagePreview) {
@@ -1883,7 +1967,7 @@ class StreamSettings : AppCompatActivity() {
                 )
                 .setPositiveButton(R.string.config_sync_action_import) { _, _ -> importPendingSyncPackage() }
                 .setNegativeButton(android.R.string.cancel, null)
-                .show()
+                .showStyled()
         }
 
         private fun importPendingSyncPackage() {
@@ -1930,7 +2014,7 @@ class StreamSettings : AppCompatActivity() {
                 .setTitle(R.string.title_config_sync_restart_required)
                 .setMessage(message)
                 .setPositiveButton(android.R.string.ok, null)
-                .show()
+                .showStyled()
         }
 
         private fun showCrownConfigManagementDialog() {
@@ -1959,7 +2043,7 @@ class StreamSettings : AppCompatActivity() {
                             7 -> showCrownMergeConfigDialog()
                         }
                     }
-                    .show()
+                    .showStyledChoiceList()
         }
 
         private fun showCrownShareExportConfigDialog() {
@@ -1990,7 +2074,7 @@ class StreamSettings : AppCompatActivity() {
                             Toast.makeText(context, R.string.toast_crown_share_export_failed, Toast.LENGTH_LONG).show()
                         }
                     }
-                    .show()
+                    .showStyledChoiceList()
         }
 
         private fun currentCrownShareExportMetadata(): CrownProfileShareManager.ExportMetadata {
@@ -2105,7 +2189,7 @@ class StreamSettings : AppCompatActivity() {
                         )
                     }
                     .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                    .showStyledChoiceList()
         }
 
         private fun crownStoreProfileLabel(profile: CrownProfileShareManager.StoreProfile): String {
@@ -2158,7 +2242,7 @@ class StreamSettings : AppCompatActivity() {
                     .setItems(names) { _, which ->
                         showCrownStorePublishMetadataDialog(ids[which], configMap[ids[which]] ?: "Crown Profile")
                     }
-                    .show()
+                    .showStyledChoiceList()
         }
 
         private fun showCrownStorePublishMetadataDialog(configId: String, defaultName: String) {
@@ -2239,7 +2323,7 @@ class StreamSettings : AppCompatActivity() {
                     }
                 }
             }
-            dialog.show()
+            showStyledDialog(dialog)
         }
 
         private fun crownStorePublishInput(value: String, hintRes: Int): EditText {
@@ -2329,7 +2413,7 @@ class StreamSettings : AppCompatActivity() {
                         startDeveloperUnlockVerification(GitHubStarVerifier.OAuthScope.CROWN_STORE_PUBLISH)
                     }
                     .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                    .showStyled()
         }
 
         private fun showCrownStorePublishSuccessDialog(result: GitHubCrownProfileStorePublisher.PublishResult) {
@@ -2346,7 +2430,7 @@ class StreamSettings : AppCompatActivity() {
                         openDeveloperUrl(result.pullRequestUrl)
                     }
                     .setNegativeButton(android.R.string.ok, null)
-                    .show()
+                    .showStyled()
         }
 
         private fun showCrownShareUrlImportDialog() {
@@ -2382,7 +2466,7 @@ class StreamSettings : AppCompatActivity() {
                 input.requestFocus()
                 dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
             }
-            dialog.show()
+            showStyledDialog(dialog)
         }
 
         private fun importCrownShareFromUrl(
@@ -2497,7 +2581,7 @@ class StreamSettings : AppCompatActivity() {
                         showCrownShareMergeTargetDialog()
                     }
                     .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                    .showStyled()
         }
 
         private fun importPendingCrownShareAsNew() {
@@ -2542,7 +2626,7 @@ class StreamSettings : AppCompatActivity() {
                             Toast.makeText(context, R.string.toast_crown_share_import_failed, Toast.LENGTH_LONG).show()
                         }
                     }
-                    .show()
+                    .showStyledChoiceList()
         }
 
         private fun showCrownExportConfigDialog() {
@@ -2562,7 +2646,7 @@ class StreamSettings : AppCompatActivity() {
                         exportConfigString = helper.exportConfig(id.toLong())
                         createConfigDocument(configMap[id] ?: "crown_config")
                     }
-                    .show()
+                    .showStyledChoiceList()
         }
 
         private fun showCrownMergeConfigDialog() {
@@ -2580,7 +2664,7 @@ class StreamSettings : AppCompatActivity() {
                         exportConfigString = ids[which]
                         openConfigDocument(3)
                     }
-                    .show()
+                    .showStyledChoiceList()
         }
 
         /**
@@ -3327,9 +3411,15 @@ class StreamSettings : AppCompatActivity() {
                     f.setTargetFragment(this, 0)
                     f.show(parentFragmentManager, "StyledEditTextPreference")
                 }
+                is MultiSelectListPreference -> {
+                    val f = StyledMultiSelectListPreferenceDialogFragment.newInstance(preference.key)
+                    @Suppress("DEPRECATION")
+                    f.setTargetFragment(this, 0)
+                    f.show(parentFragmentManager, "StyledMultiSelectListPreference")
+                }
                 is ListPreference -> {
                     if (preference.key == SCREEN_COMBINATION_MODE_PREF_KEY) {
-                        showScreenCombinationModeDialog(preference)
+                        (requireActivity() as? StreamSettings)?.showScreenCombinationModePicker(preference)
                     } else {
                         val f = StyledListPreferenceDialogFragment.newInstance(preference.key)
                         @Suppress("DEPRECATION")
@@ -3338,100 +3428,6 @@ class StreamSettings : AppCompatActivity() {
                     }
                 }
                 else -> super.onDisplayPreferenceDialog(preference)
-            }
-        }
-
-        private fun showScreenCombinationModeDialog(preference: ListPreference) {
-            val values = preference.entryValues ?: return
-            val currentValue = preference.value ?: values.firstOrNull()?.toString().orEmpty()
-            val checkedIndex = values.indexOfFirst { it.toString() == currentValue }.let { index ->
-                if (index >= 0) index else 0
-            }
-
-            lateinit var dialog: AlertDialog
-            val dialogView = createScreenCombinationModeDialogView(preference, checkedIndex) { index ->
-                val newValue = values.getOrNull(index)?.toString() ?: return@createScreenCombinationModeDialogView
-                if (preference.callChangeListener(newValue)) {
-                    preference.value = newValue
-                }
-                dialog.dismiss()
-            }
-
-            dialog = appDialogBuilder()
-                    .setTitle(preference.title)
-                    .setView(dialogView)
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .create()
-            showStyledDialog(dialog)
-        }
-
-        private fun createScreenCombinationModeDialogView(
-                preference: ListPreference,
-                checkedIndex: Int,
-                onItemSelected: (Int) -> Unit
-        ): View {
-            val entries = preference.entries ?: return View(requireContext())
-            val descriptions = resources.getStringArray(R.array.screen_combination_mode_descriptions)
-            val primaryTextColor = ContextCompat.getColor(requireContext(), R.color.ui_shell_text_primary)
-            val secondaryTextColor = ContextCompat.getColor(requireContext(), R.color.ui_shell_text_secondary)
-            val accentColor = ContextCompat.getColor(requireContext(), R.color.app_dialog_accent_color)
-            val radioTint = ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(accentColor, secondaryTextColor)
-            )
-            val content = LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dpToPx(24), dpToPx(4), dpToPx(24), dpToPx(4))
-                setBackgroundColor(Color.TRANSPARENT)
-            }
-
-            content.addView(TextView(requireContext()).apply {
-                text = getString(R.string.screen_combination_mode_dialog_subtitle)
-                setTextColor(secondaryTextColor)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setPadding(0, 0, 0, dpToPx(8))
-            })
-
-            entries.forEachIndexed { index, entry ->
-                val row = LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    isClickable = true
-                    isFocusable = true
-                    val typedValue = TypedValue()
-                    requireContext().theme.resolveAttribute(android.R.attr.selectableItemBackground, typedValue, true)
-                    setBackgroundResource(typedValue.resourceId)
-                    setPadding(0, dpToPx(10), 0, dpToPx(10))
-                    setOnClickListener { onItemSelected(index) }
-                }
-
-                row.addView(RadioButton(requireContext()).apply {
-                    isChecked = index == checkedIndex
-                    isClickable = false
-                    isFocusable = false
-                    buttonTintList = radioTint
-                }, LinearLayout.LayoutParams(dpToPx(48), ViewGroup.LayoutParams.WRAP_CONTENT))
-
-                row.addView(LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(TextView(requireContext()).apply {
-                        text = entry
-                        setTextColor(primaryTextColor)
-                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                    })
-                    addView(TextView(requireContext()).apply {
-                        text = descriptions.getOrNull(index).orEmpty()
-                        setTextColor(secondaryTextColor)
-                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                        setPadding(0, dpToPx(2), 0, 0)
-                    })
-                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-
-                content.addView(row)
-            }
-
-            return ScrollView(requireContext()).apply {
-                setBackgroundColor(Color.TRANSPARENT)
-                addView(content)
             }
         }
 
@@ -4196,11 +4192,16 @@ class StreamSettings : AppCompatActivity() {
         val size = computeBackgroundDecodeSize() ?: return
         val (width, height) = size
 
-        // 模糊 + 半透明黑色蒙版，单次解码完成（合并到一个 Glide pipeline）
+        // 模糊 + theme-aware 蒙版，单次解码完成（合并到一个 Glide pipeline）
         // 强制 RGB_565：每像素 2 字节，整张图内存减半，模糊背景视觉无损
+        val filterColor = if (isNightMode()) {
+            Color.argb(120, 0, 0, 0)
+        } else {
+            Color.argb(96, 255, 255, 255)
+        }
         val transformations = MultiTransformation<Bitmap>(
                 BlurTransformation(2, 3),
-                ColorFilterTransformation(Color.argb(120, 0, 0, 0))
+                ColorFilterTransformation(filterColor)
         )
         val options = RequestOptions()
                 .override(width, height)

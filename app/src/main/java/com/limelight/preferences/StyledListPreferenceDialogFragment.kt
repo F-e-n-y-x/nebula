@@ -1,14 +1,16 @@
 package com.limelight.preferences
 
-import android.graphics.Color
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
+import android.widget.CheckedTextView
 import android.widget.ListView
 import androidx.appcompat.app.AlertDialog
-import androidx.core.content.ContextCompat
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceDialogFragmentCompat
 import com.limelight.R
+import com.limelight.utils.AppDialogStyler
 
 class StyledListPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
 
@@ -26,7 +28,21 @@ class StyledListPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
         val entries = pref.entries ?: return
 
         clickedIndex = pref.findIndexOfValue(pref.value)
-        builder.setSingleChoiceItems(entries, clickedIndex) { dialog, which ->
+        val adapter = object : ArrayAdapter<CharSequence>(
+            requireContext(),
+            R.layout.app_dialog_single_choice_item,
+            android.R.id.text1,
+            entries
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                view.findViewById<CheckedTextView>(android.R.id.text1)?.let { textView ->
+                    AppDialogStyler.bindChoiceRow(view, textView, context, position == clickedIndex)
+                }
+                return view
+            }
+        }
+        builder.setSingleChoiceItems(adapter, clickedIndex) { dialog, which ->
             clickedIndex = which
             onClick(dialog, AlertDialog.BUTTON_POSITIVE)
             dialog.dismiss()
@@ -36,10 +52,9 @@ class StyledListPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
 
     override fun onStart() {
         super.onStart()
-        dialog?.window?.setBackgroundDrawableResource(R.drawable.app_dialog_bg_cute)
         val alert = dialog as? AlertDialog ?: return
-        tintDialogButtons(alert)
-        styleList(alert.listView)
+        AppDialogStyler.apply(alert, requireContext())
+        AppDialogStyler.styleChoiceListContainer(alert.findViewById<ListView>(android.R.id.list), requireContext())
     }
 
     override fun onDialogClosed(positiveResult: Boolean) {
@@ -50,30 +65,6 @@ class StyledListPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
                 pref.value = value
             }
         }
-    }
-
-    private fun tintDialogButtons(dialog: AlertDialog) {
-        val accentColor = ContextCompat.getColor(requireContext(), R.color.app_dialog_accent_color)
-        listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL)
-            .forEach { buttonId ->
-                dialog.getButton(buttonId)?.setTextColor(accentColor)
-            }
-    }
-
-    private fun styleList(listView: ListView?) {
-        listView ?: return
-        listView.setBackgroundColor(Color.TRANSPARENT)
-        listView.cacheColorHint = Color.TRANSPARENT
-        listView.divider = ColorDrawable(ContextCompat.getColor(requireContext(), R.color.ui_shell_outline))
-        listView.dividerHeight = dpToPx(1)
-        ContextCompat.getDrawable(requireContext(), R.drawable.app_dialog_list_item_bg)?.let {
-            listView.selector = it
-        }
-    }
-
-    private fun dpToPx(value: Int): Int {
-        val density = resources.displayMetrics.density
-        return (value * density + 0.5f).toInt()
     }
 
     companion object {

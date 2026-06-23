@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    
-    <solid android:color="@color/ui_shell_surface_elevated" />
+
+    <gradient
+        android:angle="135"
+        android:startColor="@color/app_dialog_surface_gradient_start"
+        android:centerColor="@color/app_dialog_surface_gradient_center"
+        android:endColor="@color/app_dialog_surface_gradient_end" />
 
     <corners android:radius="16dp" />
 
     <stroke
         android:width="1dp"
-        android:color="@color/ui_shell_outline" />
+        android:color="@color/app_dialog_outline" />
 
     <padding
         android:left="1dp"
@@ -16,5 +20,4 @@
         android:right="1dp"
         android:bottom="1dp" />
 </shape>
-
 

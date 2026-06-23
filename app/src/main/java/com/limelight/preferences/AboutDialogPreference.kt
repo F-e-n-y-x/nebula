@@ -12,8 +12,9 @@ import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.TextView
 
-import com.limelight.R
+import androidx.core.content.ContextCompat
 
+import com.limelight.R
 class AboutDialogPreference : Preference {
 
     constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int)
@@ -65,12 +66,12 @@ class AboutDialogPreference : Preference {
 
         val dialog = builder.create()
         dialog.show()
-        dialog.window?.setBackgroundDrawableResource(R.drawable.app_dialog_bg_cute)
+        dialog.window?.setBackgroundDrawableResource(R.drawable.dialog_about_window_bg)
         tintAboutDialogButtons(dialog)
     }
 
     private fun tintAboutDialogButtons(dialog: AlertDialog) {
-        val accentColor = context.resources.getColor(R.color.app_dialog_accent_color)
+        val accentColor = ContextCompat.getColor(context, R.color.app_dialog_accent_color)
         listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL)
             .forEach { buttonId ->
                 dialog.getButton(buttonId)?.setTextColor(accentColor)

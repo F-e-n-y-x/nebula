@@ -4,57 +4,74 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.CheckedTextView
 import android.widget.ImageView
+import android.widget.ListView
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceDialogFragmentCompat
 import com.limelight.R
+import com.limelight.utils.AppDialogStyler
 
 class IconListPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
 
     private var clickedIndex = -1
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NORMAL, R.style.AppDialogStyle)
+    }
 
     override fun onPrepareDialogBuilder(builder: AlertDialog.Builder) {
         super.onPrepareDialogBuilder(builder)
 
         val pref = preference as? IconListPreference ?: return
         val entries = pref.entries ?: return
-        val entryValues = pref.entryValues ?: return
         val icons = pref.entryIcons
 
         clickedIndex = pref.findIndexOfValue(pref.value)
 
-        if (icons != null) {
-            val adapter = object : ArrayAdapter<CharSequence>(
-                requireContext(), R.layout.icon_list_item, R.id.text, entries
-            ) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val view = super.getView(position, convertView, parent)
-                    val iconView = view.findViewById<ImageView>(R.id.icon)
-                    if (position < icons.size && icons[position] != 0) {
-                        iconView.setImageResource(icons[position])
-                        iconView.visibility = View.VISIBLE
-                    } else {
-                        iconView.visibility = View.GONE
-                    }
-                    return view
-                }
-            }
+        val adapter = object : ArrayAdapter<CharSequence>(
+            requireContext(),
+            R.layout.icon_list_item,
+            R.id.text,
+            entries
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
 
-            builder.setSingleChoiceItems(adapter, clickedIndex) { dialog, which ->
-                clickedIndex = which
-                onClick(dialog, AlertDialog.BUTTON_POSITIVE)
-                dialog.dismiss()
-            }
-        } else {
-            builder.setSingleChoiceItems(entries, clickedIndex) { dialog, which ->
-                clickedIndex = which
-                onClick(dialog, AlertDialog.BUTTON_POSITIVE)
-                dialog.dismiss()
+                view.findViewById<CheckedTextView>(R.id.text)?.let { textView ->
+                    AppDialogStyler.bindChoiceRow(view, textView, context, position == clickedIndex)
+                }
+
+                val iconContainer = view.findViewById<View>(R.id.icon_container)
+                val iconView = view.findViewById<ImageView>(R.id.icon)
+                if (icons != null && position < icons.size && icons[position] != 0) {
+                    iconContainer.visibility = View.VISIBLE
+                    iconView.setImageResource(icons[position])
+                    iconView.visibility = View.VISIBLE
+                } else {
+                    iconContainer.visibility = View.GONE
+                    iconView.visibility = View.GONE
+                }
+                return view
             }
         }
 
+        builder.setSingleChoiceItems(adapter, clickedIndex) { dialog, which ->
+            clickedIndex = which
+            onClick(dialog, AlertDialog.BUTTON_POSITIVE)
+            dialog.dismiss()
+        }
+
         builder.setPositiveButton(null, null)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val alert = dialog as? AlertDialog ?: return
+        AppDialogStyler.apply(alert, requireContext())
+        AppDialogStyler.styleChoiceListContainer(alert.findViewById<ListView>(android.R.id.list), requireContext())
     }
 
     override fun onDialogClosed(positiveResult: Boolean) {
