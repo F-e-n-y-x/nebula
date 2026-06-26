@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -136,7 +137,7 @@ class EasyTierController(
 
     fun showControlDialog() {
         if (easyTierManager == null) {
-            Toast.makeText(activity, "EasyTier Manager尚未初始化", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, R.string.easytier_manager_uninitialized, Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -147,10 +148,10 @@ class EasyTierController(
         if (resultCode == Activity.RESULT_OK) {
             LimeLog.info("$TAG: VPN权限已获取，启动EasyTier Manager。")
             easyTierManager?.start()
-            Toast.makeText(activity, "EasyTier服务正在启动...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, R.string.easytier_starting, Toast.LENGTH_SHORT).show()
         } else {
             LimeLog.warning("$TAG: VPN权限被拒绝。")
-            Toast.makeText(activity, "需要VPN权限才能启动服务。", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, R.string.easytier_vpn_permission_required, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -180,11 +181,11 @@ class EasyTierController(
                         },
                         onRefresh = {
                             uiState.value = uiState.value.copy(statusJson = easyTierManager?.latestNetworkInfoJson)
-                            Toast.makeText(activity, "状态已刷新", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(activity, R.string.easytier_status_refreshed, Toast.LENGTH_SHORT).show()
                         },
                         onToggleService = {
                             if (uiState.value.isRunning) {
-                                Toast.makeText(activity, "Easytier服务已停止", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(activity, R.string.easytier_stopped, Toast.LENGTH_SHORT).show()
                                 easyTierManager?.stop()
                                 uiState.value = uiState.value.copy(statusJson = null)
                                 currentDialog?.dismiss()
@@ -257,13 +258,16 @@ class EasyTierController(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                        text = "EasyTier 控制面板",
+                                        text = stringResource(R.string.easytier_panel_title),
                                         color = textPrimary,
                                         fontSize = 20.sp,
                                         fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                        text = if (state.isRunning) "服务正在运行" else "服务未运行或正在连接",
+                                        text = stringResource(
+                                                if (state.isRunning) R.string.easytier_status_running
+                                                else R.string.easytier_status_stopped
+                                        ),
                                         color = textSecondary,
                                         fontSize = 12.5.sp
                                 )
@@ -281,12 +285,12 @@ class EasyTierController(
                             Tab(
                                     selected = state.selectedTab == EasyTierTab.STATUS,
                                     onClick = { onTabSelected(EasyTierTab.STATUS) },
-                                    text = { Text("状态") }
+                                    text = { Text(stringResource(R.string.easytier_tab_status)) }
                             )
                             Tab(
                                     selected = state.selectedTab == EasyTierTab.CONFIG,
                                     onClick = { onTabSelected(EasyTierTab.CONFIG) },
-                                    text = { Text("配置") }
+                                    text = { Text(stringResource(R.string.easytier_tab_config)) }
                             )
                         }
 
@@ -320,7 +324,7 @@ class EasyTierController(
                                     onClick = onClose,
                                     modifier = Modifier.weight(1f)
                             ) {
-                                Text("关闭")
+                                Text(stringResource(R.string.dialog_button_close))
                             }
                             ComposeButton(
                                     onClick = onSaveConfig,
@@ -331,7 +335,7 @@ class EasyTierController(
                                     ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                             ) {
-                                Text("保存", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(stringResource(R.string.config_sync_action_export), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             ComposeButton(
                                     onClick = onToggleService,
@@ -342,7 +346,11 @@ class EasyTierController(
                                     ),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                             ) {
-                                Text(if (state.isRunning) "停止" else "启动", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                        stringResource(if (state.isRunning) R.string.dialog_button_stop else R.string.dialog_button_start),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
@@ -361,7 +369,7 @@ class EasyTierController(
                         .padding(horizontal = 10.dp, vertical = 5.dp)
         ) {
             Text(
-                    text = if (isRunning) "Running" else "Idle",
+                    text = stringResource(if (isRunning) R.string.easytier_pill_running else R.string.easytier_pill_idle),
                     color = textColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -386,20 +394,20 @@ class EasyTierController(
                     ),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
             ) {
-                Text("刷新状态")
+                Text(stringResource(R.string.easytier_refresh_status))
             }
 
             if (statusJson.isNullOrEmpty()) {
                 EasyTierInfoCard {
                     Text(
-                            text = "服务未运行或正在连接...",
+                            text = stringResource(R.string.easytier_service_not_running),
                             color = colorResource(R.color.crown_text_primary),
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                            text = "请点击刷新按钮获取最新状态。",
+                            text = stringResource(R.string.easytier_refresh_hint),
                             color = colorResource(R.color.crown_text_secondary),
                             fontSize = 13.sp
                     )
@@ -411,19 +419,19 @@ class EasyTierController(
                 parseNetworkInfoForDialog(statusJson, instanceName)
             }
 
-            EasyTierSectionTitle("本机信息")
+            EasyTierSectionTitle(stringResource(R.string.easytier_local_info))
             EasyTierInfoCard {
-                EasyTierInfoRow("主机名:", displayInfo.hostname)
-                EasyTierInfoRow("虚拟 IP:", displayInfo.virtualIp)
-                EasyTierInfoRow("公网 IP:", displayInfo.publicIp)
-                EasyTierInfoRow("NAT 类型:", displayInfo.natType)
+                EasyTierInfoRow(stringResource(R.string.easytier_hostname), displayInfo.hostname)
+                EasyTierInfoRow(stringResource(R.string.easytier_virtual_ip), displayInfo.virtualIp)
+                EasyTierInfoRow(stringResource(R.string.easytier_public_ip), displayInfo.publicIp)
+                EasyTierInfoRow(stringResource(R.string.easytier_nat_type), displayInfo.natType)
             }
 
-            EasyTierSectionTitle("对等节点 (${displayInfo.finalPeerList.size})")
+            EasyTierSectionTitle(stringResource(R.string.easytier_peers_count, displayInfo.finalPeerList.size))
             if (displayInfo.finalPeerList.isEmpty()) {
                 EasyTierInfoCard {
                     Text(
-                            text = "暂无其他节点",
+                            text = stringResource(R.string.easytier_no_peers),
                             color = colorResource(R.color.crown_text_secondary),
                             fontSize = 13.sp
                     )
@@ -542,18 +550,21 @@ class EasyTierController(
                     overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(8.dp))
-            EasyTierInfoRow("虚拟 IP:", peer.virtualIp)
-            EasyTierInfoRow("NAT 类型:", peer.natType)
-            EasyTierInfoRow(if (peer.isDirectConnection) "物理地址:" else "下一跳节点:", peer.connectionDetails)
-            EasyTierInfoRow("延迟:", peer.latency)
-            EasyTierInfoRow("流量:", peer.traffic)
+            EasyTierInfoRow(stringResource(R.string.easytier_virtual_ip), peer.virtualIp)
+            EasyTierInfoRow(stringResource(R.string.easytier_nat_type), peer.natType)
+            EasyTierInfoRow(
+                    stringResource(if (peer.isDirectConnection) R.string.easytier_physical_address else R.string.easytier_next_hop),
+                    peer.connectionDetails
+            )
+            EasyTierInfoRow(stringResource(R.string.easytier_latency), peer.latency)
+            EasyTierInfoRow(stringResource(R.string.easytier_traffic), peer.traffic)
         }
     }
 
     private fun peerTitle(peer: FinalPeerInfo): String {
         return when {
-            !peer.isInSameSubnet -> "${peer.hostname} (网段不匹配!)"
-            !peer.isDirectConnection -> "${peer.hostname} (中转)"
+            !peer.isInSameSubnet -> "${peer.hostname} (${activity.getString(R.string.easytier_subnet_mismatch)}!)"
+            !peer.isDirectConnection -> "${peer.hostname} (${activity.getString(R.string.easytier_relayed)})"
             else -> peer.hostname
         }
     }
@@ -717,7 +728,7 @@ class EasyTierController(
         initEasyTierManager()
 
         if (showToast) {
-            Toast.makeText(activity, "配置已保存，服务已根据新配置重新初始化。", Toast.LENGTH_LONG).show()
+            Toast.makeText(activity, R.string.easytier_config_saved, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -800,7 +811,7 @@ class EasyTierController(
                 myIp = ipFromInt(virtualIpv4.getJSONObject("address").getInt("addr"))
                 displayInfo.virtualIp = "$myIp/$myPrefix"
             } else {
-                displayInfo.virtualIp = "获取中..."
+                displayInfo.virtualIp = activity.getString(R.string.easytier_loading)
             }
 
             val stunInfo = myNode.getJSONObject("stun_info")
@@ -825,7 +836,7 @@ class EasyTierController(
             val finalPeerList = ArrayList<FinalPeerInfo>()
             for (route in routesMap.values) {
                 var inSameSubnet = true
-                if (myIp != null && myPrefix > 0 && route.virtualIp != "无") {
+                if (myIp != null && myPrefix > 0 && route.virtualIp != activity.getString(R.string.easytier_none)) {
                     inSameSubnet = isInSameSubnet(myIp, route.virtualIp, myPrefix)
                 }
 
@@ -851,14 +862,14 @@ class EasyTierController(
                 } else {
                     // 中继路由
                     val nextHop = routesMap[route.nextHopPeerId]
-                    val nextHopHostname = nextHop?.hostname ?: "未知"
+                    val nextHopHostname = nextHop?.hostname ?: activity.getString(R.string.easytier_unknown)
                     finalPeerList.add(FinalPeerInfo(
                             route.hostname,
                             route.virtualIp,
                             false,
                             inSameSubnet,
-                            "通过 $nextHopHostname",
-                            "${route.pathLatency} ms (路径)",
+                            activity.getString(R.string.easytier_via_peer, nextHopHostname),
+                            activity.getString(R.string.easytier_path_latency, route.pathLatency),
                             "N/A",
                             route.version,
                             route.natType,
@@ -875,7 +886,7 @@ class EasyTierController(
 
         } catch (e: Exception) {
             LimeLog.warning("解析JSON失败:$e")
-            displayInfo.hostname = "解析错误"
+            displayInfo.hostname = activity.getString(R.string.easytier_parse_error)
             displayInfo.version = e.message
         }
         return displayInfo
@@ -955,16 +966,16 @@ class EasyTierController(
 
     private fun parseNatType(typeCode: Int): String {
         return when (typeCode) {
-            0 -> "Unknown (未知类型)"
-            1 -> "Open Internet (开放互联网)"
-            2 -> "No PAT (无端口转换)"
-            3 -> "Full Cone (完全锥形)"
-            4 -> "Restricted Cone (限制锥形)"
-            5 -> "Port Restricted (端口限制锥形)"
-            6 -> "Symmetric (对称型)"
-            7 -> "Symmetric UDP Firewall (对称UDP防火墙)"
-            8 -> "Symmetric Easy Inc (对称型-端口递增)"
-            9 -> "Symmetric Easy Dec (对称型-端口递减)"
+            0 -> activity.getString(R.string.easytier_nat_unknown)
+            1 -> activity.getString(R.string.easytier_nat_open_internet)
+            2 -> activity.getString(R.string.easytier_nat_no_pat)
+            3 -> activity.getString(R.string.easytier_nat_full_cone)
+            4 -> activity.getString(R.string.easytier_nat_restricted_cone)
+            5 -> activity.getString(R.string.easytier_nat_port_restricted)
+            6 -> activity.getString(R.string.easytier_nat_symmetric)
+            7 -> activity.getString(R.string.easytier_nat_symmetric_udp_firewall)
+            8 -> activity.getString(R.string.easytier_nat_symmetric_easy_inc)
+            9 -> activity.getString(R.string.easytier_nat_symmetric_easy_dec)
             else -> "Other Type ($typeCode)"
         }
     }
@@ -997,7 +1008,7 @@ class EasyTierController(
             val route = routesJson.getJSONObject(i)
             val peerId = route.getLong("peer_id")
             val ipv4AddrJson = route.optJSONObject("ipv4_addr")
-            val virtualIp = if (ipv4AddrJson != null) ipFromInt(ipv4AddrJson.getJSONObject("address").getInt("addr")) else "无"
+            val virtualIp = if (ipv4AddrJson != null) ipFromInt(ipv4AddrJson.getJSONObject("address").getInt("addr")) else activity.getString(R.string.easytier_none)
 
             map[peerId] = RouteData(
                     peerId,

@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.widget.Toast
 
 import com.limelight.LimeLog
+import com.limelight.R
 
 import java.io.File
 
@@ -45,7 +46,7 @@ class ResetBackgroundImagePreference : Preference {
         // legacy key, and broadcasts a refresh.
         BackgroundSource.setActive(context, BackgroundSource.Auto)
 
-        Toast.makeText(context, "已恢复默认背景图片", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_background_image_reset, Toast.LENGTH_SHORT).show()
         LimeLog.info("Background image reset to default")
     }
 

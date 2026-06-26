@@ -793,7 +793,7 @@ public class GroupButton extends Element {
                     // 准备添加新元素前，检查该元素是否为本组按键自身
                     if (element == groupButton) {
                         // 如果是自身，则提示用户不能添加，并终止操作
-                        Toast.makeText(context, "不能将组按键添加到自身", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, R.string.group_button_cannot_add_self, Toast.LENGTH_SHORT).show();
                     } else {
                         // 如果不是自身，则正常添加为子元素
                         addChildElement(element);
@@ -825,9 +825,9 @@ public class GroupButton extends Element {
             isPermanentlyIndependent = isChecked; // 控制新的永久状态变量
             save(); // 保存更改
             if (isChecked) {
-                Toast.makeText(context, "此组按键将永久保持独立状态", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, R.string.group_button_independent_on, Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(context, "此组按键将重新跟随父级", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, R.string.group_button_independent_off, Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -841,7 +841,7 @@ public class GroupButton extends Element {
                 }
                 elementController.toggleInfoPage(groupButtonPage);
                 elementController.deleteElement(groupButton);
-                Toast.makeText(context, "删除成功", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, R.string.delete_success, Toast.LENGTH_SHORT).show();
             }
         });
     }

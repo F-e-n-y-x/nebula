@@ -1414,21 +1414,21 @@ public class ElementController {
                             contentValues.put(PageConfigController.COLUMN_BOOLEAN_ENHANCED_TOUCH, String.valueOf(true));
                             controllerManager.getTouchController().setTouchMode(false);
                             controllerManager.getTouchController().setEnhancedTouch(true);
-                            showToast("多点触控模式");
+                            showToast(context.getString(R.string.touch_mode_multitouch));
                         } else if (!touchMode && enhancedTouch) {
                             // 当前是多点触控模式 -> 切换到触控板模式
                             contentValues.put(PageConfigController.COLUMN_BOOLEAN_TOUCH_MODE, String.valueOf(true));
                             contentValues.put(PageConfigController.COLUMN_BOOLEAN_ENHANCED_TOUCH, String.valueOf(false));
                             controllerManager.getTouchController().setTouchMode(true);
                             controllerManager.getTouchController().setEnhancedTouch(false);
-                            showToast("触控板模式");
+                            showToast(context.getString(R.string.touch_mode_trackpad));
                         } else {
                             // 当前是触控板模式 -> 切换到经典鼠标模式
                             contentValues.put(PageConfigController.COLUMN_BOOLEAN_TOUCH_MODE, String.valueOf(false));
                             contentValues.put(PageConfigController.COLUMN_BOOLEAN_ENHANCED_TOUCH, String.valueOf(false));
                             controllerManager.getTouchController().setTouchMode(false);
                             controllerManager.getTouchController().setEnhancedTouch(false);
-                            showToast("经典鼠标模式");
+                            showToast(context.getString(R.string.touch_mode_classic_mouse));
                         }
 
                         // 保存到数据库中
@@ -1443,11 +1443,11 @@ public class ElementController {
                 }
             };
         } else if (key.equals(SPECIAL_KEY_CLASSIC_MOUSE_SWITCH)) {
-            return switchMouseMode(false, false, "经典鼠标模式");
+            return switchMouseMode(false, false, context.getString(R.string.touch_mode_classic_mouse));
         } else if (key.equals(SPECIAL_KEY_TRACKPAD_MODE)) {
-            return switchMouseMode(true, false, "触控板模式");
+            return switchMouseMode(true, false, context.getString(R.string.touch_mode_trackpad));
         } else if (key.equals(SPECIAL_KEY_MULTI_TOUCH_MODE)) {
-            return switchMouseMode(false, true, "多点触控模式");
+            return switchMouseMode(false, true, context.getString(R.string.touch_mode_multitouch));
         } else if (key.equals(SPECIAL_KEY_PC_KEYBOARD_SWITCH)) {
             return new SendEventHandler() {
                 @Override
@@ -1496,7 +1496,7 @@ public class ElementController {
 
                         // 弹出选择对话框
                         AlertDialog.Builder builder = new AlertDialog.Builder(context, R.style.AppDialogStyle);
-                        AlertDialog dialog = builder.setTitle("选择配置")
+                        AlertDialog dialog = builder.setTitle(R.string.dialog_title_select_config)
                                 .setItems(configNames.toArray(new String[0]), new DialogInterface.OnClickListener() {
                                     @Override
                                     public void onClick(DialogInterface dialog, int which) {
@@ -1516,14 +1516,14 @@ public class ElementController {
                                         } catch (Exception ignored) {}
                                         loadAllElement(newConfigId);
 
-                                        showToast("已切换到: " + newName);
+                                        showToast(context.getString(R.string.toast_switched_to_config, newName));
                                     }
                                 })
                                 .setNegativeButton(R.string.game_menu_cancel, null)
                                 .show();
                         AppDialogStyler.INSTANCE.applySystemChoiceList(dialog, context);
                     } catch (Exception e) {
-                        Toast.makeText(context, "无法加载配置列表", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, R.string.toast_config_list_load_failed, Toast.LENGTH_SHORT).show();
                     }
                 }
 
@@ -1536,7 +1536,9 @@ public class ElementController {
                 @Override
                 public void sendEvent(boolean down) {
                     if (down) {
-                        Toast.makeText(game, game.getisTouchOverrideEnabled()?"已关闭平移/缩放":"已开启平移/缩放", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(game,
+                                game.getisTouchOverrideEnabled() ? R.string.toast_pan_zoom_disabled_short : R.string.toast_pan_zoom_enabled_short,
+                                Toast.LENGTH_SHORT).show();
                         game.setisTouchOverrideEnabled(!game.getisTouchOverrideEnabled());
                     }
                 }
@@ -1588,9 +1590,9 @@ public class ElementController {
                         //做实际的设置
                         controllerManager.getTouchController().enableTouch(!mouseEnable);
                         if (!mouseEnable) {
-                            showToast("开启触控");
+                            showToast(context.getString(R.string.toast_touch_enabled_short));
                         } else {
-                            showToast("关闭触控");
+                            showToast(context.getString(R.string.toast_touch_disabled_short));
                         }
                     }
                 }

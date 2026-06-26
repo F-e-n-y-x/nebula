@@ -18,6 +18,7 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -78,6 +79,10 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
 
     private lateinit var plainTextReport: StringBuilder
 
+    private fun tr(@StringRes id: Int, vararg args: Any): String {
+        return if (args.isEmpty()) getString(id) else getString(id, *args)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -101,7 +106,7 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
                     onCopy = {
                         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                         clipboard?.setPrimaryClip(
-                                ClipData.newPlainText("Capability Report", plainTextReport.toString()))
+                                ClipData.newPlainText(tr(R.string.diag_report_clip_label), plainTextReport.toString()))
                         Toast.makeText(this, R.string.copy_success, Toast.LENGTH_SHORT).show()
                     }
             )
@@ -113,7 +118,7 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
     private fun generateReport(): List<DiagnosticCard> {
         val cards = mutableListOf<DiagnosticCard>()
         plainTextReport.append("═══════════════════════════════════\n")
-        plainTextReport.append("  设备能力检测报告\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_report_title)).append("\n")
         plainTextReport.append("═══════════════════════════════════\n\n")
 
         cards += buildDeviceCard()
@@ -122,23 +127,23 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
         cards += buildDecoderCards()
 
         plainTextReport.append("\n═══════════════════════════════════\n")
-        plainTextReport.append("  报告生成完毕\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_report_complete)).append("\n")
         plainTextReport.append("═══════════════════════════════════\n")
         return cards
     }
 
     private fun buildDeviceCard(): DiagnosticCard {
-        val card = DiagnosticCard("设备", "设备信息")
-        plainTextReport.append("【设备信息】\n")
+        val card = DiagnosticCard(tr(R.string.diag_device_card_icon), tr(R.string.diag_device_card_title))
+        plainTextReport.append("【").append(tr(R.string.diag_device_card_title)).append("】\n")
 
-        card.keyValue("品牌", Build.BRAND)
-        card.keyValue("型号", Build.MODEL)
-        card.keyValue("芯片", Build.HARDWARE)
+        card.keyValue(tr(R.string.diag_brand), Build.BRAND)
+        card.keyValue(tr(R.string.diag_model), Build.MODEL)
+        card.keyValue(tr(R.string.diag_chip), Build.HARDWARE)
         card.keyValue("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
 
-        plainTextReport.append("  品牌: ").append(Build.BRAND).append("\n")
-        plainTextReport.append("  型号: ").append(Build.MODEL).append("\n")
-        plainTextReport.append("  芯片: ").append(Build.HARDWARE).append("\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_brand)).append(": ").append(Build.BRAND).append("\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_model)).append(": ").append(Build.MODEL).append("\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_chip)).append(": ").append(Build.HARDWARE).append("\n")
         plainTextReport.append("  Android: ").append(Build.VERSION.RELEASE)
                 .append(" (API ").append(Build.VERSION.SDK_INT).append(")\n")
 
@@ -154,42 +159,43 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
 
     @SuppressLint("NewApi")
     private fun buildDisplayCard(): DiagnosticCard {
-        val card = DiagnosticCard("屏幕", "屏幕信息")
-        plainTextReport.append("【屏幕信息】\n")
+        val card = DiagnosticCard(tr(R.string.diag_display_card_icon), tr(R.string.diag_display_card_title))
+        plainTextReport.append("【").append(tr(R.string.diag_display_card_title)).append("】\n")
 
         try {
             val dm = getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
             val display = dm?.getDisplay(Display.DEFAULT_DISPLAY)
             if (display == null) {
-                card.badge("无法获取 Display 信息", DiagnosticTone.Error)
-                plainTextReport.append("  无法获取\n\n")
+                card.badge(tr(R.string.diag_display_info_unavailable), DiagnosticTone.Error)
+                plainTextReport.append("  ").append(tr(R.string.diag_unavailable)).append("\n\n")
                 return card
             }
 
             val metrics = DisplayMetrics()
             display.getRealMetrics(metrics)
             val res = "${metrics.widthPixels} × ${metrics.heightPixels}"
-            card.keyValue("分辨率", res)
-            card.keyValue("密度", "${metrics.densityDpi} dpi")
-            plainTextReport.append("  分辨率: ").append(res).append("\n")
-            plainTextReport.append("  密度: ").append(metrics.densityDpi).append(" dpi\n")
+            card.keyValue(tr(R.string.diag_resolution), res)
+            card.keyValue(tr(R.string.diag_density), "${metrics.densityDpi} dpi")
+            plainTextReport.append("  ").append(tr(R.string.diag_resolution)).append(": ").append(res).append("\n")
+            plainTextReport.append("  ").append(tr(R.string.diag_density)).append(": ").append(metrics.densityDpi).append(" dpi\n")
 
             val rr = display.refreshRate
-            card.keyValue("刷新率", String.format("%.1f Hz", rr))
-            plainTextReport.append("  刷新率: ").append(String.format("%.1f Hz", rr)).append("\n")
+            card.keyValue(tr(R.string.diag_refresh_rate), String.format("%.1f Hz", rr))
+            plainTextReport.append("  ").append(tr(R.string.diag_refresh_rate)).append(": ")
+                    .append(String.format("%.1f Hz", rr)).append("\n")
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val modes = display.supportedModes
                 if (modes.size > 1) {
                     card.divider()
-                    card.section("显示模式")
+                    card.section(tr(R.string.diag_display_modes))
                     card.tags(modes.map {
                         "${it.physicalWidth}×${it.physicalHeight} ${String.format("%.0fHz", it.refreshRate)}"
                     })
                 }
             }
         } catch (e: Exception) {
-            card.badge("获取失败: ${e.message}", DiagnosticTone.Error)
+            card.badge(tr(R.string.diag_fetch_failed, e.message ?: ""), DiagnosticTone.Error)
         }
 
         plainTextReport.append("\n")
@@ -198,12 +204,12 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
 
     @SuppressLint("NewApi")
     private fun buildHdrCard(): DiagnosticCard {
-        val card = DiagnosticCard("HDR", "HDR 能力")
-        plainTextReport.append("【HDR 能力】\n")
+        val card = DiagnosticCard("HDR", tr(R.string.diag_hdr_card_title))
+        plainTextReport.append("【").append(tr(R.string.diag_hdr_card_title)).append("】\n")
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-            card.badge("需要 Android 7.0+", DiagnosticTone.Warning)
-            plainTextReport.append("  需要 Android 7.0+\n\n")
+            card.badge(tr(R.string.diag_requires_android_7), DiagnosticTone.Warning)
+            plainTextReport.append("  ").append(tr(R.string.diag_requires_android_7)).append("\n\n")
             return card
         }
 
@@ -212,18 +218,19 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
         val ts = capInfo.typeSupport
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            card.status("屏幕 HDR", capInfo.isScreenHdr, "isScreenHdr()")
-            card.status("广色域", capInfo.isWideColorGamut)
+            card.status(tr(R.string.diag_screen_hdr), capInfo.isScreenHdr, "isScreenHdr()")
+            card.status(tr(R.string.diag_wide_color_gamut), capInfo.isWideColorGamut)
             plainTextReport.append("  isScreenHdr: ").append(capInfo.isScreenHdr).append("\n")
-            plainTextReport.append("  广色域: ").append(capInfo.isWideColorGamut).append("\n")
+            plainTextReport.append("  ").append(tr(R.string.diag_wide_color_gamut)).append(": ")
+                    .append(capInfo.isWideColorGamut).append("\n")
         }
 
         card.divider()
-        card.section("HDR 类型")
+        card.section(tr(R.string.diag_hdr_types))
 
         if (ts.rawTypes.isEmpty()) {
-            card.badge("设备不支持任何 HDR 类型", DiagnosticTone.Warning)
-            plainTextReport.append("  ❌ 无 HDR 类型\n")
+            card.badge(tr(R.string.diag_no_hdr_types), DiagnosticTone.Warning)
+            plainTextReport.append("  ❌ ").append(tr(R.string.diag_no_hdr_types)).append("\n")
         } else {
             card.status("Dolby Vision", ts.hasDolbyVision)
             card.status("HDR10 / PQ", ts.hasHdr10)
@@ -236,87 +243,101 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
                     .append("  HDR10+: ").append(if (ts.hasHdr10Plus) "✅" else "❌").append("\n")
 
             card.divider()
-            card.section("串流兼容性")
-            card.compat("HLG 直通", ts.hasHlg, "设备支持", "设备未声明")
-            card.compat("HDR10/PQ 直通", ts.hasHdr10, "设备支持", "设备未声明")
+            card.section(tr(R.string.diag_stream_compatibility))
+            card.compat(
+                    tr(R.string.diag_hlg_passthrough),
+                    ts.hasHlg,
+                    tr(R.string.diag_device_supported),
+                    tr(R.string.diag_device_not_declared)
+            )
+            card.compat(
+                    tr(R.string.diag_hdr10_pq_passthrough),
+                    ts.hasHdr10,
+                    tr(R.string.diag_device_supported),
+                    tr(R.string.diag_device_not_declared)
+            )
         }
 
         card.divider()
-        card.section("屏幕亮度")
+        card.section(tr(R.string.diag_screen_brightness))
 
         var maxDesc = String.format("%.0f nits", brightness.maxLuminance)
-        if (brightness.isDefault) maxDesc += " (默认)"
+        if (brightness.isDefault) maxDesc += " (${tr(R.string.diag_default_suffix)})"
         else if (brightness.isFromHdrCaps) maxDesc += " (EDID)"
-        card.keyValue("峰值亮度", maxDesc)
-        card.keyValue("最小亮度", String.format("%.4f nits", brightness.minLuminance))
-        card.keyValue("平均亮度", String.format("%.0f nits", brightness.maxAvgLuminance))
+        card.keyValue(tr(R.string.diag_peak_brightness), maxDesc)
+        card.keyValue(tr(R.string.diag_min_brightness), String.format("%.4f nits", brightness.minLuminance))
+        card.keyValue(tr(R.string.diag_avg_brightness), String.format("%.0f nits", brightness.maxAvgLuminance))
 
-        plainTextReport.append("  峰值: ").append(maxDesc).append("\n")
-        plainTextReport.append("  最小: ").append(String.format("%.4f", brightness.minLuminance)).append("\n")
-        plainTextReport.append("  平均: ").append(String.format("%.0f", brightness.maxAvgLuminance)).append("\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_peak_brightness)).append(": ").append(maxDesc).append("\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_min_brightness)).append(": ")
+                .append(String.format("%.4f", brightness.minLuminance)).append("\n")
+        plainTextReport.append("  ").append(tr(R.string.diag_avg_brightness)).append(": ")
+                .append(String.format("%.0f", brightness.maxAvgLuminance)).append("\n")
 
         when {
-            brightness.isDefault -> card.badge("驱动未报告 EDID 亮度", DiagnosticTone.Warning)
-            brightness.maxLuminance >= 1000 -> card.badge("高阶 HDR 面板 ≥1000 nits", DiagnosticTone.Success)
-            brightness.maxLuminance >= 600 -> card.badge("中等 HDR 面板", DiagnosticTone.Success)
-            brightness.maxLuminance < 400 -> card.badge("峰值亮度偏低 <400 nits", DiagnosticTone.Warning)
+            brightness.isDefault -> card.badge(tr(R.string.diag_edid_brightness_missing), DiagnosticTone.Warning)
+            brightness.maxLuminance >= 1000 -> card.badge(tr(R.string.diag_hdr_panel_high), DiagnosticTone.Success)
+            brightness.maxLuminance >= 600 -> card.badge(tr(R.string.diag_hdr_panel_mid), DiagnosticTone.Success)
+            brightness.maxLuminance < 400 -> card.badge(tr(R.string.diag_peak_low), DiagnosticTone.Warning)
         }
 
         card.divider()
-        card.section("HDR/SDR 动态比率")
+        card.section(tr(R.string.diag_hdr_sdr_ratio))
 
         if (Build.VERSION.SDK_INT < 34) {
-            card.badge("需要 Android 14+ (API 34)", DiagnosticTone.Muted)
-            plainTextReport.append("  HDR/SDR Ratio: 需要 API 34+\n")
+            card.badge(tr(R.string.diag_requires_android_14), DiagnosticTone.Muted)
+            plainTextReport.append("  HDR/SDR Ratio: ").append(tr(R.string.diag_requires_android_14)).append("\n")
         } else if (!brightness.isHdrSdrRatioAvailable) {
-            card.badge("设备不支持 ratio 查询", DiagnosticTone.Warning)
-            plainTextReport.append("  HDR/SDR Ratio: 不支持\n")
+            card.badge(tr(R.string.diag_ratio_unsupported), DiagnosticTone.Warning)
+            plainTextReport.append("  HDR/SDR Ratio: ").append(tr(R.string.diag_ratio_unsupported)).append("\n")
         } else {
-            card.keyValue("当前比率", String.format("%.2f×", brightness.hdrSdrRatio))
+            card.keyValue(tr(R.string.diag_current_ratio), String.format("%.2f×", brightness.hdrSdrRatio))
             card.keyValue(
-                    "最高比率",
+                    tr(R.string.diag_highest_ratio),
                     String.format("%.2f×", brightness.highestHdrSdrRatio) +
-                            if (Build.VERSION.SDK_INT >= 36) "" else " (≈当前)"
+                            if (Build.VERSION.SDK_INT >= 36) "" else " (${tr(R.string.diag_approx_current)})"
             )
-            plainTextReport.append("  当前 ratio: ").append(String.format("%.2f", brightness.hdrSdrRatio)).append("\n")
-            plainTextReport.append("  最高 ratio: ").append(String.format("%.2f", brightness.highestHdrSdrRatio)).append("\n")
+            plainTextReport.append("  ").append(tr(R.string.diag_current_ratio)).append(": ")
+                    .append(String.format("%.2f", brightness.hdrSdrRatio)).append("\n")
+            plainTextReport.append("  ").append(tr(R.string.diag_highest_ratio)).append(": ")
+                    .append(String.format("%.2f", brightness.highestHdrSdrRatio)).append("\n")
 
             if (brightness.isComputedFromRatio && brightness.computedPeakBrightness > 0) {
-                card.keyValue("Ratio 峰值", String.format("%.0f nits", brightness.computedPeakBrightness))
-                plainTextReport.append("  Ratio 峰值: ").append(
+                card.keyValue(tr(R.string.diag_ratio_peak), String.format("%.0f nits", brightness.computedPeakBrightness))
+                plainTextReport.append("  ").append(tr(R.string.diag_ratio_peak)).append(": ").append(
                         String.format("%.0f", brightness.computedPeakBrightness)).append("\n")
             }
-            card.badge("Android 未公开 sdrNits，精度受限", DiagnosticTone.Info)
+            card.badge(tr(R.string.diag_sdr_nits_limited), DiagnosticTone.Info)
         }
 
         card.divider()
-        card.section("上报服务端")
+        card.section(tr(R.string.diag_report_to_host))
 
         val sv = HdrCapabilityHelper.getBrightnessRangeAsInts(this)
         card.keyValue("minBrightness", "${sv[0]} nits")
         card.keyValue("maxBrightness", "${sv[1]} nits")
         card.keyValue("maxAvgBrightness", "${sv[2]} nits")
-        plainTextReport.append("  上报: min=").append(sv[0]).append(" max=").append(sv[1])
+        plainTextReport.append("  ").append(tr(R.string.diag_report_to_host)).append(": min=").append(sv[0]).append(" max=").append(sv[1])
                 .append(" avg=").append(sv[2]).append("\n")
 
         card.divider()
-        card.section("系统亮度")
+        card.section(tr(R.string.diag_system_brightness))
 
         val sysBr = HdrCapabilityHelper.getSystemBrightness(this)
         if (sysBr >= 0) {
-            card.keyValue("当前亮度", "$sysBr/255 (${String.format("%.0f%%", sysBr / 255f * 100)})")
-            plainTextReport.append("  系统亮度: ").append(sysBr).append("/255\n")
+            card.keyValue(tr(R.string.diag_current_brightness), "$sysBr/255 (${String.format("%.0f%%", sysBr / 255f * 100)})")
+            plainTextReport.append("  ").append(tr(R.string.diag_system_brightness)).append(": ").append(sysBr).append("/255\n")
         }
         val autoBr = HdrCapabilityHelper.isAutoBrightnessEnabled(this)
-        card.keyValue("自动亮度", if (autoBr) "开启" else "关闭")
-        plainTextReport.append("  自动亮度: ").append(autoBr).append("\n\n")
+        card.keyValue(tr(R.string.diag_auto_brightness), tr(if (autoBr) R.string.diag_enabled else R.string.diag_disabled))
+        plainTextReport.append("  ").append(tr(R.string.diag_auto_brightness)).append(": ").append(autoBr).append("\n\n")
 
         return card
     }
 
     @SuppressLint("NewApi")
     private fun buildDecoderCards(): List<DiagnosticCard> {
-        plainTextReport.append("【视频解码器】\n")
+        plainTextReport.append("【").append(tr(R.string.diag_video_decoders)).append("】\n")
 
         val codecInfos = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos
         val hevc = mutableListOf<MediaCodecInfo>()
@@ -352,8 +373,8 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
         plainTextReport.append("\n  ").append(codecName).append(" (").append(decoders.size).append("):\n")
 
         if (decoders.isEmpty()) {
-            card.badge("无可用解码器", DiagnosticTone.Error)
-            plainTextReport.append("    ❌ 无\n")
+            card.badge(tr(R.string.diag_no_decoder), DiagnosticTone.Error)
+            plainTextReport.append("    ❌ ").append(tr(R.string.diag_no_decoder)).append("\n")
             return card
         }
 
@@ -369,7 +390,7 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
 
             card.decoderName(info.name, isHw)
             plainTextReport.append("    ").append(info.name)
-                    .append(if (isHw) " [硬件]" else " [软件]").append("\n")
+                    .append(if (isHw) " [${tr(R.string.diag_hardware)}]" else " [${tr(R.string.diag_software)}]").append("\n")
 
             try {
                 val caps = info.getCapabilitiesForType(mime)
@@ -441,8 +462,9 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
                     buildTransferRequestCheck(card, info, mime)
                 }
             } catch (e: Exception) {
-                card.badge("能力查询失败", DiagnosticTone.Error)
-                plainTextReport.append("      失败: ").append(e.message).append("\n")
+                card.badge(tr(R.string.diag_capability_query_failed), DiagnosticTone.Error)
+                plainTextReport.append("      ").append(tr(R.string.diag_capability_query_failed)).append(": ")
+                        .append(e.message).append("\n")
             }
         }
 
@@ -475,15 +497,20 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
                         .getInteger("color-transfer-request", 0) == MediaFormat.COLOR_TRANSFER_ST2084
                 codec.stop()
 
-                card.miniStatus(listOf(MiniStatus("HLG透传", hlgOk), MiniStatus("PQ透传", pqOk)))
-                plainTextReport.append("      HLG透传=").append(if (hlgOk) "✅" else "❌")
-                        .append(" PQ透传=").append(if (pqOk) "✅" else "❌").append("\n")
+                card.miniStatus(listOf(
+                        MiniStatus(tr(R.string.diag_hlg_transfer), hlgOk),
+                        MiniStatus(tr(R.string.diag_pq_transfer), pqOk)
+                ))
+                plainTextReport.append("      ").append(tr(R.string.diag_hlg_transfer)).append("=")
+                        .append(if (hlgOk) "✅" else "❌")
+                        .append(" ").append(tr(R.string.diag_pq_transfer)).append("=")
+                        .append(if (pqOk) "✅" else "❌").append("\n")
             } finally {
                 codec.release()
             }
         } catch (_: Exception) {
-            card.badge("传递函数检测失败", DiagnosticTone.Warning)
-            plainTextReport.append("      传递函数检测失败\n")
+            card.badge(tr(R.string.diag_transfer_check_failed), DiagnosticTone.Warning)
+            plainTextReport.append("      ").append(tr(R.string.diag_transfer_check_failed)).append("\n")
         }
     }
 
@@ -830,7 +857,7 @@ class CapabilityDiagnosticActivity : ComponentActivity() {
                             modifier = Modifier.weight(1f)
                     )
                     Text(
-                            text = if (row.hardware) "硬件" else "软件",
+                            text = stringResource(if (row.hardware) R.string.diag_hardware else R.string.diag_software),
                             color = if (row.hardware) DiagnosticTone.Success.foreground else Color(0xAAFFFFFF),
                             fontSize = 11.sp,
                             modifier = Modifier

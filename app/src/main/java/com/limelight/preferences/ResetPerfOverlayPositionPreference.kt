@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import androidx.preference.Preference
 import android.util.AttributeSet
 import android.widget.Toast
+import com.limelight.R
 
 class ResetPerfOverlayPositionPreference : Preference {
     constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int) :
@@ -26,6 +27,6 @@ class ResetPerfOverlayPositionPreference : Preference {
         val prefs = context.getSharedPreferences("performance_overlay", Context.MODE_PRIVATE)
         prefs.edit().clear().apply()
 
-        Toast.makeText(context, "性能统计位置已重置", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.toast_perf_overlay_position_reset, Toast.LENGTH_SHORT).show()
     }
 }

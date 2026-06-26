@@ -3466,10 +3466,10 @@ class StreamSettings : AppCompatActivity() {
                         if (outputStream != null) {
                             outputStream.write(exportConfigString.toByteArray())
                             outputStream.close()
-                            Toast.makeText(context, "导出配置文件成功", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_legacy_config_export_success, Toast.LENGTH_SHORT).show()
                         }
                     } catch (e: IOException) {
-                        Toast.makeText(context, "导出配置文件失败", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_legacy_config_export_failed, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -3494,16 +3494,16 @@ class StreamSettings : AppCompatActivity() {
                                 }
                                 when (errorCode) {
                                     0 -> {
-                                        Toast.makeText(context, "导入配置文件成功", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, R.string.toast_legacy_config_import_success, Toast.LENGTH_SHORT).show()
                                         //更新导出配置文件列表
                                     }
-                                    -1, -2 -> Toast.makeText(context, "读取配置文件失败", Toast.LENGTH_SHORT).show()
-                                    -3 -> Toast.makeText(context, "配置文件版本不匹配", Toast.LENGTH_SHORT).show()
+                                    -1, -2 -> Toast.makeText(context, R.string.toast_legacy_config_read_failed, Toast.LENGTH_SHORT).show()
+                                    -3 -> Toast.makeText(context, R.string.toast_legacy_config_version_mismatch, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }
                     } catch (e: IOException) {
-                        Toast.makeText(context, "读取配置文件失败", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_legacy_config_read_failed, Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -3527,14 +3527,14 @@ class StreamSettings : AppCompatActivity() {
                                     requestConfigSyncAutoSnapshot(delayMs = 0L)
                                 }
                                 when (errorCode) {
-                                    0 -> Toast.makeText(context, "合并配置文件成功", Toast.LENGTH_SHORT).show()
-                                    -1, -2 -> Toast.makeText(context, "读取配置文件失败", Toast.LENGTH_SHORT).show()
-                                    -3 -> Toast.makeText(context, "配置文件版本不匹配", Toast.LENGTH_SHORT).show()
+                                    0 -> Toast.makeText(context, R.string.toast_legacy_config_merge_success, Toast.LENGTH_SHORT).show()
+                                    -1, -2 -> Toast.makeText(context, R.string.toast_legacy_config_read_failed, Toast.LENGTH_SHORT).show()
+                                    -3 -> Toast.makeText(context, R.string.toast_legacy_config_version_mismatch, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }
                     } catch (e: IOException) {
-                        Toast.makeText(context, "读取配置文件失败", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, R.string.toast_legacy_config_read_failed, Toast.LENGTH_SHORT).show()
                     }
                 }
             }

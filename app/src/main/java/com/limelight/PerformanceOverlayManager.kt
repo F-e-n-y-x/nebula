@@ -583,22 +583,30 @@ class PerformanceOverlayManager(
         val streamDurationSeconds = if (hasStreamData) (System.currentTimeMillis() - streamStartTime) / 1000 else 0L
 
         if (isCharging) {
-            info.append("\n\n⚡ 设备正在充电中")
+            info.append("\n\n⚡ ").append(activity.getString(R.string.perf_battery_charging))
             if (hasStreamData) {
-                info.append("\n串流时长: ").append(formatDuration(streamDurationSeconds))
+                info.append("\n")
+                    .append(activity.getString(R.string.perf_stream_duration, formatDuration(streamDurationSeconds)))
             }
         } else if (hasStreamData) {
             val batteryConsumed = streamStartBatteryLevel - batteryLevel
-            info.append("\n\n本次串流已消耗电量: ")
-                .append(if (batteryConsumed > 0) "${batteryConsumed}%" else "0%")
-                .append("\n串流时长: ")
-                .append(formatDuration(streamDurationSeconds))
+            info.append("\n\n")
+                .append(activity.getString(
+                    R.string.perf_battery_consumed,
+                    if (batteryConsumed > 0) "${batteryConsumed}%" else "0%"
+                ))
+                .append("\n")
+                .append(activity.getString(R.string.perf_stream_duration, formatDuration(streamDurationSeconds)))
 
             if (batteryConsumed > 0 && streamDurationSeconds > 0) {
                 val consumedPerMinute = batteryConsumed.toDouble() / (streamDurationSeconds / 60.0)
                 if (consumedPerMinute > 0) {
                     val remainingMinutes = (batteryLevel / consumedPerMinute).toLong()
-                    info.append("\n预计还可续航: ").append(formatDuration(remainingMinutes * 60))
+                    info.append("\n")
+                        .append(activity.getString(
+                            R.string.perf_battery_remaining_estimate,
+                            formatDuration(remainingMinutes * 60)
+                        ))
                 }
             }
         }
@@ -608,16 +616,20 @@ class PerformanceOverlayManager(
 
     private fun formatDuration(seconds: Long): String {
         if (seconds < 60) {
-            return "${seconds}秒"
+            return activity.getString(R.string.perf_duration_seconds, seconds)
         }
         val hours = seconds / 3600
         val minutes = (seconds % 3600) / 60
         val remainingSeconds = seconds % 60
 
         return when {
-            hours > 0 -> if (minutes > 0) "${hours}小时${minutes}分钟" else "${hours}小时"
-            remainingSeconds > 0 -> "${minutes}分${remainingSeconds}秒"
-            else -> "${minutes}分钟"
+            hours > 0 -> if (minutes > 0) {
+                activity.getString(R.string.perf_duration_hours_minutes, hours, minutes)
+            } else {
+                activity.getString(R.string.perf_duration_hours, hours)
+            }
+            remainingSeconds > 0 -> activity.getString(R.string.perf_duration_minutes_seconds, minutes, remainingSeconds)
+            else -> activity.getString(R.string.perf_duration_minutes, minutes)
         }
     }
 
@@ -1003,7 +1015,7 @@ class PerformanceOverlayManager(
         val phasePercentage = MoonPhaseUtils.getMoonPhasePercentage(moonPhase)
         val daysInCycle = MoonPhaseUtils.getDaysInMoonCycle(moonPhase)
 
-        val dateFormat = SimpleDateFormat("yyyy年MM月dd日 EEEE", Locale.getDefault())
+        val dateFormat = SimpleDateFormat(activity.getString(R.string.perf_moon_date_format), Locale.getDefault())
         val currentDate = dateFormat.format(Calendar.getInstance(TimeZone.getDefault()).time)
 
         val moonInfo = String.format(

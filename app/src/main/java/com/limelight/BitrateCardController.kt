@@ -31,12 +31,20 @@ class BitrateCardController(
 ) {
 
     /** Haptic feedback mode for the bitrate seekbar. */
-    enum class HapticMode(val label: String) {
-        ALL("震动：每档"),
-        KEY_NODES("震动：关键节点"),
-        NONE("震动：关闭");
+    enum class HapticMode {
+        ALL,
+        KEY_NODES,
+        NONE;
 
         fun next(): HapticMode = entries[(ordinal + 1) % entries.size]
+
+        fun label(context: Context): String = context.getString(
+            when (this) {
+                ALL -> R.string.bitrate_haptic_mode_all
+                KEY_NODES -> R.string.bitrate_haptic_mode_key_nodes
+                NONE -> R.string.bitrate_haptic_mode_none
+            }
+        )
     }
 
     companion object {
@@ -123,7 +131,7 @@ class BitrateCardController(
         bitrateTipIcon.setOnClickListener {
             AlertDialog.Builder(game, R.style.AppDialogStyle)
                 .setMessage(game.resources.getString(R.string.game_menu_bitrate_tip))
-                .setPositiveButton("懂了", null)
+                .setPositiveButton(R.string.dialog_button_ok, null)
                 .show()
         }
 
@@ -132,7 +140,7 @@ class BitrateCardController(
         bitrateTipIcon.setOnLongClickListener {
             currentHapticMode = currentHapticMode.next()
             setHapticMode(game, currentHapticMode)
-            Toast.makeText(game, currentHapticMode.label, Toast.LENGTH_SHORT).show()
+            Toast.makeText(game, currentHapticMode.label(game), Toast.LENGTH_SHORT).show()
             true
         }
 
@@ -228,7 +236,7 @@ class BitrateCardController(
 
     private fun adjustBitrate(bitrateKbps: Int, currentBitrateText: TextView? = null) {
         try {
-            showBitrateToast("正在调整码率...")
+            showBitrateToast(game.getString(R.string.toast_adjusting_bitrate))
 
             conn.setBitrate(bitrateKbps, object : NvConnection.BitrateAdjustmentCallback {
                 override fun onSuccess(newBitrate: Int) {

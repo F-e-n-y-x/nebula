@@ -12,6 +12,7 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 
 import com.limelight.LimeLog
+import com.limelight.R
 
 import java.io.File
 import java.io.FileOutputStream
@@ -58,7 +59,7 @@ class LocalImagePickerPreference : Preference {
         }
 
         try {
-            val chooserIntent = Intent.createChooser(intent, "选择背景图片")
+            val chooserIntent = Intent.createChooser(intent, context.getString(R.string.title_local_image_picker))
             if (fragment != null) {
                 fragment!!.startActivityForResult(chooserIntent, PICK_IMAGE_REQUEST)
             } else if (activity != null) {
@@ -66,7 +67,7 @@ class LocalImagePickerPreference : Preference {
             }
         } catch (e: Exception) {
             LimeLog.warning("Failed to open image picker: ${e.message}")
-            Toast.makeText(context, "无法打开图片选择器", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_image_picker_open_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -87,14 +88,14 @@ class LocalImagePickerPreference : Preference {
                     .apply()
                 BackgroundSource.setActivePreservingExtras(context, BackgroundSource.Local)
 
-                Toast.makeText(context, "背景图片设置成功", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_background_image_saved, Toast.LENGTH_SHORT).show()
                 LimeLog.info("Image saved to internal storage: $internalPath")
             } else {
-                Toast.makeText(context, "图片保存失败，请重试", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.toast_image_save_failed, Toast.LENGTH_SHORT).show()
                 LimeLog.warning("Failed to copy image to internal storage")
             }
         } else {
-            Toast.makeText(context, "图片选择已取消", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.toast_image_pick_cancelled, Toast.LENGTH_SHORT).show()
         }
     }
 

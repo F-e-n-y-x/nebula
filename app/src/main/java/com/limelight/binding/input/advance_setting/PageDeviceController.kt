@@ -69,7 +69,7 @@ class PageDeviceController(
     fun getKeyNameByValue(value: String?): String {
         // 1. 预处理无效的输入值
         if (value.isNullOrEmpty() || value == "null") {
-            return "空" // 返回一个明确的"未设置"状态
+            return context.getString(R.string.empty_value) // 返回一个明确的"未设置"状态
         }
 
         // 2. 查找视图
