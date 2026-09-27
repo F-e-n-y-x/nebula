@@ -706,6 +706,26 @@ class NvHTTP(
         return resp.byteStream()
     }
 
+    /**
+     * GET a Nova host extension endpoint (e.g. "nova/v1/apps") over the paired HTTPS channel.
+     * Throws [FileNotFoundException] when the host doesn't implement it.
+     */
+    @Throws(IOException::class, InterruptedException::class)
+    fun novaGet(pathSegments: String, query: String? = null): ResponseBody {
+        val url = getHttpsUrl(true).newBuilder()
+            .addPathSegments(pathSegments)
+            .query(query)
+            .addQueryParameter("uniqueid", uniqueId)
+            .addQueryParameter("clientname", clientName)
+            .addQueryParameter("uuid", UUID.randomUUID().toString())
+            .build()
+        val response = httpClientLongConnectTimeout.newCall(Request.Builder().url(url).get().build()).execute()
+        if (response.isSuccessful) return response.body
+        response.body.close()
+        if (response.code == 404) throw FileNotFoundException(url.encodedPath)
+        throw HostHttpResponseException(response.code, response.message)
+    }
+
     @Throws(IOException::class, InterruptedException::class)
     fun getDisplays(): DisplayCatalog {
         try {
@@ -799,6 +819,10 @@ class NvHTTP(
 
         streamConfig.getUseVdd()?.let { useVdd ->
             queryParams += "&useVdd=${if (useVdd) 1 else 0}"
+        }
+        // Nova extension: pick the host desktop for this launch; other hosts ignore it.
+        streamConfig.getNovaDisplayMode()?.let { mode ->
+            if (mode == "virtual" || mode == "mirror") queryParams += "&nova_display=$mode"
         }
         // Sunshine extension: touch-keyboard auto-invoke intent. Explicitly
         // sending 0 lets the client override a host-side per-client opt-in.

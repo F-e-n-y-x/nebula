@@ -3,7 +3,7 @@ package com.limelight.utils
 import java.util.Locale
 
 /** Formats a Mbps value as "N KB/s" below 1 MB/s, otherwise "N.NN MB/s" (1000-based). */
-internal fun formatBandwidthSpeed(bandwidthMbps: Double): String {
+fun formatBandwidthSpeed(bandwidthMbps: Double): String {
     if (!bandwidthMbps.isFinite() || bandwidthMbps < 0.0) return "N/A"
     val kBps = bandwidthMbps * 125.0
     return if (kBps < 1000.0) {
@@ -20,7 +20,7 @@ internal fun formatBandwidthSpeed(bandwidthMbps: Double): String {
  * host switching to a static desktop) within one sampling window. Stability comes
  * from the precise per-packet RTP byte counter, not from averaging here.
  */
-internal class BandwidthMeter(
+class BandwidthMeter(
     private val minIntervalNanos: Long = 250_000_000L,
     private val maxIntervalNanos: Long = 5_000_000_000L,
 ) {

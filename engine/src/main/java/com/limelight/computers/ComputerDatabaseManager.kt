@@ -9,7 +9,6 @@ import com.limelight.LimeLog
 import com.limelight.nvstream.http.ComputerDetails
 import com.limelight.nvstream.http.NvHTTP
 import com.limelight.nvstream.http.PairingManager
-import com.limelight.utils.ConfigurationSyncManager
 
 import org.json.JSONException
 import org.json.JSONObject
@@ -86,7 +85,7 @@ class ComputerDatabaseManager(c: Context) {
     fun deleteComputer(details: ComputerDetails) {
         val deleted = computerDb.delete(COMPUTER_TABLE_NAME, "$COMPUTER_UUID_COLUMN_NAME=?", arrayOf(details.uuid))
         if (deleted > 0) {
-            ConfigurationSyncManager.recordPairingStateChanged(context)
+            onPairingStateChanged?.invoke(context)
         }
     }
 
@@ -130,7 +129,7 @@ class ComputerDatabaseManager(c: Context) {
             COMPUTER_TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE
         )
         if (updated && hasPersistentComputerChanged(previousDetails, details)) {
-            ConfigurationSyncManager.recordPairingStateChanged(context)
+            onPairingStateChanged?.invoke(context)
         }
         return updated
     }
@@ -241,6 +240,14 @@ class ComputerDatabaseManager(c: Context) {
     }
 
     companion object {
+        /**
+         * Called after a saved host is added, changed or removed, so an app can sync its settings.
+         * Nebula's legacy app points this at its configuration sync; the engine itself needs nothing.
+         */
+        @JvmStatic
+        @Volatile
+        var onPairingStateChanged: ((Context) -> Unit)? = null
+
         private const val COMPUTER_TABLE_NAME = "Computers"
         private const val COMPUTER_UUID_COLUMN_NAME = "UUID"
         private const val COMPUTER_NAME_COLUMN_NAME = "ComputerName"

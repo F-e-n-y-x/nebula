@@ -2,6 +2,8 @@ package com.limelight
 
 import android.app.Application
 import android.util.Log
+import com.limelight.computers.ComputerDatabaseManager
+import com.limelight.utils.ConfigurationSyncManager
 
 import com.limelight.utils.AppTheme
 import com.limelight.binding.crypto.AndroidCryptoProvider
@@ -16,6 +18,7 @@ class LimelightApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        ComputerDatabaseManager.onPairingStateChanged = { ConfigurationSyncManager.recordPairingStateChanged(it) }
         AppTheme.applyStoredAppTheme(this)
         CrashReporter.install(this)
         ConfigurationSyncScheduler.runNow(this)
