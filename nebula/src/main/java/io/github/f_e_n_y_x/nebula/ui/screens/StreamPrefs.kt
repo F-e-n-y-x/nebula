@@ -6,6 +6,9 @@ import io.github.f_e_n_y_x.nebula.input.TouchMode
 import io.github.f_e_n_y_x.nebula.input.VideoRect
 import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
 
+/** The PC keyboard (on screen, every PC key) or this device's own keyboard (typing text). */
+enum class KeyboardKind(val id: String, val label: String) { PC("pc", "PC keyboard"), PHONE("phone", "Device keyboard") }
+
 enum class PerfDetail(val id: String, val label: String) { OFF("off", "Off"), SIMPLE("simple", "Simple"), FULL("full", "Full") }
 
 /** Everything the stream screen reads from V+'s preferences, snapshotted on each change. */
@@ -21,6 +24,10 @@ data class StreamUiPrefs(
     val mouseCapture: Boolean,
     val localCursor: Boolean,
     val mouseBar: Boolean,
+    /** Opacity (percent) of the mouse bar and float ball; the menu's transparency control sets all overlays. */
+    val overlayOpacity: Int,
+    /** What the keyboard gesture / buttons open. */
+    val keyboardKind: KeyboardKind,
     val mouseNavButtons: Boolean,
     val perf: PerfDetail,
     val perfOpacity: Int,
@@ -48,6 +55,7 @@ data class StreamUiPrefs(
         const val LOCAL_CURSOR_KEY = "nebula_local_cursor"
         const val MOUSE_BAR_KEY = "nebula_mouse_bar"
         const val MOUSE_CAPTURE_KEY = "nebula_mouse_capture"
+        const val KEYBOARD_KIND_KEY = "nebula_keyboard_kind"
 
         /** Per-game touch mode chosen from the stream menu; overrides the global default. */
         fun touchModeKey(gameKey: String) = "nebula_touch_mode:$gameKey"
@@ -85,6 +93,8 @@ data class StreamUiPrefs(
                 mouseCapture = b(MOUSE_CAPTURE_KEY, true),
                 localCursor = b(LOCAL_CURSOR_KEY, false),
                 mouseBar = b(MOUSE_BAR_KEY, false),
+                overlayOpacity = i(io.github.f_e_n_y_x.nebula.settings.OVERLAY_OPACITY_KEY, io.github.f_e_n_y_x.nebula.settings.DEFAULT_OVERLAY_OPACITY).coerceIn(10, 100),
+                keyboardKind = if (all[KEYBOARD_KIND_KEY] == KeyboardKind.PHONE.id) KeyboardKind.PHONE else KeyboardKind.PC,
                 mouseNavButtons = b("checkbox_mouse_nav_buttons", false),
                 perf = if (perfOn) detail else PerfDetail.OFF,
                 perfOpacity = i("seekbar_perf_overlay_bg_opacity", 40),

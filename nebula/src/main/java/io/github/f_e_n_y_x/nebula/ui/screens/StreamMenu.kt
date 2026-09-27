@@ -43,6 +43,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
@@ -66,6 +68,9 @@ class StreamMenuActions(
     val onResetZoom: () -> Unit,
     val onBitrate: (Int) -> Unit,
     val onKeyboard: () -> Unit,
+    val onPcKeyboard: () -> Unit,
+    /** Sets every overlay's opacity (percent). */
+    val onOverlayOpacity: (Int) -> Unit,
     val onClipboard: () -> Unit,
     val onShortcut: (Shortcut) -> Unit,
     val onDisconnect: () -> Unit,
@@ -196,10 +201,12 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             NebulaButton("Resume", onClick = actions.onResume, icon = Icons.Rounded.PlayArrow, modifier = Modifier.focusRequester(first))
-            NebulaButton("Keyboard", onClick = actions.onKeyboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.Keyboard)
+            NebulaButton("PC keyboard", onClick = actions.onPcKeyboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.Keyboard)
+            NebulaButton("Device keyboard", onClick = actions.onKeyboard, style = ButtonStyle.Secondary)
             NebulaButton("Send clipboard", onClick = actions.onClipboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.ContentPaste)
             if (zoomed) NebulaButton("Reset zoom", onClick = actions.onResetZoom, style = ButtonStyle.Secondary)
         }
+        OverlayTransparency(ui.overlayOpacity, actions.onOverlayOpacity)
         MenuSetting("Touch · remembered for this game") {
             Segmented(TouchMode.entries.map { it.label to it }, ui.touch.mode) { m -> prefs.put(StreamUiPrefs.touchModeKey(gameKey), m.pref) }
         }
@@ -290,3 +297,25 @@ private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: St
     Text("Disconnect leaves the game running so you can resume. Back or B closes this menu.", style = Nebula.type.label, color = NebulaColors.textMuted)
     Spacer(Modifier.size(s.dp(4)))
 }
+
+/**
+ * Transparency of every overlay (PC keyboard, on-screen controls, mouse bar, float ball) with
+ * − / + steps and the slider (tap the value to type one). Shown as transparency, stored as opacity.
+ */
+@Composable
+private fun OverlayTransparency(opacity: Int, onOpacity: (Int) -> Unit) {
+    val s = Nebula.scale
+    val transparency = 100 - opacity
+    MenuSetting("Overlay transparency · keyboard, controls, mouse bar, float ball") {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            NebulaButton("−", onClick = { onOpacity(opacity + STEP) }, style = ButtonStyle.Secondary, modifier = Modifier.semantics { contentDescription = "Less transparent" })
+            SliderField(
+                label = "Overlay transparency", value = transparency.toFloat(), range = 0f..90f, step = 5f, unit = "%",
+                onValueChange = { onOpacity(100 - it.toInt()) }, modifier = Modifier.weight(1f),
+            )
+            NebulaButton("+", onClick = { onOpacity(opacity - STEP) }, style = ButtonStyle.Secondary, modifier = Modifier.semantics { contentDescription = "More transparent" })
+        }
+    }
+}
+
+private const val STEP = 10

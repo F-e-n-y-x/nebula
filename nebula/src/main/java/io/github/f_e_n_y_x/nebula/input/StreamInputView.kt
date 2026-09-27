@@ -150,6 +150,24 @@ class StreamInputView(
             updateCapture()
         }
 
+    /**
+     * Focusable only while the stream itself takes input. When a menu or the PC keyboard is up, the
+     * layer must not hold focus, or it swallows the D-pad keys those need (in touch mode Android
+     * hands focus back to the first view that's focusable in touch mode).
+     */
+    var inputEnabled = true
+        set(value) {
+            field = value
+            isFocusable = value
+            isFocusableInTouchMode = value
+            if (!value) {
+                if (hasPointerCapture()) releasePointerCapture()
+                clearFocus()
+            } else {
+                updateCapture()
+            }
+        }
+
     init {
         isFocusable = true
         isFocusableInTouchMode = true
@@ -157,7 +175,7 @@ class StreamInputView(
     }
 
     fun updateCapture() {
-        if (wantCapture) {
+        if (wantCapture && inputEnabled) {
             if (!hasFocus()) requestFocus()
             if (hasWindowFocus() && !hasPointerCapture()) requestPointerCapture()
         } else if (hasPointerCapture()) {

@@ -203,6 +203,8 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
         SettingsSection.Input -> {
             VirtualMouseSection()
             Spacer(Modifier.height(s.dp(12)))
+            PcKeyboardSection()
+            Spacer(Modifier.height(s.dp(12)))
             LegacySettingsList("input")
         }
         SettingsSection.Advanced -> {
@@ -282,6 +284,35 @@ private fun VirtualMouseSection() {
         ToggleRow("Mouse buttons bar", "Left, middle, right, scroll strip, drag lock and keyboard on screen.", bar) { bar = it; prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, it) }
         ToggleRow("Local cursor", "Draws a pointer on this device. The PC's cursor also stays in the video until Nova can hide it.", cursor) { cursor = it; prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
         ToggleRow("Capture a connected mouse", "Games get raw relative movement and the local pointer hides. Off keeps a free pointer.", capture) { capture = it; prefs.put(StreamUiPrefs.MOUSE_CAPTURE_KEY, it) }
+    }
+}
+
+/** The on-screen PC keyboard and the transparency shared by every stream overlay. */
+@Composable
+private fun PcKeyboardSection() {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    val kb = remember { io.github.f_e_n_y_x.nebula.settings.KeyboardSettings(ctx) }
+    var kind by remember { mutableStateOf(if (prefs.prefs.all[StreamUiPrefs.KEYBOARD_KIND_KEY] == KeyboardKind.PHONE.id) KeyboardKind.PHONE else KeyboardKind.PC) }
+    var opacity by remember { mutableStateOf(io.github.f_e_n_y_x.nebula.settings.overlayOpacity(ctx)) }
+    var page by remember { mutableStateOf(kb.read().page) }
+    Column(Modifier.widthIn(max = s.dp(720)), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
+        SectionTitle("PC keyboard")
+        Setting("The keyboard gesture opens", "Three-finger tap, the float ball and the mouse bar's keyboard button. Both stay in the stream menu.") {
+            Segmented(KeyboardKind.entries.map { it.label to it }, kind) { k -> kind = k; prefs.put(StreamUiPrefs.KEYBOARD_KIND_KEY, k.id) }
+        }
+        Setting("Layout", "Keys is a full compact PC keyboard; Nav, Numpad and Mini are smaller pages. Switch any time from the keyboard's bar.") {
+            Segmented(io.github.f_e_n_y_x.nebula.input.KeyboardPage.entries.map { it.label to it.name }, page) { p -> page = p; kb.setPage(p) }
+        }
+        Setting("Overlay transparency", "How see-through the PC keyboard, on-screen controls, mouse bar and float ball are. Also in the stream menu.") {
+            SliderField(
+                label = "Overlay transparency", value = (100 - opacity).toFloat(), range = 0f..90f, step = 5f, unit = "%",
+                onValueChange = { v -> opacity = 100 - v.roundToInt(); io.github.f_e_n_y_x.nebula.settings.setOverlayOpacity(ctx, opacity) },
+            )
+        }
+        NebulaButton("Reset keyboard size and position", onClick = { kb.resetPlacement() }, style = ButtonStyle.Secondary)
+        Text("Tap Ctrl, Shift, Alt or Win for the next key only; tap again to lock it, a third time to release.", style = Nebula.type.label, color = NebulaColors.textMuted)
     }
 }
 

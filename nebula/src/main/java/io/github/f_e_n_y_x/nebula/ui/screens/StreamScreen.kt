@@ -94,6 +94,7 @@ import io.github.f_e_n_y_x.nebula.input.VideoRect
 import io.github.f_e_n_y_x.nebula.input.isMouse
 import io.github.f_e_n_y_x.nebula.input.press
 import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
+import io.github.f_e_n_y_x.nebula.settings.setOverlayOpacity
 import io.github.f_e_n_y_x.nebula.ui.Navigator
 import io.github.f_e_n_y_x.nebula.ui.StreamViewModel
 import io.github.f_e_n_y_x.nebula.ui.components.ArtImage
@@ -184,10 +185,16 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     var devices by remember { mutableIntStateOf(0) }
 
     // Keys, gamepads and D-pad go to the PC while the menu is closed.
-    val sink = remember(remote) { StreamKeySink(remote, pad, { uiNow }, onMenu = { menu = true }) }
+    // On-screen PC keyboard (V+'s custom keyboard); the three-finger tap, float ball and mouse bar open it.
+    var pcKeyboard by remember { mutableStateOf(false) }
+    val pcKeyboardNow by rememberUpdatedState(pcKeyboard)
+    val openKeyboard: () -> Unit = {
+        if (uiNow.keyboardKind == KeyboardKind.PHONE) inputView?.toggleKeyboard() else pcKeyboard = !pcKeyboard
+    }
+    val sink = remember(remote) { StreamKeySink(remote, pad, { uiNow }, keyboardOpen = { pcKeyboardNow }, onMenu = { menu = true }) }
     DisposableEffect(menu, live) {
         activity.streamInput = if (!menu && live) sink else null
-        if (menu) { pad.releaseAll(); inputView?.hideKeyboard(); inputView?.clearFocus() }
+        if (menu) { pad.releaseAll(); inputView?.hideKeyboard() }
         onDispose { activity.streamInput = null }
     }
     // Gamepads coming and going; a mouse appearing turns pointer capture on.
@@ -208,6 +215,8 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     var panX by remember { mutableFloatStateOf(0f) }
     var panY by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(capture, inputView) { inputView?.wantCapture = capture }
+    // The input layer gives up focus while the menu or the PC keyboard needs the D-pad.
+    LaunchedEffect(menu, pcKeyboard, live, inputView) { inputView?.inputEnabled = live && !menu && !pcKeyboard }
 
     if (container.isDemo) LaunchedEffect(Unit) { vm.attach(StreamTarget.None) }
 
@@ -269,7 +278,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             AndroidView(
                 factory = { c ->
                     val callbacks = object : GestureCallbacks {
-                        override fun onKeyboard() { inputView?.toggleKeyboard() }
+                        override fun onKeyboard() = openKeyboard()
                         override fun onMenu() { menu = true }
                         override fun onZoom(factor: Float, focusX: Float, focusY: Float) = input.zoom(factor, focusX, focusY)
                         override fun onPan(dx: Float, dy: Float) = input.pan(dx, dy)
@@ -311,14 +320,15 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
 
         if (live && !menu && ui.osc) OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
-        if (live && !menu && ui.mouseBar) MouseBar(remote, onKeyboard = { inputView?.toggleKeyboard() }, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = ui.osc, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
+        if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = ui.osc, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
         if (live && !menu && ui.perf != PerfDetail.OFF && stats != null) PerfOverlay(stats, ui.perf == PerfDetail.FULL, ui.perfOpacity, Modifier.align(if (ui.osc) Alignment.TopCenter else Alignment.TopStart))
-        if (live && !menu && ui.floatBall) {
+        if (live && !menu && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
+        if (live && !menu && ui.floatBall && !pcKeyboard) {
             FloatBall(
                 ui,
                 onAction = { action ->
                     when (action) {
-                        "open_keyboard" -> inputView?.toggleKeyboard()
+                        "open_keyboard" -> openKeyboard()
                         "open_menu" -> menu = true
                         "toggle_visibility" -> prefs.put("checkbox_enable_float_ball", false)
                     }
@@ -378,6 +388,11 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                         menu = false
                         inputView?.postDelayed({ inputView?.showKeyboard() }, 150)
                     },
+                    onPcKeyboard = {
+                        menu = false
+                        pcKeyboard = true
+                    },
+                    onOverlayOpacity = { setOverlayOpacity(ctx, it) },
                     onClipboard = {
                         val text = ctx.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }
                             ?.getItemAt(0)?.coerceToText(ctx)?.toString()
@@ -418,11 +433,16 @@ private class StreamKeySink(
     private val remote: () -> RemoteInput?,
     private val pad: GamepadMapper,
     private val ui: () -> StreamUiPrefs,
+    private val keyboardOpen: () -> Boolean,
     private val onMenu: () -> Unit,
 ) : StreamInputSink {
     private var lastMenuKeyUp = 0L
 
     override fun onKey(event: KeyEvent): Boolean {
+        // With the PC keyboard open, a TV remote's D-pad moves between its keys instead of reaching the PC.
+        if (keyboardOpen() && event.keyCode in DPAD_KEYS && !event.isFromSource(InputDevice.SOURCE_GAMEPAD) &&
+            event.device?.keyboardType != InputDevice.KEYBOARD_TYPE_ALPHABETIC
+        ) return false
         if (pad.onKey(event)) return true
         val fromMouse = event.isFromSource(InputDevice.SOURCE_MOUSE)
         if (event.keyCode == KeyEvent.KEYCODE_BACK || event.keyCode == KeyEvent.KEYCODE_FORWARD) {
@@ -448,6 +468,10 @@ private class StreamKeySink(
 
     private companion object {
         const val DOUBLE_PRESS_MS = 400L
+        val DPAD_KEYS = setOf(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+        )
     }
 }
 
@@ -475,6 +499,7 @@ private fun PerfOverlay(x: StreamStats, full: Boolean, opacity: Int, modifier: M
 /** V+'s quick float ball: tap / double tap / long press run the actions chosen in Settings. */
 @Composable
 private fun FloatBall(ui: StreamUiPrefs, onAction: (String) -> Unit) {
+    val base = ui.overlayOpacity / 100f
     val s = Nebula.scale
     var poke by remember { mutableIntStateOf(0) }
     var faded by remember { mutableStateOf(false) }
@@ -491,7 +516,7 @@ private fun FloatBall(ui: StreamUiPrefs, onAction: (String) -> Unit) {
     }
     Box(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(10))) {
         Box(
-            Modifier.align(align).size(s.dp(44)).alpha(if (faded) 0.35f else 0.9f)
+            Modifier.align(align).size(s.dp(44)).alpha(if (faded) base * 0.4f else base)
                 .background(Color(0xCC17171A), CircleShape).border(1.dp, NebulaColors.controlBorder, CircleShape)
                 .pointerInput(ui.floatBallTap, ui.floatBallDoubleTap, ui.floatBallLongPress) {
                     detectTapGestures(

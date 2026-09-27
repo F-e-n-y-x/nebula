@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,7 +50,7 @@ import kotlin.math.roundToInt
  * stays down until tapped again) and the keyboard. Drag the handle to move it; × hides it.
  */
 @Composable
-fun MouseBar(remote: () -> RemoteInput?, onKeyboard: () -> Unit, onHide: () -> Unit, atTop: Boolean = false, topInset: Int = 12) {
+fun MouseBar(remote: () -> RemoteInput?, opacity: Int = 90, onKeyboard: () -> Unit, onHide: () -> Unit, atTop: Boolean = false, topInset: Int = 12) {
     val s = Nebula.scale
     var x by rememberSaveable { mutableFloatStateOf(0f) }
     var y by rememberSaveable { mutableFloatStateOf(0f) }
@@ -60,6 +61,7 @@ fun MouseBar(remote: () -> RemoteInput?, onKeyboard: () -> Unit, onHide: () -> U
         val shape = RoundedCornerShape(s.dp(16))
         Row(
             Modifier.align(if (atTop) Alignment.TopCenter else Alignment.BottomCenter).offset { IntOffset(x.roundToInt(), y.roundToInt()) }
+                .alpha(opacity.coerceIn(10, 100) / 100f)
                 .background(Color(0xD90E0E10), shape).border(1.dp, NebulaColors.border, shape).padding(s.dp(6)),
             horizontalArrangement = Arrangement.spacedBy(s.dp(6)),
             verticalAlignment = Alignment.CenterVertically,
