@@ -39,6 +39,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
+import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
+import io.github.f_e_n_y_x.nebula.ui.components.statusBarScrim
+import coil3.SingletonImageLoader
+import androidx.compose.runtime.key
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -65,6 +80,7 @@ import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameId: String) {
     val vm = viewModel { DetailsViewModel(container, hostId, gameId) }
@@ -74,20 +90,28 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
     val s = Nebula.scale
     val play: (DisplayMode) -> Unit = { m -> vm.remember(m); nav.push(Route.Stream(hostId, game.id, m)) }
     val wide = form.isLandscape
+    val ctx = LocalContext.current
+    val refresh = { vm.refresh(onArtCleared = { SingletonImageLoader.get(ctx).memoryCache?.clear() }) }
+    val showAbout = ui.details != null && ui.options.showDetails
 
-    Box(Modifier.fillMaxSize().background(NebulaColors.bg)) {
+    PullToRefreshBox(isRefreshing = ui.refreshing, onRefresh = refresh, modifier = Modifier.fillMaxSize().background(NebulaColors.bg)) {
         if (wide) {
-            ArtImage(game.art.hero ?: game.art.header, game.name, null, Modifier.fillMaxSize(), alignment = Alignment.TopEnd,
-                fallbackIcon = if (game.kind == GameKind.DESKTOP) Icons.Outlined.DesktopWindows else null)
-            Box(Modifier.fillMaxSize().background(NebulaColors.bg.copy(alpha = if (ui.details != null && form.widthDp >= 760) 0.55f else 0.2f)))
-            Box(Modifier.fillMaxSize().leftScrim(0.97f))
+            key(ui.artVersion) {
+                ArtImage(game.art.hero ?: game.art.header, game.name, null, Modifier.fillMaxSize(), alignment = Alignment.TopEnd,
+                    fallbackIcon = if (game.kind == GameKind.DESKTOP) Icons.Outlined.DesktopWindows else null)
+            }
+            // Dark only behind the text: the left column and the bottom edge. The art stays clear top-right.
+            Box(Modifier.fillMaxSize().leftScrim(0.97f, reach = 0.66f))
             Box(Modifier.fillMaxSize().bottomScrim())
             Row(
                 Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = s.dp(40), vertical = s.dp(20)),
                 horizontalArrangement = Arrangement.spacedBy(s.dp(40)),
             ) {
                 Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
-                    NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                        NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                        MoreMenu(refresh)
+                    }
                     Spacer(Modifier.height(s.dp(20)))
                     Header(ui)
                     Spacer(Modifier.height(s.dp(22)))
@@ -95,16 +119,32 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     Spacer(Modifier.height(s.dp(24)))
                     Stats(ui)
                 }
-                if (ui.details != null && form.widthDp >= 760) {
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = s.dp(68))) { About(ui) }
+                if (showAbout && form.widthDp >= 760) {
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = s.dp(68))) {
+                        // A glass panel keeps About readable over the visible art.
+                        Column(
+                            Modifier.background(NebulaColors.bg.copy(alpha = 0.86f), RoundedCornerShape(s.dp(16)))
+                                .border(1.dp, NebulaColors.border, RoundedCornerShape(s.dp(16)))
+                                .padding(s.dp(20)),
+                        ) { About(ui, wide = true) }
+                    }
                 }
             }
         } else {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 Box(Modifier.fillMaxWidth().aspectRatio(if (form.isCompact) 1.05f else 1.5f)) {
-                    ArtImage(game.art.hero ?: game.art.header ?: game.art.poster, game.name, null, Modifier.fillMaxSize(), alignment = Alignment.TopCenter)
+                    key(ui.artVersion) {
+                        ArtImage(game.art.hero ?: game.art.header ?: game.art.poster, game.name, null, Modifier.fillMaxSize(), alignment = Alignment.TopCenter)
+                    }
                     Box(Modifier.fillMaxSize().bottomScrim())
-                    NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() }, Modifier.statusBarsPadding().padding(s.dp(16)))
+                    Box(Modifier.fillMaxWidth().statusBarScrim())
+                    Row(
+                        Modifier.fillMaxWidth().statusBarsPadding().padding(s.dp(16)),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                        MoreMenu(refresh)
+                    }
                     Column(Modifier.align(Alignment.BottomStart).padding(horizontal = s.dp(20))) { Header(ui) }
                 }
                 Column(Modifier.padding(horizontal = s.dp(20)).navigationBarsPadding()) {
@@ -112,7 +152,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     PlayChoices(ui, play)
                     Spacer(Modifier.height(s.dp(22)))
                     Stats(ui)
-                    if (ui.details != null) {
+                    if (showAbout) {
                         Spacer(Modifier.height(s.dp(26)))
                         About(ui)
                     }
@@ -207,8 +247,8 @@ private fun Stats(ui: DetailsUi) {
     val game = ui.game ?: return
     val s = Nebula.scale
     val items = listOfNotNull(
-        playtime(game.playtimeS)?.let { "Played" to it.removeSuffix(" played") },
-        relativeAgo(game.lastPlayedEpochS)?.let { "Last played" to it.replaceFirstChar(Char::uppercase) },
+        playtime(game.playtimeS)?.takeIf { ui.options.showPlaytime }?.let { "Played" to it.removeSuffix(" played") },
+        relativeAgo(game.lastPlayedEpochS)?.takeIf { ui.options.showPlaytime }?.let { "Last played" to it.replaceFirstChar(Char::uppercase) },
         ui.details?.lastSession?.let { "Last stream" to "${it.resolution} · ${it.fps} Hz" },
     )
     if (items.isEmpty()) return
@@ -225,13 +265,35 @@ private fun Stats(ui: DetailsUi) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun About(ui: DetailsUi) {
+private fun About(ui: DetailsUi, wide: Boolean = false) {
     val d = ui.details ?: return
     val s = Nebula.scale
+    var viewing by remember { mutableStateOf<String?>(null) }
     if (d.description != null) {
         SectionTitle("About")
-        Text(d.description, style = Nebula.type.body, color = NebulaColors.textSecondary)
-        Spacer(Modifier.height(s.dp(14)))
+        Text(
+            d.description, style = Nebula.type.body, color = NebulaColors.textSecondary,
+            maxLines = if (wide) 5 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(s.dp(16)))
+    }
+    // Screenshots come right after the description so they're visible without scrolling.
+    var loadShots by remember { mutableStateOf(false) }
+    if (d.screenshots.isNotEmpty() && ui.saveData && !loadShots) {
+        SectionTitle("Screenshots")
+        NebulaButton("Load ${d.screenshots.size} screenshots", onClick = { loadShots = true }, style = ButtonStyle.Secondary, icon = Icons.Outlined.Image)
+        Text("Data saver is on while you're on mobile data.", style = Nebula.type.label, color = NebulaColors.textMuted, modifier = Modifier.padding(top = s.dp(6)))
+        Spacer(Modifier.height(s.dp(16)))
+    } else if (d.screenshots.isNotEmpty()) {
+        SectionTitle("Screenshots")
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), contentPadding = PaddingValues(vertical = s.dp(4))) {
+            items(d.screenshots) { url ->
+                val shape = RoundedCornerShape(s.dp(10))
+                ArtImage(url, url, "Screenshot", Modifier.width(s.dp(if (wide) 200 else 240)).aspectRatio(16f / 9f)
+                    .nebulaClickable(shape, { viewing = url }, focusScale = 1.04f).border(1.dp, NebulaColors.border, shape))
+            }
+        }
+        Spacer(Modifier.height(s.dp(16)))
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
         d.genres.forEach { Pill(it) }
@@ -243,15 +305,30 @@ private fun About(ui: DetailsUi) {
         Text(credit, style = Nebula.type.label, color = NebulaColors.textMuted)
     }
     if (d.screenshots.isNotEmpty()) {
-        Spacer(Modifier.height(s.dp(22)))
-        SectionTitle("Screenshots")
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), contentPadding = PaddingValues(vertical = s.dp(4))) {
-            items(d.screenshots) { url ->
-                val shape = RoundedCornerShape(s.dp(10))
-                ArtImage(url, url, "Screenshot", Modifier.width(s.dp(220)).aspectRatio(16f / 9f).nebulaClickable(shape, {}, focusScale = 1.04f).border(1.dp, NebulaColors.border, shape))
-            }
-        }
         Spacer(Modifier.height(s.dp(8)))
         Text("Details and screenshots from Steam, fetched by Nova", style = Nebula.type.label, color = NebulaColors.textMuted)
+    }
+    viewing?.let { url ->
+        Dialog(onDismissRequest = { viewing = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Box(Modifier.fillMaxSize().background(Color.Black).nebulaClickable(RoundedCornerShape(0.dp), { viewing = null }), contentAlignment = Alignment.Center) {
+                ArtImage(url, url, "Screenshot", Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentScale = androidx.compose.ui.layout.ContentScale.Fit)
+            }
+        }
+    }
+}
+
+/** "More" actions for D-pad and TV users, who can't pull to refresh. */
+@Composable
+private fun MoreMenu(onRefresh: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        NebulaIconButton(Icons.Rounded.MoreVert, "More actions", { open = true })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = NebulaColors.raised) {
+            DropdownMenuItem(
+                text = { Text("Refresh details and art", style = Nebula.type.body, color = NebulaColors.text) },
+                leadingIcon = { Icon(Icons.Outlined.Refresh, null, tint = NebulaColors.textSecondary) },
+                onClick = { open = false; onRefresh() },
+            )
+        }
     }
 }

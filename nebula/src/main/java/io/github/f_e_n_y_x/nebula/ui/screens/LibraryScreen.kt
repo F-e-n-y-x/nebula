@@ -45,6 +45,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.github.f_e_n_y_x.nebula.ui.components.statusBarScrim
+import io.github.f_e_n_y_x.nebula.ui.LocalRailInset
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -122,18 +128,19 @@ private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Ga
         ) { g ->
             ArtImage(
                 url = g.art.hero ?: g.art.header ?: g.art.poster, seed = g.name, contentDescription = null,
-                modifier = Modifier.fillMaxSize(), alignment = Alignment.TopEnd,
+                modifier = Modifier.fillMaxSize(), alignment = HeroFocus,
             )
         }
         Box(Modifier.fillMaxSize().leftScrim())
         Box(Modifier.fillMaxSize().bottomScrim())
+        Box(Modifier.fillMaxWidth().statusBarScrim())
 
         Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .padding(start = s.dp(40), end = s.dp(32), top = s.dp(if (compactHeight) 12 else 24), bottom = s.dp(if (compactHeight) 10 else 24)),
+                .padding(start = LocalRailInset.current + s.dp(40), end = s.dp(32), top = s.dp(if (compactHeight) 12 else 24), bottom = s.dp(if (compactHeight) 10 else 24)),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
@@ -143,14 +150,14 @@ private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Ga
             Column(Modifier.widthIn(max = s.dp(560))) {
                 val eyebrow = when {
                     focused.running -> "RUNNING ON ${ui.host?.name?.uppercase() ?: "HOST"}"
-                    focused.lastPlayedEpochS != null -> "LAST PLAYED · ${relativeAgo(focused.lastPlayedEpochS)!!.uppercase()}"
+                    focused.lastPlayedEpochS != null && ui.options.showPlaytime -> "LAST PLAYED · ${relativeAgo(focused.lastPlayedEpochS)!!.uppercase()}"
                     focused.kind == GameKind.DESKTOP -> "DESKTOP"
                     else -> "IN YOUR LIBRARY"
                 }
                 Text(eyebrow, style = t.eyebrow, color = NebulaColors.accentText)
                 Spacer(Modifier.height(s.dp(10)))
                 GameTitle(focused, maxHeight = s.dp(if (compactHeight) 64 else 96), small = compactHeight)
-                val meta = listOfNotNull(focused.metaLine().ifBlank { null }, playtime(focused.playtimeS)).joinToString("  ·  ")
+                val meta = listOfNotNull(focused.metaLine().ifBlank { null }, playtime(focused.playtimeS)?.takeIf { ui.options.showPlaytime }).joinToString("  ·  ")
                 if (meta.isNotBlank()) {
                     Spacer(Modifier.height(s.dp(10)))
                     Text(meta, style = t.secondary, color = NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -245,30 +252,35 @@ private fun PortraitLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Gam
     val focused = ui.focused ?: return
     val compact = Nebula.form.isCompact
     val cols = if (compact) 3 else 5
+    val side = s.dp(if (compact) 16 else 24)
+    val start = LocalRailInset.current + side
+    val heroHeight = (LocalConfiguration.current.screenHeightDp * 0.58f).dp
     LazyVerticalGrid(
         columns = GridCells.Fixed(cols),
         modifier = Modifier.fillMaxSize().background(NebulaColors.bg),
-        contentPadding = PaddingValues(start = s.dp(16), end = s.dp(16), bottom = s.dp(24)),
+        contentPadding = PaddingValues(start = start, end = side, bottom = s.dp(24)),
         horizontalArrangement = Arrangement.spacedBy(s.dp(10)),
         verticalArrangement = Arrangement.spacedBy(s.dp(12)),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Box(Modifier.fillMaxWidth().padding(top = 0.dp)) {
-                Box(Modifier.fillMaxWidth().aspectRatio(if (compact) 0.92f else 1.35f)) {
+            // Full-bleed: the hero ignores the grid's side padding (and the rail) and runs under the status bar.
+            Box(Modifier.fillMaxWidth().bleed(start, side).height(heroHeight)) {
+                Box(Modifier.fillMaxSize()) {
                     ArtImage(
                         url = focused.art.hero ?: focused.art.header ?: focused.art.poster, seed = focused.name, contentDescription = null,
-                        modifier = Modifier.fillMaxSize(), alignment = Alignment.TopCenter,
+                        modifier = Modifier.fillMaxSize(), alignment = HeroFocus,
                     )
                     Box(Modifier.fillMaxSize().bottomScrim())
+                    Box(Modifier.fillMaxWidth().statusBarScrim())
                 }
-                Column(Modifier.fillMaxWidth().statusBarsPadding().padding(top = s.dp(12))) {
+                Column(Modifier.fillMaxWidth().statusBarsPadding().padding(top = s.dp(12), end = side)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Spacer(Modifier.weight(1f))
                         HostChip(ui.host)
                     }
                 }
-                Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(bottom = s.dp(4))) {
-                    val eyebrow = focused.lastPlayedEpochS?.let { "LAST PLAYED · ${relativeAgo(it)!!.uppercase()}" } ?: "IN YOUR LIBRARY"
+                Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = start, end = side, bottom = s.dp(4))) {
+                    val eyebrow = focused.lastPlayedEpochS?.takeIf { ui.options.showPlaytime }?.let { "LAST PLAYED · ${relativeAgo(it)!!.uppercase()}" } ?: "IN YOUR LIBRARY"
                     Text(eyebrow, style = t.eyebrow, color = NebulaColors.accentText)
                     Spacer(Modifier.height(s.dp(8)))
                     GameTitle(focused, maxHeight = s.dp(72), small = true)
@@ -327,4 +339,16 @@ private fun EmptyLibrary(host: Host?, nav: Navigator) {
         Spacer(Modifier.height(s.dp(24)))
         NebulaButton("Choose a host", onClick = { nav.top(Route.Hosts) }, style = ButtonStyle.Secondary)
     }
+}
+
+/** Crop focus for hero art: a little right of centre and above the middle, where faces usually are. */
+private val HeroFocus = BiasAlignment(0.35f, -0.35f)
+
+/** Lets a grid item draw past the grid's side padding (full-bleed headers). */
+private fun Modifier.bleed(start: Dp, end: Dp) = layout { measurable, constraints ->
+    val s = start.roundToPx()
+    val e = end.roundToPx()
+    val width = constraints.maxWidth + s + e
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-s, 0) }
 }

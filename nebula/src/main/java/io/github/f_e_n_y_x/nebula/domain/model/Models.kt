@@ -77,6 +77,15 @@ data class StreamSettings(
     val defaultMode: DisplayMode = DisplayMode.VIRTUAL,
 )
 
+/** How the library shows games, and how much artwork it keeps. */
+data class LibraryOptions(
+    val showDetails: Boolean = true,
+    val showPlaytime: Boolean = true,
+    /** On metered networks, skip hero art and load screenshots only on request. */
+    val dataSaver: Boolean = false,
+    val cacheLimitMb: Int = 512,
+)
+
 sealed interface PairingState {
     data object Connecting : PairingState
     /** Enter [pin] on the host (Nova web UI → Pair a device). */

@@ -1,6 +1,7 @@
 package io.github.f_e_n_y_x.nebula.data.demo
 
 import android.content.Context
+import io.github.f_e_n_y_x.nebula.domain.ArtworkRepository
 import io.github.f_e_n_y_x.nebula.domain.HostRepository
 import io.github.f_e_n_y_x.nebula.domain.LibraryRepository
 import io.github.f_e_n_y_x.nebula.domain.StreamRepository
@@ -17,7 +18,9 @@ import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -113,6 +116,17 @@ class DemoHost(private val context: Context) {
         override fun observeGames(hostId: String): Flow<List<Game>> =
             hosts.map { if (hostId == HOST_ID) entries.map { it.game } else emptyList() }
         override suspend fun details(hostId: String, gameId: String): GameDetails? = entries.firstOrNull { it.game.id == gameId }?.details
+    }
+
+    /** The demo "cache" is the bundled art: usage is its real size; clearing and refreshing are no-ops. */
+    val artworkRepository = object : ArtworkRepository {
+        override suspend fun usedBytes(): Long = withContext(Dispatchers.IO) {
+            context.assets.list("demo")?.sumOf { name -> runCatching { context.assets.openFd("demo/$name").use { it.length } }.getOrDefault(0L) } ?: 0L
+        }
+        override fun setLimit(bytes: Long) = Unit
+        override suspend fun clear() = Unit
+        override suspend fun refreshHost(hostId: String) = delay(600)
+        override suspend fun refreshGame(hostId: String, gameId: String) = delay(400)
     }
 
     val streamRepository = object : StreamRepository {

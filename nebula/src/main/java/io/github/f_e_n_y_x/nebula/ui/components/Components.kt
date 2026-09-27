@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
@@ -213,12 +215,28 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 }
 
 /** Dark scrim so text on artwork always meets contrast. */
-fun Modifier.leftScrim(strength: Float = 0.94f) = this.background(
-    Brush.horizontalGradient(0f to NebulaColors.bg.copy(alpha = strength), 0.55f to NebulaColors.bg.copy(alpha = strength * 0.55f), 1f to Color.Transparent),
+/**
+ * Darkens the left side for a text column and clears by [reach] of the width, so the art stays
+ * visible on the right. Text sits in the first ~40%, where the scrim is ≥ 88% opaque (≥ 4.5:1 for
+ * the secondary text colour over any art).
+ */
+fun Modifier.leftScrim(strength: Float = 0.94f, reach: Float = 0.72f) = this.background(
+    Brush.horizontalGradient(
+        0f to NebulaColors.bg.copy(alpha = strength),
+        reach * 0.5f to NebulaColors.bg.copy(alpha = strength * 0.93f),
+        reach * 0.8f to NebulaColors.bg.copy(alpha = strength * 0.4f),
+        reach to Color.Transparent,
+    ),
 )
 
+/** A short dark band under the status bar so its icons stay legible over full-bleed art. */
+fun Modifier.statusBarScrim() = this
+    .height(96.dp)
+    .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 1f to Color.Transparent))
+
+/** Fades the bottom into the page background; the top half stays untouched. */
 fun Modifier.bottomScrim(strength: Float = 1f) = this.background(
-    Brush.verticalGradient(0f to Color.Transparent, 0.55f to NebulaColors.bg.copy(alpha = 0.35f * strength), 1f to NebulaColors.bg.copy(alpha = strength)),
+    Brush.verticalGradient(0f to Color.Transparent, 0.5f to Color.Transparent, 0.78f to NebulaColors.bg.copy(alpha = 0.55f * strength), 1f to NebulaColors.bg.copy(alpha = strength)),
 )
 
 /** The Nebula mark: a four-point star with a dark core (matches the launcher icon). */
@@ -238,4 +256,25 @@ fun NebulaStar(modifier: Modifier = Modifier, color: Color = Color(0xFF8B72FF)) 
         drawPath(p, color)
         drawCircle(NebulaColors.bg, radius = w * 0.065f, center = Offset(w * 0.5f, h * 0.5f))
     }
+}
+
+/** A confirm dialog in Nebula colours; the confirm button takes focus so OK on a remote confirms deliberately. */
+@Composable
+fun NebulaConfirmDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val s = Nebula.scale
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = NebulaColors.raised,
+        titleContentColor = NebulaColors.text,
+        textContentColor = NebulaColors.textSecondary,
+        title = { Text(title, style = Nebula.type.heading) },
+        text = { Text(text, style = Nebula.type.body) },
+        confirmButton = {
+            NebulaButton(confirm, onClick = onConfirm, style = ButtonStyle.Danger, modifier = Modifier.focusRequester(focus))
+            androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+        },
+        dismissButton = { NebulaButton("Cancel", onClick = onDismiss, style = ButtonStyle.Ghost) },
+        shape = RoundedCornerShape(s.dp(18)),
+    )
 }

@@ -22,6 +22,9 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -64,18 +67,36 @@ sealed interface Route {
     data class Library(val hostId: String) : Route
     data class Details(val hostId: String, val gameId: String) : Route
     data class Stream(val hostId: String, val gameId: String, val mode: DisplayMode) : Route
-    data object Settings : Route
+    /** [section] opens one settings section directly (its enum name, e.g. "Library"). */
+    data class Settings(val section: String? = null) : Route
 }
 
 /** Navigation actions shared by every screen. */
 class Navigator(private val stack: SnapshotStateList<Route>) {
     val current: Route get() = stack.last()
     fun push(r: Route) { stack.add(r) }
-    fun back() { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
+
+    /**
+     * Pops one screen. At the root of Hosts or Settings it returns to the home section (the
+     * library, or Hosts before any PC is paired), like a real app's tabs. Returns false only at
+     * home, where Back should leave the app.
+     */
+    fun back(): Boolean {
+        if (stack.size > 1) { stack.removeAt(stack.lastIndex); return true }
+        if (isAtHome) return false
+        top(home)
+        return true
+    }
+
     /** Switch top-level section (rail / bottom bar): reset to just that section. */
     fun top(r: Route) { stack.clear(); stack.add(r) }
     var lastLibrary: Route.Library? = null
+    val home: Route get() = lastLibrary ?: Route.Hosts
+    val isAtHome: Boolean get() = stack.size == 1 && (stack[0] == home || stack[0] == Route.Onboarding)
 }
+
+/** Width of the nav rail drawn over the screen; the library draws its hero underneath it. */
+val LocalRailInset = staticCompositionLocalOf { 0.dp }
 
 private enum class Section(val label: String, val icon: ImageVector) {
     Library("Library", Icons.Outlined.SportsEsports),
@@ -86,13 +107,14 @@ private enum class Section(val label: String, val icon: ImageVector) {
 @Composable
 fun NebulaApp(container: AppContainer, startOverride: String? = null) {
     var start by remember { mutableStateOf<Route?>(null) }
+    var homeLibrary by remember { mutableStateOf<Route.Library?>(null) }
     LaunchedEffect(Unit) {
-        debugStart(startOverride)?.let { start = it; return@LaunchedEffect }
         val hosts = container.hosts.observeHosts().first()
         val last = container.prefs.lastHostId.first()
         val paired = hosts.filter { it.paired }
         val pick = paired.firstOrNull { it.id == last } ?: paired.firstOrNull()
-        start = if (pick != null) Route.Library(pick.id) else Route.Onboarding
+        homeLibrary = pick?.let { Route.Library(it.id) }
+        start = debugStart(startOverride) ?: homeLibrary ?: Route.Onboarding
     }
     val initial = start
     if (initial == null) {
@@ -100,18 +122,22 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
         return
     }
     val stack = remember { mutableStateListOf(initial) }
-    val nav = remember { Navigator(stack) }
+    val nav = remember { Navigator(stack).apply { lastLibrary = homeLibrary } }
     (stack.lastOrNull { it is Route.Library } as? Route.Library)?.let { nav.lastLibrary = it }
 
     val route = stack.last()
     val section = when (route) {
         is Route.Library -> Section.Library
         Route.Hosts -> Section.Hosts
-        Route.Settings -> Section.Settings
+        is Route.Settings -> Section.Settings
         else -> null
     }
     val form = Nebula.form
     val showChrome = section != null
+
+    // Back at a section root goes home; NavDisplay handles the pops above that. Registered first,
+    // so screen-level handlers (stream overlay, settings drill-down) take priority.
+    BackHandler(enabled = stack.size == 1 && !nav.isAtHome) { nav.back() }
 
     val content: @Composable () -> Unit = {
         NavDisplay(
@@ -125,7 +151,7 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
                 entry<Route.Library> { LibraryScreen(container, nav, it.hostId) }
                 entry<Route.Details> { DetailsScreen(container, nav, it.hostId, it.gameId) }
                 entry<Route.Stream> { StreamScreen(container, nav, it.hostId, it.gameId, it.mode) }
-                entry<Route.Settings> { SettingsScreen(container, nav) }
+                entry<Route.Settings> { SettingsScreen(container, nav, it.section) }
             },
         )
     }
@@ -134,24 +160,22 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
         when (s) {
             Section.Library -> nav.top(nav.lastLibrary ?: Route.Hosts)
             Section.Hosts -> nav.top(Route.Hosts)
-            Section.Settings -> nav.top(Route.Settings)
+            Section.Settings -> nav.top(Route.Settings())
         }
     }
 
+    // One layout tree for every route so NavDisplay keeps its state when the chrome changes.
+    val rail = showChrome && form.useRail
+    val overlayRail = rail && section == Section.Library // the library hero runs full-bleed under the rail
+    val railWidth = Nebula.scale.dp(RAIL_WIDTH)
     Box(Modifier.fillMaxSize().background(NebulaColors.bg)) {
-        if (showChrome && form.useRail) {
-            Row(Modifier.fillMaxSize()) {
-                NebulaRail(section!!, go)
-                Box(Modifier.weight(1f).fillMaxHeight()) { content() }
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f).fillMaxWidth().padding(start = if (rail && !overlayRail) railWidth else 0.dp)) {
+                CompositionLocalProvider(LocalRailInset provides if (overlayRail) railWidth else 0.dp) { content() }
             }
-        } else if (showChrome) {
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-                NebulaBottomBar(section!!, go)
-            }
-        } else {
-            content()
+            if (showChrome && !rail) NebulaBottomBar(section!!, go)
         }
+        if (rail) NebulaRail(section!!, go, transparent = overlayRail)
     }
 }
 
@@ -167,19 +191,21 @@ private fun debugStart(spec: String?): Route? {
         "library" -> Route.Library(host)
         "details" -> Route.Details(host, arg ?: "gta5")
         "stream" -> Route.Stream(host, arg ?: "gta5", DisplayMode.VIRTUAL)
-        "settings" -> Route.Settings
+        "settings" -> Route.Settings(arg)
         else -> null
     }
 }
 
+private const val RAIL_WIDTH = 88
+
 @Composable
-private fun NebulaRail(selected: Section, onSelect: (Section) -> Unit) {
+private fun NebulaRail(selected: Section, onSelect: (Section) -> Unit, transparent: Boolean) {
     val s = Nebula.scale
     Column(
         Modifier
             .fillMaxHeight()
-            .width(s.dp(88))
-            .background(NebulaColors.bg)
+            .width(s.dp(RAIL_WIDTH))
+            .background(if (transparent) Color.Transparent else NebulaColors.bg)
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(vertical = s.dp(20)),

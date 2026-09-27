@@ -31,10 +31,9 @@ import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +41,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.FlowRow
+import kotlin.math.roundToInt
+import io.github.f_e_n_y_x.nebula.ui.components.NebulaConfirmDialog
+import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
+import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
+import io.github.f_e_n_y_x.nebula.ui.components.SliderField
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -68,6 +81,7 @@ import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
 private enum class SettingsSection(val title: String, val summary: String, val icon: ImageVector, val ready: Boolean) {
     Stream("Stream", "Resolution, frame rate, bitrate, codec", Icons.Outlined.Videocam, true),
+    Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, true),
     Display("Display & audio", "HDR, scaling, surround, microphone", Icons.Outlined.Tv, false),
     Controls("Controls & input", "Keyboard, mouse, touch, gamepads, on-screen controls", Icons.Outlined.Gamepad, false),
     FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, false),
@@ -76,13 +90,16 @@ private enum class SettingsSection(val title: String, val summary: String, val i
 }
 
 @Composable
-fun SettingsScreen(container: AppContainer, nav: Navigator) {
+fun SettingsScreen(container: AppContainer, nav: Navigator, initialSection: String? = null) {
     val vm = viewModel { SettingsViewModel(container) }
     val settings by vm.settings.collectAsStateWithLifecycle()
     val form = Nebula.form
     val s = Nebula.scale
     val twoPane = form.widthDp >= 720
-    var open by remember { mutableStateOf(if (twoPane) SettingsSection.Stream else null) }
+    val initial = SettingsSection.entries.firstOrNull { it.name.equals(initialSection, ignoreCase = true) }
+    var open by remember { mutableStateOf(initial ?: if (twoPane) SettingsSection.Stream else null) }
+    // Single pane: Back closes the open section before leaving Settings.
+    BackHandler(enabled = !twoPane && open != null) { open = null }
 
     Box(Modifier.fillMaxSize().background(NebulaColors.bg)) {
         if (twoPane) {
@@ -94,7 +111,7 @@ fun SettingsScreen(container: AppContainer, nav: Navigator) {
                 }
                 Box(Modifier.width(1.dp).fillMaxHeight().background(NebulaColors.border))
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(32))) {
-                    SectionBody(open ?: SettingsSection.Stream, settings, vm::update)
+                    SectionBody(open ?: SettingsSection.Stream, settings, vm)
                 }
             }
         } else {
@@ -107,7 +124,7 @@ fun SettingsScreen(container: AppContainer, nav: Navigator) {
                 } else {
                     NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to settings", { open = null })
                     Spacer(Modifier.height(s.dp(12)))
-                    SectionBody(sec, settings, vm::update)
+                    SectionBody(sec, settings, vm)
                 }
             }
         }
@@ -139,7 +156,8 @@ private fun SectionRow(sec: SettingsSection, selected: Boolean, onClick: () -> U
 }
 
 @Composable
-private fun SectionBody(sec: SettingsSection, settings: StreamSettings, update: ((StreamSettings) -> StreamSettings) -> Unit) {
+private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: SettingsViewModel) {
+    val update: ((StreamSettings) -> StreamSettings) -> Unit = { vm.update(it) }
     val s = Nebula.scale
     Text(sec.title, style = Nebula.type.title, color = NebulaColors.text)
     Spacer(Modifier.height(s.dp(6)))
@@ -148,6 +166,7 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, update: 
     when (sec) {
         SettingsSection.Stream -> StreamSection(settings, update)
         SettingsSection.About -> AboutSection()
+        SettingsSection.Library -> LibrarySection(vm)
         else -> Column(
             Modifier.widthIn(max = s.dp(640)).fillMaxWidth().background(NebulaColors.surface, RoundedCornerShape(s.dp(14)))
                 .border(1.dp, NebulaColors.border, RoundedCornerShape(s.dp(14))).padding(s.dp(20)),
@@ -178,17 +197,10 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
             Segmented(listOf("60 fps" to 60, "90 fps" to 90, "120 fps" to 120), st.fps) { f -> update { it.copy(fps = f) } }
         }
         Setting("Bitrate", "Higher looks sharper; lower copes better with weak Wi-Fi.") {
-            var v by remember(st.bitrateKbps) { mutableFloatStateOf(st.bitrateKbps / 1000f) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Slider(
-                    value = v, onValueChange = { v = it }, valueRange = 5f..150f,
-                    onValueChangeFinished = { update { it.copy(bitrateKbps = (v * 1000).toInt()) } },
-                    colors = SliderDefaults.colors(thumbColor = NebulaColors.text, activeTrackColor = NebulaColors.accent, inactiveTrackColor = NebulaColors.raised),
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(s.dp(16)))
-                Text("${v.toInt()} Mbps", style = Nebula.type.mono, color = NebulaColors.text, modifier = Modifier.width(s.dp(84)))
-            }
+            SliderField(
+                label = "Bitrate", value = st.bitrateKbps / 1000f, range = 5f..150f, step = 5f, unit = "Mbps",
+                onValueChange = { v -> update { it.copy(bitrateKbps = (v * 1000).roundToInt()) } },
+            )
         }
         Setting("Video codec", "Auto picks HEVC when both sides support it.") {
             Segmented(listOf("Auto" to VideoCodec.AUTO, "HEVC" to VideoCodec.HEVC, "H.264" to VideoCodec.H264, "AV1" to VideoCodec.AV1), st.codec) { c -> update { it.copy(codec = c) } }
@@ -233,6 +245,87 @@ private fun <T> Segmented(options: List<Pair<String, T>>, selected: T, onSelect:
             }
         }
     }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun LibrarySection(vm: SettingsViewModel) {
+    val s = Nebula.scale
+    val o by vm.options.collectAsStateWithLifecycle()
+    val used by vm.cacheUsed.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
+    val host by vm.host.collectAsStateWithLifecycle()
+    var confirmClear by remember { mutableStateOf(false) }
+    Column(Modifier.widthIn(max = s.dp(680)), verticalArrangement = Arrangement.spacedBy(s.dp(26))) {
+        Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            ToggleRow("Show game details", "Description, genres and screenshots on each game's page.", o.showDetails) { v -> vm.updateOptions { it.copy(showDetails = v) } }
+            ToggleRow("Show playtime", "Hours played and last played, from Nova.", o.showPlaytime) { v -> vm.updateOptions { it.copy(showPlaytime = v) } }
+        }
+        Setting("Image quality", "Data saver skips large hero art and waits to load screenshots on mobile data.") {
+            Segmented(listOf("Original" to false, "Data saver on mobile data" to true), o.dataSaver) { v -> vm.updateOptions { it.copy(dataSaver = v) } }
+        }
+        Setting("Art cache size", "Posters, heroes and screenshots kept on this device. " + (used?.let { "Using ${formatBytes(it)}." } ?: "")) {
+            Segmented(listOf("256 MB" to 256, "512 MB" to 512, "1 GB" to 1024), o.cacheLimitMb) { v -> vm.updateOptions { it.copy(cacheLimitMb = v) } }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+            NebulaButton("Clear cache", onClick = { confirmClear = true }, style = ButtonStyle.Secondary, icon = Icons.Outlined.DeleteSweep)
+            NebulaButton(
+                host?.let { "Refresh from ${it.name}" } ?: "Refresh from host", onClick = { vm.refreshHost() },
+                style = ButtonStyle.Secondary, icon = Icons.Outlined.Refresh,
+            )
+        }
+        busy?.let {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(s.dp(16)), color = NebulaColors.accentText, strokeWidth = 2.dp)
+                Spacer(Modifier.width(s.dp(10)))
+                Text(it, style = Nebula.type.secondary, color = NebulaColors.textSecondary)
+            }
+        }
+    }
+    if (confirmClear) {
+        NebulaConfirmDialog(
+            title = "Clear the art cache?",
+            text = "Posters, heroes and screenshots download again from your PC the next time you open the library.",
+            confirm = "Clear cache",
+            onConfirm = { confirmClear = false; vm.clearCache() },
+            onDismiss = { confirmClear = false },
+        )
+    }
+}
+
+/** A setting that's on or off: the whole row is one focus target, so OK/tap toggles it. */
+@Composable
+private fun ToggleRow(title: String, help: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(12))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .semantics { stateDescription = if (checked) "On" else "Off" }
+            .nebulaClickable(shape, { onChange(!checked) }, role = Role.Switch)
+            .background(NebulaColors.surface, shape)
+            .padding(horizontal = s.dp(16), vertical = s.dp(12)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = Nebula.type.bodyStrong, color = NebulaColors.text)
+            Text(help, style = Nebula.type.label, color = NebulaColors.textMuted)
+        }
+        Spacer(Modifier.width(s.dp(12)))
+        Switch(
+            checked = checked, onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White, checkedTrackColor = NebulaColors.accent,
+                uncheckedThumbColor = NebulaColors.textSecondary, uncheckedTrackColor = NebulaColors.raised, uncheckedBorderColor = NebulaColors.controlBorder,
+            ),
+        )
+    }
+}
+
+private fun formatBytes(b: Long): String = when {
+    b >= 1024L * 1024 * 1024 -> "%.1f GB".format(b / (1024f * 1024 * 1024))
+    b >= 1024L * 1024 -> "%.1f MB".format(b / (1024f * 1024))
+    else -> "${b / 1024} KB"
 }
 
 @Composable

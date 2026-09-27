@@ -1,12 +1,14 @@
 package io.github.f_e_n_y_x.nebula.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
+import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.Resolution
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.VideoCodec
@@ -26,6 +28,10 @@ class PreferencesStore(context: Context) : PreferencesRepository {
         val codec = stringPreferencesKey("stream_codec")
         val defaultMode = stringPreferencesKey("stream_default_mode")
         val lastHost = stringPreferencesKey("last_host")
+        val showDetails = booleanPreferencesKey("library_show_details")
+        val showPlaytime = booleanPreferencesKey("library_show_playtime")
+        val dataSaver = booleanPreferencesKey("library_data_saver")
+        val cacheLimit = intPreferencesKey("library_cache_limit_mb")
         fun mode(hostId: String, gameId: String) = stringPreferencesKey("mode_${hostId}_$gameId")
     }
 
@@ -64,6 +70,32 @@ class PreferencesStore(context: Context) : PreferencesRepository {
 
     override suspend fun setMode(hostId: String, gameId: String, mode: DisplayMode) {
         store.edit { it[Keys.mode(hostId, gameId)] = mode.name }
+    }
+
+    override val libraryOptions: Flow<LibraryOptions> = store.data.map { p ->
+        val d = LibraryOptions()
+        LibraryOptions(
+            showDetails = p[Keys.showDetails] ?: d.showDetails,
+            showPlaytime = p[Keys.showPlaytime] ?: d.showPlaytime,
+            dataSaver = p[Keys.dataSaver] ?: d.dataSaver,
+            cacheLimitMb = p[Keys.cacheLimit] ?: d.cacheLimitMb,
+        )
+    }
+
+    override suspend fun updateLibraryOptions(transform: (LibraryOptions) -> LibraryOptions) {
+        store.edit { p ->
+            val d = LibraryOptions()
+            val next = transform(
+                LibraryOptions(
+                    p[Keys.showDetails] ?: d.showDetails, p[Keys.showPlaytime] ?: d.showPlaytime,
+                    p[Keys.dataSaver] ?: d.dataSaver, p[Keys.cacheLimit] ?: d.cacheLimitMb,
+                ),
+            )
+            p[Keys.showDetails] = next.showDetails
+            p[Keys.showPlaytime] = next.showPlaytime
+            p[Keys.dataSaver] = next.dataSaver
+            p[Keys.cacheLimit] = next.cacheLimitMb
+        }
     }
 
     override val lastHostId: Flow<String?> = store.data.map { it[Keys.lastHost] }

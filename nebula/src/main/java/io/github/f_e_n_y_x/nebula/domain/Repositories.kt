@@ -4,6 +4,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameDetails
 import io.github.f_e_n_y_x.nebula.domain.model.Host
+import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
@@ -32,8 +33,21 @@ interface PreferencesRepository {
     /** The mode the user last chose for this game, or null if never chosen. */
     fun modeFor(hostId: String, gameId: String): Flow<DisplayMode?>
     suspend fun setMode(hostId: String, gameId: String, mode: DisplayMode)
+    val libraryOptions: Flow<LibraryOptions>
+    suspend fun updateLibraryOptions(transform: (LibraryOptions) -> LibraryOptions)
     val lastHostId: Flow<String?>
     suspend fun setLastHost(hostId: String)
+}
+
+/** The artwork cache and re-fetching art and details from a host. */
+interface ArtworkRepository {
+    suspend fun usedBytes(): Long
+    fun setLimit(bytes: Long)
+    suspend fun clear()
+    /** Drops cached art for every game on [hostId] and asks the host for its list again. */
+    suspend fun refreshHost(hostId: String)
+    /** Drops [gameId]'s cached art so the next load fetches it fresh. */
+    suspend fun refreshGame(hostId: String, gameId: String)
 }
 
 /**

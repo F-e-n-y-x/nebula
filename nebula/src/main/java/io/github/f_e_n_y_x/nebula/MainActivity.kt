@@ -43,8 +43,23 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        streamInput?.onKey(event) == true || super.dispatchKeyEvent(event)
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        streamInput?.let { if (it.onKey(event)) return true }
+        if (streamInput == null) {
+            // Gamepads drive the UI like a TV remote: A selects, B goes back.
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BUTTON_A -> return super.dispatchKeyEvent(
+                    KeyEvent(event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_DPAD_CENTER, event.repeatCount,
+                        event.metaState, event.deviceId, event.scanCode, event.flags, event.source),
+                )
+                KeyEvent.KEYCODE_BUTTON_B -> {
+                    if (event.action == KeyEvent.ACTION_UP && !event.isCanceled) onBackPressedDispatcher.onBackPressed()
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =
         streamInput?.onMotion(event) == true || super.dispatchGenericMotionEvent(event)

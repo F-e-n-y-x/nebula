@@ -3,6 +3,7 @@ package io.github.f_e_n_y_x.nebula.data.engine
 import android.app.Activity
 import android.view.SurfaceHolder
 import io.github.f_e_n_y_x.nebula.data.PreferencesStore
+import io.github.f_e_n_y_x.nebula.domain.ArtworkRepository
 import io.github.f_e_n_y_x.nebula.domain.HostRepository
 import io.github.f_e_n_y_x.nebula.domain.LibraryRepository
 import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
@@ -198,6 +199,20 @@ private fun VideoCodec.toEngine() = when (this) {
     VideoCodec.H264 -> CodecPreference.H264
     VideoCodec.HEVC -> CodecPreference.HEVC
     VideoCodec.AV1 -> CodecPreference.AV1
+}
+
+class EngineArtworkRepository(private val engine: NebulaEngine) : ArtworkRepository {
+    override suspend fun usedBytes(): Long = withContext(Dispatchers.IO) { engine.artCache.usedBytes() }
+    override fun setLimit(bytes: Long) { engine.artCache.limitBytes = bytes }
+    override suspend fun clear() = withContext(Dispatchers.IO) { engine.artCache.clear() }
+
+    override suspend fun refreshHost(hostId: String) {
+        withContext(Dispatchers.IO) { engine.artCache.clearHost(hostId) }
+        engine.refresh(hostId)
+    }
+
+    override suspend fun refreshGame(hostId: String, gameId: String) =
+        withContext(Dispatchers.IO) { engine.artCache.clearApp(hostId, gameId) }
 }
 
 class EngineStreamRepository(

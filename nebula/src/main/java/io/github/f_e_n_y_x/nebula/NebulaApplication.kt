@@ -12,7 +12,16 @@ import io.github.f_e_n_y_x.nebula.data.engine.EngineHostRepository
 import io.github.f_e_n_y_x.nebula.data.engine.EngineLibraryRepository
 import io.github.f_e_n_y_x.nebula.data.engine.EnginePreferencesRepository
 import io.github.f_e_n_y_x.nebula.data.engine.EngineStreamRepository
+import android.net.ConnectivityManager
+import io.github.f_e_n_y_x.nebula.data.engine.EngineArtworkRepository
+import io.github.f_e_n_y_x.nebula.domain.ArtworkRepository
 import io.github.f_e_n_y_x.nebula.domain.HostRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import io.github.f_e_n_y_x.nebula.domain.LibraryRepository
 import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
 import io.github.f_e_n_y_x.nebula.domain.ResolvePlayModeUseCase
@@ -39,7 +48,20 @@ class AppContainer(context: Context) {
     val hosts: HostRepository = engine?.let { EngineHostRepository(it) } ?: demo.hostRepository
     val library: LibraryRepository = engine?.let { EngineLibraryRepository(it) } ?: demo.libraryRepository
     val stream: StreamRepository = engine?.let { EngineStreamRepository(it, screen) } ?: demo.streamRepository
+    val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)
+
+    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+
+    /** True on mobile data and other metered links, where data saver applies. */
+    fun isMetered(): Boolean = connectivity?.isActiveNetworkMetered == true
+
+    init {
+        // Keep the engine's cache limit in step with the setting.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            prefs.libraryOptions.map { it.cacheLimitMb }.distinctUntilChanged().collect { artwork.setLimit(it * 1024L * 1024L) }
+        }
+    }
 }
 
 class NebulaApplication : Application(), SingletonImageLoader.Factory {
