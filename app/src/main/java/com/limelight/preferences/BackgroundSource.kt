@@ -89,9 +89,9 @@ sealed class BackgroundSource(val prefValue: String) {
             val path = prefs.getString(KEY_LOCAL_PATH, null)
             if (path != null && File(path).exists()) return path
             // Self-heal: demote to Auto so user sees something.
-            setActive(ctx, Auto)
+            setActive(ctx, None)
             prefs.edit().remove(KEY_LOCAL_PATH).apply()
-            return Auto.resolveTarget(ctx, orientation)
+            return None.resolveTarget(ctx, orientation)
         }
     }
 
@@ -119,7 +119,7 @@ sealed class BackgroundSource(val prefValue: String) {
         private var resolvedTargetOrientation: Int? = null
 
         fun fromPrefValue(value: String?): BackgroundSource =
-            ALL.firstOrNull { it.prefValue == value } ?: Auto
+            ALL.firstOrNull { it.prefValue == value } ?: None
 
         /** Read the currently active source, running a one-shot legacy migration. */
         fun current(ctx: Context): BackgroundSource {

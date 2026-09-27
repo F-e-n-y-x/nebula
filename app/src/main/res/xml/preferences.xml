@@ -474,7 +474,7 @@
             android:summary="@string/summary_background_source"
             android:entries="@array/background_source_names"
             android:entryValues="@array/background_source_values"
-            android:defaultValue="auto" />
+            android:defaultValue="none" />
         <EditTextPreference
             android:key="background_image_url"
             android:title="@string/title_background_image_api"
@@ -490,11 +490,6 @@
             android:key="reset_background_image"
             android:title="@string/title_reset_background_image"
             android:summary="@string/summary_reset_background_image" />
-        <CheckBoxPreference
-            android:key="checkbox_enable_analytics"
-            android:title="@string/title_enable_analytics"
-            android:summary="@string/summary_enable_analytics"
-            android:defaultValue="true" />
         <CheckBoxPreference
             android:key="checkbox_enable_perf_overlay"
             android:title="@string/title_enable_perf_overlay"

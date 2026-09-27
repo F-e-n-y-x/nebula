@@ -54,8 +54,12 @@ import com.limelight.utils.UiHelper
 
 object UpdateManager {
     private const val TAG = "UpdateManager"
-    private const val GITHUB_API_URL = "https://api.github.com/repos/qiin2333/moonlight-vplus/releases/latest"
-    private const val GITHUB_RELEASE_PAGE = "https://github.com/qiin2333/moonlight-vplus/releases/latest"
+    private const val GITHUB_API_URL = "https://api.github.com/repos/F-e-n-y-x/nebula/releases/latest"
+    private const val GITHUB_RELEASE_PAGE = "https://github.com/F-e-n-y-x/nebula/releases/latest"
+
+    // Nebula: no automatic update checks and no third-party proxy lookups until
+    // public releases exist. A manual check just reports that none is available.
+    private const val AUTO_UPDATE_CHECKS = false
     private const val UPDATE_CHECK_INTERVAL = 4 * 60 * 60 * 1000L
 
     // 代理发现地址
@@ -112,6 +116,7 @@ object UpdateManager {
     }
 
     fun checkForUpdatesOnStartup(context: Context) {
+        if (!AUTO_UPDATE_CHECKS) return
         val lastCheckTime = context.getSharedPreferences("update_prefs", Context.MODE_PRIVATE)
                 .getLong("last_check_time", 0)
         val currentTime = System.currentTimeMillis()
@@ -1162,6 +1167,7 @@ object UpdateManager {
     }
 
     fun ensureProxyListUpdated(context: Context) {
+        if (!AUTO_UPDATE_CHECKS) return
         if (shouldUpdateProxyList(context)) {
             updateProxyList(context)
         }
