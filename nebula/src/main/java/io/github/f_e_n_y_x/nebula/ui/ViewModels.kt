@@ -1,9 +1,15 @@
 package io.github.f_e_n_y_x.nebula.ui
 
+import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.f_e_n_y_x.nebula.AppContainer
+import io.github.f_e_n_y_x.nebula.domain.LiveResolutionSwitcher
 import io.github.f_e_n_y_x.nebula.domain.SortLibrary
+import io.github.f_e_n_y_x.nebula.domain.SwitchOutcome
+import io.github.f_e_n_y_x.nebula.domain.SwitchState
+import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameDetails
@@ -143,7 +149,10 @@ class DetailsViewModel(private val c: AppContainer, val hostId: String, val game
     val ui: StateFlow<DetailsUi> = combine(
         combine(game, details, ::Pair),
         game.flatMapLatest { g -> if (g == null) flowOf(DisplayMode.VIRTUAL) else c.resolvePlayMode(g) },
-        combine(c.prefs.modeFor(hostId, gameId), c.prefs.streamSettings, ::Pair),
+        combine(c.prefs.modeFor(hostId, gameId), c.prefs.streamSettings, c.prefs.videoModeFor(hostId, gameId)) { m, st, v ->
+            // A size saved for this game from the stream menu wins over Settings.
+            m to (v?.let { st.copy(resolution = it.resolution, fps = it.fps) } ?: st)
+        },
         options,
         combine(refreshing, artVersion, ::Pair),
     ) { (g, d), m, (remembered, s), o, (r, v) ->
@@ -170,6 +179,9 @@ class DetailsViewModel(private val c: AppContainer, val hostId: String, val game
     }
 }
 
+/** Result of the last live resolution change, for a short message on the stream screen. */
+data class SwitchNote(val text: String, val ok: Boolean)
+
 class StreamViewModel(private val c: AppContainer, val hostId: String, val gameId: String, val mode: DisplayMode) : ViewModel() {
     private val _state = MutableStateFlow<StreamState>(StreamState.Starting)
     val state = _state.asStateFlow()
@@ -190,6 +202,18 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
 
     val backgrounded: StateFlow<Boolean> = c.stream.backgrounded.stateIn(this, false)
 
+    /** Live resolution changes; created with the stream's starting mode. */
+    private var switcher: LiveResolutionSwitcher? = null
+    private val _switch = MutableStateFlow<SwitchState?>(null)
+    /** Null until the stream has started; see [LiveResolutionSwitcher]. */
+    val switchState: StateFlow<SwitchState?> = _switch.asStateFlow()
+    private val _switchNote = MutableStateFlow<SwitchNote?>(null)
+    val switchNote: StateFlow<SwitchNote?> = _switchNote.asStateFlow()
+    /** The size and frame rate saved for this game ("Use for this game from now on"), if any. */
+    val gameVideoMode: StateFlow<VideoMode?> = c.prefs.videoModeFor(hostId, gameId).stateIn(this, null)
+    /** Settings' default resolution and frame rate, for the picker's "current" hints. */
+    val settings: StateFlow<StreamSettings> = c.prefs.streamSettings.stateIn(this, StreamSettings())
+
     /**
      * Starts the stream into [target] the first time; later calls (a new surface after the app
      * comes back from the background) move the running stream onto it.
@@ -206,8 +230,13 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
                 return@launch
             }
             c.prefs.setMode(hostId, gameId, mode)
-            val settings = c.prefs.streamSettings.first()
+            val base = c.prefs.streamSettings.first()
+            val initial = startingMode(base, c.prefs.videoModeFor(hostId, gameId).first(), c.deviceResolution())
+            val settings = base.copy(resolution = initial.resolution, fps = initial.fps)
             _bitrateKbps.value = settings.bitrateKbps
+            val sw = LiveResolutionSwitcher(initial, reconnect = { c.stream.switchMode(it) }, clock = SystemClock::elapsedRealtime)
+            switcher = sw
+            viewModelScope.launch { sw.state.collect { _switch.value = it } }
             var announced = false
             c.stream.start(g, mode, settings, target).collect {
                 _state.value = it
@@ -217,6 +246,48 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
                 }
                 if (it is StreamState.Ended || it is StreamState.Failed) c.onStreamEnded()
             }
+        }
+    }
+
+    /**
+     * Reconnects at [target] in place (same game, same Virtual / Mirror mode). [rememberForGame]
+     * saves it for this game once it works; turning it off forgets a saved one.
+     */
+    fun changeResolution(target: VideoMode, rememberForGame: Boolean) {
+        val sw = switcher ?: return
+        if (_state.value !is StreamState.Live || sw.state.value.busy) return
+        viewModelScope.launch {
+            _switchNote.value = null
+            val outcome = sw.switchTo(target)
+            when (outcome) {
+                is SwitchOutcome.Switched -> {
+                    Log.i(TAG, "Live resolution: ${target.label} in ${outcome.elapsedMs} ms")
+                    _switchNote.value = SwitchNote("Now streaming at ${target.label} · switched in %.1f s".format(outcome.elapsedMs / 1000f), ok = true)
+                    rememberChoice(target, rememberForGame)
+                }
+                SwitchOutcome.Unchanged -> rememberChoice(target, rememberForGame)
+                is SwitchOutcome.RolledBack -> {
+                    Log.w(TAG, "Live resolution: ${target.label} failed (${outcome.reason}); back at ${outcome.restored.label} after ${outcome.elapsedMs} ms")
+                    _switchNote.value = SwitchNote("Couldn't switch to ${target.label}. ${outcome.reason} Back at ${outcome.restored.label}.", ok = false)
+                }
+                is SwitchOutcome.Lost -> {
+                    Log.w(TAG, "Live resolution: stream lost: ${outcome.reason}")
+                    _switch.value = sw.state.value
+                    _state.value = StreamState.Failed("Couldn't change the resolution. ${outcome.reason}")
+                    session?.cancel()
+                    c.onStreamEnded()
+                }
+                SwitchOutcome.Busy -> Unit
+            }
+        }
+    }
+
+    fun clearSwitchNote() { _switchNote.value = null }
+
+    private suspend fun rememberChoice(target: VideoMode, remember: Boolean) {
+        when {
+            remember -> c.prefs.setVideoMode(hostId, gameId, target)
+            gameVideoMode.value != null -> c.prefs.setVideoMode(hostId, gameId, null)
         }
     }
 
@@ -235,6 +306,17 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
     override fun onCleared() {
         c.stream.stop(quitApp = false)
         c.onStreamEnded()
+    }
+
+    companion object {
+        private const val TAG = "Nebula"
+
+        /** The game's saved mode, else Settings' resolution ("this device" resolved) and frame rate. */
+        fun startingMode(settings: StreamSettings, forGame: VideoMode?, device: Pair<Int, Int>): VideoMode =
+            forGame ?: run {
+                val r = settings.resolution
+                if (r.width > 0 && r.height > 0) VideoMode(r.width, r.height, settings.fps) else VideoMode(device.first, device.second, settings.fps)
+            }
     }
 }
 

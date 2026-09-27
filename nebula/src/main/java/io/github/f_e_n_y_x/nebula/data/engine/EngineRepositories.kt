@@ -23,6 +23,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
 import io.github.f_e_n_y_x.nebula.domain.model.VideoCodec
+import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
 import io.github.fenyx.nebula.engine.ArtKind
 import io.github.fenyx.nebula.engine.CodecPreference
 import io.github.fenyx.nebula.engine.HostApp
@@ -33,8 +34,14 @@ import io.github.fenyx.nebula.engine.NovaDisplayMode
 import io.github.fenyx.nebula.engine.PairingFailure
 import io.github.fenyx.nebula.engine.StreamEndReason
 import io.github.fenyx.nebula.engine.StreamListener
+import io.github.fenyx.nebula.engine.StreamRequest
 import io.github.fenyx.nebula.engine.StreamSession
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.awaitClose
@@ -225,6 +232,10 @@ class EngineStreamRepository(
         get() = current.value
         set(value) { current.value = value }
 
+    /** The stream [start] is running, so a live resolution change can swap its connection. */
+    @Volatile
+    private var run: Run? = null
+
     /** Input for the live stream, or null when nothing is connected. */
     val input: InputBridge? get() = session?.takeIf { it.isConnected }?.input
 
@@ -238,7 +249,15 @@ class EngineStreamRepository(
         session?.attachSurface(surface.holder)
     }
 
-    override suspend fun setBitrate(kbps: Int): Boolean = session?.setBitrate(kbps) ?: false
+    override suspend fun setBitrate(kbps: Int): Boolean {
+        val ok = session?.setBitrate(kbps) ?: false
+        // A later resolution change reconnects at the bitrate the stream has now.
+        if (ok) run?.let { it.request = it.request.copy(bitrateKbps = kbps) }
+        return ok
+    }
+
+    override suspend fun switchMode(mode: VideoMode): Result<Unit> =
+        run?.switchTo(mode) ?: Result.failure(IllegalStateException("Nothing is streaming."))
 
     override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = callbackFlow {
         val surface = target as? SurfaceStreamTarget ?: error("The engine streams into a SurfaceStreamTarget")
@@ -248,42 +267,151 @@ class EngineStreamRepository(
             width = w, height = h, fps = settings.fps, bitrateKbps = settings.bitrateKbps, codec = settings.codec.toEngine(),
             novaDisplay = if (mode == DisplayMode.MIRROR) NovaDisplayMode.MIRROR else NovaDisplayMode.VIRTUAL,
         )
-        val listener = object : StreamListener {
-            override fun onConnected() {
-                val s = session ?: return
-                launch { s.stats.collect { trySend(StreamState.Live(it.toDomain())) } }
-            }
-
-            override fun onStageFailed(stage: String, errorCode: Int) {
-                trySend(StreamState.Failed("Couldn't start the stream: $stage failed (error $errorCode)."))
-            }
-
-            override fun onEnded(reason: StreamEndReason, errorCode: Int) {
-                trySend(
-                    when (reason) {
-                        StreamEndReason.USER_QUIT -> StreamState.Ended(null)
-                        StreamEndReason.HOST_ENDED -> StreamState.Ended("The PC ended the stream.")
-                        StreamEndReason.DISCONNECTED -> StreamState.Ended("The connection to the PC was lost.")
-                        StreamEndReason.ERROR -> StreamState.Failed("The stream stopped with error $errorCode.")
-                    },
-                )
-                session = null
-                channel.close()
-            }
-        }
+        val r = Run(this, game, surface, request)
+        run = r
         // startStream must run on the main thread with a live surface.
         withContext(Dispatchers.Main.immediate) {
-            runCatching { engine.startStream(surface.activity, game.hostId, game.id, request, surface.holder, listener) }
-                .onSuccess { session = it }
+            runCatching { r.open(request) }
                 .onFailure { trySend(StreamState.Failed(it.message ?: "Couldn't start the stream.")); channel.close() }
         }
-        awaitClose { session?.disconnect(); session = null }
+        awaitClose {
+            if (run === r) run = null
+            session?.disconnect()
+            session = null
+        }
     }
 
     override fun stop(quitApp: Boolean) {
         val s = session ?: return
         if (quitApp) s.quit() else s.disconnect()
     }
+
+    /**
+     * One [start] call: the flow the UI collects outlives the engine sessions behind it, so a
+     * resolution change can end one connection and resume the app on a new one without the screen
+     * seeing the stream end. Callbacks from a session that is no longer [session] are ignored.
+     */
+    private inner class Run(
+        private val out: ProducerScope<StreamState>,
+        private val game: Game,
+        private val surface: SurfaceStreamTarget,
+        @Volatile var request: StreamRequest,
+    ) {
+        private var statsJob: Job? = null
+
+        /** Set while a switch waits for its new connection; failures complete it instead of ending the flow. */
+        @Volatile
+        private var pending: CompletableDeferred<Result<Unit>>? = null
+
+        /** Starts a session for [req] and makes it current. Main thread. */
+        fun open(req: StreamRequest): StreamSession {
+            var mine: StreamSession? = null
+            // Callbacks are posted to the main thread, so they run after `mine` is set below.
+            fun isMine() = mine != null && session === mine
+            val listener = object : StreamListener {
+                override fun onConnected() {
+                    val s = mine ?: return
+                    if (!isMine()) return
+                    statsJob?.cancel()
+                    statsJob = out.launch { s.stats.collect { out.trySend(StreamState.Live(it.toDomain())) } }
+                    pending?.complete(Result.success(Unit))
+                }
+
+                override fun onStageFailed(stage: String, errorCode: Int) {
+                    if (!isMine()) return
+                    val why = "Couldn't start the stream: $stage failed (error $errorCode)."
+                    val p = pending
+                    if (p != null) p.complete(Result.failure(IllegalStateException(why))) else out.trySend(StreamState.Failed(why))
+                }
+
+                override fun onEnded(reason: StreamEndReason, errorCode: Int) {
+                    if (!isMine()) return
+                    session = null
+                    statsJob?.cancel()
+                    val p = pending
+                    if (p != null) {
+                        p.complete(Result.failure(IllegalStateException(reason.message(errorCode) ?: "The PC ended the connection.")))
+                        return
+                    }
+                    out.trySend(
+                        when (reason) {
+                            StreamEndReason.USER_QUIT -> StreamState.Ended(null)
+                            StreamEndReason.ERROR -> StreamState.Failed(reason.message(errorCode)!!)
+                            else -> StreamState.Ended(reason.message(errorCode))
+                        },
+                    )
+                    out.channel.close()
+                }
+            }
+            val s = engine.startStream(surface.activity, game.hostId, game.id, req, surface.holder, listener)
+            mine = s
+            session = s
+            return s
+        }
+
+        /**
+         * Ends the current connection (the game keeps running on the PC), then resumes the app at
+         * [mode] into the same surface. Only /resume is used, so the PC never launches or quits
+         * anything; Nova applies the new size to its display when it sees no active session.
+         */
+        suspend fun switchTo(mode: VideoMode): Result<Unit> {
+            val old = withContext(Dispatchers.Main.immediate) {
+                session.also {
+                    // Retire it first: its "ended" callback must not end the flow.
+                    session = null
+                    statsJob?.cancel()
+                }
+            }
+            if (old != null) {
+                val stopped = CompletableDeferred<Unit>()
+                old.disconnect { stopped.complete(Unit) }
+                if (withTimeoutOrNull(STOP_TIMEOUT_MS) { stopped.await() } == null) {
+                    android.util.Log.w("Nebula", "Live resolution: the old connection took over $STOP_TIMEOUT_MS ms to stop")
+                }
+                // Let the PC see the disconnect before /resume, so it reconfigures the display.
+                delay(HOST_SETTLE_MS)
+            }
+            val req = request.copy(width = mode.width, height = mode.height, fps = mode.fps, resumeOnly = true)
+            val result = CompletableDeferred<Result<Unit>>()
+            pending = result
+            try {
+                withContext(Dispatchers.Main.immediate) {
+                    runCatching { open(req) }.onFailure { result.complete(Result.failure(it)) }
+                }
+                val r = result.await()
+                if (r.isSuccess) {
+                    request = req
+                } else {
+                    withContext(Dispatchers.Main.immediate) { session?.disconnect(); session = null }
+                }
+                return r
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Timed out or the screen went away: don't leave a half-open connection behind.
+                withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main.immediate) { session?.disconnect(); session = null }
+                throw e
+            } finally {
+                pending = null
+            }
+        }
+    }
+
+    private companion object {
+        const val STOP_TIMEOUT_MS = 3_000L
+
+        /**
+         * Nova (Sunshine) only reconfigures its display on /resume when no session is active. The
+         * ENet disconnect is sent by the time the old connection has stopped, and /resume follows a
+         * serverinfo round trip; this small pause covers a busy host.
+         */
+        const val HOST_SETTLE_MS = 250L
+    }
+}
+
+private fun StreamEndReason.message(errorCode: Int): String? = when (this) {
+    StreamEndReason.USER_QUIT -> null
+    StreamEndReason.HOST_ENDED -> "The PC ended the stream."
+    StreamEndReason.DISCONNECTED -> "The connection to the PC was lost."
+    StreamEndReason.ERROR -> "The stream stopped with error $errorCode."
 }
 
 private fun EngineStats.toDomain(): StreamStats {

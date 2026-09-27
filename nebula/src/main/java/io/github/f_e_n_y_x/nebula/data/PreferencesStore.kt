@@ -12,6 +12,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.Resolution
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.VideoCodec
+import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -33,6 +34,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
         val dataSaver = booleanPreferencesKey("library_data_saver")
         val cacheLimit = intPreferencesKey("library_cache_limit_mb")
         fun mode(hostId: String, gameId: String) = stringPreferencesKey("mode_${hostId}_$gameId")
+        fun videoMode(hostId: String, gameId: String) = stringPreferencesKey("video_mode_${hostId}_$gameId")
     }
 
     override val streamSettings: Flow<StreamSettings> = store.data.map { p ->
@@ -70,6 +72,17 @@ class PreferencesStore(context: Context) : PreferencesRepository {
 
     override suspend fun setMode(hostId: String, gameId: String, mode: DisplayMode) {
         store.edit { it[Keys.mode(hostId, gameId)] = mode.name }
+    }
+
+    override fun videoModeFor(hostId: String, gameId: String): Flow<VideoMode?> =
+        store.data.map { p -> VideoMode.decode(p[Keys.videoMode(hostId, gameId)]) }
+
+    override suspend fun setVideoMode(hostId: String, gameId: String, mode: VideoMode?) {
+        store.edit { p ->
+            val key = Keys.videoMode(hostId, gameId)
+            if (mode == null) p.remove(key) else p[key] = mode.encode()
+            Unit
+        }
     }
 
     override val libraryOptions: Flow<LibraryOptions> = store.data.map { p ->

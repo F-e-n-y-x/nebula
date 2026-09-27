@@ -8,6 +8,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
+import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
 import kotlinx.coroutines.flow.Flow
 
 interface HostRepository {
@@ -33,6 +34,9 @@ interface PreferencesRepository {
     /** The mode the user last chose for this game, or null if never chosen. */
     fun modeFor(hostId: String, gameId: String): Flow<DisplayMode?>
     suspend fun setMode(hostId: String, gameId: String, mode: DisplayMode)
+    /** The size and frame rate chosen for this game from the stream menu, or null to use Settings. */
+    fun videoModeFor(hostId: String, gameId: String): Flow<VideoMode?>
+    suspend fun setVideoMode(hostId: String, gameId: String, mode: VideoMode?)
     val libraryOptions: Flow<LibraryOptions>
     suspend fun updateLibraryOptions(transform: (LibraryOptions) -> LibraryOptions)
     val lastHostId: Flow<String?>
@@ -64,6 +68,13 @@ interface StreamRepository {
     fun stop(quitApp: Boolean)
     /** Moves a running stream onto a new surface (after the app returns from the background). */
     fun reattach(target: StreamTarget) {}
+    /**
+     * Reconnects the running stream at [mode] without quitting the game on the PC: the connection
+     * ends and the same app is resumed at the new size and frame rate (same display mode), into the
+     * same surface. Returns once the new connection is live. On failure the stream is left
+     * disconnected and may be switched again (to roll back); the start() flow stays open meanwhile.
+     */
+    suspend fun switchMode(mode: VideoMode): Result<Unit> = Result.failure(UnsupportedOperationException("Changing resolution live isn't supported here."))
     /** Changes the bitrate mid-stream; true once the PC accepted it. */
     suspend fun setBitrate(kbps: Int): Boolean = false
     /** Input for the running stream, or null when nothing is connected. */

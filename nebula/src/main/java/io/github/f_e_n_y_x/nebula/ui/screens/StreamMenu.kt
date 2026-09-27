@@ -94,11 +94,18 @@ fun StreamMenu(
     gameKey: String,
     zoomed: Boolean,
     actions: StreamMenuActions,
+    resolution: LiveResolutionUi? = null,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
     val side = form.isLandscape || form.isTv || !form.isCompact
     var confirmQuit by remember { mutableStateOf(false) }
+    // The resolution picker replaces the panel; Back returns to it, applying closes the menu.
+    var picking by remember { mutableStateOf(false) }
+    if (picking && resolution != null) {
+        ResolutionPicker(resolution, onDismiss = { picking = false }, onApplied = { picking = false; actions.onResume() })
+        return
+    }
     Box(Modifier.fillMaxSize()) {
         // Scrim: tapping outside the panel resumes.
         Box(
@@ -119,6 +126,7 @@ fun StreamMenu(
         ) {
             Header(gameName, mode, stats)
             StatsBlock(stats, ui.perf == PerfDetail.FULL)
+            resolution?.let { ResolutionRow(it, onOpen = { picking = true }) }
             Controls(ui, prefs, actions, gameKey, zoomed)
             Bitrate(bitrateKbps, bitrateNote, actions.onBitrate)
             Keys(actions.onShortcut)

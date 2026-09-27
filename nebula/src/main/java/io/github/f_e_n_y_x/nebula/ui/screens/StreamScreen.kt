@@ -79,6 +79,7 @@ import io.github.f_e_n_y_x.nebula.StreamInputSink
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
 import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
 import io.github.f_e_n_y_x.nebula.domain.StreamTarget
+import io.github.f_e_n_y_x.nebula.domain.SwitchState
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
@@ -131,6 +132,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     val game by vm.game.collectAsStateWithLifecycle()
     val bitrate by vm.bitrateKbps.collectAsStateWithLifecycle()
     val bitrateNote by vm.bitrateNote.collectAsStateWithLifecycle()
+    val switchState by vm.switchState.collectAsStateWithLifecycle()
+    val switchNote by vm.switchNote.collectAsStateWithLifecycle()
+    val gameVideoMode by vm.gameVideoMode.collectAsStateWithLifecycle()
     val s = Nebula.scale
     val t = Nebula.type
     val ctx = LocalContext.current
@@ -373,6 +377,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
+        // Live resolution change: the last frame stays up behind a small "Switching to…" pill.
+        SwitchingOverlay(switchState, switchNote, onNoteShown = vm::clearSwitchNote, modifier = Modifier.align(Alignment.TopCenter))
+
         AnimatedVisibility(menu && !ended, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             StreamMenu(
                 gameName = game?.name ?: "Stream",
@@ -385,6 +392,12 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 gamepads = pad.count,
                 gameKey = gameKey,
                 zoomed = zoom > 1.001f,
+                resolution = LiveResolutionUi(
+                    current = (switchState as? SwitchState.Streaming)?.mode?.takeIf { live },
+                    state = switchState,
+                    saved = gameVideoMode,
+                    onApply = vm::changeResolution,
+                ),
                 actions = StreamMenuActions(
                     onResume = { menu = false },
                     onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },

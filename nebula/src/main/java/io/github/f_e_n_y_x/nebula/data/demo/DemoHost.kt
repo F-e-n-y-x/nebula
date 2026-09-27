@@ -18,6 +18,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
+import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -129,27 +130,53 @@ class DemoHost(private val context: Context) {
         override suspend fun refreshGame(hostId: String, gameId: String) = delay(400)
     }
 
+    /**
+     * The demo stream reports the size it was asked for, and changes it live like a Nova host: a
+     * switch takes about a second and a half; sizes wider than 4K "fail" so the rollback path can be
+     * seen without a PC.
+     */
     val streamRepository = object : StreamRepository {
+        private val demoMode = MutableStateFlow<VideoMode?>(null)
+        private val paused = MutableStateFlow(false)
+
         override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = flow {
             emit(StreamState.Starting)
+            val r = settings.resolution
+            demoMode.value = VideoMode(r.width.takeIf { it > 0 } ?: 2340, r.height.takeIf { it > 0 } ?: 1080, settings.fps)
+            paused.value = false
             delay(1_200)
-            val res = if (mode == DisplayMode.MIRROR) "1920×1080" else "2340×1080"
             var t = 0
             while (true) {
-                val (w, h) = if (mode == DisplayMode.MIRROR) 1920 to 1080 else 2340 to 1080
-                emit(
-                    StreamState.Live(
-                        StreamStats(
-                            res, if (mode == DisplayMode.MIRROR) 60 else 120, 28f + (t % 5), 5.6f + (t % 3) * 0.3f, "HEVC",
-                            width = w, height = h, receivedFps = if (mode == DisplayMode.MIRROR) 60f else 120f, lossPercent = 0.1f * (t % 2),
-                            hostMs = 1.8f, networkMs = 2.1f + (t % 3) * 0.3f, decodeMs = 1.2f, renderMs = 0.5f, decoder = "c2.android.hevc.decoder",
+                if (!paused.value) {
+                    val m = demoMode.value ?: break
+                    emit(
+                        StreamState.Live(
+                            StreamStats(
+                                "${m.width}×${m.height}", m.fps, 28f + (t % 5), 5.6f + (t % 3) * 0.3f, "HEVC",
+                                width = m.width, height = m.height, receivedFps = m.fps.toFloat(), lossPercent = 0.1f * (t % 2),
+                                hostMs = 1.8f, networkMs = 2.1f + (t % 3) * 0.3f, decodeMs = 1.2f, renderMs = 0.5f, decoder = "c2.android.hevc.decoder",
+                            ),
                         ),
-                    ),
-                )
-                t++
-                delay(1_000)
+                    )
+                    t++
+                }
+                delay(if (paused.value) 50 else 1_000)
             }
         }
+
+        override suspend fun switchMode(mode: VideoMode): Result<Unit> {
+            paused.value = true
+            delay(700) // disconnect
+            if (mode.width > 3840) {
+                delay(600)
+                return Result.failure(IllegalStateException("The PC's encoder doesn't support ${mode.width}×${mode.height}."))
+            }
+            delay(800) // /resume, RTSP and the first frame
+            demoMode.value = mode
+            paused.value = false
+            return Result.success(Unit)
+        }
+
         override fun stop(quitApp: Boolean) = Unit
         private val log = io.github.f_e_n_y_x.nebula.input.LoggingInput()
         override val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput get() = log

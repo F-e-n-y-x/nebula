@@ -46,6 +46,9 @@ class AppContainer(context: Context) {
     private val local = PreferencesStore(context)
     private val screen = { deviceResolution(context) }
 
+    /** This device's panel size in landscape: what "match this device" streams at. */
+    fun deviceResolution(): Pair<Int, Int> = screen()
+
     val prefs: PreferencesRepository = engine?.let { EnginePreferencesRepository(it, local, screen) } ?: local
     val hosts: HostRepository = engine?.let { EngineHostRepository(it) } ?: demo.hostRepository
     val library: LibraryRepository = engine?.let { EngineLibraryRepository(it) } ?: demo.libraryRepository
