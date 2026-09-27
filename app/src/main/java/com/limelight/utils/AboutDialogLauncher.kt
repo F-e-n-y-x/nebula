@@ -302,9 +302,9 @@ object AboutDialogLauncher {
             info.applicationInfo
                 ?.loadLabel(context.packageManager)
                 ?.toString()
-                ?: "Moonlight V+"
+                ?: "Nebula"
         } catch (_: PackageManager.NameNotFoundException) {
-            "Moonlight V+"
+            "Nebula"
         }
     }
 

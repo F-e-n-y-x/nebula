@@ -594,7 +594,7 @@ class PcView : ThemedActivity(), AdapterFragmentCallbacks, ShakeDetector.Listene
 
         clientName = Settings.Global.getString(contentResolver, "device_name")
             ?: Build.MODEL
-            ?: "Moonlight V+ Client"
+            ?: "Nebula Client"
         backgroundImageView = findViewById(R.id.pcBackgroundImage)
 
         loadBackgroundImage(loadGeneration)

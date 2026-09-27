@@ -169,7 +169,7 @@
     <string name="applist_refresh_error_title">Error</string>
     <string name="applist_refresh_error_msg">Failed to get app list</string>
     <string name="quick_start_load_app_list_first">No cached apps yet. Opening the app list to load them first.</string>
-    <string name="error_desktop_special_app_unsupported">This host does not support Desktop quick start. Open the app list once to load cached apps, or update Foundation Sunshine.</string>
+    <string name="error_desktop_special_app_unsupported">This host does not support Desktop quick start. Open the app list once to load cached apps, or update the host.</string>
     <string name="error_vdd_unsupported">This host does not support virtual display streaming.</string>
     <string name="error_vdd_unavailable">The host virtual display driver is unavailable. Install or repair ZakoVDD, then try again.</string>
     <string name="applist_quit_app">Quitting</string>
@@ -179,7 +179,7 @@
     <string name="applist_details_id">App ID:</string>
 
     <!-- In Game menu -->
-    <string name="game_menu_title">🍥🍬 V+ Game Menu</string>
+    <string name="game_menu_title">Game menu</string>
     <string name="game_menu_server_version">%1$s  Server %2$s</string>
     <string name="game_menu_toggle_keyboard">Toggle Local Keyboard</string>
     <string name="game_menu_toggle_performance_overlay">Performance Overlay</string>
@@ -325,7 +325,7 @@
     <string name="title_checkbox_control_only">Control-only mode</string>
     <string name="summary_checkbox_control_only">Only establish control stream connection without video and audio streams. Useful for remote input control only. Requires Sunshine server with control-only mode support.</string>
     <string name="title_checkbox_enable_mic">Enable microphone</string>
-    <string name="summary_checkbox_enable_mic">Send this device\'s microphone audio to the host. Requires Foundation Sunshine 2025.0720 or later.</string>
+    <string name="summary_checkbox_enable_mic">Send this device\'s microphone audio to the host. Requires Nova, or Foundation Sunshine 2025.0720 or later.</string>
     <string name="title_list_mic_initial_state">Initial microphone state</string>
     <string name="summary_list_mic_initial_state">Choose the microphone state when each stream starts.</string>
     <string name="mic_initial_state_off">Off</string>
@@ -421,7 +421,7 @@
     <string name="controller_diag_connection_wireless">Bluetooth/wireless</string>
     <string name="controller_diag_connection_builtin">Built-in</string>
     <string name="controller_diag_path_system">Android system input</string>
-    <string name="controller_diag_path_usb_takeover">V+ USB takeover</string>
+    <string name="controller_diag_path_usb_takeover">Nebula USB takeover</string>
     <string name="controller_diag_path_unavailable">Unavailable</string>
     <string name="usb_shortcut_hold_hint">Release a D-pad direction to run it now, or move a stick and release Start</string>
     <string name="start_hold_wheel_menu">Stream menu</string>
@@ -491,8 +491,8 @@
     <string name="controller_diag_simulator_controller">Controller: %1$s</string>
     <string name="controller_diag_simulator_waiting_input">Waiting for controller</string>
     <string name="controller_diag_simulator_current_buttons">Buttons</string>
-    <string name="controller_diag_note_usb_ready">Uses V+ USB takeover when streaming.</string>
-    <string name="controller_diag_note_usb_permission">Uses V+ USB takeover; USB permission may be required.</string>
+    <string name="controller_diag_note_usb_ready">Uses Nebula USB takeover when streaming.</string>
+    <string name="controller_diag_note_usb_permission">Uses Nebula USB takeover; USB permission may be required.</string>
     <string name="controller_diag_note_system_usb">Uses Android controller input when streaming.</string>
     <string name="controller_diag_note_system_wireless">Uses Android controller input when streaming.</string>
     <string name="controller_diag_note_system_builtin">Uses Android controller input.</string>
@@ -667,8 +667,8 @@
     <string name="toast_config_sync_password_saved">Backup password saved</string>
     <string name="toast_config_sync_password_unavailable">Automatic folder backups require Android 6.0 or later</string>
     <string name="title_config_sync_restart_required">Restart Moonlight to finish restoring</string>
-    <string name="message_config_sync_restart_required">Computer pairing was restored. Restart Moonlight V+ before checking paired computers.</string>
-    <string name="message_config_sync_restart_required_with_failures">Computer pairing was restored, but %1$d pairing items could not be restored. Restart Moonlight V+ before checking paired computers; failed computers may need to be paired again.</string>
+    <string name="message_config_sync_restart_required">Computer pairing was restored. Restart Nebula before checking paired computers.</string>
+    <string name="message_config_sync_restart_required_with_failures">Computer pairing was restored, but %1$d pairing items could not be restored. Restart Nebula before checking paired computers; failed computers may need to be paired again.</string>
     <string name="title_checkbox_resume_stream">Resume stream automatically</string>
     <string name="summary_checkbox_resume_stream">Automatically resume the stream when returning to Moonlight from the background</string>
 
@@ -778,8 +778,8 @@
     <string name="summary_about_mode">View app information and project details</string>
     
     <!-- About dialog strings -->
-    <string name="about_dialog_description">Moonlight V+ is an enhanced client built for Foundation Sunshine, delivering a smoother game-streaming experience.</string>
-    <string name="about_dialog_project_info">Based on Moonlight-Android open source project, crafted by the Foundation community</string>
+    <string name="about_dialog_description">Nebula is a game-streaming client for Nova, Sunshine and GameStream hosts.</string>
+    <string name="about_dialog_project_info">Nebula is based on Moonlight (github.com/moonlight-stream) and moonlight-vplus by qiin2333 (github.com/qiin2333/moonlight-vplus), licensed GPL-3.0.</string>
     <string name="about_dialog_thanks">Thank you for choosing and supporting us.</string>
     <string name="about_dialog_bilibili_badge" translatable="false">TV</string>
     <string name="about_dialog_bilibili_title">Moonlight V+ on Bilibili</string>
@@ -1456,7 +1456,7 @@ Tap again to replace it.</string>
     <string name="summary_framegen_internal_width">Advanced tuning for the internal frame generation scale. Lower values improve stability; higher values improve detail.</string>
     <string name="suffix_framegen_scale">x</string>
     <string name="title_framegen_slow_threshold_ms">Smoothness protection</string>
-    <string name="summary_framegen_slow_threshold_ms">Custom mode only. Moonlight V+ falls back to direct rendering when frame generation gets too slow. Default: 18 ms.</string>
+    <string name="summary_framegen_slow_threshold_ms">Custom mode only. Nebula falls back to direct rendering when frame generation gets too slow. Default: 18 ms.</string>
     <string name="title_framegen_present_real_first">Motion cadence fallback</string>
     <string name="summary_framegen_present_real_first">Custom troubleshooting option. Leave off unless motion looks uneven.</string>
     <string name="unpaired_devices_shown">Unpaired devices shown</string>
@@ -1880,7 +1880,7 @@ Tap again to replace it.</string>
     <string name="update_install_permission_msg">To auto-install updates, please grant install permission.\n\nTap OK to open settings. Download will start automatically after you return.</string>
     <string name="toast_cannot_open_settings">Cannot open settings page</string>
     <string name="toast_download_service_unavailable">System download service unavailable</string>
-    <string name="update_download_notification_title">Moonlight V+ Update</string>
+    <string name="update_download_notification_title">Nebula Update</string>
     <string name="toast_download_started">Download started, tap notification to install when complete</string>
     <string name="toast_download_failed">Download failed: %s</string>
     <string name="update_downloading_title">Downloading Update</string>
@@ -2143,7 +2143,7 @@ Tap again to replace it.</string>
     <string name="handbook_error_timeout">The handbook took too long to respond. Please try again.</string>
     <string name="handbook_error_unavailable">The handbook is temporarily unavailable. Please try again later.</string>
     <string name="handbook_retry">Tap to retry</string>
-    <string name="title_about_us">About Moonlight V+</string>
+    <string name="title_about_us">About Nebula</string>
     <!-- Feature discovery -->
     <string name="feature_guide_step">A SECRET EVEN ROOKIES FIND · %1$d/%2$d</string>
     <string name="feature_guide_quick_actions_title">Need help with shortcuts too?</string>
@@ -2171,7 +2171,7 @@ Tap again to replace it.</string>
     <string name="network_quality_measuring_bandwidth">Measuring stable bandwidth</string>
     <string name="network_quality_test_failed">Streaming quality test failed</string>
     <string name="network_quality_test_failed_detail">The network test could not be completed. Check the connection and try again.</string>
-    <string name="network_quality_unsupported">This host does not support the startup bandwidth probe. Update Foundation Sunshine and try again.</string>
+    <string name="network_quality_unsupported">This host does not support the startup bandwidth probe. Update the host and try again.</string>
     <string name="network_quality_stream_active">The test is unavailable while a stream is active.</string>
     <string name="network_quality_rate_limited">The host is cooling down after a recent test. Try again in a few seconds.</string>
     <string name="network_quality_excellent">Excellent</string>

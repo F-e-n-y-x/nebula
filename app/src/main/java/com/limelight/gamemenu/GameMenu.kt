@@ -1388,7 +1388,7 @@ class GameMenu(
                 app.appName
             }
         } catch (_: Exception) {
-            "Moonlight V+"
+            "Nebula"
         }
     }
 

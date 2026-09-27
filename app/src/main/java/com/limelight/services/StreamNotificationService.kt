@@ -129,7 +129,7 @@ class StreamNotificationService : Service() {
         }
         val contentIntent = PendingIntent.getActivity(this, 0, intent, flags)
 
-        val title = "Moonlight-V+"
+        val title = getString(R.string.app_label)
         val content = getString(
             R.string.notification_content_streaming,
             appName ?: DEFAULT_APP_NAME,

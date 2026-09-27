@@ -652,11 +652,11 @@
     <string name="summary_setup_guide">查看有关如何设置游戏电脑以进行流传输的说明。</string>
     <string name="title_privacy_policy">隐私政策</string>
     <string name="summary_privacy_policy">查看 Moonlight 隐私政策。</string>
-    <string name="title_about_mode">关于 Moonlight V+</string>
+    <string name="title_about_mode">关于 Nebula</string>
     <string name="summary_about_mode">请前往GitHub查看，喜欢的话点个Star支持一下我们吧。</string>
 
     <!-- About dialog strings -->
-    <string name="about_dialog_description">Moonlight V+ 是专为 Foundation Sunshine 打造的增强客户端，为您带来更流畅的游戏串流体验。</string>
+    <string name="about_dialog_description">Nebula 是专为 Foundation Sunshine 打造的增强客户端，为您带来更流畅的游戏串流体验。</string>
     <string name="about_dialog_project_info">基于 Moonlight-Android 开源项目，由基地社区倾力打造</string>
     <string name="about_dialog_thanks">感谢您的选择与支持。</string>
     <string name="about_dialog_bilibili_title">Moonlight V+ 官方 B站</string>
@@ -1589,7 +1589,7 @@
     <string name="update_install_permission_msg">为了自动安装更新，需要授予应用安装权限。\n\n点击确定前往设置页面开启权限，返回后将自动开始下载。</string>
     <string name="toast_cannot_open_settings">无法打开设置页面</string>
     <string name="toast_download_service_unavailable">系统下载服务不可用</string>
-    <string name="update_download_notification_title">Moonlight V+ 更新下载</string>
+    <string name="update_download_notification_title">Nebula 更新下载</string>
     <string name="toast_download_started">已开始下载，下载完成后点击通知栏即可安装</string>
     <string name="toast_download_failed">下载失败: %s</string>
     <string name="update_downloading_title">正在下载更新</string>
@@ -1816,8 +1816,8 @@
     <string name="toast_config_sync_password_saved">备份密码已保存</string>
     <string name="toast_config_sync_password_unavailable">自动保存到文件夹需要 Android 6.0 或更高版本</string>
     <string name="title_config_sync_restart_required">重启 Moonlight 以完成恢复</string>
-    <string name="message_config_sync_restart_required">电脑配对已恢复。请先重启 Moonlight V+，再查看已配对电脑。</string>
-    <string name="message_config_sync_restart_required_with_failures">电脑配对已恢复，但有 %1$d 项配对内容未能恢复。请先重启 Moonlight V+，再查看已配对电脑；失败的电脑可能需要重新配对。</string>
+    <string name="message_config_sync_restart_required">电脑配对已恢复。请先重启 Nebula，再查看已配对电脑。</string>
+    <string name="message_config_sync_restart_required_with_failures">电脑配对已恢复，但有 %1$d 项配对内容未能恢复。请先重启 Nebula，再查看已配对电脑；失败的电脑可能需要重新配对。</string>
     <string name="dialog_button_ok">确定</string>
     <string name="dialog_button_close">关闭</string>
     <string name="dialog_button_start">开始</string>
@@ -2050,7 +2050,7 @@
     <string name="handbook_error_timeout">文档加载超时，请点击重试</string>
     <string name="handbook_error_unavailable">文档手册暂时无法打开，请稍后再试</string>
     <string name="handbook_retry">点击重试</string>
-    <string name="title_about_us">关于 Moonlight V+</string>
+    <string name="title_about_us">关于 Nebula</string>
     <!-- 功能发现引导 -->
     <string name="feature_guide_step">杂鱼也能发现的小秘密 · %1$d/%2$d</string>
     <string name="feature_guide_quick_actions_title">快捷栏也要我教吗？</string>
