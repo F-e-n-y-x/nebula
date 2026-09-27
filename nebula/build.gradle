@@ -1,0 +1,117 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+// Release signing: same key as Nebula 0.1.x (kept outside the repo), so this app updates it in place.
+def signingProps = new Properties()
+def signingPropsPath = (project.findProperty("nebulaSigningProperties")
+        ?: localProperties.getProperty("nebulaSigningProperties") ?: "").toString().trim()
+if (!signingPropsPath.isEmpty() && new File(signingPropsPath).exists()) {
+    new File(signingPropsPath).withInputStream { signingProps.load(it) }
+}
+def keystorePath = signingProps.getProperty("storeFile")
+def hasSigning = keystorePath != null && new File(keystorePath).exists()
+
+android {
+    namespace 'io.github.f_e_n_y_x.nebula'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "io.github.f_e_n_y_x.nebula"
+        // 26: Navigation 3 and the current AndroidX stack need API 23+; 26 also gives adaptive icons
+        // and the modern notification/foreground-service model for the stream service.
+        minSdk 26
+        targetSdk 35
+        versionCode 300
+        versionName "0.3.0-dev1"
+        // The engine's native core ships for ARM only (x86_64 emulators run it through translation).
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (hasSigning) {
+            release {
+                storeFile file(keystorePath)
+                storePassword signingProps.getProperty("storePassword")
+                keyAlias signingProps.getProperty("keyAlias")
+                keyPassword signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
+
+dependencies {
+    implementation project(':engine')
+    coreLibraryDesugaring libs.desugar.jdk.libs
+    implementation platform(libs.nebula.compose.bom)
+    implementation libs.androidx.compose.ui
+    implementation libs.androidx.compose.foundation
+    implementation libs.androidx.compose.material3
+    implementation "androidx.compose.material:material-icons-extended"
+    implementation libs.androidx.compose.ui.tooling.preview
+    debugImplementation "androidx.compose.ui:ui-tooling"
+
+    implementation libs.nebula.core.ktx
+    implementation libs.nebula.activity.compose
+    implementation libs.nebula.lifecycle.viewmodel.compose
+    implementation libs.nebula.lifecycle.runtime.compose
+    implementation libs.nebula.navigation3.runtime
+    implementation libs.nebula.navigation3.ui
+    implementation libs.nebula.lifecycle.viewmodel.navigation3
+    implementation libs.nebula.datastore.preferences
+    implementation libs.nebula.coil.compose
+    implementation libs.kotlinx.coroutines.android
+
+    testImplementation libs.junit
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.coroutines.get()}"
+    androidTestImplementation platform(libs.nebula.compose.bom)
+    androidTestImplementation libs.androidx.compose.ui.test.junit4
+    androidTestImplementation libs.androidx.test.ext.junit
+    androidTestImplementation libs.androidx.test.runner
+    debugImplementation libs.androidx.compose.ui.test.manifest
+}

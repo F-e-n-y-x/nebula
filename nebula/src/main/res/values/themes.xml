@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window-level theme only; all UI is Compose (NebulaTheme). Dark by design, like a console launcher. -->
+    <style name="Theme.Nebula" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/nebula_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

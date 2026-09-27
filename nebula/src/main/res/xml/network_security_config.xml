@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GameStream hosts answer serverinfo and pairing over plain HTTP on the LAN (port 47989);
+     everything sensitive afterwards goes over HTTPS pinned to the paired host's certificate. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

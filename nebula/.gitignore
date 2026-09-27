@@ -1,0 +1,4 @@
+/build
+# Demo artwork is copyrighted; fetch it with tools/fetch-demo-art.py (games.json is committed).
+/src/debug/assets/demo/*.jpg
+/src/debug/assets/demo/*.png

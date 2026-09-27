@@ -1,0 +1,161 @@
+[
+ {
+  "key": "gta5",
+  "name": "Grand Theft Auto V",
+  "art": {
+   "poster": "gta5_poster.jpg",
+   "hero": "gta5_hero.jpg",
+   "logo": "gta5_logo.png",
+   "header": "gta5_header.jpg"
+  },
+  "appid": 271590,
+  "description": "Grand Theft Auto V for PC offers players the option to explore the award-winning world of Los Santos and Blaine County in resolutions of up to 4k and beyond, as well as the chance to experience the game running at 60 frames per second.",
+  "genres": [
+   "Action",
+   "Adventure"
+  ],
+  "developer": "Rockstar North",
+  "publisher": "Rockstar Games",
+  "release": "13 Apr, 2015",
+  "metacritic": 96,
+  "screenshots": [
+   "gta5_shot0.jpg",
+   "gta5_shot1.jpg",
+   "gta5_shot2.jpg",
+   "gta5_shot3.jpg"
+  ]
+ },
+ {
+  "key": "farcry5",
+  "name": "Far Cry 5",
+  "art": {
+   "poster": "farcry5_poster.jpg",
+   "hero": "farcry5_hero.jpg",
+   "logo": "farcry5_logo.png",
+   "header": "farcry5_header.jpg"
+  },
+  "appid": 552520,
+  "description": "Fight a fanatical cult in this open world FPS. Engage in intense combat, free hostile territory, recruit loyal followers and animal allies, and liberate Hope County solo or in full 2-player co-op.",
+  "genres": [
+   "Action",
+   "Adventure"
+  ],
+  "developer": "Ubisoft Montreal",
+  "publisher": "Ubisoft",
+  "release": "26 Mar, 2018",
+  "metacritic": null,
+  "screenshots": [
+   "farcry5_shot0.jpg",
+   "farcry5_shot1.jpg",
+   "farcry5_shot2.jpg",
+   "farcry5_shot3.jpg"
+  ]
+ },
+ {
+  "key": "wukong",
+  "name": "Black Myth: Wukong",
+  "art": {
+   "poster": "wukong_poster.jpg",
+   "hero": "wukong_hero.jpg",
+   "logo": "wukong_logo.png",
+   "header": "wukong_header.jpg"
+  },
+  "appid": 2358720,
+  "description": "Black Myth: Wukong is an action RPG rooted in Chinese mythology. You shall set out as the Destined One to venture into the challenges and marvels ahead, to uncover the obscured truth beneath the veil of a glorious legend from the past.",
+  "genres": [
+   "Action",
+   "Adventure",
+   "RPG"
+  ],
+  "developer": "Game Science",
+  "publisher": "Game Science",
+  "release": "19 Aug, 2024",
+  "metacritic": null,
+  "screenshots": [
+   "wukong_shot0.jpg",
+   "wukong_shot1.jpg",
+   "wukong_shot2.jpg",
+   "wukong_shot3.jpg"
+  ]
+ },
+ {
+  "key": "spiderman2",
+  "name": "Marvel's Spider-Man 2",
+  "art": {
+   "poster": "spiderman2_poster.jpg",
+   "hero": "spiderman2_hero.jpg",
+   "logo": "spiderman2_logo.png",
+   "header": "spiderman2_header.jpg"
+  },
+  "appid": 2651280,
+  "description": "Be Greater. Together. The incredible power of the symbiote forces Peter Parker and Miles Morales into a desperate fight as they balance their lives, friendships, and their duty to protect in an exciting chapter of the critically acclaimed Spider-Man franchise on PC.",
+  "genres": [
+   "Action",
+   "Adventure"
+  ],
+  "developer": "Insomniac Games",
+  "publisher": "PlayStation Publishing LLC",
+  "release": "30 Jan, 2025",
+  "metacritic": null,
+  "screenshots": [
+   "spiderman2_shot0.jpg",
+   "spiderman2_shot1.jpg",
+   "spiderman2_shot2.jpg",
+   "spiderman2_shot3.jpg"
+  ]
+ },
+ {
+  "key": "spidermanr",
+  "name": "Marvel's Spider-Man Remastered",
+  "art": {
+   "poster": "spidermanr_poster.jpg",
+   "hero": "spidermanr_hero.jpg",
+   "logo": "spidermanr_logo.png",
+   "header": "spidermanr_header.jpg"
+  },
+  "appid": 1817070,
+  "description": "In Marvel\u2019s Spider-Man Remastered, the worlds of Peter Parker and Spider-Man collide in an original action-packed story. Play as an experienced Peter Parker, fighting big crime and iconic villains in Marvel\u2019s New York. Web-swing through vibrant neighborhoods and defeat villains with epic takedowns.",
+  "genres": [
+   "Action",
+   "Adventure",
+   "Casual"
+  ],
+  "developer": "Insomniac Games",
+  "publisher": "PlayStation Publishing LLC",
+  "release": "12 Aug, 2022",
+  "metacritic": null,
+  "screenshots": [
+   "spidermanr_shot0.jpg",
+   "spidermanr_shot1.jpg",
+   "spidermanr_shot2.jpg",
+   "spidermanr_shot3.jpg"
+  ]
+ },
+ {
+  "key": "fenyx",
+  "name": "Immortals Fenyx Rising",
+  "art": {
+   "poster": "fenyx_poster.jpg",
+   "hero": "fenyx_hero.jpg",
+   "logo": "fenyx_logo.png",
+   "header": "fenyx_header.jpg"
+  },
+  "appid": 2221920,
+  "description": "Immortals Fenyx Rising brings grand mythological adventure to life. Play as Fenyx on a quest to save the Greek gods.",
+  "genres": [
+   "Action",
+   "Adventure",
+   "RPG"
+  ],
+  "developer": "Ubisoft",
+  "publisher": "Ubisoft",
+  "release": "15 Dec, 2022",
+  "metacritic": null,
+  "screenshots": [
+   "fenyx_shot0.jpg",
+   "fenyx_shot1.jpg",
+   "fenyx_shot2.jpg",
+   "fenyx_shot3.jpg"
+  ]
+ }
+]
