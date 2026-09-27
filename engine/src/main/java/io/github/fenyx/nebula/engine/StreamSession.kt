@@ -32,16 +32,32 @@ import kotlin.coroutines.resume
  */
 class StreamSession internal constructor(
     private val activity: Activity,
-    private val holder: SurfaceHolder,
+    private var holder: SurfaceHolder,
     private val listener: StreamListener,
     initialWidth: Int,
     initialHeight: Int,
+    private val background: BackgroundPolicy = BackgroundPolicy(),
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val bandwidth = BandwidthMeter()
     private val ended = AtomicBoolean(false)
     private lateinit var connection: NvConnection
     private lateinit var decoder: MediaCodecDecoderRenderer
+    private lateinit var audio: SmartAudioRenderer
+    private var audioPaused = false
+
+    private val _backgrounded = MutableStateFlow(false)
+
+    /**
+     * True while the video surface is gone (app in the background, screen off) but the session is
+     * kept alive for [BackgroundPolicy.graceMs]. Attaching a surface again resumes it.
+     */
+    val backgrounded: StateFlow<Boolean> = _backgrounded.asStateFlow()
+
+    private val graceExpired = Runnable {
+        LimeLog.info("Background grace period of ${background.graceMs} ms expired; disconnecting")
+        disconnect()
+    }
 
     private val _stats = MutableStateFlow(StreamStats(width = initialWidth, height = initialHeight))
 
@@ -59,20 +75,62 @@ class StreamSession internal constructor(
     private val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) = Unit
 
-        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-            decoder.setRenderTarget(holder)
-        }
+        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = attachSurface(holder)
 
-        override fun surfaceDestroyed(holder: SurfaceHolder) {
-            // The decoder can't outlive its surface; background streaming isn't supported yet.
-            disconnect()
+        override fun surfaceDestroyed(holder: SurfaceHolder) = detachSurface()
+    }
+
+    /**
+     * Points video at [newHolder] (a new SurfaceView after navigation, or the same one after
+     * returning from the background). A paused decoder is rebuilt on it and an IDR frame requested.
+     * Call on the main thread with a valid surface.
+     */
+    fun attachSurface(newHolder: SurfaceHolder) {
+        if (ended.get() || newHolder.surface?.isValid != true) return
+        if (newHolder !== holder) {
+            holder.removeCallback(surfaceCallback)
+            holder = newHolder
+            newHolder.addCallback(surfaceCallback)
         }
+        decoder.setRenderTarget(newHolder)
+        if (_backgrounded.value) {
+            main.removeCallbacks(graceExpired)
+            LimeLog.info("Surface back; resuming video")
+            decoder.resumeProcessing()
+            if (audioPaused) {
+                audio.resumeProcessing()
+                audioPaused = false
+            }
+            _backgrounded.value = false
+        }
+    }
+
+    /**
+     * The surface is going away. Within the grace period the network session stays up: video is
+     * paused (decoder released), audio too unless [BackgroundPolicy.keepAudio]. Without a grace
+     * period, or before the stream connected, this disconnects.
+     */
+    fun detachSurface() {
+        if (ended.get() || _backgrounded.value) return
+        if (background.graceMs <= 0 || !isConnected) {
+            disconnect()
+            return
+        }
+        LimeLog.info("Surface gone; keeping the session for ${background.graceMs} ms")
+        _backgrounded.value = true
+        if (!background.keepAudio) {
+            audio.pauseProcessing()
+            audioPaused = true
+        }
+        decoder.pauseProcessing()
+        main.postDelayed(graceExpired, background.graceMs)
     }
 
     internal fun start(connection: NvConnection, decoder: MediaCodecDecoderRenderer, audio: SmartAudioRenderer) {
         check(holder.surface?.isValid == true) { "startStream needs a created surface; call it from surfaceChanged()" }
         this.connection = connection
         this.decoder = decoder
+        this.audio = audio
         input = InputBridge(connection)
         holder.addCallback(surfaceCallback)
         decoder.setRenderTarget(holder)
@@ -109,7 +167,11 @@ class StreamSession internal constructor(
     private fun beginEnd(reason: StreamEndReason): Boolean {
         if (ended.getAndSet(true)) return false
         isConnected = false
-        main.post { holder.removeCallback(surfaceCallback) }
+        main.post {
+            main.removeCallbacks(graceExpired)
+            holder.removeCallback(surfaceCallback)
+            _backgrounded.value = false
+        }
         decoder.prepareForStop()
         if (reason == StreamEndReason.USER_QUIT) {
             main.post { listener.onEnded(StreamEndReason.USER_QUIT, 0) }
@@ -217,6 +279,12 @@ class StreamSession internal constructor(
     /** The decoder is built before [start] and reports stats through this. */
     internal val perfListener: PerfOverlayListener get() = connectionListener
 }
+
+/**
+ * What happens when the stream's surface goes away. [graceMs] = 0 disconnects at once; otherwise
+ * the session waits that long for a new surface. [keepAudio] keeps host audio playing meanwhile.
+ */
+data class BackgroundPolicy(val graceMs: Long = 60_000, val keepAudio: Boolean = false)
 
 /** Maps a decoder stats window onto [StreamStats]; [measuredMbps] is null until measured. */
 internal fun PerformanceInfo.toStreamStats(measuredMbps: Double?, previous: StreamStats): StreamStats = StreamStats(

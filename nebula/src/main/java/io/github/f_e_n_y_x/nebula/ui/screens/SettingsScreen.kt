@@ -27,6 +27,17 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Gamepad
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Mouse
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.QueryStats
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.onFocusChanged
+import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
+import io.github.f_e_n_y_x.nebula.settings.searchSettings
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Tv
 import androidx.compose.material.icons.outlined.Videocam
@@ -79,14 +90,19 @@ import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
-private enum class SettingsSection(val title: String, val summary: String, val icon: ImageVector, val ready: Boolean) {
-    Stream("Stream", "Resolution, frame rate, bitrate, codec", Icons.Outlined.Videocam, true),
-    Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, true),
-    Display("Display & audio", "HDR, scaling, surround, microphone", Icons.Outlined.Tv, false),
-    Controls("Controls & input", "Keyboard, mouse, touch, gamepads, on-screen controls", Icons.Outlined.Gamepad, false),
-    FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, false),
-    Network("Network", "Packet size, VPN, Wake-on-LAN", Icons.Outlined.NetworkCheck, false),
-    About("About", "Version, licenses, credits", Icons.Outlined.Info, true),
+private enum class SettingsSection(val title: String, val summary: String, val icon: ImageVector, val group: String?) {
+    Stream("Stream", "Resolution, frame rate, bitrate, codec, frame pacing", Icons.Outlined.Videocam, "stream"),
+    Display("Display", "Fit, fill or stretch, HDR, image position, rotation", Icons.Outlined.Tv, "display"),
+    Audio("Audio & microphone", "Surround, host audio, microphone", Icons.Outlined.GraphicEq, "audio"),
+    Input("Touch, mouse & keyboard", "Trackpad or direct touch, mouse modes, shortcuts", Icons.Outlined.Mouse, "input"),
+    Gamepads("Gamepads", "Controllers, rumble, gyro, remapping", Icons.Outlined.Gamepad, "gamepads"),
+    Osc("On-screen controls", "Virtual gamepad buttons and layout", Icons.Outlined.TouchApp, "osc"),
+    Overlay("Stats & stream menu", "Performance overlay, in-stream menu", Icons.Outlined.QueryStats, "interface"),
+    Network("Host & network", "Packet size, host audio, Wake-on-LAN, VPN", Icons.Outlined.NetworkCheck, "host"),
+    FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, "framegen"),
+    Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, null),
+    Advanced("Advanced", "Backup, restore and everything else", Icons.Outlined.Tune, "advanced"),
+    About("About", "Version, licenses, credits", Icons.Outlined.Info, null),
 }
 
 @Composable
@@ -100,18 +116,22 @@ fun SettingsScreen(container: AppContainer, nav: Navigator, initialSection: Stri
     var open by remember { mutableStateOf(initial ?: if (twoPane) SettingsSection.Stream else null) }
     // Single pane: Back closes the open section before leaving Settings.
     BackHandler(enabled = !twoPane && open != null) { open = null }
+    var query by remember { mutableStateOf("") }
+    BackHandler(enabled = query.isNotEmpty()) { query = "" }
 
     Box(Modifier.fillMaxSize().background(NebulaColors.bg)) {
         if (twoPane) {
             Row(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                 Column(Modifier.width(s.dp(320)).fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(24))) {
                     Text("Settings", style = Nebula.type.title, color = NebulaColors.text)
-                    Spacer(Modifier.height(s.dp(20)))
-                    SettingsSection.entries.forEach { sec -> SectionRow(sec, sec == open) { open = sec } }
+                    Spacer(Modifier.height(s.dp(16)))
+                    SearchField(query) { query = it }
+                    Spacer(Modifier.height(s.dp(12)))
+                    SettingsSection.entries.forEach { sec -> SectionRow(sec, sec == open && query.isEmpty()) { query = ""; open = sec } }
                 }
                 Box(Modifier.width(1.dp).fillMaxHeight().background(NebulaColors.border))
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(32))) {
-                    SectionBody(open ?: SettingsSection.Stream, settings, vm)
+                    if (query.isNotBlank()) SearchResults(query) else SectionBody(open ?: SettingsSection.Stream, settings, vm)
                 }
             }
         } else {
@@ -119,8 +139,10 @@ fun SettingsScreen(container: AppContainer, nav: Navigator, initialSection: Stri
             Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(s.dp(20))) {
                 if (sec == null) {
                     Text("Settings", style = Nebula.type.title, color = NebulaColors.text)
-                    Spacer(Modifier.height(s.dp(20)))
-                    SettingsSection.entries.forEach { SectionRow(it, false) { open = it } }
+                    Spacer(Modifier.height(s.dp(16)))
+                    SearchField(query) { query = it }
+                    Spacer(Modifier.height(s.dp(12)))
+                    if (query.isNotBlank()) SearchResults(query) else SettingsSection.entries.forEach { SectionRow(it, false) { open = it } }
                 } else {
                     NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to settings", { open = null })
                     Spacer(Modifier.height(s.dp(12)))
@@ -164,20 +186,145 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
     Text(sec.summary, style = Nebula.type.secondary, color = NebulaColors.textSecondary)
     Spacer(Modifier.height(s.dp(24)))
     when (sec) {
-        SettingsSection.Stream -> StreamSection(settings, update)
-        SettingsSection.About -> AboutSection()
-        SettingsSection.Library -> LibrarySection(vm)
-        else -> Column(
-            Modifier.widthIn(max = s.dp(640)).fillMaxWidth().background(NebulaColors.surface, RoundedCornerShape(s.dp(14)))
-                .border(1.dp, NebulaColors.border, RoundedCornerShape(s.dp(14))).padding(s.dp(20)),
-        ) {
-            Pill("Next update", color = NebulaColors.accentText, background = NebulaColors.accentTint)
+        SettingsSection.Stream -> {
+            StreamSection(settings, update)
+            Spacer(Modifier.height(s.dp(26)))
+            LegacySettingsList("stream")
+        }
+        SettingsSection.Display -> {
+            ScalingSection()
             Spacer(Modifier.height(s.dp(12)))
-            Text(
-                "Every option from Nebula 0.1 moves here, redesigned, as the streaming engine is connected: " + sec.summary.lowercase() + ".",
-                style = Nebula.type.body, color = NebulaColors.textSecondary,
+            LegacySettingsList("display")
+        }
+        SettingsSection.About -> {
+            AboutSection()
+        }
+        SettingsSection.Library -> LibrarySection(vm)
+        SettingsSection.Input -> {
+            VirtualMouseSection()
+            Spacer(Modifier.height(s.dp(12)))
+            LegacySettingsList("input")
+        }
+        SettingsSection.Advanced -> {
+            BackgroundSection()
+            Spacer(Modifier.height(s.dp(12)))
+            LegacySettingsList("advanced")
+        }
+        else -> LegacySettingsList(sec.group!!)
+    }
+}
+
+@Composable
+private fun SearchField(query: String, onChange: (String) -> Unit) {
+    val s = Nebula.scale
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(s.dp(12))
+    Row(
+        Modifier.fillMaxWidth().widthIn(max = s.dp(560)).background(NebulaColors.surface, shape)
+            .border(if (focused) 2.dp else 1.dp, if (focused) NebulaColors.accentText else NebulaColors.controlBorder, shape)
+            .padding(horizontal = s.dp(12), vertical = s.dp(10)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Search, null, tint = NebulaColors.textMuted, modifier = Modifier.size(s.dp(20)))
+        Spacer(Modifier.width(s.dp(10)))
+        BasicTextField(
+            value = query, onValueChange = onChange, singleLine = true,
+            textStyle = Nebula.type.body.copy(color = NebulaColors.text), cursorBrush = SolidColor(NebulaColors.accentText),
+            modifier = Modifier.weight(1f).onFocusChanged { focused = it.isFocused },
+            decorationBox = { inner -> if (query.isEmpty()) Text("Search all settings", style = Nebula.type.body, color = NebulaColors.textMuted); inner() },
+        )
+    }
+}
+
+@Composable
+private fun SearchResults(query: String) {
+    val s = Nebula.scale
+    val hits = remember(query) { searchSettings(query).filter { it.key !in nativeKeys && it.group != "about" } }
+    Column(verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+        Text(if (hits.isEmpty()) "No settings match \"$query\"" else "${hits.size} settings", style = Nebula.type.secondary, color = NebulaColors.textSecondary)
+        hits.groupBy { it.group }.forEach { (group, specs) ->
+            val sec = SettingsSection.entries.firstOrNull { it.group == group }
+            LegacySettingsList(group, specs, header = sec?.title ?: group)
+        }
+    }
+}
+
+/** Nebula's virtual mouse (touch as a trackpad) tuning, on top of V+'s input options below. */
+@Composable
+private fun VirtualMouseSection() {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    fun b(k: String, d: Boolean) = prefs.prefs.all[k] as? Boolean ?: d
+    var speed by remember { mutableStateOf((prefs.prefs.all[StreamUiPrefs.TRACKPAD_SPEED_KEY] as? Int) ?: 140) }
+    var accel by remember { mutableStateOf(b(StreamUiPrefs.TRACKPAD_ACCEL_KEY, true)) }
+    var natural by remember { mutableStateOf(b(StreamUiPrefs.NATURAL_SCROLL_KEY, true)) }
+    var pinch by remember { mutableStateOf(b(StreamUiPrefs.PINCH_ZOOM_KEY, true)) }
+    var bar by remember { mutableStateOf(b(StreamUiPrefs.MOUSE_BAR_KEY, false)) }
+    var cursor by remember { mutableStateOf(b(StreamUiPrefs.LOCAL_CURSOR_KEY, false)) }
+    var capture by remember { mutableStateOf(b(StreamUiPrefs.MOUSE_CAPTURE_KEY, true)) }
+    Column(Modifier.widthIn(max = s.dp(720)), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+        SectionTitle("Virtual mouse")
+        Text(
+            "Trackpad: drag to move, tap to click, two-finger tap for right click, hold then drag to click-drag, two fingers to scroll, " +
+                "pinch to zoom, three fingers for the keyboard, four for the stream menu. Pick the touch mode per game from the stream menu.",
+            style = Nebula.type.label, color = NebulaColors.textMuted,
+        )
+        Setting("Trackpad sensitivity", "How far the pointer moves for a finger movement.") {
+            SliderField(
+                label = "Trackpad sensitivity", value = speed.toFloat(), range = 25f..400f, step = 5f, unit = "%",
+                onValueChange = { v -> speed = v.roundToInt(); prefs.put(StreamUiPrefs.TRACKPAD_SPEED_KEY, speed) },
             )
         }
+        ToggleRow("Pointer acceleration", "Fast swipes travel further, slow ones stay precise.", accel) { accel = it; prefs.put(StreamUiPrefs.TRACKPAD_ACCEL_KEY, it) }
+        ToggleRow("Natural scrolling", "Content follows your fingers, like a phone. Off scrolls like a mouse wheel.", natural) { natural = it; prefs.put(StreamUiPrefs.NATURAL_SCROLL_KEY, it) }
+        ToggleRow("Pinch to zoom", "Zoom and pan the picture on this device; nothing is sent to the PC.", pinch) { pinch = it; prefs.put(StreamUiPrefs.PINCH_ZOOM_KEY, it) }
+        ToggleRow("Mouse buttons bar", "Left, middle, right, scroll strip, drag lock and keyboard on screen.", bar) { bar = it; prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, it) }
+        ToggleRow("Local cursor", "Draws a pointer on this device. The PC's cursor also stays in the video until Nova can hide it.", cursor) { cursor = it; prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
+        ToggleRow("Capture a connected mouse", "Games get raw relative movement and the local pointer hides. Off keeps a free pointer.", capture) { capture = it; prefs.put(StreamUiPrefs.MOUSE_CAPTURE_KEY, it) }
+    }
+}
+
+/** How long a stream survives in the background; the behaviour itself is under Host & network. */
+@Composable
+private fun BackgroundSection() {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    var grace by remember { mutableStateOf((prefs.prefs.all[BACKGROUND_GRACE_KEY] as? Int) ?: 60) }
+    Column(Modifier.widthIn(max = s.dp(720))) {
+        Setting("Keep a backgrounded stream for", "Switching apps, the notification shade or locking the screen keeps the stream connected this long, then disconnects. 0 disconnects at once.") {
+            SliderField(
+                label = "Background grace period", value = grace.toFloat(), range = 0f..600f, step = 5f, unit = "s",
+                onValueChange = { v -> grace = v.roundToInt(); prefs.put(BACKGROUND_GRACE_KEY, grace) },
+            )
+        }
+    }
+}
+
+private const val BACKGROUND_GRACE_KEY = "nebula_background_grace_s"
+
+/** Nebula's own scaling choice; also keeps V+'s stretch checkbox in sync for the engine. */
+@Composable
+private fun ScalingSection() {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    var mode by remember { mutableStateOf(scaleModeOf(prefs)) }
+    var virtualToo by remember { mutableStateOf(prefs.prefs.getBoolean(SCALE_VIRTUAL_KEY, false)) }
+    Column(Modifier.widthIn(max = s.dp(720)), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
+        Setting("Video scaling", "Fit shows the whole picture, Fill zooms and crops the edges, Stretch fills the screen and distorts.") {
+            Segmented(listOf("Fit" to ScaleMode.FIT, "Fill (zoom)" to ScaleMode.FILL, "Stretch" to ScaleMode.STRETCH), mode) { m ->
+                mode = m
+                prefs.put(SCALE_MODE_KEY, m.id)
+                prefs.put("checkbox_stretch_video", m == ScaleMode.STRETCH)
+            }
+        }
+        ToggleRow(
+            "Also scale Virtual display streams",
+            "Virtual display already matches this screen, so it's shown pixel for pixel unless you turn this on.",
+            virtualToo,
+        ) { virtualToo = it; prefs.put(SCALE_VIRTUAL_KEY, it) }
     }
 }
 
@@ -186,15 +333,24 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
     val s = Nebula.scale
     val ctx = LocalContext.current
     val (dw, dh) = remember { deviceResolution(ctx) }
+    var editCustom by remember { mutableStateOf(false) }
+    val custom = remember(editCustom) { customResolutions(ctx).map { (w, h) -> "${w}×$h" to Resolution(w, h) } }
     Column(Modifier.widthIn(max = s.dp(680)), verticalArrangement = Arrangement.spacedBy(s.dp(26))) {
         Setting("Resolution", "Virtual display streams at exactly this size.") {
             Segmented(
-                listOf("This device ${dw}×$dh" to Resolution.Native, "1080p" to Resolution(1920, 1080), "1440p" to Resolution(2560, 1440), "4K" to Resolution(3840, 2160)),
+                listOf("This device ${dw}×$dh" to Resolution.Native, "720p" to Resolution(1280, 720), "1080p" to Resolution(1920, 1080), "1440p" to Resolution(2560, 1440), "4K" to Resolution(3840, 2160)) +
+                    custom + ("Custom…" to CUSTOM_SENTINEL),
                 st.resolution,
-            ) { r -> update { it.copy(resolution = r) } }
+            ) { r -> if (r == CUSTOM_SENTINEL) editCustom = true else update { it.copy(resolution = r) } }
         }
         Setting("Frame rate", "120 fps needs a 120 Hz screen on this device.") {
-            Segmented(listOf("60 fps" to 60, "90 fps" to 90, "120 fps" to 120), st.fps) { f -> update { it.copy(fps = f) } }
+            Column(verticalArrangement = Arrangement.spacedBy(s.dp(12))) {
+                Segmented(listOf("30" to 30, "60" to 60, "90" to 90, "120" to 120, "144" to 144), st.fps) { f -> update { it.copy(fps = f) } }
+                SliderField(
+                    label = "Exact frame rate", value = st.fps.toFloat(), range = 10f..240f, step = 1f, unit = "fps",
+                    onValueChange = { v -> update { it.copy(fps = v.roundToInt()) } },
+                )
+            }
         }
         Setting("Bitrate", "Higher looks sharper; lower copes better with weak Wi-Fi.") {
             SliderField(
@@ -205,14 +361,17 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
         Setting("Video codec", "Auto picks HEVC when both sides support it.") {
             Segmented(listOf("Auto" to VideoCodec.AUTO, "HEVC" to VideoCodec.HEVC, "H.264" to VideoCodec.H264, "AV1" to VideoCodec.AV1), st.codec) { c -> update { it.copy(codec = c) } }
         }
+        if (editCustom) CustomResolutionsDialog(onDismiss = { editCustom = false })
         Setting("Default screen for games", "Used until you choose per game on its page.") {
             Segmented(listOf("Virtual display" to DisplayMode.VIRTUAL, "Desktop (Mirror)" to DisplayMode.MIRROR), st.defaultMode) { m -> update { it.copy(defaultMode = m) } }
         }
     }
 }
 
+private val CUSTOM_SENTINEL = Resolution(-1, -1)
+
 @Composable
-private fun Setting(title: String, help: String, control: @Composable () -> Unit) {
+internal fun Setting(title: String, help: String, control: @Composable () -> Unit) {
     val s = Nebula.scale
     Column {
         Text(title, style = Nebula.type.bodyStrong, color = NebulaColors.text)
@@ -223,7 +382,7 @@ private fun Setting(title: String, help: String, control: @Composable () -> Unit
 }
 
 @Composable
-private fun <T> Segmented(options: List<Pair<String, T>>, selected: T, onSelect: (T) -> Unit) {
+internal fun <T> Segmented(options: List<Pair<String, T>>, selected: T, onSelect: (T) -> Unit) {
     val s = Nebula.scale
     val outer = RoundedCornerShape(s.dp(12))
     Row(
@@ -295,7 +454,7 @@ private fun LibrarySection(vm: SettingsViewModel) {
 
 /** A setting that's on or off: the whole row is one focus target, so OK/tap toggles it. */
 @Composable
-private fun ToggleRow(title: String, help: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun ToggleRow(title: String, help: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(12))
     Row(

@@ -174,7 +174,7 @@ class NebulaEngine private constructor(context: Context) {
 
         DecoderSupport.ensure(activity)
         val prefs = PreferenceConfiguration.readPreferences(activity).also { request.applyTo(it) }
-        val session = StreamSession(activity, surface, listener, request.width, request.height)
+        val session = StreamSession(activity, surface, listener, request.width, request.height, backgroundPolicy(activity))
 
         val hdrSupport = HdrCapabilityHelper.getHdrTypeSupport(activity)
         var hdr = prefs.enableHdr && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && when (prefs.hdrMode) {
@@ -272,6 +272,21 @@ class NebulaEngine private constructor(context: Context) {
         return session
     }
 
+    /**
+     * V+'s "When Moonlight goes to the background" choice; unset means keep the stream connected.
+     * The grace period is Nebula's own setting (seconds, default 60).
+     */
+    private fun backgroundPolicy(context: Context): BackgroundPolicy {
+        val sp = context.getSharedPreferences(context.packageName + "_preferences", Context.MODE_PRIVATE)
+        val grace = (sp.all[BACKGROUND_GRACE_KEY] as? Int ?: DEFAULT_BACKGROUND_GRACE_S).coerceAtLeast(0) * 1000L
+        return when (sp.getString("list_background_stream_behavior", null)) {
+            "disconnect", "resume" -> BackgroundPolicy(graceMs = 0)
+            "keep_audio" -> BackgroundPolicy(graceMs = grace, keepAudio = true)
+            "keep_connected" -> BackgroundPolicy(graceMs = grace, keepAudio = false)
+            else -> BackgroundPolicy(graceMs = grace, keepAudio = sp.getBoolean("checkbox_background_audio", false))
+        }
+    }
+
     private fun clientName(): String =
         Settings.Global.getString(appContext.contentResolver, "device_name") ?: Build.MODEL ?: "Nebula"
 
@@ -288,6 +303,9 @@ class NebulaEngine private constructor(context: Context) {
     companion object {
         private const val DISCOVERY_INTERVAL_MS = 1500
         private const val DEFAULT_PACKET_SIZE = 1392
+        /** Seconds a backgrounded stream stays connected (SharedPreferences Int). */
+        const val BACKGROUND_GRACE_KEY = "nebula_background_grace_s"
+        const val DEFAULT_BACKGROUND_GRACE_S = 60
 
         @Volatile
         private var instance: NebulaEngine? = null

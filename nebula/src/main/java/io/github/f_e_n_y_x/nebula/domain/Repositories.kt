@@ -62,4 +62,12 @@ interface StreamRepository {
     fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState>
     /** Ends the stream; [quitApp] also closes the game on the PC instead of leaving it to resume. */
     fun stop(quitApp: Boolean)
+    /** Moves a running stream onto a new surface (after the app returns from the background). */
+    fun reattach(target: StreamTarget) {}
+    /** Changes the bitrate mid-stream; true once the PC accepted it. */
+    suspend fun setBitrate(kbps: Int): Boolean = false
+    /** Input for the running stream, or null when nothing is connected. */
+    val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput? get() = null
+    /** True while the stream is kept alive without a surface (app in the background). */
+    val backgrounded: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
 }

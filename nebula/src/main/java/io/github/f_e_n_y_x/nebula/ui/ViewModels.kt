@@ -181,9 +181,24 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
     }
     private var session: Job? = null
 
-    /** Starts the stream into [target] once; the screen calls this when its surface exists. */
+    /** The bitrate the stream was started with, then whatever the menu last applied (kbps). */
+    private val _bitrateKbps = MutableStateFlow(0)
+    val bitrateKbps = _bitrateKbps.asStateFlow()
+    /** Result of the last bitrate change: null while idle, else a short message. */
+    private val _bitrateNote = MutableStateFlow<String?>(null)
+    val bitrateNote = _bitrateNote.asStateFlow()
+
+    val backgrounded: StateFlow<Boolean> = c.stream.backgrounded.stateIn(this, false)
+
+    /**
+     * Starts the stream into [target] the first time; later calls (a new surface after the app
+     * comes back from the background) move the running stream onto it.
+     */
     fun attach(target: StreamTarget) {
-        if (session != null) return
+        if (session != null) {
+            c.stream.reattach(target)
+            return
+        }
         session = viewModelScope.launch {
             val g = loaded.await()
             if (g == null) {
@@ -191,13 +206,36 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
                 return@launch
             }
             c.prefs.setMode(hostId, gameId, mode)
-            c.stream.start(g, mode, c.prefs.streamSettings.first(), target).collect { _state.value = it }
+            val settings = c.prefs.streamSettings.first()
+            _bitrateKbps.value = settings.bitrateKbps
+            var announced = false
+            c.stream.start(g, mode, settings, target).collect {
+                _state.value = it
+                if (it is StreamState.Live && !announced) {
+                    announced = true
+                    c.onStreamLive(g.name)
+                }
+                if (it is StreamState.Ended || it is StreamState.Failed) c.onStreamEnded()
+            }
         }
     }
 
-    fun end(quitApp: Boolean = false) = c.stream.stop(quitApp)
+    fun setBitrate(kbps: Int) = viewModelScope.launch {
+        _bitrateNote.value = "Applying…"
+        val ok = c.stream.setBitrate(kbps)
+        if (ok) _bitrateKbps.value = kbps
+        _bitrateNote.value = if (ok) "Applied: ${kbps / 1000} Mbps" else "The PC didn't accept the change"
+    }
 
-    override fun onCleared() = c.stream.stop(quitApp = false)
+    fun end(quitApp: Boolean = false) {
+        c.stream.stop(quitApp)
+        c.onStreamEnded()
+    }
+
+    override fun onCleared() {
+        c.stream.stop(quitApp = false)
+        c.onStreamEnded()
+    }
 }
 
 class SettingsViewModel(private val c: AppContainer) : ViewModel() {

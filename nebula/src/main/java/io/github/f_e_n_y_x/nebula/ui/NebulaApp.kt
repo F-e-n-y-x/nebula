@@ -191,6 +191,7 @@ private fun debugStart(spec: String?): Route? {
         "library" -> Route.Library(host)
         "details" -> Route.Details(host, arg ?: "gta5")
         "stream" -> Route.Stream(host, arg ?: "gta5", DisplayMode.VIRTUAL)
+        "mirror" -> Route.Stream(host, arg ?: "gta5", DisplayMode.MIRROR)
         "settings" -> Route.Settings(arg)
         else -> null
     }

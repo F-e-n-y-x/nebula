@@ -136,12 +136,28 @@ class DemoHost(private val context: Context) {
             val res = if (mode == DisplayMode.MIRROR) "1920×1080" else "2340×1080"
             var t = 0
             while (true) {
-                emit(StreamState.Live(StreamStats(res, if (mode == DisplayMode.MIRROR) 60 else 120, 28f + (t % 5), 5.6f + (t % 3) * 0.3f, "HEVC")))
+                val (w, h) = if (mode == DisplayMode.MIRROR) 1920 to 1080 else 2340 to 1080
+                emit(
+                    StreamState.Live(
+                        StreamStats(
+                            res, if (mode == DisplayMode.MIRROR) 60 else 120, 28f + (t % 5), 5.6f + (t % 3) * 0.3f, "HEVC",
+                            width = w, height = h, receivedFps = if (mode == DisplayMode.MIRROR) 60f else 120f, lossPercent = 0.1f * (t % 2),
+                            hostMs = 1.8f, networkMs = 2.1f + (t % 3) * 0.3f, decodeMs = 1.2f, renderMs = 0.5f, decoder = "c2.android.hevc.decoder",
+                        ),
+                    ),
+                )
                 t++
                 delay(1_000)
             }
         }
         override fun stop(quitApp: Boolean) = Unit
+        private val log = io.github.f_e_n_y_x.nebula.input.LoggingInput()
+        override val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput get() = log
+        override suspend fun setBitrate(kbps: Int): Boolean {
+            delay(300)
+            android.util.Log.i(io.github.f_e_n_y_x.nebula.input.LoggingInput.TAG, "bitrate $kbps")
+            return true
+        }
     }
 
     companion object {

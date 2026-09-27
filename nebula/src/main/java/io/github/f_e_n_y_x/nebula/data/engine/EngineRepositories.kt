@@ -40,6 +40,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
@@ -219,10 +220,25 @@ class EngineStreamRepository(
     private val engine: NebulaEngine,
     private val deviceResolution: () -> Pair<Int, Int>,
 ) : StreamRepository {
-    @Volatile private var session: StreamSession? = null
+    private val current = kotlinx.coroutines.flow.MutableStateFlow<StreamSession?>(null)
+    private var session: StreamSession?
+        get() = current.value
+        set(value) { current.value = value }
 
     /** Input for the live stream, or null when nothing is connected. */
     val input: InputBridge? get() = session?.takeIf { it.isConnected }?.input
+
+    override val remoteInput = io.github.f_e_n_y_x.nebula.input.BridgeInput { input }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override val backgrounded: Flow<Boolean> = current.flatMapLatest { it?.backgrounded ?: kotlinx.coroutines.flow.flowOf(false) }
+
+    override fun reattach(target: StreamTarget) {
+        val surface = target as? SurfaceStreamTarget ?: return
+        session?.attachSurface(surface.holder)
+    }
+
+    override suspend fun setBitrate(kbps: Int): Boolean = session?.setBitrate(kbps) ?: false
 
     override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = callbackFlow {
         val surface = target as? SurfaceStreamTarget ?: error("The engine streams into a SurfaceStreamTarget")
@@ -284,5 +300,15 @@ private fun EngineStats.toDomain(): StreamStats {
         bitrateMbps = bitrateKbps / 1000f,
         latencyMs = latency.totalMs,
         codec = if (hdr) "$codec HDR" else codec,
+        width = width,
+        height = height,
+        receivedFps = receivedFps,
+        lossPercent = lossPercent,
+        hostMs = latency.hostMs,
+        networkMs = latency.networkMs,
+        decodeMs = latency.decodeMs,
+        renderMs = latency.renderMs,
+        decoder = decoder.orEmpty(),
+        hdr = hdr,
     )
 }

@@ -101,4 +101,20 @@ sealed interface StreamState {
     data class Failed(val reason: String) : StreamState
 }
 
-data class StreamStats(val resolution: String, val fps: Int, val bitrateMbps: Float, val latencyMs: Float, val codec: String)
+data class StreamStats(
+    val resolution: String,
+    val fps: Int,
+    val bitrateMbps: Float,
+    val latencyMs: Float,
+    val codec: String,
+    val width: Int = 0,
+    val height: Int = 0,
+    val receivedFps: Float = 0f,
+    val lossPercent: Float = 0f,
+    val hostMs: Float = 0f,
+    val networkMs: Float = 0f,
+    val decodeMs: Float = 0f,
+    val renderMs: Float = 0f,
+    val decoder: String = "",
+    val hdr: Boolean = false,
+)

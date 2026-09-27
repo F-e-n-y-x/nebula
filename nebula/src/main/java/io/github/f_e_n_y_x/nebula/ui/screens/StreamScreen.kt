@@ -1,67 +1,99 @@
 package io.github.f_e_n_y_x.nebula.ui.screens
 
+import android.Manifest
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.hardware.input.InputManager
+import android.os.Build
+import android.os.SystemClock
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import androidx.activity.compose.LocalActivity
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import io.github.f_e_n_y_x.nebula.MainActivity
-import io.github.f_e_n_y_x.nebula.StreamInputSink
-import io.github.f_e_n_y_x.nebula.data.engine.EngineStreamRepository
-import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
-import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
-import io.github.f_e_n_y_x.nebula.domain.StreamTarget
-import io.github.fenyx.nebula.engine.MouseButton
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
+import io.github.f_e_n_y_x.nebula.MainActivity
+import io.github.f_e_n_y_x.nebula.StreamInputSink
+import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
+import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
+import io.github.f_e_n_y_x.nebula.domain.StreamTarget
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
+import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
+import io.github.f_e_n_y_x.nebula.input.GestureCallbacks
+import io.github.f_e_n_y_x.nebula.input.MouseInput
+import io.github.f_e_n_y_x.nebula.input.RemoteInput
+import io.github.f_e_n_y_x.nebula.input.StreamInputView
+import io.github.f_e_n_y_x.nebula.input.TrackingInput
+import androidx.compose.runtime.mutableFloatStateOf
+import io.github.f_e_n_y_x.nebula.input.TouchGestures
+import io.github.f_e_n_y_x.nebula.input.TouchMode
+import io.github.f_e_n_y_x.nebula.input.VideoRect
+import io.github.f_e_n_y_x.nebula.input.isMouse
+import io.github.f_e_n_y_x.nebula.input.press
+import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
 import io.github.f_e_n_y_x.nebula.ui.Navigator
 import io.github.f_e_n_y_x.nebula.ui.StreamViewModel
 import io.github.f_e_n_y_x.nebula.ui.components.ArtImage
@@ -70,29 +102,58 @@ import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
+
+/** Mutable state the Android input objects read; updated from composition. */
+private class InputState {
+    var rect = VideoRect(0f, 0f, 1f, 1f)
+    var viewWidth = 1f
+    var ui: StreamUiPrefs? = null
+    var active = false
+    var zoom: (Float, Float, Float) -> Unit = { _, _, _ -> }
+    var pan: (Float, Float) -> Unit = { _, _ -> }
+}
 
 /**
- * Hosts the engine's video surface full-screen with a minimal overlay (stats, Disconnect, Quit).
- * While the overlay is hidden, keys, gamepads and touch go to the PC; Back (or Start + Select)
- * brings the overlay back. The full in-stream menu (bitrate, display switch, keyboard, frame
- * generation) moves here in a later part.
+ * The stream: video scaled per Settings (Fit / Fill / Stretch; Virtual display shows native
+ * pixels), a full-screen input layer (touch gestures, mouse with pointer capture, soft keyboard),
+ * optional on-screen controls, stats overlay and float ball, and the Panel quick menu.
+ *
+ * Back, B, Start + Select, a four-finger tap or double Esc open the menu; leaving the stream only
+ * happens from the menu. The session survives the app going to the background for the grace
+ * period set in Settings.
  */
 @Composable
 fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId: String, mode: DisplayMode) {
     val vm = viewModel { StreamViewModel(container, hostId, gameId, mode) }
     val state by vm.state.collectAsStateWithLifecycle()
     val game by vm.game.collectAsStateWithLifecycle()
+    val bitrate by vm.bitrateKbps.collectAsStateWithLifecycle()
+    val bitrateNote by vm.bitrateNote.collectAsStateWithLifecycle()
     val s = Nebula.scale
     val t = Nebula.type
+    val ctx = LocalContext.current
     val activity = LocalActivity.current as MainActivity
-    val engine = container.stream as? EngineStreamRepository
-    var overlay by remember { mutableStateOf(true) }
-    var poke by remember { mutableIntStateOf(0) }
+    val prefs = remember { LegacyPrefs(ctx) }
+    val tick by prefs.changes().collectAsState(initial = null)
+    val gameKey = "$hostId:$gameId"
+    val ui = remember(tick) { StreamUiPrefs.read(prefs, gameKey) }
+    val baseInput = container.stream.remoteInput
+    // Everything goes through the tracker so the optional local cursor knows where the pointer is.
+    val remoteInput = remember(baseInput) { baseInput?.let { TrackingInput(it) } }
+    val remote = remember(remoteInput) { { remoteInput } }
+    val view = androidx.compose.ui.platform.LocalView.current
+
+    var menu by remember { mutableStateOf(false) }
     val live = state is StreamState.Live
-    LaunchedEffect(poke, live) { if (live) { delay(4_000); overlay = false } }
-    val showOverlay = { overlay = true; poke++ }
+    val stats = (state as? StreamState.Live)?.stats
+    val ended = state is StreamState.Failed || state is StreamState.Ended
+    var hint by remember { mutableStateOf(true) }
+    LaunchedEffect(live) { if (live) { delay(6_000); hint = false } }
+
     val end = { quit: Boolean -> vm.end(quit); nav.back() }
-    BackHandler { if (!overlay) showOverlay() else end(false) }
+    // Back never leaves a running stream: it toggles the menu. Leaving is Disconnect / Quit.
+    BackHandler { if (ended) nav.back() else menu = !menu }
 
     // Full screen while streaming.
     DisposableEffect(Unit) {
@@ -102,36 +163,166 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         onDispose { bars.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    // Raw input goes to the PC only while the controls are hidden, so D-pad focus works on the overlay.
-    if (engine != null) {
-        val sink = remember(engine) { EngineInputSink(engine) { showOverlay() } }
-        DisposableEffect(overlay, live) {
-            activity.streamInput = if (!overlay && live) sink else null
-            onDispose { activity.streamInput = null }
+    // The ongoing "Streaming…" notification needs permission on Android 13+; ask once.
+    val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(live) {
+        if (live && Build.VERSION.SDK_INT >= 33 && !container.isDemo &&
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+            !prefs.prefs.getBoolean(ASKED_NOTIFY_KEY, false)
+        ) {
+            prefs.put(ASKED_NOTIFY_KEY, true)
+            notify.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+
+    val input = remember { InputState() }
+    input.ui = ui
+    input.active = live && !menu
+    val uiNow by rememberUpdatedState(ui)
+    val pad = remember(remote) { GamepadMapper(remote, onMenu = { menu = true }, config = { uiNow.gamepad }) }
+    var inputView by remember { mutableStateOf<StreamInputView?>(null) }
+    var devices by remember { mutableIntStateOf(0) }
+
+    // Keys, gamepads and D-pad go to the PC while the menu is closed.
+    val sink = remember(remote) { StreamKeySink(remote, pad, { uiNow }, onMenu = { menu = true }) }
+    DisposableEffect(menu, live) {
+        activity.streamInput = if (!menu && live) sink else null
+        if (menu) { pad.releaseAll(); inputView?.hideKeyboard(); inputView?.clearFocus() }
+        onDispose { activity.streamInput = null }
+    }
+    // Gamepads coming and going; a mouse appearing turns pointer capture on.
+    DisposableEffect(Unit) {
+        val im = ctx.getSystemService(InputManager::class.java)
+        val l = object : InputManager.InputDeviceListener {
+            override fun onInputDeviceAdded(id: Int) { devices++ }
+            override fun onInputDeviceRemoved(id: Int) { pad.onDeviceRemoved(id); devices++ }
+            override fun onInputDeviceChanged(id: Int) { devices++ }
+        }
+        im?.registerInputDeviceListener(l, null)
+        onDispose { im?.unregisterInputDeviceListener(l) }
+    }
+    val hasMouse = remember(devices) { physicalMousePresent() }
+    val capture = live && !menu && !ui.absoluteMouse && ui.mouseCapture && hasMouse
+    // Pinch zoom of the local picture (V+'s zoom/pan); nothing is sent to the PC.
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var panX by remember { mutableFloatStateOf(0f) }
+    var panY by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(capture, inputView) { inputView?.wantCapture = capture }
+
     if (container.isDemo) LaunchedEffect(Unit) { vm.attach(StreamTarget.None) }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (engine == null) {
-            // Demo build: show a real screenshot where the decoded video would be.
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+        val density = LocalDensity.current
+        val cw = with(density) { maxWidth.toPx() }
+        val ch = with(density) { maxHeight.toPx() }
+        val vw = stats?.width?.takeIf { it > 0 }?.toFloat() ?: cw
+        val vh = stats?.height?.takeIf { it > 0 }?.toFloat() ?: ch
+        // Virtual display already matches this screen: show it pixel for pixel unless told otherwise.
+        val scale = if (mode == DisplayMode.VIRTUAL && !ui.scaleVirtual) ScaleMode.FIT else ui.scaleMode
+        val base = videoRect(scale, cw, ch, vw, vh, ui.position, ui.offsetX, ui.offsetY)
+        val rect = zoomed(base, zoom, panX, panY, cw, ch)
+        input.rect = rect
+        input.viewWidth = cw
+        input.zoom = { factor, fx, fy ->
+            val z = (zoom * factor).coerceIn(1f, MAX_ZOOM)
+            val applied = z / zoom
+            // Keep the point under the fingers in place.
+            panX += (fx - (cw / 2 + panX)) * (1 - applied)
+            panY += (fy - (ch / 2 + panY)) * (1 - applied)
+            zoom = z
+            if (z <= 1.001f) { panX = 0f; panY = 0f }
+            clampPan(base, zoom, cw, ch, panX, panY).let { (x, y) -> panX = x; panY = y }
+        }
+        input.pan = { dx, dy ->
+            clampPan(base, zoom, cw, ch, panX + dx, panY + dy).let { (x, y) -> panX = x; panY = y }
+        }
+        remoteInput?.let { it.frameWidth = vw.toInt(); it.frameHeight = vh.toInt() }
+        val place = Modifier.layout { m, c ->
+            val p = m.measure(Constraints.fixed(rect.width.roundToInt().coerceAtLeast(1), rect.height.roundToInt().coerceAtLeast(1)))
+            layout(c.maxWidth, c.maxHeight) { p.place(rect.left.roundToInt(), rect.top.roundToInt()) }
+        }
+
+        if (container.engine == null) {
+            // Demo build: a real screenshot where the decoded video would be, scaled the same way.
             val shot = game?.art?.hero ?: game?.art?.header
-            ArtImage(shot, game?.name ?: "stream", null, Modifier.fillMaxSize()
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { if (overlay) overlay = false else showOverlay() })
+            ArtImage(shot, game?.name ?: "stream", null, place, contentScale = ContentScale.FillBounds)
         } else {
             AndroidView(
-                factory = { ctx ->
-                    SurfaceView(ctx).apply {
+                factory = { c ->
+                    SurfaceView(c).apply {
                         keepScreenOn = true
                         holder.addCallback(object : SurfaceHolder.Callback {
                             override fun surfaceCreated(holder: SurfaceHolder) = Unit
                             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) =
                                 vm.attach(SurfaceStreamTarget(activity, holder))
-                            override fun surfaceDestroyed(holder: SurfaceHolder) = Unit // the session disconnects itself
+                            // The engine pauses video and keeps the session for the grace period.
+                            override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
                         })
                     }
                 },
-                modifier = Modifier.fillMaxSize().trackpad(engine) { if (overlay) overlay = false },
+                modifier = place,
+            )
+        }
+
+        // Input layer over the whole screen (letterbox bars included, like a trackpad).
+        if (remoteInput != null) {
+            AndroidView(
+                factory = { c ->
+                    val callbacks = object : GestureCallbacks {
+                        override fun onKeyboard() { inputView?.toggleKeyboard() }
+                        override fun onMenu() { menu = true }
+                        override fun onZoom(factor: Float, focusX: Float, focusY: Float) = input.zoom(factor, focusX, focusY)
+                        override fun onPan(dx: Float, dy: Float) = input.pan(dx, dy)
+                        override fun isZoomed() = zoom > 1.001f
+                        override fun onHold() { view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS) }
+                        override fun onTouchUnsupported() {
+                            Toast.makeText(c, "This PC doesn't support touch; using the direct pointer.", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    val gestures = TouchGestures(
+                        out = { remoteInput.takeIf { input.active } },
+                        config = { input.ui?.touch ?: io.github.f_e_n_y_x.nebula.input.TouchConfig() },
+                        video = { input.rect },
+                        viewWidth = { input.viewWidth },
+                        callbacks = callbacks,
+                    )
+                    val mouse = MouseInput(
+                        out = { remoteInput.takeIf { input.active } },
+                        absolute = { input.ui?.absoluteMouse == true },
+                        navButtons = { input.ui?.mouseNavButtons == true },
+                        video = { input.rect },
+                    )
+                    StreamInputView(c, gestures, mouse) { remoteInput.takeIf { input.active } }.also { inputView = it }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        // Local cursor: optional in Settings, always on in demo mode so gestures can be checked without a PC.
+        val relative = ui.touch.mode == TouchMode.TRACKPAD || ui.touch.mode == TouchMode.SPLIT || ui.touch.mode == TouchMode.POINTER
+        remoteInput?.takeIf { (container.isDemo || ui.localCursor) && relative }?.let { tracker ->
+            val cur by tracker.cursor.collectAsState()
+            if (live) {
+                Box(
+                    Modifier.offset { IntOffset((rect.left + cur.first * rect.width).roundToInt() - 6, (rect.top + cur.second * rect.height).roundToInt() - 6) }
+                        .size(12.dp).background(Color.White, CircleShape).border(2.dp, Color.Black, CircleShape),
+                )
+            }
+        }
+
+        if (live && !menu && ui.osc) OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
+        if (live && !menu && ui.mouseBar) MouseBar(remote, onKeyboard = { inputView?.toggleKeyboard() }, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = ui.osc, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
+        if (live && !menu && ui.perf != PerfDetail.OFF && stats != null) PerfOverlay(stats, ui.perf == PerfDetail.FULL, ui.perfOpacity, Modifier.align(if (ui.osc) Alignment.TopCenter else Alignment.TopStart))
+        if (live && !menu && ui.floatBall) {
+            FloatBall(
+                ui,
+                onAction = { action ->
+                    when (action) {
+                        "open_keyboard" -> inputView?.toggleKeyboard()
+                        "open_menu" -> menu = true
+                        "toggle_visibility" -> prefs.put("checkbox_enable_float_ball", false)
+                    }
+                },
             )
         }
 
@@ -157,74 +348,161 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 NebulaButton("Back", onClick = { nav.back() }, style = ButtonStyle.Secondary, modifier = Modifier.focusRequester(backFocus))
                 LaunchedEffect(Unit) { runCatching { backFocus.requestFocus() } }
             }
-            is StreamState.Live -> AnimatedVisibility(overlay, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(20))) {
-                    val x = st.stats
-                    val portrait = Nebula.form.isCompact && !Nebula.form.isLandscape
-                    Row(
-                        Modifier.align(Alignment.TopStart).background(Color(0xCC0A0A0B), RoundedCornerShape(50)).padding(horizontal = s.dp(14), vertical = s.dp(8)),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(s.dp(10)),
-                    ) {
-                        Box(Modifier.size(s.dp(8)).background(NebulaColors.success, RoundedCornerShape(50)))
-                        Text("Live", style = t.label, color = NebulaColors.success)
-                        val full = "${x.resolution} · ${x.fps} fps · ${"%.0f".format(x.bitrateMbps)} Mbps · ${"%.1f".format(x.latencyMs)} ms · ${x.codec}"
-                        val short = "${x.fps} fps · ${"%.0f".format(x.bitrateMbps)} Mbps · ${"%.1f".format(x.latencyMs)} ms"
-                        Text(if (portrait) short else full, style = t.mono, color = NebulaColors.text, maxLines = 1)
-                    }
-                    val endFocus = remember { FocusRequester() }
-                    LaunchedEffect(Unit) { runCatching { endFocus.requestFocus() } }
-                    Row(
-                        Modifier.align(if (portrait) Alignment.BottomCenter else Alignment.TopEnd).padding(bottom = if (portrait) s.dp(40) else 0.dp)
-                            .background(Color(0xD90A0A0B), RoundedCornerShape(s.dp(16))).padding(s.dp(6)),
-                        horizontalArrangement = Arrangement.spacedBy(s.dp(6)),
-                    ) {
-                        NebulaButton(
-                            "Quit game", onClick = { end(true) }, style = ButtonStyle.Secondary,
-                            modifier = Modifier.onFocusChanged { if (it.isFocused) poke++ },
-                        )
-                        NebulaButton(
-                            "Disconnect", onClick = { end(false) }, style = ButtonStyle.Danger, icon = Icons.Rounded.Close,
-                            modifier = Modifier.focusRequester(endFocus).onFocusChanged { if (it.isFocused) poke++ },
-                        )
-                    }
-                    Text(
-                        if (container.isDemo) "Demo stream · Tap or press Back for controls" else "Press Back or Start + Select for controls",
-                        style = t.label, color = NebulaColors.textSecondary,
-                        modifier = Modifier.align(Alignment.BottomCenter).background(Color(0xB30A0A0B), RoundedCornerShape(50)).padding(horizontal = s.dp(12), vertical = s.dp(6)),
-                    )
-                }
+            is StreamState.Live -> AnimatedVisibility(hint && !menu, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+                Text(
+                    if (Nebula.form.isTv) "Press Back or Start + Select for the menu" else "Back, four-finger tap or Start + Select for the menu · three fingers for the keyboard",
+                    style = t.label, color = NebulaColors.textSecondary, textAlign = TextAlign.Center,
+                    modifier = Modifier.systemBarsPadding().padding(bottom = s.dp(20), start = s.dp(20), end = s.dp(20))
+                        .background(Color(0xB30A0A0B), RoundedCornerShape(50)).padding(horizontal = s.dp(14), vertical = s.dp(7)),
+                )
             }
+        }
+
+        AnimatedVisibility(menu && !ended, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            StreamMenu(
+                gameName = game?.name ?: "Stream",
+                mode = mode,
+                stats = stats,
+                ui = ui,
+                prefs = prefs,
+                bitrateKbps = bitrate,
+                bitrateNote = bitrateNote,
+                gamepads = pad.count,
+                gameKey = gameKey,
+                zoomed = zoom > 1.001f,
+                actions = StreamMenuActions(
+                    onResume = { menu = false },
+                    onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },
+                    onBitrate = { vm.setBitrate(it) },
+                    onKeyboard = {
+                        menu = false
+                        inputView?.postDelayed({ inputView?.showKeyboard() }, 150)
+                    },
+                    onClipboard = {
+                        val text = ctx.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }
+                            ?.getItemAt(0)?.coerceToText(ctx)?.toString()
+                        if (text.isNullOrEmpty()) {
+                            Toast.makeText(ctx, "The clipboard is empty", Toast.LENGTH_SHORT).show()
+                        } else {
+                            remoteInput?.text(text)
+                            Toast.makeText(ctx, "Sent ${text.length} characters to your PC", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onShortcut = { remoteInput?.press(it) },
+                    onDisconnect = { end(false) },
+                    onQuit = { end(!ui.quitDisconnectsOnly) },
+                ),
+            )
         }
     }
 }
 
-/** Keyboards and TV remotes type on the PC; gamepads become player 1. Back stays with the app. */
-private class EngineInputSink(private val engine: EngineStreamRepository, onMenu: () -> Unit) : StreamInputSink {
-    private val pad = GamepadMapper({ engine.input }, onMenu)
+private const val ASKED_NOTIFY_KEY = "nebula_asked_notification_permission"
+private const val MAX_ZOOM = 4f
+
+/** Keeps a zoomed picture covering the screen: pan no further than its overhang. */
+private fun clampPan(base: VideoRect, zoom: Float, cw: Float, ch: Float, x: Float, y: Float): Pair<Float, Float> {
+    val maxX = ((base.width * zoom - cw) / 2).coerceAtLeast(0f)
+    val maxY = ((base.height * zoom - ch) / 2).coerceAtLeast(0f)
+    return x.coerceIn(-maxX, maxX) to y.coerceIn(-maxY, maxY)
+}
+
+/** A real mouse (or laptop touchpad) is attached; the emulator's and touchscreen's virtual pointers don't count. */
+private fun physicalMousePresent(): Boolean = InputDevice.getDeviceIds().any { id ->
+    val d = InputDevice.getDevice(id) ?: return@any false
+    !d.isVirtual && d.supportsSource(InputDevice.SOURCE_MOUSE) && !d.supportsSource(InputDevice.SOURCE_TOUCHSCREEN)
+}
+
+/** Keyboards, remotes and gamepads while the menu is closed. Back stays with the app (menu). */
+private class StreamKeySink(
+    private val remote: () -> RemoteInput?,
+    private val pad: GamepadMapper,
+    private val ui: () -> StreamUiPrefs,
+    private val onMenu: () -> Unit,
+) : StreamInputSink {
+    private var lastMenuKeyUp = 0L
 
     override fun onKey(event: KeyEvent): Boolean {
         if (pad.onKey(event)) return true
-        if (event.keyCode == KeyEvent.KEYCODE_BACK) return false
-        return engine.input?.sendKey(event) == true
+        val fromMouse = event.isFromSource(InputDevice.SOURCE_MOUSE)
+        if (event.keyCode == KeyEvent.KEYCODE_BACK || event.keyCode == KeyEvent.KEYCODE_FORWARD) {
+            // Mouse side buttons reach the PC as X1/X2 when enabled; otherwise Back opens the menu.
+            if (fromMouse && ui().mouseNavButtons) return true
+            if (event.keyCode == KeyEvent.KEYCODE_BACK) return false
+        }
+        val u = ui()
+        if (u.escMenu && event.keyCode == u.escMenuKey && event.action == KeyEvent.ACTION_UP) {
+            val now = SystemClock.uptimeMillis()
+            if (now - lastMenuKeyUp < DOUBLE_PRESS_MS) {
+                lastMenuKeyUp = 0
+                remote()?.key(event)
+                onMenu()
+                return true
+            }
+            lastMenuKeyUp = now
+        }
+        return remote()?.key(event) == true
     }
 
-    override fun onMotion(event: MotionEvent): Boolean = pad.onMotion(event)
+    override fun onMotion(event: MotionEvent): Boolean = !event.isMouse() && pad.onMotion(event)
+
+    private companion object {
+        const val DOUBLE_PRESS_MS = 400L
+    }
 }
 
-/** Touch acts as a laptop trackpad: drag moves the pointer, tap clicks, long-press right-clicks. */
-private fun Modifier.trackpad(engine: EngineStreamRepository, onTouch: () -> Unit): Modifier = this
-    .pointerInput(engine) {
-        detectTapGestures(
-            onTap = { onTouch(); engine.input?.run { mouseButton(MouseButton.LEFT, true); mouseButton(MouseButton.LEFT, false) } },
-            onLongPress = { engine.input?.run { mouseButton(MouseButton.RIGHT, true); mouseButton(MouseButton.RIGHT, false) } },
+@Composable
+private fun PerfOverlay(x: StreamStats, full: Boolean, opacity: Int, modifier: Modifier) {
+    val s = Nebula.scale
+    val bg = Color(0xFF0A0A0B).copy(alpha = opacity.coerceIn(0, 100) / 100f)
+    Column(
+        modifier.systemBarsPadding().padding(s.dp(12)).background(bg, RoundedCornerShape(s.dp(10))).padding(horizontal = s.dp(10), vertical = s.dp(6)),
+    ) {
+        Text(
+            "${x.fps} fps · ${"%.0f".format(x.bitrateMbps)} Mbps · ${"%.1f".format(x.latencyMs)} ms",
+            style = Nebula.type.mono, color = NebulaColors.text,
         )
-    }
-    .pointerInput(engine) {
-        detectDragGestures { change, drag ->
-            change.consume()
-            engine.input?.moveMouse((drag.x * TRACKPAD_SPEED).toInt(), (drag.y * TRACKPAD_SPEED).toInt())
+        if (full) {
+            Text("${x.resolution} · ${x.codec} · loss ${"%.1f".format(x.lossPercent)}%", style = Nebula.type.mono, color = NebulaColors.textSecondary)
+            Text(
+                "host ${"%.1f".format(x.hostMs)} · net ${"%.1f".format(x.networkMs)} · dec ${"%.1f".format(x.decodeMs)} · ren ${"%.1f".format(x.renderMs)}",
+                style = Nebula.type.mono, color = NebulaColors.textSecondary,
+            )
         }
     }
+}
 
-private const val TRACKPAD_SPEED = 1.4f
+/** V+'s quick float ball: tap / double tap / long press run the actions chosen in Settings. */
+@Composable
+private fun FloatBall(ui: StreamUiPrefs, onAction: (String) -> Unit) {
+    val s = Nebula.scale
+    var poke by remember { mutableIntStateOf(0) }
+    var faded by remember { mutableStateOf(false) }
+    LaunchedEffect(poke) { faded = false; delay(ui.floatBallHideMs.toLong().coerceAtLeast(500)); faded = true }
+    val align = when (ui.floatBallPosition) {
+        "top_left" -> Alignment.TopStart
+        "top_center" -> Alignment.TopCenter
+        "top_right" -> Alignment.TopEnd
+        "center_left" -> Alignment.CenterStart
+        "bottom_left" -> Alignment.BottomStart
+        "bottom_center" -> Alignment.BottomCenter
+        "bottom_right" -> Alignment.BottomEnd
+        else -> Alignment.CenterEnd
+    }
+    Box(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(10))) {
+        Box(
+            Modifier.align(align).size(s.dp(44)).alpha(if (faded) 0.35f else 0.9f)
+                .background(Color(0xCC17171A), CircleShape).border(1.dp, NebulaColors.controlBorder, CircleShape)
+                .pointerInput(ui.floatBallTap, ui.floatBallDoubleTap, ui.floatBallLongPress) {
+                    detectTapGestures(
+                        onTap = { poke++; onAction(ui.floatBallTap) },
+                        onDoubleTap = { poke++; onAction(ui.floatBallDoubleTap) },
+                        onLongPress = { poke++; onAction(ui.floatBallLongPress) },
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.MoreHoriz, "Stream menu", tint = NebulaColors.text, modifier = Modifier.size(s.dp(22)))
+        }
+    }
+}

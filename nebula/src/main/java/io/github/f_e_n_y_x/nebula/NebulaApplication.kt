@@ -35,6 +35,8 @@ import io.github.fenyx.nebula.engine.NebulaEngine
  * through the engine.
  */
 class AppContainer(context: Context) {
+    private val app = context.applicationContext
+
     private val demo = DemoHost(context)
     val isDemo: Boolean = demo.isAvailable
 
@@ -52,6 +54,11 @@ class AppContainer(context: Context) {
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+
+    /** A stream went live: keep the process in the foreground with an ongoing notification. */
+    fun onStreamLive(title: String) = StreamKeepAliveService.start(app, title)
+
+    fun onStreamEnded() = StreamKeepAliveService.stop(app)
 
     /** True on mobile data and other metered links, where data saver applies. */
     fun isMetered(): Boolean = connectivity?.isActiveNetworkMetered == true
