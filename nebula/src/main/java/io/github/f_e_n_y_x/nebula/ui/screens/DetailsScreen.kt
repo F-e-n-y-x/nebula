@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxHeight
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
 import io.github.f_e_n_y_x.nebula.ui.components.statusBarScrim
@@ -103,11 +104,28 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
             // Dark only behind the text: the left column and the bottom edge. The art stays clear top-right.
             Box(Modifier.fillMaxSize().leftScrim(0.97f, reach = 0.66f))
             Box(Modifier.fillMaxSize().bottomScrim())
+            // Short landscape phones (~360–420 dp tall): tighter spacing, and the play choices are
+            // pinned below a scrolling header so they're never pushed off the bottom edge.
+            val short = form.heightDp < 480
             Row(
-                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = s.dp(40), vertical = s.dp(20)),
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+                    .padding(horizontal = s.dp(40), vertical = s.dp(if (short) 8 else 20)),
                 horizontalArrangement = Arrangement.spacedBy(s.dp(40)),
             ) {
-                Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
+                if (short) Column(Modifier.weight(1.2f).fillMaxHeight()) {
+                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                            NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                            MoreMenu(refresh)
+                        }
+                        Spacer(Modifier.height(s.dp(8)))
+                        Header(ui)
+                        Spacer(Modifier.height(s.dp(12)))
+                        Stats(ui)
+                    }
+                    Spacer(Modifier.height(s.dp(12)))
+                    PlayChoices(ui, play, showNote = false)
+                } else Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                         NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                         MoreMenu(refresh)
@@ -120,7 +138,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     Stats(ui)
                 }
                 if (showAbout && form.widthDp >= 760) {
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = s.dp(68))) {
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = s.dp(if (short) 8 else 68), bottom = s.dp(8))) {
                         // A glass panel keeps About readable over the visible art.
                         Column(
                             Modifier.background(NebulaColors.bg.copy(alpha = 0.86f), RoundedCornerShape(s.dp(16)))
@@ -167,7 +185,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
 private fun Header(ui: DetailsUi) {
     val game = ui.game ?: return
     val s = Nebula.scale
-    val maxH = s.dp(if (Nebula.form.isCompact) 64 else 92)
+    val maxH = s.dp(if (Nebula.form.isCompact || Nebula.form.heightDp < 480) 56 else 92)
     if (game.art.logo != null) {
         coil3.compose.AsyncImage(
             model = game.art.logo, contentDescription = game.name, alignment = Alignment.CenterStart,
@@ -185,7 +203,7 @@ private fun Header(ui: DetailsUi) {
 }
 
 @Composable
-private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit) {
+private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: Boolean = true) {
     val s = Nebula.scale
     val ctx = LocalContext.current
     val primary = remember { FocusRequester() }
@@ -209,6 +227,7 @@ private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit) {
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(s.dp(12))) { modes.forEach { content(it, Modifier.weight(1f)) } }
     }
+    if (!showNote) return
     Spacer(Modifier.height(s.dp(10)))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Rounded.Check, null, tint = NebulaColors.success, modifier = Modifier.size(s.dp(16)))
@@ -230,14 +249,14 @@ private fun PlayCard(highlighted: Boolean, title: String, subtitle: String, icon
             .nebulaClickable(shape, onClick, focusScale = 1.02f)
             .background(if (highlighted) NebulaColors.accent else Color(0xB3111113), shape)
             .then(if (highlighted) Modifier else Modifier.border(1.dp, NebulaColors.controlBorder, shape))
-            .padding(horizontal = s.dp(18), vertical = s.dp(14)),
+            .padding(horizontal = s.dp(14), vertical = s.dp(12)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = if (highlighted) Color.White else NebulaColors.text, modifier = Modifier.size(s.dp(26)))
-        Spacer(Modifier.width(s.dp(14)))
+        Icon(icon, null, tint = if (highlighted) Color.White else NebulaColors.text, modifier = Modifier.size(s.dp(24)))
+        Spacer(Modifier.width(s.dp(12)))
         Column {
-            Text(title, style = Nebula.type.bodyStrong, color = if (highlighted) Color.White else NebulaColors.text)
-            Text(subtitle, style = Nebula.type.label, color = if (highlighted) Color.White.copy(alpha = 0.82f) else NebulaColors.textSecondary, maxLines = 2)
+            Text(title, style = Nebula.type.bodyStrong, color = if (highlighted) Color.White else NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, style = Nebula.type.label, color = if (highlighted) Color.White.copy(alpha = 0.82f) else NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -273,7 +292,7 @@ private fun About(ui: DetailsUi, wide: Boolean = false) {
         SectionTitle("About")
         Text(
             d.description, style = Nebula.type.body, color = NebulaColors.textSecondary,
-            maxLines = if (wide) 5 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
+            maxLines = if (wide) (if (Nebula.form.heightDp < 480) 3 else 5) else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(s.dp(16)))
     }
