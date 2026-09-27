@@ -22,7 +22,7 @@ def escapeBuildConfigString = { value ->
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 }
 def enableX86TestAbi = (project.findProperty("enableX86TestAbi") ?: "false").toString().toBoolean()
-def audioHapticsAppLabel = "Moonlight V+"
+def nebulaAppLabel = "Nebula"
 def audioHapticsSdkDir = (
         project.findProperty("audioHapticsSdkDir")
                 ?: localProperties.getProperty("audioHapticsSdkDir")
@@ -33,16 +33,6 @@ if (audioHapticsSdkDir.isEmpty()) {
     throw new GradleException(
             "audioHapticsSdkDir is required; point it at the Apache-2.0 audio-haptics-sdk checkout"
     )
-}
-
-// 仅在存在 google-services.json 且满足条件时应用 Google Services 插件
-def hasGoogleServicesJson = file('google-services.json').exists()
-if (hasGoogleServicesJson && (project.hasProperty('enableAnalytics') || gradle.startParameter.taskNames.any { it.contains('Release') })) {
-    apply plugin: 'com.google.gms.google-services'
-    // Crashlytics requires google-services to be applied first.
-    apply plugin: 'com.google.firebase.crashlytics'
-} else if (!hasGoogleServicesJson) {
-    logger.lifecycle("google-services.json not found; skipping Google Services + Crashlytics plugins")
 }
 
 android {
@@ -64,8 +54,8 @@ android {
 
         // 记录最近一次发布的版本。发版时由 CI 依据 tag 和发布历史覆写
         // （见 .github/release/version-code.sh）。
-        versionName "12.12.12"
-        versionCode = 121212001
+        versionName "0.1.0"
+        versionCode = 100
 
         // Optional GitHub OAuth App client ID. Enable Device Flow on the OAuth app,
         // then set githubOAuthClientId in local.properties, pass -PgithubOAuthClientId=...,
@@ -109,7 +99,7 @@ android {
                 }
             }
 
-            applicationId "com.limelight.root"
+            applicationId "io.github.f_e_n_y_x.nebula.root"
             dimension "root"
             buildConfigField "boolean", "ROOT_BUILD", "true"
         }
@@ -121,7 +111,7 @@ android {
                 }
             }
 
-            applicationId "com.limelight"
+            applicationId "io.github.f_e_n_y_x.nebula"
             dimension "root"
             buildConfigField "boolean", "ROOT_BUILD", "false"
         }
@@ -159,11 +149,18 @@ android {
         }
     }
 
-    // 基于环境变量的可选签名配置（用于 CI 等环境）
-    def keystorePath = System.getenv("KEYSTORE_PATH")
-    def keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-    def envKeyAlias = System.getenv("KEY_ALIAS")
-    def envKeyPassword = System.getenv("KEY_PASSWORD")
+    // Release signing: environment variables (CI) or a properties file kept outside the
+    // repo, named by nebulaSigningProperties in local.properties or -PnebulaSigningProperties.
+    def signingProps = new Properties()
+    def signingPropsPath = (project.findProperty("nebulaSigningProperties")
+            ?: localProperties.getProperty("nebulaSigningProperties") ?: "").toString().trim()
+    if (!signingPropsPath.isEmpty() && new File(signingPropsPath).exists()) {
+        new File(signingPropsPath).withInputStream { signingProps.load(it) }
+    }
+    def keystorePath = System.getenv("KEYSTORE_PATH") ?: signingProps.getProperty("storeFile")
+    def keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: signingProps.getProperty("storePassword")
+    def envKeyAlias = System.getenv("KEY_ALIAS") ?: signingProps.getProperty("keyAlias")
+    def envKeyPassword = System.getenv("KEY_PASSWORD") ?: signingProps.getProperty("keyPassword")
     def hasSigningConfig = keystorePath != null && keystorePassword != null && envKeyAlias != null && envKeyPassword != null && new File(keystorePath).exists()
 
     signingConfigs {
@@ -179,48 +176,18 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix ".vplus_debug"
-            resValue "string", "app_label", audioHapticsAppLabel
-            resValue "string", "app_label_root", audioHapticsAppLabel
+            applicationIdSuffix ".debug"
+            resValue "string", "app_label", "Nebula (debug)"
+            resValue "string", "app_label_root", "Nebula (Root, debug)"
 
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                     'proguard-rules.pro', 'proguard-debug.pro'
         }
         release {
-            // To whomever is releasing/using an APK in release mode with
-            // Moonlight's official application ID, please stop. I see every
-            // single one of your crashes in my Play Console and it makes
-            // Moonlight's reliability look worse and makes it more difficult
-            // to distinguish real crashes from your crashy VR app. Seriously,
-            // 44 of the *same* native crash in 72 hours and a few each of
-            // several other crashes.
-            //
-            // This is technically not your fault. I would have hoped Google
-            // would validate the signature of the APK before attributing
-            // the crash to it. I asked their Play Store support about this
-            // and they said they don't and don't have plans to, so that sucks.
-            //
-            // In any case, it's bad form to release an APK using someone
-            // else's application ID. There is no legitimate reason, that
-            // anyone would need to comment out the following line, except me
-            // when I release an official signed Moonlight build. If you feel
-            // like doing so would solve something, I can tell you it will not.
-            // You can't upgrade an app while retaining data without having the
-            // same signature as the official version. Nor can you post it on
-            // the Play Store, since that application ID is already taken.
-            // Reputable APK hosting websites similarly validate the signature
-            // is consistent with the Play Store and won't allow an APK that
-            // isn't signed the same as the original.
-            //
-            // I wish any and all people using Moonlight as the basis of other
-            // cool projects the best of luck with their efforts. All I ask
-            // is to please change the applicationId before you publish.
-            //
-            // TL;DR: Leave the following line alone!
-            applicationIdSuffix ".qiin"
-            resValue "string", "app_label", audioHapticsAppLabel
-            resValue "string", "app_label_root", "Moonlight (Root)"
+            // Nebula uses its own application ID (io.github.f_e_n_y_x.nebula), so no suffix.
+            resValue "string", "app_label", nebulaAppLabel
+            resValue "string", "app_label_root", "Nebula (Root)"
 
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -276,13 +243,6 @@ dependencies {
     implementation libs.androidx.compose.ui.tooling.preview
     implementation libs.compose.showcase.sequence
 
-    // Firebase Analytics + Crashlytics
-    // BOM 版本说明: https://firebase.google.com/support/release-notes/android
-    // 注意: Firebase 33.0.0+ 需要 minSdk 23，我们使用 32.8.1 保持 API 22 兼容
-    // 没有 google-services.json 时 Crashlytics 仍能编译进 APK 但不会上报 (init 静默失败)
-    implementation platform(libs.firebase.bom)
-    implementation libs.firebase.analytics
-    implementation libs.firebase.crashlytics
 
     // Kotlin
     implementation libs.kotlin.stdlib

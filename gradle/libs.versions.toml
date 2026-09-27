@@ -1,8 +1,6 @@
 [versions]
 agp = "9.2.1"
 kotlin = "2.2.10"
-google-services = "4.4.4"
-firebase-crashlytics-gradle = "3.0.5"
 desugar = "2.1.5"
 bouncycastle = "1.83"
 jcodec = "0.2.5"
@@ -21,7 +19,6 @@ seismic = "1.0.3"
 flexbox = "3.0.0"
 tvprovider = "1.1.0"
 zxing = "4.3.0"
-firebase-bom = "32.8.1"
 coroutines = "1.8.1"
 lifecycle = "2.8.7"
 compose-bom = "2025.06.01"
@@ -60,10 +57,6 @@ seismic = { module = "com.squareup:seismic", version.ref = "seismic" }
 flexbox = { module = "com.google.android.flexbox:flexbox", version.ref = "flexbox" }
 tvprovider = { module = "androidx.tvprovider:tvprovider", version.ref = "tvprovider" }
 zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing" }
-firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
-firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
-firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
@@ -88,5 +81,3 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
-firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebase-crashlytics-gradle" }
