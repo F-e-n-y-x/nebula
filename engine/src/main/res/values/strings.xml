@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default (English) strings used by the engine. Apps override and translate them. -->
+<resources>
+    <string name="address_ipv6">IPv6 network</string>
+    <string name="address_local">Local network</string>
+    <string name="address_manual">Manual address</string>
+    <string name="address_other">Other network</string>
+    <string name="address_remote">Remote network</string>
+    <string name="connection_4k_update">Update GeForce Experience to stream in 4K. The stream will be 1080p.</string>
+    <string name="connection_above_4k_client">Your streaming device must support HEVC or AV1 to stream at resolutions above 4K.</string>
+    <string name="connection_above_4k_host">Your host PC does not support streaming at resolutions above 4K.</string>
+    <string name="connection_app_minimized">The application is minimized. Restore it on the PC or quit the session and start streaming again.</string>
+    <string name="connection_app_missing">The app %1$s is not in the GFE app list</string>
+    <string name="connection_foreign_session_quit">This session was started by another device. End it on that device or the PC. (Error code: %1$d)</string>
+    <string name="connection_foreign_session_resumed">This session was started by another device. End it on that device or the PC. (Error code: %1$d)</string>
+    <string name="connection_hdr_unsupported">Your PC GPU does not support streaming HDR. The stream will be SDR.</string>
+    <string name="connection_http_failed">Failed to create HTTP connection: %1$s</string>
+    <string name="connection_interrupted">Connection interrupted</string>
+    <string name="connection_launch_failed">Failed to launch application</string>
+    <string name="connection_network_error">Network error: %1$s</string>
+    <string name="connection_not_paired">Device not paired with computer</string>
+    <string name="connection_operation_interrupted">Operation interrupted</string>
+    <string name="connection_quit_failed">Failed to quit previous session. Quit it manually.</string>
+    <string name="connection_resume_failed">Failed to resume existing session</string>
+    <string name="connection_rotation_unsupported">Host does not support display rotation. Update the host software.</string>
+    <string name="connection_server_failed">Server returned failure response</string>
+    <string name="error_desktop_special_app_unsupported">This host does not support Desktop quick start. Open the app list once to load cached apps, or update the host.</string>
+    <string name="error_vdd_unavailable">The host virtual display driver is unavailable. Install or repair ZakoVDD, then try again.</string>
+    <string name="error_vdd_unsupported">This host does not support virtual display streaming.</string>
+    <string name="mic_stats_continuity">Audio continuity: %1$.1f%% (Captured:%2$d Encoded:%3$d Sent:%4$d Dropped:%5$d)</string>
+</resources>

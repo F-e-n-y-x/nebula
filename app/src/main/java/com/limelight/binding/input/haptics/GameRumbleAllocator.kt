@@ -1,20 +1,5 @@
 package com.limelight.binding.input.haptics
 
-/** User-selected routing policy for host-authored game rumble. */
-enum class GameRumbleMode(val preferenceValue: String) {
-    COORDINATED("smart"),
-    DEVICE("device"),
-    CONTROLLER("controller");
-
-    companion object {
-        fun fromPreferenceValue(value: String?): GameRumbleMode =
-            entries.firstOrNull { it.preferenceValue == value } ?: CONTROLLER
-
-        fun fromLegacyFallback(enabled: Boolean): GameRumbleMode =
-            if (enabled) COORDINATED else CONTROLLER
-    }
-}
-
 /** Independent outputs produced from a single host rumble state. */
 internal data class GameRumbleRoute(
     val controller: ControllerRumbleState?,

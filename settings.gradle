@@ -43,6 +43,7 @@ if (!audioHapticsAndroidDir.isDirectory()) {
 }
 
 include ':app'
+include ':engine'
 include ':framegen'
 include ':usbip-backend'
 include ':moonlight-haptics-android'
