@@ -260,6 +260,7 @@ class NebulaEngine private constructor(context: Context) {
             config,
             crypto,
             cert,
+            forceResumeCurrentSession = request.resumeOnly,
         )
         val audio = SmartAudioRenderer(
             context = activity,

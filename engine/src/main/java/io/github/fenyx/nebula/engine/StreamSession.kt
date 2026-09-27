@@ -143,10 +143,23 @@ class StreamSession internal constructor(
         Thread({ connection.doStopAndQuit() }, "nebula-quit").start()
     }
 
-    /** Ends the stream and leaves the app running on the host, so it can be resumed. */
-    fun disconnect() {
-        if (!beginEnd(StreamEndReason.USER_QUIT)) return
-        Thread({ connection.stop() }, "nebula-stop").start()
+    /**
+     * Ends the stream and leaves the app running on the host, so it can be resumed. [onStopped]
+     * runs (on a background thread) once the connection is fully torn down and a new stream may
+     * start; right away if the session was already ending.
+     */
+    fun disconnect(onStopped: (() -> Unit)? = null) {
+        if (!beginEnd(StreamEndReason.USER_QUIT)) {
+            onStopped?.invoke()
+            return
+        }
+        Thread({
+            try {
+                connection.stop()
+            } finally {
+                onStopped?.invoke()
+            }
+        }, "nebula-stop").start()
     }
 
     /** Asks the host to change the video bitrate mid-stream; true once the host accepted it. */

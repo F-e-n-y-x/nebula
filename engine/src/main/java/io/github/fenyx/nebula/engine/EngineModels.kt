@@ -113,6 +113,12 @@ data class StreamRequest(
      * "controlOnly", "useVdd", "touchKeyboard", "customScreenMode" (Int), "maxPacketSize" (Int).
      */
     val extras: Map<String, Any> = emptyMap(),
+    /**
+     * Only resume the app already running on the host, never launch or quit one. Used to reconnect
+     * a live stream at a new size (the host applies the new mode on /resume); fails if nothing is
+     * running on the host any more.
+     */
+    val resumeOnly: Boolean = false,
 )
 
 /** Split of the end-to-end latency the client can measure. */
