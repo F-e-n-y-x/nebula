@@ -25,6 +25,7 @@ import com.limelight.preferences.PreferenceConfiguration
 import com.limelight.utils.HdrCapabilityHelper
 import io.github.fenyx.nebula.engine.internal.ArtCache
 import io.github.fenyx.nebula.engine.internal.DatabaseHostStore
+import io.github.fenyx.nebula.engine.internal.DecoderSupport
 import io.github.fenyx.nebula.engine.internal.HostRepository
 import io.github.fenyx.nebula.engine.internal.NvHttpHostBackend
 import kotlinx.coroutines.CoroutineScope
@@ -47,10 +48,15 @@ class NebulaEngine private constructor(context: Context) {
     private val identity by lazy { IdentityManager(appContext) }
     private val crypto by lazy { PlatformBinding.getCryptoProvider(appContext) }
 
+    private val art = ArtCache(File(appContext.cacheDir, "nebula-art"))
+
+    /** Artwork cache size, usage and clearing. */
+    val artCache = ArtCacheControl(art)
+
     private val repository = HostRepository(
         backend = NvHttpHostBackend(uniqueId = { identity.uniqueId }, clientName = ::clientName, crypto = crypto),
         store = DatabaseHostStore(appContext),
-        art = ArtCache(File(appContext.cacheDir, "nebula-art")),
+        art = art,
         scope = scope,
         io = Dispatchers.IO,
     )
@@ -65,6 +71,8 @@ class NebulaEngine private constructor(context: Context) {
 
     init {
         scope.launch { repository.load() }
+        // Warm up decoder support (GL renderer probe + MediaCodecHelper) off the main thread.
+        scope.launch { runCatching { DecoderSupport.ensure(appContext) } }
     }
 
     // ---- Hosts ----
@@ -164,6 +172,7 @@ class NebulaEngine private constructor(context: Context) {
         val cert = requireNotNull(host.serverCert) { "Host ${host.name} isn't paired" }
         val gameStreamId = requireNotNull(appId.toIntOrNull()) { "Not a GameStream app id: $appId" }
 
+        DecoderSupport.ensure(activity)
         val prefs = PreferenceConfiguration.readPreferences(activity).also { request.applyTo(it) }
         val session = StreamSession(activity, surface, listener, request.width, request.height)
 
@@ -184,7 +193,7 @@ class NebulaEngine private constructor(context: Context) {
             (activity.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).isActiveNetworkMetered,
             hdr,
             false,
-            activity.getSharedPreferences("GlPreferences", 0).getString("Renderer", "") ?: "",
+            DecoderSupport.glRenderer(activity),
             session.perfListener,
         )
 
@@ -265,6 +274,16 @@ class NebulaEngine private constructor(context: Context) {
 
     private fun clientName(): String =
         Settings.Global.getString(appContext.contentResolver, "device_name") ?: Build.MODEL ?: "Nebula"
+
+    /**
+     * Readies hardware decoding (GL renderer probe, decoder whitelists). startStream does this
+     * itself; call it early, off the main thread, to avoid the one-time cost at stream start.
+     * Returns the decoder that would handle [mimeType], or null if the device has none.
+     */
+    fun prepareDecoders(mimeType: String = "video/avc"): String? {
+        DecoderSupport.ensure(appContext)
+        return com.limelight.binding.video.MediaCodecHelper.findProbableSafeDecoder(mimeType, -1)?.name
+    }
 
     companion object {
         private const val DISCOVERY_INTERVAL_MS = 1500

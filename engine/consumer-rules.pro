@@ -19,3 +19,8 @@
 # jMDNS
 -dontwarn javax.jmdns.impl.DNSCache
 -dontwarn org.slf4j.**
+# BouncyCastle registers algorithms by class-name strings (e.g. X.509 → ...asymmetric.x509.CertificateFactory).
+# Obfuscating those names makes CertificateFactory.getInstance("X.509", bc) fail, which breaks host polling.
+-keep class org.bouncycastle.jcajce.provider.asymmetric.x509.** {*;}
+-keepnames class org.bouncycastle.jcajce.provider.** {*;}
+-keepnames class org.bouncycastle.jce.provider.** {*;}

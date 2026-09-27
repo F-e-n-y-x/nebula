@@ -157,3 +157,23 @@ interface StreamListener {
     fun onHdrModeChanged(enabled: Boolean) {}
     fun onResolutionChanged(width: Int, height: Int) {}
 }
+
+/** The on-disk artwork cache (posters, heroes, logos, screenshots), shared by every host. */
+class ArtCacheControl internal constructor(private val cache: io.github.fenyx.nebula.engine.internal.ArtCache) {
+    /** Size limit in bytes; least recently used art is evicted beyond it. */
+    var limitBytes: Long
+        get() = cache.maxBytes
+        set(value) { cache.maxBytes = value }
+
+    /** Bytes currently on disk. Does disk I/O; call off the main thread. */
+    fun usedBytes(): Long = cache.sizeBytes()
+
+    fun clear() = cache.clear()
+
+    /** Forgets everything cached for [hostId], so the next load re-downloads it. */
+    fun clearHost(hostId: String) = cache.clearHost(hostId)
+
+    /** Forgets [appId]'s artwork on [hostId] (every [ArtKind]). */
+    fun clearApp(hostId: String, appId: String) =
+        ArtKind.entries.forEach { cache.remove(io.github.fenyx.nebula.engine.internal.ArtCache.key(hostId, "art", appId, it.wire)) }
+}

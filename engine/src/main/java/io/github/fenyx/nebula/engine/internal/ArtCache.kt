@@ -7,7 +7,14 @@ import java.security.MessageDigest
  * Disk cache for host artwork, keyed by host + app + kind. Bounded by [maxBytes]; the least
  * recently used files are evicted first.
  */
-class ArtCache(private val dir: File, private val maxBytes: Long = 64L * 1024 * 1024) {
+class ArtCache(private val dir: File, maxBytes: Long = 64L * 1024 * 1024) {
+    /** Upper bound on disk use; lowering it evicts immediately. */
+    @Volatile
+    var maxBytes: Long = maxBytes
+        set(value) {
+            field = value
+            synchronized(this) { trim() }
+        }
 
     @Synchronized
     fun get(key: String): ByteArray? {
@@ -33,6 +40,19 @@ class ArtCache(private val dir: File, private val maxBytes: Long = 64L * 1024 * 
     fun clearHost(hostId: String) {
         val prefix = hash(hostId).take(HOST_PREFIX)
         dir.listFiles()?.filter { it.name.startsWith(prefix) }?.forEach { it.delete() }
+    }
+
+    @Synchronized
+    fun sizeBytes(): Long = dir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+
+    @Synchronized
+    fun clear() {
+        dir.listFiles()?.forEach { it.delete() }
+    }
+
+    @Synchronized
+    fun remove(key: String) {
+        fileFor(key).delete()
     }
 
     private fun trim() {
