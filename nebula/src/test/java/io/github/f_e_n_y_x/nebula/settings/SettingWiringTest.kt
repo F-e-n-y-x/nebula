@@ -113,8 +113,7 @@ class SettingWiringTest {
 
     @Test
     fun `unfinished features look unfinished`() {
-        val framegen = legacySettings.filter { it.group == "framegen" }.map { it.key }
-        (framegen + listOf("list_osc_layout", "checkbox_dualsense_direct_bluetooth", "list_dualsense_output_mode", "checkbox_usb_driver")).forEach { key ->
+        (listOf("list_osc_layout", "checkbox_dualsense_direct_bluetooth", "list_dualsense_output_mode", "checkbox_usb_driver")).forEach { key ->
             val s = rowState(key)
             assertTrue("$key should show as coming in 0.4, is $s", s is RowState.Coming && s.release == "0.4")
         }

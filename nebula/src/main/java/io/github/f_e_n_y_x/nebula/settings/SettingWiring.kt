@@ -29,11 +29,8 @@ sealed interface Wiring {
     data class NotInNebula(val why: String) : Wiring
 }
 
-private const val FG = "Part of frame generation (Lossless Scaling), coming in 0.4. Your V+ value is kept."
 private const val DS5 = "DualSense haptics and the USB controller driver are coming in 0.4."
 private const val EDITOR = "Arrives with the on-screen controls editor in 0.4."
-private const val MIC = "Microphone passthrough is being finished for 0.3.0."
-private const val CLIPBOARD = "Two-way clipboard is being finished for 0.3.0."
 private const val DIAG = "The diagnostics screens are being rebuilt for 0.3.0."
 
 private val RUMBLE = setOf("rumble", "rumbleTriggers", "setControllerLED")
@@ -58,14 +55,14 @@ val settingWiring: Map<String, Wiring> = mapOf(
     "checkbox_force_mtk_max_operating_rate" to Wiring.Engine("forceMtkMaxOperatingRate"),
     "list_hevc_low_latency_mode" to Wiring.Engine("hevcLowLatencyMode"),
     // Frame generation
-    "pref_framegen_pick_lossless_dll" to Wiring.ComingSoon("0.4", FG),
-    "checkbox_framegen_enabled" to Wiring.ComingSoon("0.4", FG),
-    "checkbox_framegen_adaptive_enabled" to Wiring.ComingSoon("0.4", FG),
-    "list_framegen_quality_preset" to Wiring.ComingSoon("0.4", FG),
-    "pref_framegen_selftest" to Wiring.ComingSoon("0.4", FG),
-    "seekbar_framegen_internal_width" to Wiring.ComingSoon("0.4", FG),
-    "seekbar_framegen_slow_threshold_ms" to Wiring.ComingSoon("0.4", FG),
-    "checkbox_framegen_present_real_first" to Wiring.ComingSoon("0.4", FG),
+    "pref_framegen_pick_lossless_dll" to Wiring.Native,
+    "checkbox_framegen_enabled" to Wiring.Native,
+    "checkbox_framegen_adaptive_enabled" to Wiring.Native,
+    "list_framegen_quality_preset" to Wiring.Native,
+    "pref_framegen_selftest" to Wiring.Native,
+    "seekbar_framegen_internal_width" to Wiring.Native,
+    "seekbar_framegen_slow_threshold_ms" to Wiring.Native,
+    "checkbox_framegen_present_real_first" to Wiring.Native,
     // Host & network
     "checkbox_enable_sops" to Wiring.Engine("enableSops"),
     "list_screen_combination_mode" to Wiring.Engine("screenCombinationMode"),
@@ -75,8 +72,8 @@ val settingWiring: Map<String, Wiring> = mapOf(
     "checkbox_swap_quit_and_disconnect" to Wiring.Nebula(),
     "checkbox_control_only" to Wiring.Engine("controlOnly"),
     "list_background_stream_behavior" to Wiring.Nebula(),
-    "checkbox_clipboard_sync_text" to Wiring.ComingSoon("0.3.0", CLIPBOARD),
-    "checkbox_clipboard_sync_image" to Wiring.ComingSoon("0.3.0", CLIPBOARD),
+    "checkbox_clipboard_sync_text" to Wiring.Engine("enableClipboardSyncText"),
+    "checkbox_clipboard_sync_image" to Wiring.Engine("enableClipboardSyncImage"),
     "checkbox_resume_stream" to Wiring.ComingSoon("0.4", "Resume from the Continue tile on Home meanwhile."),
     "checkbox_extreme_resume" to Wiring.NotInNebula("Set this with \"When Moonlight goes to the background\" and the grace period under Advanced."),
     "checkbox_background_audio" to Wiring.Nebula(),
@@ -129,20 +126,20 @@ val settingWiring: Map<String, Wiring> = mapOf(
     "seekbar_audio_vibration_strength" to Wiring.Engine("audioVibrationStrength"),
     "list_audio_vibration_mode" to Wiring.Engine("audioVibrationMode", RUMBLE),
     "list_audio_vibration_scene" to Wiring.Engine("audioVibrationScene"),
-    "checkbox_enable_mic" to Wiring.ComingSoon("0.3.0", MIC),
-    "list_mic_initial_state" to Wiring.ComingSoon("0.3.0", MIC),
-    "list_mic_menu_action_mode" to Wiring.ComingSoon("0.3.0", MIC),
-    "checkbox_show_mic_button" to Wiring.ComingSoon("0.3.0", MIC),
-    "list_mic_button_position" to Wiring.ComingSoon("0.3.0", MIC),
-    "seekbar_mic_bitrate_kbps" to Wiring.ComingSoon("0.3.0", MIC),
-    "list_mic_icon_color" to Wiring.ComingSoon("0.3.0", MIC),
-    "list_mic_volume_processing_mode" to Wiring.ComingSoon("0.3.0", MIC),
-    "checkbox_mic_volume_processing" to Wiring.ComingSoon("0.3.0", MIC),
-    "checkbox_mic_gain" to Wiring.ComingSoon("0.3.0", MIC),
-    "seekbar_mic_gain_db" to Wiring.ComingSoon("0.3.0", MIC),
-    "checkbox_mic_balance" to Wiring.ComingSoon("0.3.0", MIC),
-    "seekbar_mic_balance_target" to Wiring.ComingSoon("0.3.0", MIC),
-    "checkbox_mic_voice_enhancement" to Wiring.ComingSoon("0.3.0", MIC),
+    "checkbox_enable_mic" to Wiring.Engine("enableMic"),
+    "list_mic_initial_state" to Wiring.Engine("micInitialState"),
+    "list_mic_menu_action_mode" to Wiring.Nebula(),
+    "checkbox_show_mic_button" to Wiring.Nebula(),
+    "list_mic_button_position" to Wiring.Nebula(),
+    "seekbar_mic_bitrate_kbps" to Wiring.Engine("micBitrate"),
+    "list_mic_icon_color" to Wiring.Nebula(),
+    "list_mic_volume_processing_mode" to Wiring.Engine("micVolumeProcessingEnabled"),
+    "checkbox_mic_volume_processing" to Wiring.Engine("micVolumeProcessingEnabled"),
+    "checkbox_mic_gain" to Wiring.Engine("micGainEnabled"),
+    "seekbar_mic_gain_db" to Wiring.Engine("micGainDb"),
+    "checkbox_mic_balance" to Wiring.Engine("micBalanceEnabled"),
+    "seekbar_mic_balance_target" to Wiring.Engine("micBalanceTargetPercent"),
+    "checkbox_mic_voice_enhancement" to Wiring.Engine("micVoiceEnhancementEnabled"),
     // Gamepads
     "controller_diagnostic" to Wiring.ComingSoon("0.3.0", DIAG),
     "controller_mouse_settings" to Wiring.ComingSoon("0.4", "Using a controller as a mouse isn't built yet."),
