@@ -33,16 +33,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.limelight.nvstream.input.ControllerPacket
-import com.limelight.nvstream.jni.MoonBridge
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
-import io.github.f_e_n_y_x.nebula.input.RemoteInput
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
-/** State of the on-screen pad (player 1), sent whole on every change. */
-private class OscState(private val remote: () -> RemoteInput?, private val motionCaps: () -> Int) {
+/**
+ * State of the on-screen pad, sent whole on every change through the gamepad mapper, which owns
+ * every host slot: with no controller attached this is player 1 (the phone pad), otherwise it
+ * drives player 1 together with the controller instead of adding a second player.
+ */
+private class OscState(private val pad: () -> GamepadMapper?) {
     var buttons = 0
     var lt = 0
     var rt = 0
@@ -50,19 +52,12 @@ private class OscState(private val remote: () -> RemoteInput?, private val motio
     var ly = 0
     var rx = 0
     var ry = 0
-    private var announced = false
+    private var touched = false
 
     fun send() {
-        val o = remote() ?: return
-        if (!announced) {
-            // With this device's sensors as motion source the host needs a motion-capable pad
-            // (it picks a DualSense for an unknown type with gyro/accel); otherwise an Xbox pad.
-            val motion = motionCaps()
-            val type = if (motion != 0) MoonBridge.LI_CTYPE_UNKNOWN else MoonBridge.LI_CTYPE_XBOX
-            o.gamepadArrived(0, 1, type, GamepadMapper.SUPPORTED, (MoonBridge.LI_CCAP_ANALOG_TRIGGERS.toInt() or motion).toShort())
-            announced = true
-        }
-        o.gamepad(0, 1, buttons, lt, rt, lx, ly, rx, ry)
+        val p = pad() ?: return
+        touched = true
+        p.onScreenState(buttons, lt, rt, lx, ly, rx, ry)
     }
 
     fun set(flag: Int, down: Boolean) {
@@ -73,7 +68,7 @@ private class OscState(private val remote: () -> RemoteInput?, private val motio
     /** Lets go of everything; a pad the host never saw isn't announced just to be released. */
     fun release() {
         buttons = 0; lt = 0; rt = 0; lx = 0; ly = 0; rx = 0; ry = 0
-        if (announced) send()
+        if (touched) pad()?.onScreenReleased()
     }
 }
 
@@ -82,8 +77,8 @@ private class OscState(private val remote: () -> RemoteInput?, private val motio
  * Select/Start (and Guide). Honours opacity, "only L3/R3" and "show Guide" from Settings.
  */
 @Composable
-fun OnScreenControls(remote: () -> RemoteInput?, opacity: Int, l3r3Only: Boolean, showGuide: Boolean, motionCaps: () -> Int = { 0 }) {
-    val state = remember { OscState(remote, motionCaps) }
+fun OnScreenControls(pad: () -> GamepadMapper?, opacity: Int, l3r3Only: Boolean, showGuide: Boolean) {
+    val state = remember { OscState(pad) }
     DisposableEffect(Unit) { onDispose { state.release() } }
     val s = Nebula.scale
     val portrait = !Nebula.form.isLandscape

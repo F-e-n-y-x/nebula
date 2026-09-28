@@ -6,6 +6,7 @@ import com.limelight.nvstream.input.ControllerPacket
 import io.github.f_e_n_y_x.nebula.input.RemoteInput
 import io.github.fenyx.nebula.engine.MouseButton
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,6 +15,7 @@ private class PadRecorder : RemoteInput {
     data class State(val controller: Int, val mask: Int, val buttons: Int, val lt: Int, val rt: Int, val lx: Int, val ly: Int, val rx: Int, val ry: Int)
 
     val arrivals = mutableListOf<Int>()
+    val arrivalCaps = mutableListOf<Int>()
     val states = mutableListOf<State>()
     val last: State get() = states.last()
 
@@ -31,6 +33,7 @@ private class PadRecorder : RemoteInput {
     }
     override fun gamepadArrived(controller: Int, activeMask: Int, type: Byte, supportedButtons: Int, capabilities: Short) {
         arrivals += controller
+        arrivalCaps += capabilities.toInt()
     }
 }
 
@@ -100,15 +103,20 @@ class GamepadAxesTest {
 
 class GamepadMapperTest {
     private val out = PadRecorder()
-    private var osc = false
     private val devices = mutableMapOf<Int, ControllerTraits>()
     private val layouts = mutableMapOf<Int, Set<Int>>()
+    /** Devices unplugged in the test (still known by traits until removed). */
+    private val unplugged = mutableSetOf<Int>()
+    private var caps: (Int, Int) -> Int = { _, _ -> GamepadMapper.DEFAULT_CAPS }
+    private var hook: (Int, Boolean) -> Boolean = { _, _ -> false }
     private val mapper = GamepadMapper(
         input = { out },
         onMenu = {},
-        oscSlot = { osc },
         traitsOf = { devices[it] },
         axesOf = { GamepadAxes.forAxes(layouts[it] ?: emptySet()) },
+        capabilities = { id, index -> caps(id, index) },
+        attached = { devices.filter { (id, t) -> id !in unplugged && t.isController && t.hasSticks }.keys.sorted() },
+        keyHook = { k, d -> hook(k, d) },
     )
 
     private fun pad(id: Int, axes: Set<Int>, vendor: Int = 0x045e, product: Int = 0x0b13) {
@@ -247,12 +255,109 @@ class GamepadMapperTest {
         assertEquals(3, out.last.mask)
     }
 
+    // ---- Regression: exactly one host controller per physical controller (0.3.0-dev9.1 showed two) ----
+
     @Test
-    fun `with the on-screen controls kept, pads start at player 2`() {
-        osc = true
+    fun `a controller plus the on-screen controls is one host controller`() {
+        pad(7, androidXbox)
+        mapper.onScreenState(ControllerPacket.A_FLAG, 0, 0, 0, 0, 0, 0)
+        press(7, KeyEvent.KEYCODE_BUTTON_B)
+        mapper.onScreenReleased()
+        assertEquals(listOf(0), out.arrivals)
+        assertTrue(out.states.all { it.controller == 0 && it.mask == 1 })
+        assertEquals(1, mapper.count)
+    }
+
+    @Test
+    fun `phone gyro to right stick with a controller attached drives that controller`() {
+        pad(7, androidXbox)
+        mapper.gyroStick(null, 12000, -3000)
+        move(7, MotionEvent.AXIS_X to 1f)
+        assertEquals(listOf(0), out.arrivals)
+        assertEquals(1, mapper.count)
+        // Gyro stays on the right stick while the pad moves, and adds to the physical stick with a clamp.
+        assertEquals(12000, out.last.rx)
+        assertEquals(-3000, out.last.ry)
+        move(7, MotionEvent.AXIS_Z to 1f)
+        assertEquals(32767, out.last.rx)
+        mapper.gyroStick(null, -12000, 0)
+        assertEquals(32767 - 12000, out.last.rx)
+    }
+
+    @Test
+    fun `the phone pad is player 1 only without a controller, and the first controller takes it over`() {
+        mapper.onScreenState(ControllerPacket.A_FLAG, 0, 0, 0, 0, 0, 0)
+        assertEquals(listOf(0), out.arrivals)
+        assertTrue(mapper.hasPhonePad)
+        assertEquals(null, mapper.deviceIdFor(0))
+        // A controller connects mid-stream and is used: same player, no second arrival.
         pad(7, androidXbox)
         press(7, KeyEvent.KEYCODE_BUTTON_A)
-        assertEquals(listOf(1), out.arrivals)
-        assertEquals(3, out.last.mask)
+        assertEquals(listOf(0), out.arrivals)
+        assertEquals(7, mapper.deviceIdFor(0))
+        assertEquals(1, mapper.count)
+        assertTrue(out.states.all { it.controller == 0 && it.mask == 1 })
+    }
+
+    @Test
+    fun `a controller taking over the phone pad is re-announced when it needs other capabilities`() {
+        val gyroCaps = GamepadMapper.DEFAULT_CAPS or com.limelight.nvstream.jni.MoonBridge.LI_CCAP_GYRO.toInt()
+        caps = { id, _ -> if (id == GamepadMapper.PHONE_PAD) GamepadMapper.DEFAULT_CAPS else gyroCaps }
+        mapper.announcePlayerOne()
+        assertEquals(listOf(0), out.arrivals)
+        pad(7, androidXbox)
+        press(7, KeyEvent.KEYCODE_BUTTON_A)
+        // Released (bit cleared) and announced again with the pad's gyro, still as player 1.
+        assertTrue(out.states.any { it.controller == 0 && it.mask and 1 == 0 })
+        assertEquals(listOf(0, 0), out.arrivals)
+        assertEquals(gyroCaps, out.arrivalCaps.last())
+        assertEquals(1, out.last.mask)
+    }
+
+    @Test
+    fun `no phone pad is announced while a controller is attached`() {
+        pad(7, androidXbox)
+        mapper.announcePlayerOne()
+        mapper.gyroStick(null, 0, 0)
+        assertTrue(out.arrivals.isEmpty())
+        assertFalse(mapper.hasPhonePad)
+    }
+
+    @Test
+    fun `a companion node that speaks before its sticks joins the same pad`() {
+        pad(7, androidXbox)
+        devices[8] = ControllerTraits(8, isVirtual = false, hasSticks = false, hasGamepadButtons = true, vendorId = 0x045e, productId = 0x0b13)
+        // The buttons-only node is pressed first (e.g. a button both nodes report).
+        assertTrue(press(8, KeyEvent.KEYCODE_BUTTON_MODE))
+        move(7, MotionEvent.AXIS_X to 1f)
+        assertEquals(listOf(0), out.arrivals)
+        assertEquals(1, mapper.count)
+        assertEquals(7, mapper.deviceIdFor(0))
+    }
+
+    @Test
+    fun `gyro zero never announces a pad and the toggle button is kept from the host`() {
+        mapper.gyroStick(null, 0, 0)
+        assertTrue(out.arrivals.isEmpty())
+        hook = { k, _ -> k == KeyEvent.KEYCODE_BUTTON_THUMBR }
+        pad(7, androidXbox)
+        assertTrue(press(7, KeyEvent.KEYCODE_BUTTON_THUMBR))
+        assertTrue("the toggle press reached the host", out.states.isEmpty())
+        press(7, KeyEvent.KEYCODE_BUTTON_THUMBL)
+        assertEquals(ControllerPacket.LS_CLK_FLAG, out.last.buttons)
+    }
+
+    @Test
+    fun `unplugging the only controller frees its slot on the host`() {
+        pad(7, androidXbox)
+        press(7, KeyEvent.KEYCODE_BUTTON_A)
+        unplugged += 7
+        mapper.onDeviceRemoved(7)
+        assertEquals(0, out.last.mask)
+        assertEquals(0, mapper.count)
+        // The on-screen controls then become the phone pad in slot 0 again.
+        mapper.onScreenState(ControllerPacket.A_FLAG, 0, 0, 0, 0, 0, 0)
+        assertEquals(listOf(0, 0), out.arrivals)
+        assertTrue(mapper.hasPhonePad)
     }
 }

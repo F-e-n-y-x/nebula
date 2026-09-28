@@ -16,6 +16,11 @@ import io.github.f_e_n_y_x.nebula.settings.MotionSettings
 import io.github.f_e_n_y_x.nebula.settings.MotionSource
 import io.github.fenyx.nebula.engine.MotionType
 
+/** The gyro toggle button's state ([io.github.f_e_n_y_x.nebula.settings.MotionHold.TOGGLE]), shared by passthrough and the mapping modes. */
+object GyroToggle {
+    @Volatile var on: Boolean = false
+}
+
 /** Where one host motion request is served from, decided by [MotionRouting.resolve]. */
 enum class MotionFeed { NONE, CONTROLLER, PHONE }
 
@@ -25,23 +30,26 @@ object MotionRouting {
      * [padHasSensor]: the pad bound to [controller] has this sensor (Android 13+).
      * [phoneHasSensor]: this device has it. Phone sensors only ever stand in for controller 0.
      */
-    fun resolve(settings: MotionSettings, controller: Int, padHasSensor: Boolean, phoneHasSensor: Boolean): MotionFeed = when (settings.source) {
-        MotionSource.OFF -> MotionFeed.NONE
-        MotionSource.PHONE -> if (controller == 0 && phoneHasSensor) MotionFeed.PHONE else MotionFeed.NONE
-        MotionSource.CONTROLLER -> when {
-            padHasSensor -> MotionFeed.CONTROLLER
-            settings.phoneFallback && controller == 0 && phoneHasSensor -> MotionFeed.PHONE
-            else -> MotionFeed.NONE
-        }
+    fun resolve(settings: MotionSettings, controller: Int, padHasSensor: Boolean, phoneHasSensor: Boolean): MotionFeed = when {
+        // Right stick / mouse modes use the gyro themselves; the host gets no motion.
+        !settings.passthrough -> MotionFeed.NONE
+        settings.source == MotionSource.PHONE -> if (controller == 0 && phoneHasSensor) MotionFeed.PHONE else MotionFeed.NONE
+        padHasSensor -> MotionFeed.CONTROLLER
+        settings.phoneFallback && controller == 0 && phoneHasSensor -> MotionFeed.PHONE
+        else -> MotionFeed.NONE
     }
 
-    /** True when this device should announce a motion-capable controller 0 by itself (no pad attached). */
-    fun announcePhonePad(settings: MotionSettings, anyPad: Boolean, phoneHasGyro: Boolean): Boolean =
-        !anyPad && phoneHasGyro && settings.source == MotionSource.PHONE
+    /**
+     * True when this device should announce a motion-capable player 1 by itself: passthrough from
+     * this device's gyro and no controller attached (an attached controller's own arrival carries
+     * the phone's motion bits instead).
+     */
+    fun announcePhonePad(settings: MotionSettings, controllerAttached: Boolean, phoneHasGyro: Boolean): Boolean =
+        !controllerAttached && phoneHasGyro && settings.passthrough && settings.source == MotionSource.PHONE
 
     /** Gyro as sent: deg/s times sensitivity, or zero while the hold trigger is released. */
-    fun gyroOut(x: Float, y: Float, z: Float, settings: MotionSettings, lt: Int, rt: Int): Triple<Float, Float, Float> {
-        if (!settings.hold.allows(lt, rt)) return Triple(0f, 0f, 0f)
+    fun gyroOut(x: Float, y: Float, z: Float, settings: MotionSettings, lt: Int, rt: Int, toggledOn: Boolean = GyroToggle.on): Triple<Float, Float, Float> {
+        if (!settings.hold.allows(lt, rt, toggledOn)) return Triple(0f, 0f, 0f)
         val k = Feedback.RAD_TO_DEG * settings.gyroScale
         return Triple(x * k, y * k, z * k)
     }
@@ -125,7 +133,7 @@ class MotionForwarder(
     /** LI_CCAP bits this device's own sensors add to controller 0 when it serves motion. */
     fun phoneCapabilities(): Int {
         val s = current
-        if (s.source != MotionSource.PHONE && !(s.source == MotionSource.CONTROLLER && s.phoneFallback)) return 0
+        if (!s.passthrough || !s.usesPhone) return 0
         var c = 0
         if (phoneSensors?.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null) c = c or MoonBridge.LI_CCAP_GYRO.toInt()
         if (phoneSensors?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) c = c or MoonBridge.LI_CCAP_ACCEL.toInt()
