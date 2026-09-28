@@ -100,6 +100,9 @@ class DemoHost(private val context: Context) {
         ),
     )
 
+    /** Debug QA only: every demo PC starts unpaired, like a fresh install (`--es start firstrun`). */
+    fun forgetPairings() = hosts.update { list -> list.map { it.copy(paired = false) } }
+
     val hostRepository = object : HostRepository {
         override fun observeHosts(): Flow<List<Host>> = hosts
         override suspend fun discover() { delay(900) }

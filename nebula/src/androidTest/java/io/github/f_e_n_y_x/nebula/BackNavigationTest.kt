@@ -8,6 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,7 +54,7 @@ class BackNavigationTest {
 
     @Test fun backFromSettingsReturnsToLibrary() {
         openTab("Settings")
-        waitFor("Display & audio")
+        waitFor("Audio & microphone")
         back()
         assertOnLibrary()
     }
@@ -66,12 +67,14 @@ class BackNavigationTest {
     }
 
     @Test fun backFromSettingsSectionReturnsToSettingsListThenLibrary() {
+        // Tablet/TV show the list and the section side by side, so there is no list step to return to.
+        assumeTrue(compose.activity.resources.configuration.screenWidthDp < 720)
         openTab("Settings")
-        waitFor("Display & audio")
+        waitFor("Audio & microphone")
         compose.onAllNodesWithText("Stream").onFirst().performClick()
         waitFor("Frame rate")
         back()
-        waitFor("Display & audio")
+        waitFor("Audio & microphone")
         assertFalse("still in the section", shown("Frame rate"))
         back()
         assertOnLibrary()

@@ -26,6 +26,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +49,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
+import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaStar
 import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.screens.DetailsScreen
@@ -58,6 +61,7 @@ import io.github.f_e_n_y_x.nebula.ui.screens.SettingsScreen
 import io.github.f_e_n_y_x.nebula.ui.screens.StreamScreen
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 
 sealed interface Route {
@@ -71,17 +75,28 @@ sealed interface Route {
     data class Settings(val section: String? = null) : Route
 }
 
-/** Navigation actions shared by every screen. */
-class Navigator(private val stack: SnapshotStateList<Route>) {
+/**
+ * Navigation actions shared by every screen.
+ *
+ * [pairedHostIds] is read live (the last used PC first), so a PC paired mid-session becomes the
+ * Library tab's target and Back's home at once, not only after the next app start.
+ */
+class Navigator(
+    private val stack: SnapshotStateList<Route>,
+    private val pairedHostIds: () -> List<String> = { emptyList() },
+) {
     val current: Route get() = stack.last()
     fun push(r: Route) { stack.add(r) }
 
     /**
      * Pops one screen. At the root of Hosts or Settings it returns to the home section (the
      * library, or Hosts before any PC is paired), like a real app's tabs. Returns false only at
-     * home, where Back should leave the app.
+     * home, where Back should leave the app. Back from a finished pairing opens that PC's library:
+     * setup is done, so it does what "Open library" does.
      */
     fun back(): Boolean {
+        val cur = stack.last()
+        if (cur is Route.Pair && cur.hostId in pairedHostIds()) { top(Route.Library(cur.hostId)); return true }
         if (stack.size > 1) { stack.removeAt(stack.lastIndex); return true }
         if (isAtHome) return false
         top(home)
@@ -90,8 +105,15 @@ class Navigator(private val stack: SnapshotStateList<Route>) {
 
     /** Switch top-level section (rail / bottom bar): reset to just that section. */
     fun top(r: Route) { stack.clear(); stack.add(r) }
+
+    /** The library shown last this session. Only used while its PC is still paired. */
     var lastLibrary: Route.Library? = null
-    val home: Route get() = lastLibrary ?: Route.Hosts
+
+    /** The Library tab and Back's home: the last library, else the preferred paired PC's, else Hosts. */
+    val home: Route get() {
+        val paired = pairedHostIds()
+        return lastLibrary?.takeIf { it.hostId in paired } ?: paired.firstOrNull()?.let { Route.Library(it) } ?: Route.Hosts
+    }
     val isAtHome: Boolean get() = stack.size == 1 && (stack[0] == home || stack[0] == Route.Onboarding)
 }
 
@@ -107,17 +129,18 @@ private enum class Section(val label: String, val icon: ImageVector) {
 @Composable
 fun NebulaApp(container: AppContainer, startOverride: String? = null) {
     var start by remember { mutableStateOf<Route?>(null) }
-    var homeLibrary by remember { mutableStateOf<Route.Library?>(null) }
+    var startPaired by remember { mutableStateOf(emptyList<String>()) }
+    // Paired PCs, the last used first. Live: pairing during first-run setup must update the tabs.
+    val livePaired by remember(container) {
+        combine(container.hosts.observeHosts(), container.prefs.lastHostId) { hosts, last -> pairedFirstLast(hosts, last) }
+    }.collectAsState(initial = null)
     LaunchedEffect(Unit) {
-        val hosts = container.hosts.observeHosts().first()
-        val last = container.prefs.lastHostId.first()
-        val paired = hosts.filter { it.paired }
-        val pick = paired.firstOrNull { it.id == last } ?: paired.firstOrNull()
-        homeLibrary = pick?.let { Route.Library(it.id) }
+        if (io.github.f_e_n_y_x.nebula.BuildConfig.DEBUG && startOverride == "firstrun") container.demoFirstRun()
+        startPaired = pairedFirstLast(container.hosts.observeHosts().first(), container.prefs.lastHostId.first())
         // Debug QA: "asleep:<screen>" starts with the demo PC asleep.
         val spec = startOverride?.takeIf { io.github.f_e_n_y_x.nebula.BuildConfig.DEBUG && it.startsWith("asleep:") }
             ?.also { container.debugPutDemoHostToSleep() }?.removePrefix("asleep:") ?: startOverride
-        start = debugStart(spec) ?: homeLibrary ?: Route.Onboarding
+        start = debugStart(spec) ?: startPaired.firstOrNull()?.let { Route.Library(it) } ?: Route.Onboarding
     }
     val initial = start
     if (initial == null) {
@@ -125,7 +148,8 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
         return
     }
     val stack = remember { mutableStateListOf(initial) }
-    val nav = remember { Navigator(stack).apply { lastLibrary = homeLibrary } }
+    val paired = rememberUpdatedState(livePaired ?: startPaired)
+    val nav = remember { Navigator(stack) { paired.value } }
     (stack.lastOrNull { it is Route.Library } as? Route.Library)?.let { nav.lastLibrary = it }
 
     val route = stack.last()
@@ -161,7 +185,7 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
 
     val go: (Section) -> Unit = { s ->
         when (s) {
-            Section.Library -> nav.top(nav.lastLibrary ?: Route.Hosts)
+            Section.Library -> nav.top(nav.home)
             Section.Hosts -> nav.top(Route.Hosts)
             Section.Settings -> nav.top(Route.Settings())
         }
@@ -182,13 +206,16 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
     }
 }
 
+private fun pairedFirstLast(hosts: List<Host>, lastHostId: String?): List<String> =
+    hosts.filter { it.paired }.sortedByDescending { it.id == lastHostId }.map { it.id }
+
 /** Debug builds only: `adb shell am start ... --es start details:gta5` opens a screen directly (QA screenshots). */
 private fun debugStart(spec: String?): Route? {
     if (!io.github.f_e_n_y_x.nebula.BuildConfig.DEBUG || spec.isNullOrBlank()) return null
     val host = io.github.f_e_n_y_x.nebula.data.demo.DemoHost.HOST_ID
     val (name, arg) = spec.split(':', limit = 2).let { it[0] to it.getOrNull(1) }
     return when (name) {
-        "onboarding" -> Route.Onboarding
+        "onboarding", "firstrun" -> Route.Onboarding
         "hosts" -> Route.Hosts
         "pair" -> Route.Pair(arg ?: "demo-deck")
         "library" -> Route.Library(host)

@@ -61,6 +61,9 @@ class AppContainer(context: Context) {
 
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
+    /** Debug QA only: the demo host forgets its pairings so first-run setup can be replayed. */
+    fun demoFirstRun() { if (isDemo) demo.forgetPairings() }
+
     /** A stream went live: keep the process in the foreground with an ongoing notification. */
     fun onStreamLive(title: String) = StreamKeepAliveService.start(app, title)
 
