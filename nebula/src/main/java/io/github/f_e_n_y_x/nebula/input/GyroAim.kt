@@ -62,6 +62,10 @@ class GyroAim {
         val a = 1f - s.smoothing.coerceIn(0, MotionSettings.MAX_SMOOTHING) / 100f
         smoothYaw += a * (deadzoned(yaw, s) - smoothYaw)
         smoothPitch += a * (deadzoned(pitch, s) - smoothPitch)
+        // Smoothing only approaches zero; at rest the output must be exactly zero, or the stick
+        // minimum turns the leftover into a constant deflection.
+        if (abs(smoothYaw) < REST) smoothYaw = 0f
+        if (abs(smoothPitch) < REST) smoothPitch = 0f
         val base = s.sensitivity.coerceIn(MotionSettings.MIN_SENSITIVITY, MotionSettings.MAX_SENSITIVITY) / 100f
         val kx = base * s.sensitivityX.coerceIn(MotionSettings.MIN_SENSITIVITY, MotionSettings.MAX_SENSITIVITY) / 100f
         val ky = base * s.sensitivityY.coerceIn(MotionSettings.MIN_SENSITIVITY, MotionSettings.MAX_SENSITIVITY) / 100f
@@ -115,6 +119,8 @@ class GyroAim {
         /** Long gaps (sensor paused) don't turn into one big jump. */
         const val MAX_DT = 0.05f
         private const val GRAVITY_ALPHA = 0.05f
+        /** deg/s below which the smoothed rate counts as still. */
+        private const val REST = 0.05f
         /** JoyShockMapper's player-space yaw relax factor. */
         private const val YAW_RELAX = 1.41f
     }

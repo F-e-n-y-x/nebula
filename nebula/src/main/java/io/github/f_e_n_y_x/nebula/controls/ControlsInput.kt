@@ -122,8 +122,17 @@ class ControlsInput(
     fun setStick(side: Side, x: Float, y: Float) {
         val ax = (x.coerceIn(-1f, 1f) * AXIS_MAX).roundToInt()
         val ay = (y.coerceIn(-1f, 1f) * AXIS_MAX).roundToInt()
+        // Mix into a pad the PC already has; with none yet (no physical pad has spoken, or the
+        // phone wrongly counts one as attached) the zone drives the on-screen pad itself, so it is
+        // never dropped.
         val m = mixer()
-        if (m != null) { m.touchStick(side, ax, ay); return }
+        if (m != null && m.hasController) {
+            // A drag that started on the on-screen pad lets go of it there.
+            if (side == Side.LEFT && (lx != 0 || ly != 0)) { lx = 0; ly = 0; send() }
+            if (side == Side.RIGHT && (rx != 0 || ry != 0)) { rx = 0; ry = 0; send() }
+            m.touchStick(side, ax, ay)
+            return
+        }
         if (side == Side.LEFT) { if (lx == ax && ly == ay) return; lx = ax; ly = ay } else { if (rx == ax && ry == ay) return; rx = ax; ry = ay }
         send()
     }

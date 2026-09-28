@@ -53,6 +53,8 @@ class GamepadMapper(
     private val attached: () -> List<Int> = ::attachedControllers,
     /** Sees every mapped gamepad key first; true keeps it from the host (the gyro toggle button). */
     private val keyHook: (keyCode: Int, down: Boolean) -> Boolean = { _, _ -> false },
+    /** Diagnostics: one line per slot handed out or announced (logcat tag NebulaPads). */
+    private val log: (String) -> Unit = {},
 ) : ControllerLookup {
     /** [deviceId] is the device that owns the slot (companion nodes share it; [PHONE_PAD] for the phone pad). */
     private class Pad(val index: Int, var deviceId: Int) {
@@ -246,6 +248,8 @@ class GamepadMapper(
     private fun existingPlayerOne(): Pad? {
         pads[PHONE_PAD]?.let { return it }
         val att = attached()
+        // Without a stick controller, whatever already holds a slot (a buttons-only node) is player 1.
+        if (att.isEmpty()) return pads.values.minByOrNull { it.index }
         return pads.entries.filter { it.key in att }.minByOrNull { it.value.index }?.value
     }
 
@@ -275,6 +279,9 @@ class GamepadMapper(
                 ?: pads.keys.firstOrNull { traitsFor(it)?.hasSticks == true }
                 ?: attached().firstOrNull { it != deviceId }
             if (owner != null) return padFor(owner).also { pads[deviceId] = it }
+            // No stick controller: never a second player next to the phone pad (on-screen controls
+            // or gyro); join player 1 instead.
+            existingPlayerOne()?.let { p -> pads[deviceId] = p; return p }
         }
         // The first real pad takes over the phone pad's slot (same player, now the controller).
         val phone = pads.remove(PHONE_PAD)
@@ -298,6 +305,7 @@ class GamepadMapper(
         val bridge = input() ?: return
         if (!pad.announced) {
             pad.caps = capabilities(pad.deviceId, pad.index)
+            log("announce player ${pad.index + 1} for ${if (pad.deviceId == PHONE_PAD) "the phone pad (on-screen controls / gyro)" else "device ${pad.deviceId} ${traitsFor(pad.deviceId)}"}, caps 0x${pad.caps.toString(16)}, attached ${attached()}")
             bridge.gamepadArrived(pad.index, activeMask, MoonBridge.LI_CTYPE_UNKNOWN, SUPPORTED, pad.caps.toShort())
             pad.announced = true
         }
