@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./app/src/main/res/drawable/vplus.webp" width="100" alt="Moonlight V+ Logo">
+  <img src="../../app/src/main/res/drawable/vplus.webp" width="100" alt="Moonlight V+ Logo">
 
   # Moonlight V+
 
