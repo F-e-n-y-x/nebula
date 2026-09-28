@@ -18,9 +18,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -150,6 +153,9 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
     val changesSaved = saveForGame != (ui.saved != null) || (saveForGame && ui.saved != target)
 
     val two = form.isTv || form.isLandscape || !form.isCompact
+    // Typing a custom size: the keyboard leaves little room on phones, so only the entry stays up.
+    // Everything else is hidden in place, so the text field keeps its focus and contents.
+    val typing = adding && WindowInsets.isImeVisible
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize().background(Color(0x99000000))
@@ -157,7 +163,8 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
         )
         val shape = if (two) RoundedCornerShape(s.dp(20)) else RoundedCornerShape(topStart = s.dp(20), topEnd = s.dp(20))
         BoxWithConstraints(
-            Modifier.fillMaxSize().then(if (two) Modifier.systemBarsPadding().padding(s.dp(16)) else Modifier),
+            // imePadding: typing a custom size keeps the fields above the keyboard on short screens.
+            Modifier.fillMaxSize().imePadding().then(if (two) Modifier.systemBarsPadding().padding(s.dp(16)) else Modifier),
             contentAlignment = if (two) Alignment.Center else Alignment.BottomCenter,
         ) {
             Column(
@@ -168,19 +175,11 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
                     .border(1.dp, NebulaColors.border, shape)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                     .then(if (two) Modifier else Modifier.navigationBarsPadding())
-                    .verticalScroll(rememberScrollState())
                     .padding(s.dp(if (form.isTv) 28 else 22)),
-                verticalArrangement = Arrangement.spacedBy(s.dp(16)),
+                verticalArrangement = Arrangement.spacedBy(s.dp(14)),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(s.dp(4))) {
-                    Text("Resolution", style = Nebula.type.heading, color = NebulaColors.text)
-                    Text(
-                        "Now ${current.label}. Switching reconnects in place in a couple of seconds; the game keeps running on your PC.",
-                        style = Nebula.type.label, color = NebulaColors.textMuted,
-                    )
-                }
                 val sizesBlock: @Composable () -> Unit = {
-                    SizeGrid(sizes, size, onPick = { size = it; adding = false }, adding = adding, onAdd = { adding = !adding })
+                    if (!typing) SizeGrid(sizes, size, onPick = { size = it; adding = false }, adding = adding, onAdd = { adding = !adding })
                     if (adding) {
                         CustomSizeEntry(onAdd = { r ->
                             addCustomResolution(ctx, r)
@@ -219,21 +218,33 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
                         )
                     }
                 }
-                if (two) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(s.dp(20))) {
-                        Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                            MenuLabel("Size")
-                            sizesBlock()
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(s.dp(12))) { sideBlock() }
+                // Choices scroll; the Cancel / Switch row below them always stays in view.
+                Column(
+                    Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(s.dp(16)),
+                ) {
+                    if (!typing) Column(verticalArrangement = Arrangement.spacedBy(s.dp(4))) {
+                        Text("Resolution", style = Nebula.type.heading, color = NebulaColors.text)
+                        Text(
+                            "Now ${current.label}. Switching reconnects in place in a couple of seconds; the game keeps running on your PC.",
+                            style = Nebula.type.label, color = NebulaColors.textMuted,
+                        )
                     }
-                    actionsBlock()
-                } else {
-                    MenuLabel("Size")
-                    sizesBlock()
-                    sideBlock()
-                    actionsBlock()
+                    if (two) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(s.dp(20))) {
+                            Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+                                MenuLabel(if (typing) "Custom size" else "Size")
+                                sizesBlock()
+                            }
+                            if (!typing) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(s.dp(12))) { sideBlock() }
+                        }
+                    } else {
+                        MenuLabel(if (typing) "Custom size" else "Size")
+                        sizesBlock()
+                        if (!typing) sideBlock()
+                    }
                 }
+                if (!typing) actionsBlock()
             }
         }
     }
