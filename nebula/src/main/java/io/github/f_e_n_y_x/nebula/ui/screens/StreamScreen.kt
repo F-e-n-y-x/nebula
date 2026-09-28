@@ -273,6 +273,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             capabilities = { id, index -> stream.padCapabilities(id, index) ?: GamepadMapper.DEFAULT_CAPS },
             onPadsChanged = { stream.refreshFeedback() },
             keyHook = { key, down -> gyroAssistNow?.onKey(key, down) == true },
+            log = { android.util.Log.i("NebulaPads", it) },
         )
     }
     // Rumble, light bar and motion reach the physical pad through the mapper.

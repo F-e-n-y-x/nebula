@@ -155,7 +155,7 @@ private fun DrawScope.drawDpad(dirs: Set<Int>) {
         Offset(cx - s / 2, cy - arm / 2) to Size(arm * 1.08f, arm),
         Offset(cx + s / 2 - arm * 1.08f, cy - arm / 2) to Size(arm * 1.08f, arm),
     )
-    drawRect(Fill, Offset(cx - arm / 2, cy - arm / 2), Size(arm, arm))
+    // Only the four arms: no centre tile or backdrop (the touch area is unchanged).
     arms.forEachIndexed { i, (tl, sz) ->
         drawRoundRect(if (i in dirs) NebulaColors.accent else Fill, tl, sz, r)
         drawRoundRect(if (i in dirs) NebulaColors.accentText else Edge, tl, sz, r, style = Stroke(stroke))
