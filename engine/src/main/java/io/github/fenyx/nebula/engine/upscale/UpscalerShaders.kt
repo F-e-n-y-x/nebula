@@ -41,13 +41,14 @@ void main() {
     private const val COMMON = """
 precision highp float;
 precision highp int;
+// Source size comes from a uniform: textureSize() returned 1x1 on the emulator's GLES translator.
+uniform ivec2 uSrcSize;
 vec4 fetchC(sampler2D t, ivec2 p) {
-    ivec2 sz = textureSize(t, 0);
-    return texelFetch(t, clamp(p, ivec2(0), sz - ivec2(1)), 0);
+    return texelFetch(t, clamp(p, ivec2(0), uSrcSize - ivec2(1)), 0);
 }
 // textureGather emulation: the 2x2 footprint a bilinear sample at uv p would use.
 void gather4(sampler2D t, vec2 p, out vec4 x, out vec4 y, out vec4 z, out vec4 w) {
-    vec2 q = p * vec2(textureSize(t, 0)) - 0.5;
+    vec2 q = p * vec2(uSrcSize) - 0.5;
     ivec2 i0 = ivec2(floor(q));
     ivec2 i1 = i0 + ivec2(1);
     x = fetchC(t, ivec2(i0.x, i1.y));
@@ -194,8 +195,10 @@ void main() {
     vec3 mn4 = min(min3v(b, d, f), h);
     vec3 mx4 = max(max3v(b, d, f), h);
     vec2 peakC = vec2(1.0, -4.0);
-    vec3 hitMin = min(mn4, e) / (4.0 * mx4);
-    vec3 hitMax = (peakC.x - max(mx4, e)) / (4.0 * mn4 + peakC.y);
+    // Denominators kept off zero: flat white or black areas would give 0/0, which GPUs treat
+    // differently (AMD's HLSL relies on max() dropping NaN).
+    vec3 hitMin = min(mn4, e) / max(4.0 * mx4, vec3(1.0 / 65536.0));
+    vec3 hitMax = (peakC.x - max(mx4, e)) / min(4.0 * mn4 + peakC.y, vec3(-1.0 / 65536.0));
     vec3 lobeRGB = max(-hitMin, hitMax);
     float lobe = max(-FSR_RCAS_LIMIT, min(max3(lobeRGB.r, lobeRGB.g, lobeRGB.b), 0.0)) * uSharpness;
     float rcpL = aRcpMed(4.0 * lobe + 1.0);

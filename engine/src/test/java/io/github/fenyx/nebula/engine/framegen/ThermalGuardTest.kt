@@ -50,7 +50,7 @@ class ThermalGuardTest {
         assertTrue(d is GuardDecision.TurnOff && (d as GuardDecision.TurnOff).detail.contains("22 ms"))
     }
 
-    @Test fun `stays tripped until reset; disabled guard never trips`() {
+    @Test fun `stays tripped until reset and a disabled guard never trips`() {
         val g = ThermalGuard()
         val d = g.onSample(sample(status = 4))
         assertEquals(d, g.onSample(sample()))

@@ -174,17 +174,25 @@ class UpscalerRenderer private constructor(
             val last = idx == passes.lastIndex
             // COPY stays at stream size; everything after it runs at window size.
             val (w, h) = if (pass == UpscalePass.COPY) inW to inH else outW to outH
-            val target = if (last) null else target("$idx", w, h)
+            val target = if (last) null else target("$idx", w, h).also { GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0) }
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, target?.fbo ?: 0)
             GLES30.glViewport(0, 0, w, h)
             val p = program(pass)
             GLES30.glUseProgram(p.id)
             GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+            // Only the sampled texture stays bound, so a render target is never also bound
+            // (some drivers, SwiftShader among them, treat that as a feedback loop and skip the draw).
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
+            GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, 0)
             if (pass == UpscalePass.COPY || pass == UpscalePass.BILINEAR) {
                 GLES30.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, srcTex)
                 GLES30.glUniformMatrix4fv(p.loc("uTexMatrix"), 1, false, texMatrix, 0)
             } else {
                 GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, srcTex)
+                // The source is the previous pass: stream size after COPY, window size otherwise.
+                val prev = passes[idx - 1]
+                if (prev == UpscalePass.COPY) GLES30.glUniform2i(p.loc("uSrcSize"), inW, inH)
+                else GLES30.glUniform2i(p.loc("uSrcSize"), outW, outH)
             }
             GLES30.glUniform1i(p.loc("uSrc"), 0)
             when (pass) {
@@ -237,7 +245,7 @@ class UpscalerRenderer private constructor(
                 val t = IntArray(1)
                 GLES30.glGenTextures(1, t, 0)
                 GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, t[0])
-                GLES30.glTexStorage2D(GLES30.GL_TEXTURE_2D, 1, GLES30.GL_RGBA8, w, h)
+                GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA8, w, h, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
                 GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
                 GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
                 GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)

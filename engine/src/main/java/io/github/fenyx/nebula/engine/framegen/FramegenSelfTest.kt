@@ -67,7 +67,7 @@ data class SelfTestReport(
         get() = when (verdict) {
             SelfTestVerdict.PASSED -> "Supported" + (benchmark?.let { " · %.1f ms per generated frame".format(it.p95Ms) } ?: "")
             SelfTestVerdict.SLOW -> "Supported but slow" + (benchmark?.let { " · %.1f ms per generated frame".format(it.p95Ms) } ?: "")
-            SelfTestVerdict.UNSUPPORTED -> "Not supported on this device" + (firstFailure?.let { ": ${it.title.lowercase()}" } ?: "")
+            SelfTestVerdict.UNSUPPORTED -> "Not supported on this device" + (firstFailure?.let { ": ${it.title}" } ?: "")
             SelfTestVerdict.FAILED -> "Check failed" + (firstFailure?.let { ": ${it.detail}" } ?: "")
             SelfTestVerdict.NOT_RUN -> "Not checked yet"
         }
