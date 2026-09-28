@@ -8,6 +8,8 @@ import io.github.fenyx.nebula.engine.AppDetails
 import io.github.fenyx.nebula.engine.ArtKind
 import io.github.fenyx.nebula.engine.Host
 import io.github.fenyx.nebula.engine.HostApp
+import io.github.fenyx.nebula.engine.HostCommandList
+import io.github.fenyx.nebula.engine.HostRefusedException
 import io.github.fenyx.nebula.engine.NovaCapabilities
 import io.github.fenyx.nebula.engine.PairingFailure
 import io.github.fenyx.nebula.engine.PairingState
@@ -166,6 +168,36 @@ class HostRepository(
             LimeLog.warning("Wake-on-LAN failed for ${details.name}: ${e.message}")
             false
         }
+    }
+
+    /**
+     * Suspends the host (Foundation/Nova `/pcsleep`). Throws [HostRefusedException] when the host
+     * refuses (no `power` permission, another stream running) and IOException when unreachable.
+     */
+    suspend fun sleep(hostId: String) = withContext(io) {
+        val details = known[hostId] ?: throw IOException("Unknown host")
+        if (details.activeAddress == null) throw IOException("${details.name} isn't reachable")
+        if (!backend.pcSleep(details)) throw HostRefusedException("${details.name} didn't accept the sleep request")
+    }
+
+    /** Host-wide commands (`/nova/v1/commands`); empty when the host has none or doesn't list them. */
+    suspend fun commands(hostId: String): HostCommandList = withContext(io) {
+        val details = known[hostId] ?: return@withContext HostCommandList.Empty
+        try {
+            backend.novaJson(details, NovaApi.COMMANDS)?.let(NovaApi::parseCommands) ?: HostCommandList.Empty
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            LimeLog.info("Host command list unavailable for ${details.name}: ${e.message}")
+            HostCommandList.Empty
+        }
+    }
+
+    /** Runs a host command by id. Same errors as [sleep]. */
+    suspend fun runCommand(hostId: String, commandId: String) = withContext(io) {
+        val details = known[hostId] ?: throw IOException("Unknown host")
+        if (details.activeAddress == null) throw IOException("${details.name} isn't reachable")
+        if (!backend.superCmd(details, commandId)) throw HostRefusedException("${details.name} didn't run the command")
     }
 
     /** Tells the host to forget this client (best effort) and drops the pinned certificate. */
@@ -403,6 +435,7 @@ class HostRepository(
                     lastPlayed = match?.lastPlayed,
                     playtimeSeconds = match?.playtimeSeconds,
                     modeDefault = match?.modeDefault,
+                    commands = NovaApi.parseSuperCmds(app.cmdList?.toString(), match?.id),
                 )
             }
         }

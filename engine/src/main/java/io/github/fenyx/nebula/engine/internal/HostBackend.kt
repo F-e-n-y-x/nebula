@@ -40,4 +40,10 @@ interface HostBackend {
     fun boxArt(details: ComputerDetails, app: NvApp): ByteArray?
 
     fun wake(details: ComputerDetails)
+
+    /** GET /pcsleep. True when the host accepted; throws HostRefusedException when it refused. */
+    fun pcSleep(details: ComputerDetails): Boolean
+
+    /** GET /supercmd?cmdId=. True when the host ran it; throws HostRefusedException when it refused. */
+    fun superCmd(details: ComputerDetails, cmdId: String): Boolean
 }

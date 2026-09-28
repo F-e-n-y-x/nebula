@@ -124,6 +124,18 @@ class NebulaEngine private constructor(context: Context) {
     /** Sends Wake-on-LAN; false when the host has no known MAC address or sending failed. */
     suspend fun wake(hostId: String): Boolean = repository.wake(hostId)
 
+    /**
+     * Puts the host to sleep (`/pcsleep`). Throws [HostRefusedException] when the host refuses and
+     * IOException when it can't be reached. Check [NovaCapabilities.has] ([NovaFeature.PC_SLEEP]) first.
+     */
+    suspend fun sleepHost(hostId: String) = repository.sleep(hostId)
+
+    /** Host-wide commands the host's owner defined; per-app ones are on [HostApp.commands]. */
+    suspend fun hostCommands(hostId: String): HostCommandList = repository.commands(hostId)
+
+    /** Runs a host command (`/supercmd?cmdId=`). Same errors as [sleepHost]. */
+    suspend fun runHostCommand(hostId: String, commandId: String) = repository.runCommand(hostId, commandId)
+
     suspend fun unpair(hostId: String) = repository.unpair(hostId)
 
     /** Removes a host from the saved list. */
@@ -217,6 +229,14 @@ class NebulaEngine private constructor(context: Context) {
             if (hdr && av1Hdr) formats = formats or MoonBridge.VIDEO_FORMAT_AV1_MAIN10
         }
 
+        val caps = repository.hosts.value.firstOrNull { it.id == hostId }?.novaCapabilities
+        // Hosts from Nova phase 1 on list the caller's permissions and advertise mic/clipboard as
+        // features; older hosts don't, so for them the stream handshake alone decides.
+        val phase1 = caps?.permissions != null
+        // Asking for a mic the host has turned off makes its RTSP SETUP answer 404, which aborts the
+        // whole connection, so only ask when a phase-1 host advertises "mic".
+        val micRequested = prefs.enableMic && (!phase1 || caps!!.has(NovaFeature.MIC))
+
         @Suppress("DEPRECATION")
         val refreshRate = activity.windowManager.defaultDisplay.refreshRate
         val extras = request.extras
@@ -245,7 +265,7 @@ class NebulaEngine private constructor(context: Context) {
             .setPersistGamepadsAfterDisconnect(!prefs.multiController)
             .setUseVdd(extras[StreamExtras.USE_VDD] as? Boolean)
             .setTouchKeyboard(prefs.touchKeyboardAutoInvoke)
-            .setEnableMic(prefs.enableMic)
+            .setEnableMic(micRequested)
             .setControlOnly(prefs.controlOnly)
             .setCustomScreenMode(prefs.screenCombinationMode)
             .setNovaDisplayMode(request.novaDisplay?.wire)
@@ -267,6 +287,15 @@ class NebulaEngine private constructor(context: Context) {
             enableSpatializer = prefs.enableSpatializer,
             passthroughBufferBytes = prefs.audioPassthroughBufferBytes,
             useAc3Iec61937 = prefs.useAc3Iec61937,
+        )
+        session.linkConfig = StreamHostLink.Config(
+            enableMic = micRequested,
+            micInitialState = com.limelight.preferences.MicrophoneInitialState.fromPreferenceValue(prefs.micInitialState),
+            hostId = hostId,
+            clipboardText = prefs.enableClipboardSyncText,
+            clipboardImage = prefs.enableClipboardSyncImage,
+            requireClipboardFlag = caps != null,
+            clipboardDenied = phase1 && !(caps!!.has(NovaFeature.CLIPBOARD) && caps.allows(NovaFeature.PERMISSION_CLIPBOARD)),
         )
         session.start(connection, decoder, audio)
         return session

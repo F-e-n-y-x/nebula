@@ -1,6 +1,8 @@
 package io.github.fenyx.nebula.engine.internal
 
 import io.github.fenyx.nebula.engine.AppDetails
+import io.github.fenyx.nebula.engine.HostCommand
+import io.github.fenyx.nebula.engine.HostCommandList
 import io.github.fenyx.nebula.engine.ArtKind
 import io.github.fenyx.nebula.engine.NovaCapabilities
 import io.github.fenyx.nebula.engine.NovaDisplayMode
@@ -27,6 +29,7 @@ data class NovaApp(
 object NovaApi {
     const val CAPABILITIES = "nova/v1/capabilities"
     const val APPS = "nova/v1/apps"
+    const val COMMANDS = "nova/v1/commands"
 
     fun details(novaId: String) = "nova/v1/apps/$novaId/details"
     fun art(novaId: String, kind: ArtKind) = "nova/v1/apps/$novaId/art/${kind.wire}"
@@ -38,7 +41,60 @@ object NovaApi {
     fun parseCapabilities(body: String): NovaCapabilities? {
         val json = JSONObject(body)
         if (!json.optBoolean("nova")) return null
-        return NovaCapabilities(json.optString("version"), json.optJSONArray("features").strings().toSet())
+        return NovaCapabilities(
+            version = json.optString("version"),
+            features = json.optJSONArray("features").strings().toSet(),
+            permissions = json.optJSONArray("permissions")?.strings()?.toSet(),
+        )
+    }
+
+    /**
+     * GET /nova/v1/commands: `{"allowed":bool,"commands":[{id,name,icon,confirm,scope,app,runnable,running,last_run}]}`.
+     * A bare array is accepted too. Entries without an id or name are skipped; ids are de-duplicated.
+     */
+    fun parseCommands(body: String): HostCommandList {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) return HostCommandList.Empty
+        if (trimmed.startsWith("[")) return HostCommandList(null, commandsFrom(JSONArray(trimmed), appNovaId = null))
+        val o = JSONObject(trimmed)
+        val allowed = if (o.has("allowed") && !o.isNull("allowed")) o.optBoolean("allowed") else null
+        val list = o.optJSONArray("commands")?.let { commandsFrom(it, appNovaId = null) }.orEmpty()
+        return HostCommandList(allowed, if (allowed == false) emptyList() else list)
+    }
+
+    /**
+     * An app's Foundation `SuperCmds` value from /applist: a JSON array of `{id, name}` (ids may be
+     * numbers). "null", blank or malformed text means none.
+     */
+    fun parseSuperCmds(raw: String?, appNovaId: String? = null): List<HostCommand> {
+        val text = raw?.trim().orEmpty()
+        if (text.isEmpty() || text == "null" || !text.startsWith("[")) return emptyList()
+        return try {
+            commandsFrom(JSONArray(text), appNovaId)
+        } catch (e: org.json.JSONException) {
+            emptyList()
+        }
+    }
+
+    private fun commandsFrom(arr: JSONArray, appNovaId: String?): List<HostCommand> {
+        val seen = HashSet<String>()
+        return (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val id = o.opt("id")?.takeUnless { it == JSONObject.NULL }?.toString()?.trim().orEmpty()
+            val name = o.optString("name").trim()
+            if (id.isEmpty() || name.isEmpty() || !seen.add(id)) return@mapNotNull null
+            val scopeGlobal = o.optString("scope") == "global"
+            HostCommand(
+                id = id,
+                name = name,
+                // Hosts that don't say get a confirmation, to be safe.
+                confirm = if (o.has("confirm") && !o.isNull("confirm")) o.optBoolean("confirm", true) else true,
+                appNovaId = if (scopeGlobal) null else o.optString("app").takeIf { it.isNotBlank() && it != "null" } ?: appNovaId,
+                icon = o.optString("icon").takeIf { it.isNotBlank() && it != "null" },
+                runnable = o.optBoolean("runnable", true),
+                running = o.optBoolean("running", false),
+            )
+        }
     }
 
     fun parseApps(body: String): List<NovaApp> {
