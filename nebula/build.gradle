@@ -108,6 +108,8 @@ dependencies {
     implementation libs.kotlinx.coroutines.android
 
     testImplementation libs.junit
+    // Real org.json for JVM tests (android.jar only has stubs); the app uses the platform copy.
+    testImplementation libs.json
     testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.coroutines.get()}"
     androidTestImplementation platform(libs.nebula.compose.bom)
     androidTestImplementation libs.androidx.compose.ui.test.junit4
