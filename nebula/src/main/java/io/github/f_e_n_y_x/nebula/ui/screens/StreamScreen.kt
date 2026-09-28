@@ -332,6 +332,10 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             val shot = game?.art?.hero ?: game?.art?.header
             ArtImage(shot, game?.name ?: "stream", null, place, contentScale = ContentScale.FillBounds)
         } else {
+            // A new SurfaceView (and so a new Surface) whenever the next connection needs one: a
+            // live resolution switch must not reuse a surface the old connection drew into.
+            val surfaceGeneration by stream.surfaceGeneration.collectAsState(initial = 0)
+            androidx.compose.runtime.key(surfaceGeneration) {
             AndroidView(
                 factory = { c ->
                     SurfaceView(c).apply {
@@ -347,6 +351,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 },
                 modifier = place,
             )
+            }
         }
 
         // Input layer over the whole screen (letterbox bars included, like a trackpad).

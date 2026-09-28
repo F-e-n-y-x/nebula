@@ -146,6 +146,11 @@ class LiveResolutionSwitcher(
     }
 
     companion object {
-        const val DEFAULT_ATTEMPT_TIMEOUT_MS = 10_000L
+        /**
+         * One attempt: stop the old connection (up to 3 s), a new surface, /resume (the PC resizes
+         * or re-probes its display first) and the RTSP handshake. 10 s was too tight on a slow link
+         * and cut attempts off mid-handshake, which left the PC holding a half-started session.
+         */
+        const val DEFAULT_ATTEMPT_TIMEOUT_MS = 25_000L
     }
 }

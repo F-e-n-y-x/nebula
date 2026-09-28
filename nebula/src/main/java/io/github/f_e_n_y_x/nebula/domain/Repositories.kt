@@ -87,11 +87,21 @@ interface StreamRepository {
     fun stop(quitApp: Boolean)
     /** Moves a running stream onto a new surface (after the app returns from the background). */
     fun reattach(target: StreamTarget) {}
+
+    /**
+     * Bumped when the next connection needs a brand-new video surface; the stream screen recreates
+     * its SurfaceView and hands the new one over through [reattach]. A surface a previous connection
+     * rendered into can keep a producer attached (frame generation presents with
+     * ANativeWindow_lock, which connects it as a CPU producer for good), and a new decoder can't
+     * connect to it: the live resolution switch failed to start its video stream on the same view.
+     */
+    val surfaceGeneration: Flow<Int> get() = kotlinx.coroutines.flow.flowOf(0)
     /**
      * Reconnects the running stream at [mode] without quitting the game on the PC: the connection
-     * ends and the same app is resumed at the new size and frame rate (same display mode), into the
-     * same surface. Returns once the new connection is live. On failure the stream is left
-     * disconnected and may be switched again (to roll back); the start() flow stays open meanwhile.
+     * ends and the same app is resumed at the new size and frame rate (same display mode), into a
+     * fresh surface (see [surfaceGeneration]). Returns once the new connection is live. On failure
+     * the stream is left disconnected and may be switched again (to roll back); the start() flow
+     * stays open meanwhile.
      */
     suspend fun switchMode(mode: VideoMode): Result<Unit> = Result.failure(UnsupportedOperationException("Changing resolution live isn't supported here."))
     /** Asks the PC to scale its desktop UI to [percent] (resolution unchanged); true once accepted. */
