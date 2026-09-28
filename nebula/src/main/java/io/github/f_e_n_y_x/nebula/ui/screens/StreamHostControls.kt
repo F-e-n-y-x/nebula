@@ -103,6 +103,7 @@ class StreamHostState internal constructor(
     internal var askSleep by mutableStateOf(false)
     internal var ask: () -> Unit = {}
     internal var openSettings: () -> Unit = {}
+    internal var onMicFailed: () -> Unit = {}
 
     val mic: MicUi get() = MicPolicy.ui(link, permission)
 
@@ -112,7 +113,7 @@ class StreamHostState internal constructor(
         when (action) {
             MicAction.ASK_PERMISSION -> rationale = true
             MicAction.OPEN_SETTINGS -> openSettings()
-            MicAction.START -> container.stream.setMicLive(true)
+            MicAction.START -> if (!container.stream.setMicLive(true)) onMicFailed()
             MicAction.STOP -> container.stream.setMicLive(false)
             MicAction.NONE -> Unit
         }
@@ -155,6 +156,7 @@ fun rememberStreamHostState(container: AppContainer, hostId: String, gameId: Str
         prefs.put(ASKED_MIC_KEY, true)
         launcher.launch(Manifest.permission.RECORD_AUDIO)
     }
+    state.onMicFailed = { Toast.makeText(ctx, "Couldn't start the microphone. Another app may be using it.", Toast.LENGTH_LONG).show() }
     state.openSettings = {
         runCatching {
             activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)))
