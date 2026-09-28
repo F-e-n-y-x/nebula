@@ -295,7 +295,7 @@ private fun FeedbackSection(ui: StreamUiPrefs, prefs: LegacyPrefs, supports: (St
         SectionTitle("Gyro", Modifier.padding(bottom = 0.dp))
         MotionControls(
             prefs, ui.motion,
-            hostNote = if (!supports("motion")) "Your PC doesn't report motion support; gyro won't reach games." else null,
+            hostHasMotion = supports("motion"),
             phoneHasGyro = phoneHasGyro,
         )
         SectionTitle("Rumble & haptics", Modifier.padding(bottom = 0.dp))

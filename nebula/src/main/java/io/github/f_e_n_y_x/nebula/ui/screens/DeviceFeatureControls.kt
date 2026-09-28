@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
 import io.github.f_e_n_y_x.nebula.settings.HapticsSettings
 import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
+import io.github.f_e_n_y_x.nebula.settings.GyroMode
+import io.github.f_e_n_y_x.nebula.settings.GyroToggleButton
 import io.github.f_e_n_y_x.nebula.settings.MotionHold
 import io.github.f_e_n_y_x.nebula.settings.MotionSettings
 import io.github.f_e_n_y_x.nebula.settings.MotionSource
@@ -208,38 +210,110 @@ internal fun StatsOverlayDialog(prefs: LegacyPrefs, cfg: StatsOverlaySettings, o
     )
 }
 
-/** Gyro passthrough options. [hostNote] explains a host that can't take motion. */
+/**
+ * Gyro options: the mode first (right stick and mouse work in every game; passthrough needs native
+ * gyro support in the game and a motion-capable pad on the PC), then the source and aim tuning.
+ * [hostHasMotion]: what the connected PC says about motion, or null outside a stream.
+ */
 @Composable
-internal fun MotionControls(prefs: LegacyPrefs, cfg: MotionSettings, hostNote: String?, phoneHasGyro: Boolean) {
+internal fun MotionControls(prefs: LegacyPrefs, cfg: MotionSettings, hostHasMotion: Boolean?, phoneHasGyro: Boolean) {
     val s = Nebula.scale
+    fun save(c: MotionSettings) = MotionSettings.write(prefs, c)
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(16))) {
-        hostNote?.let { Text(it, style = Nebula.type.label, color = NebulaColors.warning) }
-        ControlGroup("Source", "The host asks for motion when a game uses it; sensors stay off until then.") {
-            Segmented(MotionSource.entries.map { it.label to it }, cfg.source) { MotionSettings.write(prefs, cfg.copy(source = it)) }
+        ControlGroup("Gyro does", modeHelp(cfg.mode)) {
+            Segmented(GyroMode.entries.map { modeShort(it) to it }, cfg.mode) { save(cfg.copy(mode = it)) }
+            if (cfg.migratedToStick) {
+                Text(
+                    "Switched to Gyro to right stick: phone motion passthrough only reaches games with native gyro support, so it did nothing in most games.",
+                    style = Nebula.type.label, color = NebulaColors.textMuted,
+                )
+            }
+            if (cfg.mode == GyroMode.PASSTHROUGH && hostHasMotion == false) {
+                Text(
+                    "This PC doesn't take motion, so passthrough does nothing here. Gyro to right stick works with any PC and game.",
+                    style = Nebula.type.label, color = NebulaColors.warning,
+                )
+                NebulaButton("Use Gyro to right stick", onClick = { save(cfg.copy(mode = GyroMode.RIGHT_STICK)) }, style = ButtonStyle.Secondary)
+            }
+        }
+        if (cfg.mode == GyroMode.OFF) return@Column
+        ControlGroup(
+            "Gyro source",
+            if (cfg.mode == GyroMode.PASSTHROUGH) "The PC asks for motion when a game uses it; sensors stay off until then."
+            else "Controller gyro needs Android 13 or later. This device's gyro follows the screen rotation.",
+        ) {
+            Segmented(MotionSource.entries.map { it.label to it }, cfg.source) { save(cfg.copy(source = it)) }
             if (cfg.source == MotionSource.PHONE && !phoneHasGyro) {
                 Text("This device has no gyroscope.", style = Nebula.type.label, color = NebulaColors.warning)
             }
         }
-        if (cfg.source != MotionSource.OFF) {
-            if (cfg.source == MotionSource.CONTROLLER) {
-                ToggleRow(
-                    "Use this device when the controller has no gyro",
-                    "Player 1 gets this device's sensors instead. Controller sensors need Android 13 or later.",
-                    cfg.phoneFallback,
-                ) { MotionSettings.write(prefs, cfg.copy(phoneFallback = it)) }
+        if (cfg.source == MotionSource.CONTROLLER) {
+            ToggleRow(
+                "Use this device when the controller has no gyro",
+                "Player 1 gets this device's gyro instead.",
+                cfg.phoneFallback,
+            ) { save(cfg.copy(phoneFallback = it)) }
+        }
+        ControlGroup("Gyro active", "Aim-while-held: the gyro only acts while the trigger is pressed. Toggle: a button turns it on and off (that button isn't sent to the PC).") {
+            Segmented(MotionHold.entries.map { holdShort(it) to it }, cfg.hold) { save(cfg.copy(hold = it)) }
+            if (cfg.hold == MotionHold.TOGGLE) {
+                Segmented(GyroToggleButton.entries.map { it.label to it }, cfg.toggleButton) { save(cfg.copy(toggleButton = it)) }
             }
-            ControlGroup("Sensitivity") {
+        }
+        ControlGroup("Sensitivity") {
+            SliderField(
+                label = "Overall", value = cfg.sensitivity.toFloat(),
+                range = MotionSettings.MIN_SENSITIVITY.toFloat()..MotionSettings.MAX_SENSITIVITY.toFloat(), step = 5f, unit = "%",
+                onValueChange = { save(cfg.copy(sensitivity = it.toInt())) },
+            )
+            if (cfg.mode.mapsLocally) {
                 SliderField(
-                    label = "Gyro sensitivity", value = cfg.sensitivity.toFloat(),
+                    label = "Horizontal", value = cfg.sensitivityX.toFloat(),
                     range = MotionSettings.MIN_SENSITIVITY.toFloat()..MotionSettings.MAX_SENSITIVITY.toFloat(), step = 5f, unit = "%",
-                    onValueChange = { MotionSettings.write(prefs, cfg.copy(sensitivity = it.toInt())) },
+                    onValueChange = { save(cfg.copy(sensitivityX = it.toInt())) },
+                )
+                SliderField(
+                    label = "Vertical", value = cfg.sensitivityY.toFloat(),
+                    range = MotionSettings.MIN_SENSITIVITY.toFloat()..MotionSettings.MAX_SENSITIVITY.toFloat(), step = 5f, unit = "%",
+                    onValueChange = { save(cfg.copy(sensitivityY = it.toInt())) },
                 )
             }
-            ControlGroup("Gyro active", "Aim-while-held: the camera only follows the gyro while the trigger is pressed.") {
-                Segmented(MotionHold.entries.map { holdShort(it) to it }, cfg.hold) { MotionSettings.write(prefs, cfg.copy(hold = it)) }
+        }
+        if (cfg.mode.mapsLocally) {
+            ToggleRow("Invert horizontal", "Turning right moves the view left.", cfg.invertX) { save(cfg.copy(invertX = it)) }
+            ToggleRow("Invert vertical", "Tilting up moves the view down.", cfg.invertY) { save(cfg.copy(invertY = it)) }
+            ControlGroup("Steadiness", "Deadzone ignores slow drift and hand tremor; smoothing trades a little lag for a steadier aim.") {
+                SliderField(
+                    label = "Deadzone", value = cfg.deadzone.toFloat(), range = 0f..MotionSettings.MAX_DEADZONE.toFloat(), step = 1f, unit = "°/s",
+                    onValueChange = { save(cfg.copy(deadzone = it.toInt())) },
+                )
+                SliderField(
+                    label = "Smoothing", value = cfg.smoothing.toFloat(), range = 0f..MotionSettings.MAX_SMOOTHING.toFloat(), step = 5f, unit = "%",
+                    onValueChange = { save(cfg.copy(smoothing = it.toInt())) },
+                )
+                if (cfg.mode == GyroMode.RIGHT_STICK) {
+                    SliderField(
+                        label = "Stick minimum", value = cfg.stickMinimum.toFloat(), range = 0f..MotionSettings.MAX_STICK_MINIMUM.toFloat(), step = 1f, unit = "%",
+                        onValueChange = { save(cfg.copy(stickMinimum = it.toInt())) },
+                    )
+                }
             }
         }
     }
+}
+
+private fun modeShort(m: GyroMode) = when (m) {
+    GyroMode.RIGHT_STICK -> "Right stick"
+    GyroMode.MOUSE -> "Mouse"
+    GyroMode.PASSTHROUGH -> "Passthrough"
+    GyroMode.OFF -> "Off"
+}
+
+private fun modeHelp(m: GyroMode) = when (m) {
+    GyroMode.RIGHT_STICK -> "Gyro to right stick: turning the phone or controller moves the right stick. Works in every game, with any PC."
+    GyroMode.MOUSE -> "Gyro to mouse: turning moves the mouse. Works in every game and on the desktop."
+    GyroMode.PASSTHROUGH -> "Motion passthrough: raw gyro goes to the PC. Only games with native gyro support use it, and the PC needs a motion-capable controller (Nova's DualSense profile)."
+    GyroMode.OFF -> "The gyro isn't used."
 }
 
 private fun holdShort(h: MotionHold) = when (h) {
@@ -247,6 +321,7 @@ private fun holdShort(h: MotionHold) = when (h) {
     MotionHold.LEFT_TRIGGER -> "Hold L2"
     MotionHold.RIGHT_TRIGGER -> "Hold R2"
     MotionHold.EITHER_TRIGGER -> "Hold either"
+    MotionHold.TOGGLE -> "Toggle"
 }
 
 /** Host rumble routing and strength (V+'s keys). */

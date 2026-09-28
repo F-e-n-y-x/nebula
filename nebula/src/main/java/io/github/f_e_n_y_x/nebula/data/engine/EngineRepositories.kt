@@ -377,16 +377,18 @@ class EngineStreamRepository(
     }
 
     override fun padCapabilities(deviceId: Int, index: Int): Int {
-        val hw = PadHardware.of(android.view.InputDevice.getDevice(deviceId))
+        val device = android.view.InputDevice.getDevice(deviceId)
+        val hw = PadHardware.of(device)
         var caps = hw.capabilities()
-        // This device's sensors stand in for controller 0 when the pad has none.
+        // The phone pad (no controller): this device's vibrator plays the game's rumble.
+        if (device == null) caps = caps or com.limelight.nvstream.jni.MoonBridge.LI_CCAP_RUMBLE.toInt()
+        // This device's sensors stand in for controller 0 when the pad has none (passthrough only).
         if (index == 0 && !hw.gyro) caps = caps or (motion?.phoneCapabilities() ?: 0)
         return caps
     }
 
     override fun refreshFeedback() {
         motion?.refresh()
-        announcePhonePadIfNeeded()
     }
 
     override fun applyAudioHaptics(settings: io.github.f_e_n_y_x.nebula.settings.HapticsSettings): Boolean =
@@ -395,16 +397,6 @@ class EngineStreamRepository(
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override val unsupportedFeatures: Flow<List<String>> =
         current.flatMapLatest { s -> s?.unsupportedHostFeatures?.map { set -> set.map { "${it.title} (coming in ${it.plannedFor})" } } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
-
-    /** Phone as the motion source with no pad attached: announce a motion-capable controller 0 ourselves. */
-    private fun announcePhonePadIfNeeded() {
-        val m = motion ?: return
-        val input = input ?: return
-        val anyPad = lookup?.indices()?.isNotEmpty() == true
-        if (!MotionRouting.announcePhonePad(motionSettings(), anyPad, m.phoneHasGyro)) return
-        input.gamepadArrived(0, 1, com.limelight.nvstream.jni.MoonBridge.LI_CTYPE_UNKNOWN, GamepadMapper.SUPPORTED, (GamepadMapper.DEFAULT_CAPS or m.phoneCapabilities()).toShort())
-        input.gamepad(0, 1, 0, 0, 0, 0, 0, 0, 0)
-    }
 
     override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = callbackFlow {
         val surface = target as? SurfaceStreamTarget ?: error("The engine streams into a SurfaceStreamTarget")
@@ -516,7 +508,6 @@ class EngineStreamRepository(
                             .collect { out.trySend(StreamState.Live(it)) }
                     }
                     s.audioHapticsGamepad = feedback
-                    announcePhonePadIfNeeded()
                     pending?.complete(Result.success(Unit))
                 }
 

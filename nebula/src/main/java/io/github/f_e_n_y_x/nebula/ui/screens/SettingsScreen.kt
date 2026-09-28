@@ -347,7 +347,7 @@ private fun StatsOverlaySection() {
     }
 }
 
-/** Gyro passthrough and host rumble. */
+/** Gyro (right stick, mouse or passthrough) and host rumble. */
 @Composable
 private fun GamepadFeedbackSection() {
     val s = Nebula.scale
@@ -359,7 +359,7 @@ private fun GamepadFeedbackSection() {
     val gyro = remember { ctx.getSystemService(android.hardware.SensorManager::class.java)?.getDefaultSensor(android.hardware.Sensor.TYPE_GYROSCOPE) != null }
     Column(Modifier.widthIn(max = s.dp(720)), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
         SectionTitle("Gyro")
-        MotionControls(prefs, motion, hostNote = null, phoneHasGyro = gyro)
+        MotionControls(prefs, motion, hostHasMotion = null, phoneHasGyro = gyro)
         SectionTitle("Rumble")
         RumbleControls(prefs, rumble, hostNote = null)
         Text("Controller light bars follow the game on Android 12 and later. Adaptive triggers and DualSense haptics are coming in 0.4.", style = Nebula.type.label, color = NebulaColors.textMuted)

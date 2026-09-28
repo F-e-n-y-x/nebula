@@ -79,6 +79,9 @@ import io.github.f_e_n_y_x.nebula.domain.Orientation
 import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
 import io.github.f_e_n_y_x.nebula.StreamInputSink
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
+import io.github.f_e_n_y_x.nebula.data.engine.GyroAssist
+import io.github.f_e_n_y_x.nebula.data.engine.GyroToggle
+import io.github.f_e_n_y_x.nebula.data.engine.MotionRouting
 import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
 import io.github.f_e_n_y_x.nebula.domain.StreamTarget
 import io.github.f_e_n_y_x.nebula.domain.SwitchState
@@ -238,16 +241,19 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     val stream = container.stream
     var inputView by remember { mutableStateOf<StreamInputView?>(null) }
     var devices by remember { mutableIntStateOf(0) }
-    // With a physical controller attached the on-screen controls stay away (no second, silent
-    // player on the PC) unless the user keeps them; when shown they own player 1.
+    // With a physical controller attached the on-screen controls stay away unless the user keeps
+    // them; kept, they drive player 1 together with the controller (never a second player).
     val padPresent = remember(devices) { GamepadMapper.physicalControllerPresent() }
     val oscShown = live && !menu && ui.osc && (!padPresent || ui.oscWithGamepad)
-    val oscShownNow by rememberUpdatedState(oscShown)
+    // Gyro to right stick / mouse (created below); the mapper asks it about the toggle button.
+    var gyroAssist by remember { mutableStateOf<GyroAssist?>(null) }
+    val gyroAssistNow by rememberUpdatedState(gyroAssist)
     val pad = remember(remote) {
         GamepadMapper(
-            remote, onMenu = { menu = true }, config = { uiNow.gamepad }, oscSlot = { oscShownNow },
+            remote, onMenu = { menu = true }, config = { uiNow.gamepad },
             capabilities = { id, index -> stream.padCapabilities(id, index) ?: GamepadMapper.DEFAULT_CAPS },
             onPadsChanged = { stream.refreshFeedback() },
+            keyHook = { key, down -> gyroAssistNow?.onKey(key, down) == true },
         )
     }
     // Rumble, light bar and motion reach the physical pad through the mapper.
@@ -271,6 +277,21 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     LaunchedEffect(live, scaleSupported) { if (live && scaleSupported) savedScale?.let(vm::applySavedDisplayScale) }
     val phoneHasGyro = remember {
         ctx.getSystemService(android.hardware.SensorManager::class.java)?.getDefaultSensor(android.hardware.Sensor.TYPE_GYROSCOPE) != null
+    }
+    DisposableEffect(pad) {
+        GyroToggle.on = false
+        @Suppress("DEPRECATION")
+        val g = GyroAssist(ctx, { pad }, { uiNow.motion }, rotation = { activity.windowManager.defaultDisplay.rotation }) { dx, dy ->
+            remote()?.move(dx, dy)
+        }
+        gyroAssist = g
+        onDispose { g.release(); gyroAssist = null }
+    }
+    // The mapping modes run while the stream has input; passthrough from this device with no
+    // controller announces player 1 so the PC builds a motion-capable pad before a game asks.
+    LaunchedEffect(gyroAssist, ui.motion, live, menu, devices) {
+        gyroAssist?.update(live && !menu)
+        if (live && MotionRouting.announcePhonePad(ui.motion, padPresent, phoneHasGyro)) pad.announcePlayerOne()
     }
 
     // Keys, gamepads and D-pad go to the PC while the menu is closed.
@@ -416,9 +437,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
 
         if (oscShown) {
-            OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide, motionCaps = {
-                (stream.padCapabilities(-1, 0) ?: 0) and (com.limelight.nvstream.jni.MoonBridge.LI_CCAP_GYRO.toInt() or com.limelight.nvstream.jni.MoonBridge.LI_CCAP_ACCEL.toInt())
-            })
+            OnScreenControls({ pad }, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
         }
         val statsAtTop = ui.stats.enabled && ui.stats.position.row == 0
         if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (statsAtTop) 60 + (ui.stats.metrics.size.coerceAtMost(8) * if (ui.stats.layout == io.github.f_e_n_y_x.nebula.settings.StatLayout.CARD) 18 else 0) else 12)
