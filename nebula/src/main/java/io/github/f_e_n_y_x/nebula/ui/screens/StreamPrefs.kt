@@ -4,12 +4,14 @@ import io.github.f_e_n_y_x.nebula.data.engine.GamepadConfig
 import io.github.f_e_n_y_x.nebula.input.TouchConfig
 import io.github.f_e_n_y_x.nebula.input.TouchMode
 import io.github.f_e_n_y_x.nebula.input.VideoRect
+import io.github.f_e_n_y_x.nebula.settings.HapticsSettings
 import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
+import io.github.f_e_n_y_x.nebula.settings.MotionSettings
+import io.github.f_e_n_y_x.nebula.settings.StatsOverlaySettings
 
 /** The PC keyboard (on screen, every PC key) or this device's own keyboard (typing text). */
 enum class KeyboardKind(val id: String, val label: String) { PC("pc", "PC keyboard"), PHONE("phone", "Device keyboard") }
 
-enum class PerfDetail(val id: String, val label: String) { OFF("off", "Off"), SIMPLE("simple", "Simple"), FULL("full", "Full") }
 
 /** Everything the stream screen reads from V+'s preferences, snapshotted on each change. */
 data class StreamUiPrefs(
@@ -29,8 +31,10 @@ data class StreamUiPrefs(
     /** What the keyboard gesture / buttons open. */
     val keyboardKind: KeyboardKind,
     val mouseNavButtons: Boolean,
-    val perf: PerfDetail,
-    val perfOpacity: Int,
+    /** The stats overlay (metrics, position, layout, size; opacity is [overlayOpacity]). */
+    val stats: StatsOverlaySettings,
+    val motion: MotionSettings,
+    val haptics: HapticsSettings,
     val osc: Boolean,
     val oscOpacity: Int,
     val oscL3R3Only: Boolean,
@@ -47,9 +51,14 @@ data class StreamUiPrefs(
     val escMenuKey: Int,
     val gamepad: GamepadConfig,
     val quitDisconnectsOnly: Boolean,
+    /** V+'s "Maximum display brightness for HDR". */
+    val hdrMaxBrightness: Boolean,
+    /** V+'s "Follow device rotation"; off locks the stream to the orientation it started in. */
+    val followRotation: Boolean,
+    /** V+'s "Show latency message after streaming". */
+    val latencyToast: Boolean,
 ) {
     companion object {
-        const val PERF_DETAIL_KEY = "nebula_perf_overlay_detail"
         const val TRACKPAD_SPEED_KEY = "nebula_trackpad_speed"
         const val TRACKPAD_ACCEL_KEY = "nebula_trackpad_accel"
         const val NATURAL_SCROLL_KEY = "nebula_natural_scroll"
@@ -68,8 +77,6 @@ data class StreamUiPrefs(
             fun b(k: String, d: Boolean) = when (val v = all[k]) { is Boolean -> v; is String -> v.toBooleanStrictOrNull() ?: d; else -> d }
             fun i(k: String, d: Int) = when (val v = all[k]) { is Int -> v; is String -> v.toIntOrNull() ?: d; is Long -> v.toInt(); else -> d }
             fun s(k: String, d: String) = (all[k] as? String) ?: d
-            val perfOn = b("checkbox_enable_perf_overlay", false)
-            val detail = PerfDetail.entries.firstOrNull { it.id == all[PERF_DETAIL_KEY] } ?: PerfDetail.SIMPLE
             return StreamUiPrefs(
                 scaleMode = scaleModeOf(p),
                 scaleVirtual = b(SCALE_VIRTUAL_KEY, false),
@@ -78,7 +85,10 @@ data class StreamUiPrefs(
                 offsetY = i("seekbar_screen_offset_y", 0),
                 touch = TouchConfig(
                     mode = gameKey?.let { k -> TouchMode.entries.firstOrNull { it.pref == all[touchModeKey(k)] } }
-                        ?: TouchMode.fromPrefs(all["list_native_mouse_mode_preset"] as? String, b("checkbox_touchscreen_trackpad", true)),
+                        ?: TouchMode.fromPrefs(
+                            all["list_native_mouse_mode_preset"] as? String ?: "enhanced".takeIf { all["checkbox_enable_enhanced_touch"] == true },
+                            b("checkbox_touchscreen_trackpad", true),
+                        ),
                     speed = i(TRACKPAD_SPEED_KEY, 140) / 100f,
                     acceleration = b(TRACKPAD_ACCEL_KEY, true),
                     naturalScroll = b(NATURAL_SCROLL_KEY, true),
@@ -99,8 +109,9 @@ data class StreamUiPrefs(
                 overlayOpacity = i(io.github.f_e_n_y_x.nebula.settings.OVERLAY_OPACITY_KEY, io.github.f_e_n_y_x.nebula.settings.DEFAULT_OVERLAY_OPACITY).coerceIn(10, 100),
                 keyboardKind = if (all[KEYBOARD_KIND_KEY] == KeyboardKind.PHONE.id) KeyboardKind.PHONE else KeyboardKind.PC,
                 mouseNavButtons = b("checkbox_mouse_nav_buttons", false),
-                perf = if (perfOn) detail else PerfDetail.OFF,
-                perfOpacity = i("seekbar_perf_overlay_bg_opacity", 40),
+                stats = StatsOverlaySettings.read(all),
+                motion = MotionSettings.read(all),
+                haptics = HapticsSettings.read(all),
                 osc = b("checkbox_show_onscreen_controls", false),
                 oscOpacity = i("seekbar_osc_opacity", 90),
                 oscL3R3Only = b("checkbox_only_show_L3R3", false),
@@ -120,6 +131,9 @@ data class StreamUiPrefs(
                     deadzone = i("seekbar_deadzone", 7).coerceIn(0, 50) / 100f,
                 ),
                 quitDisconnectsOnly = all["list_quit_behavior"] == "disconnect_only" || b("checkbox_swap_quit_and_disconnect", false),
+                hdrMaxBrightness = b("checkbox_enable_hdr_high_brightness", false),
+                followRotation = b("checkbox_rotable_screen", false),
+                latencyToast = b("checkbox_enable_post_stream_toast", false),
             )
         }
     }

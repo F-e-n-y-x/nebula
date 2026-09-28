@@ -186,7 +186,9 @@ class NebulaEngine private constructor(context: Context) {
 
         DecoderSupport.ensure(activity)
         val prefs = PreferenceConfiguration.readPreferences(activity).also { request.applyTo(it) }
-        val session = StreamSession(activity, surface, listener, request.width, request.height, backgroundPolicy(activity))
+        // V+'s "Swap stream width and height" (portrait streams from a landscape request).
+        if (prefs.reverseResolution) prefs.width = prefs.height.also { prefs.height = prefs.width }
+        val session = StreamSession(activity, surface, listener, prefs.width, prefs.height, backgroundPolicy(activity))
 
         val hdrSupport = HdrCapabilityHelper.getHdrTypeSupport(activity)
         var hdr = prefs.enableHdr && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && when (prefs.hdrMode) {
@@ -282,11 +284,19 @@ class NebulaEngine private constructor(context: Context) {
             cert,
             forceResumeCurrentSession = request.resumeOnly,
         )
+        // Audio haptics runs for every stream (output gated by its setting) so it can be turned on live.
+        val haptics = runCatching { AudioHapticsDriver(activity, AudioHapticsConfig.from(prefs)) }
+            .onFailure { LimeLog.warning("Audio haptics unavailable: ${it.message}") }
+            .getOrNull()
+        session.useAudioHaptics(haptics)
         val audio = SmartAudioRenderer(
             context = activity,
             enableAudioFx = prefs.enableAudioFx,
             enableSpatializer = prefs.enableSpatializer,
             passthroughBufferBytes = prefs.audioPassthroughBufferBytes,
+            enableSystemAudioHaptics = haptics?.wantsSystemCoupled == true,
+            onSystemAudioHapticsActiveChanged = { active -> haptics?.setSystemCoupledActive(active) },
+            onAudioPresentationClock = { position, nanos, rate -> haptics?.updatePresentationClock(position, nanos, rate) },
             useAc3Iec61937 = prefs.useAc3Iec61937,
         )
         session.linkConfig = StreamHostLink.Config(

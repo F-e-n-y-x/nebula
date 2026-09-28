@@ -88,6 +88,14 @@ class InputBridge internal constructor(private val connection: NvConnection) {
     fun gamepadArrived(controller: Int, activeMask: Int, type: Byte, supportedButtons: Int, capabilities: Short) =
         connection.sendControllerArrivalEvent(controller.toByte(), activeMask.toShort(), type, supportedButtons, capabilities)
 
+    /**
+     * One motion sample for [controller]: gyro in degrees per second, accelerometer in m/s²,
+     * in the controller's frame (the SDL/DualShock convention the host expects).
+     */
+    fun motion(controller: Int, type: MotionType, x: Float, y: Float, z: Float) {
+        connection.sendControllerMotionEvent(controller.toByte(), type.wire, x, y, z)
+    }
+
     private fun modifiers(event: KeyEvent): Byte {
         var m = 0
         if (event.isShiftPressed) m = m or KeyboardPacket.MODIFIER_SHIFT.toInt()

@@ -15,7 +15,12 @@ data class Host(
     val features: HostFeatures = HostFeatures.None,
     /** The host shared a MAC address, so Wake-on-LAN can reach it. */
     val canWake: Boolean = false,
-)
+    /** Nova's advertised /nova/v1 features ("motion", "rumble", …); null when unknown (not Nova). */
+    val novaFeatures: Set<String>? = null,
+) {
+    /** True unless a Nova host says it lacks [feature]; other hosts are assumed capable. */
+    fun supports(feature: String): Boolean = novaFeatures?.contains(feature) ?: true
+}
 
 /** Whether a host-linked action is offered. */
 enum class Gate {
@@ -157,6 +162,10 @@ data class StreamStats(
     val width: Int = 0,
     val height: Int = 0,
     val receivedFps: Float = 0f,
+    /** Frames the host sent per second (received plus lost). */
+    val hostFps: Float = 0f,
+    val onePercentLowFps: Float = 0f,
+    val jitterMs: Float = 0f,
     val lossPercent: Float = 0f,
     val hostMs: Float = 0f,
     val networkMs: Float = 0f,

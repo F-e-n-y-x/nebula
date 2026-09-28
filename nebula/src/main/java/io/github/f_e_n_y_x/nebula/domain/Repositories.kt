@@ -110,4 +110,22 @@ interface StreamRepository {
     fun sendClipboard(): ClipboardSendResult = ClipboardSendResult.NOT_SYNCING
     /** The stream window gained or lost input focus (Android 10+ clipboard reads need focus). */
     fun onWindowFocus(focused: Boolean) {}
+
+    /** Lets rumble, lights and motion find the physical pad behind each host controller. */
+    fun bindControllers(lookup: io.github.f_e_n_y_x.nebula.input.ControllerLookup?) {}
+
+    /** LI_CCAP bits to announce for a physical pad (motors, IMU, light bar); null = the mapper's default. */
+    fun padCapabilities(deviceId: Int, index: Int): Int? = null
+
+    /** Motion, rumble or audio-haptics settings changed, or a pad came or went. */
+    fun refreshFeedback() {}
+
+    /**
+     * Applies audio-haptics settings to the running stream; false when the change only takes effect
+     * on the next stream (music on a fixed device route uses Android's audio-coupled generator).
+     */
+    fun applyAudioHaptics(settings: io.github.f_e_n_y_x.nebula.settings.HapticsSettings): Boolean = true
+
+    /** Host features the running stream asked for that Nebula doesn't do yet, by title. */
+    val unsupportedFeatures: Flow<List<String>> get() = kotlinx.coroutines.flow.flowOf(emptyList())
 }
