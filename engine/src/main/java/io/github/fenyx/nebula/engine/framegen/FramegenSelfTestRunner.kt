@@ -72,7 +72,11 @@ class SelfTestMachine(
             SelfTestEvaluator.evaluate(
                 hostEnv,
                 caps = if (stage == FramegenSelfTestService.STAGE_CAPS) null else CAPS_UNKNOWN_OK,
-                dllProbe = if (stage == FramegenSelfTestService.STAGE_DLL) "crashed" else null,
+                dllProbe = when (stage) {
+                    FramegenSelfTestService.STAGE_DLL -> "crashed"
+                    FramegenSelfTestService.STAGE_BENCHMARK -> "lossless-dll-ok (translated before the crash)"
+                    else -> null
+                },
                 benchmark = if (stage == FramegenSelfTestService.STAGE_BENCHMARK) "error=crashed" else null,
                 fingerprint = fingerprint,
                 nowMs = now(),

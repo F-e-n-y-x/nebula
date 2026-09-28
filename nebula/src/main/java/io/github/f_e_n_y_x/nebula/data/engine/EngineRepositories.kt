@@ -240,6 +240,12 @@ class EngineStreamRepository(
 
     override suspend fun setBitrate(kbps: Int): Boolean = session?.setBitrate(kbps) ?: false
 
+    override fun setFramegenPaused(paused: Boolean, force: Boolean): Boolean = session?.setFramegenPaused(paused, force) ?: false
+
+    override fun refreshUpscaler() {
+        session?.refreshUpscaler()
+    }
+
     override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = callbackFlow {
         val surface = target as? SurfaceStreamTarget ?: error("The engine streams into a SurfaceStreamTarget")
         send(StreamState.Starting)
@@ -251,8 +257,14 @@ class EngineStreamRepository(
         val listener = object : StreamListener {
             override fun onConnected() {
                 val s = session ?: return
-                launch { s.stats.collect { trySend(StreamState.Live(it.toDomain())) } }
+                launch {
+                    combine(s.stats, s.framegen, s.upscaling) { st, fg, up -> st.toDomain().copy(post = io.github.f_e_n_y_x.nebula.framegen.postProcessStats(fg, up)) }
+                        .collect { trySend(StreamState.Live(it)) }
+                }
             }
+
+            override fun onFramegenEvent(event: io.github.fenyx.nebula.engine.framegen.FramegenEvent) =
+                io.github.f_e_n_y_x.nebula.framegen.FramegenAppSetup.onEvent(surface.activity, event)
 
             override fun onStageFailed(stage: String, errorCode: Int) {
                 trySend(StreamState.Failed("Couldn't start the stream: $stage failed (error $errorCode)."))

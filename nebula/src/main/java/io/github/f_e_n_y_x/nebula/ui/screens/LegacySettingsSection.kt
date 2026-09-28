@@ -59,12 +59,15 @@ import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import org.json.JSONObject
 
 /** Keys that have a native control elsewhere in Settings, so they aren't listed twice. */
-internal val nativeKeys = setOf("list_resolution", "list_fps", "seekbar_bitrate_kbps", "video_format", "checkbox_stretch_video")
+/** Frame generation's V+ keys are shown by framegen/FramegenSettingsSection.kt. */
+internal val nativeKeys = setOf(
+    "list_resolution", "list_fps", "seekbar_bitrate_kbps", "video_format", "checkbox_stretch_video",
+    "pref_framegen_pick_lossless_dll", "checkbox_framegen_enabled", "checkbox_framegen_adaptive_enabled", "list_framegen_quality_preset",
+    "pref_framegen_selftest", "seekbar_framegen_internal_width", "seekbar_framegen_slow_threshold_ms", "checkbox_framegen_present_real_first",
+)
 
 /** Actions from V+ that need screens not yet rebuilt; listed honestly instead of hidden. */
 private val laterActions = mapOf(
-    "pref_framegen_pick_lossless_dll" to "Frame generation arrives in the next part.",
-    "pref_framegen_selftest" to "Frame generation arrives in the next part.",
     "capability_diagnostic" to "The video capability report is being rebuilt.",
     "use_external_display" to "External display output is being rebuilt.",
     "game_menu_cards" to "Configure the stream menu from inside a stream.",
@@ -265,8 +268,6 @@ private fun ActionRow(spec: SettingSpec, prefs: LegacyPrefs, mod: Modifier) {
         }
         if (action != null) {
             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = NebulaColors.textMuted, modifier = Modifier.size(s.dp(20)))
-        } else if (later != null && spec.key.startsWith("pref_framegen")) {
-            Pill("Next part", color = NebulaColors.accentText, background = NebulaColors.accentTint)
         }
     }
     if (editResolutions) CustomResolutionsDialog(onDismiss = { editResolutions = false })

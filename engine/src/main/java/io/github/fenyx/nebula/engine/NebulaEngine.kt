@@ -268,7 +268,12 @@ class NebulaEngine private constructor(context: Context) {
             passthroughBufferBytes = prefs.audioPassthroughBufferBytes,
             useAc3Iec61937 = prefs.useAc3Iec61937,
         )
-        session.start(connection, decoder, audio)
+        session.start(
+            connection, decoder, audio,
+            videoFps = prefs.fps,
+            hdrMode = if (hdr) prefs.hdrMode else MoonBridge.HDR_MODE_SDR,
+            hdrFullRange = hdr && com.limelight.nvstream.ColorRangePolicy.isFullRangeHdr(prefs.hdrMode, decoder.getPreferredColorRange()),
+        )
         return session
     }
 

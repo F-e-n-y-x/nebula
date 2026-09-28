@@ -143,6 +143,7 @@ class DemoHost(private val context: Context) {
                             res, if (mode == DisplayMode.MIRROR) 60 else 120, 28f + (t % 5), 5.6f + (t % 3) * 0.3f, "HEVC",
                             width = w, height = h, receivedFps = if (mode == DisplayMode.MIRROR) 60f else 120f, lossPercent = 0.1f * (t % 2),
                             hostMs = 1.8f, networkMs = 2.1f + (t % 3) * 0.3f, decodeMs = 1.2f, renderMs = 0.5f, decoder = "c2.android.hevc.decoder",
+                            post = demoPost(t),
                         ),
                     ),
                 )
@@ -151,6 +152,32 @@ class DemoHost(private val context: Context) {
             }
         }
         override fun stop(quitApp: Boolean) = Unit
+
+        /** Demo only: frame generation as it would look at 60→120 when on in Settings. */
+        @Volatile private var fgPaused = false
+        override fun setFramegenPaused(paused: Boolean, force: Boolean): Boolean { fgPaused = paused; return true }
+
+        private fun demoPost(t: Int): io.github.f_e_n_y_x.nebula.domain.model.PostProcessStats? {
+            val all = context.getSharedPreferences(context.packageName + "_preferences", Context.MODE_PRIVATE).all
+            val fg = io.github.fenyx.nebula.engine.framegen.FramegenConfig.from(all)
+            val up = io.github.fenyx.nebula.engine.framegen.UpscalerConfig.from(all)
+            if (!fg.enabled && up.mode == io.github.fenyx.nebula.engine.framegen.UpscalerMode.OFF) return null
+            val lsfg = 5 + t % 3
+            return io.github.f_e_n_y_x.nebula.domain.model.PostProcessStats(
+                framegen = when {
+                    !fg.enabled -> io.github.f_e_n_y_x.nebula.domain.model.FramegenState.OFF
+                    fgPaused -> io.github.f_e_n_y_x.nebula.domain.model.FramegenState.PAUSED
+                    else -> io.github.f_e_n_y_x.nebula.domain.model.FramegenState.ACTIVE
+                },
+                presentedFps = if (fg.enabled && !fgPaused) 117.6f + (t % 3) * 0.8f else 0f,
+                inputFps = 60f, targetFps = 120, multiplier = 2, lsfgMs = lsfg,
+                addedLatencyMs = 8.3f + lsfg + 1f, addedLatencyFrames = (8.3f + lsfg + 1f) / 16.7f,
+                model = (if (fg.performanceMode) "LSFG 3.1 performance" else "LSFG 3.1") + " · flow ${fg.flowScalePercent}%",
+                soak = "%d:%02d · 99%% ≥115 fps · min 113".format(t / 60, t % 60),
+                upscaler = if (fg.enabled) "off" else up.mode.id,
+                upscalerLabel = up.mode.label, upscaleMs = 1.1f, upscaleOut = "1920×1080 → 2340×1080",
+            )
+        }
         private val log = io.github.f_e_n_y_x.nebula.input.LoggingInput()
         override val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput get() = log
         override suspend fun setBitrate(kbps: Int): Boolean {

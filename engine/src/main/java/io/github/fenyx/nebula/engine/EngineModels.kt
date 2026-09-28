@@ -156,6 +156,8 @@ interface StreamListener {
     fun onRumble(controller: Int, lowFreq: Int, highFreq: Int) {}
     fun onHdrModeChanged(enabled: Boolean) {}
     fun onResolutionChanged(width: Int, height: Int) {}
+    /** Frame generation turned itself off, or can't run for this stream. */
+    fun onFramegenEvent(event: io.github.fenyx.nebula.engine.framegen.FramegenEvent) {}
 }
 
 /** The on-disk artwork cache (posters, heroes, logos, screenshots), shared by every host. */

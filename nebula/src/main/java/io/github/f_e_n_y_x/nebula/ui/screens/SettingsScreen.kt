@@ -212,6 +212,7 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
             Spacer(Modifier.height(s.dp(12)))
             LegacySettingsList("advanced")
         }
+        SettingsSection.FrameGen -> io.github.f_e_n_y_x.nebula.framegen.FramegenSettingsSection()
         else -> LegacySettingsList(sec.group!!)
     }
 }

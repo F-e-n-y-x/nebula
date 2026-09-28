@@ -17,6 +17,10 @@ import com.limelight.nvstream.NvConnectionListener
 import com.limelight.nvstream.RemoteTextContext
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.BandwidthMeter
+import io.github.fenyx.nebula.engine.framegen.FramegenController
+import io.github.fenyx.nebula.engine.framegen.FramegenStatus
+import io.github.fenyx.nebula.engine.upscale.UpscalerController
+import io.github.fenyx.nebula.engine.upscale.UpscalerStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +49,21 @@ class StreamSession internal constructor(
     private lateinit var decoder: MediaCodecDecoderRenderer
     private lateinit var audio: SmartAudioRenderer
     private var audioPaused = false
+    private var videoFps = 0
+    private var hdrMode = MoonBridge.HDR_MODE_SDR
+    private var hdrFullRange = false
+
+    /** Frame generation (V+'s in-decoder LSFG pipeline); see [framegen] and [setFramegenPaused]. */
+    private val framegenController = FramegenController(activity.applicationContext) { e -> onMain { listener.onFramegenEvent(e) } }
+
+    /** Decoder-output upscaling / sharpening; used only when frame generation isn't. */
+    private val upscaler = UpscalerController(activity.applicationContext)
+
+    /** What frame generation is doing (presented vs input fps, LSFG ms, auto-off). */
+    val framegen: StateFlow<FramegenStatus> get() = framegenController.status
+
+    /** What the decoder-output upscaler is doing. */
+    val upscaling: StateFlow<UpscalerStatus> get() = upscaler.status
 
     private val _backgrounded = MutableStateFlow(false)
 
@@ -93,9 +112,15 @@ class StreamSession internal constructor(
             newHolder.addCallback(surfaceCallback)
         }
         decoder.setRenderTarget(newHolder)
+        if (!_backgrounded.value) {
+            framegenController.onOutputSurface(newHolder.surface)
+            upscaler.onOutputSurface(newHolder)
+        }
         if (_backgrounded.value) {
             main.removeCallbacks(graceExpired)
             LimeLog.info("Surface back; resuming video")
+            // The decoder is rebuilt on resume: re-arm the capture path on the new surface first.
+            armPostProcessing(newHolder)
             decoder.resumeProcessing()
             if (audioPaused) {
                 audio.resumeProcessing()
@@ -123,19 +148,50 @@ class StreamSession internal constructor(
             audioPaused = true
         }
         decoder.pauseProcessing()
+        framegenController.release(decoder)
+        upscaler.release(decoder)
         main.postDelayed(graceExpired, background.graceMs)
     }
 
-    internal fun start(connection: NvConnection, decoder: MediaCodecDecoderRenderer, audio: SmartAudioRenderer) {
+    internal fun start(
+        connection: NvConnection,
+        decoder: MediaCodecDecoderRenderer,
+        audio: SmartAudioRenderer,
+        videoFps: Int,
+        hdrMode: Int,
+        hdrFullRange: Boolean,
+    ) {
         check(holder.surface?.isValid == true) { "startStream needs a created surface; call it from surfaceChanged()" }
         this.connection = connection
         this.decoder = decoder
         this.audio = audio
+        this.videoFps = videoFps
+        this.hdrMode = hdrMode
+        this.hdrFullRange = hdrFullRange
         input = InputBridge(connection)
         holder.addCallback(surfaceCallback)
         decoder.setRenderTarget(holder)
+        framegenController.newSession()
+        armPostProcessing(holder)
         connection.start(audio, decoder, connectionListener)
     }
+
+    /** Frame generation when it can run, else the upscaler when chosen, else the direct path. */
+    private fun armPostProcessing(target: SurfaceHolder) {
+        val (w, h) = _stats.value.width to _stats.value.height
+        val surface = target.surface ?: return
+        if (framegenController.arm(decoder, surface, w, h, videoFps, hdrMode, hdrFullRange)) return
+        upscaler.arm(decoder, target, w, h, hdr = hdrMode != MoonBridge.HDR_MODE_SDR)
+    }
+
+    /**
+     * Stream-menu quick toggle: pauses frame generation (decoded frames only) or resumes it.
+     * Resuming after a thermal auto-off needs [force]. False when that was refused.
+     */
+    fun setFramegenPaused(paused: Boolean, force: Boolean = false): Boolean = framegenController.setPaused(paused, force)
+
+    /** Applies a changed upscaler strength (Settings or stream menu) to the running stream. */
+    fun refreshUpscaler() = upscaler.applyConfig()
 
     /** Ends the stream and asks the host to close the running app. */
     fun quit() {
@@ -173,6 +229,10 @@ class StreamSession internal constructor(
             _backgrounded.value = false
         }
         decoder.prepareForStop()
+        main.post {
+            framegenController.shutdown(decoder)
+            upscaler.release(decoder)
+        }
         if (reason == StreamEndReason.USER_QUIT) {
             main.post { listener.onEnded(StreamEndReason.USER_QUIT, 0) }
         }
@@ -234,6 +294,7 @@ class StreamSession internal constructor(
         ) = Unit
 
         override fun setHdrMode(enabled: Boolean, hdrMetadata: ByteArray?) {
+            framegenController.configureHdr(if (enabled) hdrMode else MoonBridge.HDR_MODE_SDR, enabled && hdrFullRange)
             decoder.setHdrMode(enabled, hdrMetadata)
             _stats.update { it.copy(hdr = enabled) }
             onMain {
@@ -267,12 +328,14 @@ class StreamSession internal constructor(
         override fun onRemoteTextContext(context: RemoteTextContext) = Unit
 
         override fun onPerfUpdateV(performanceInfo: PerformanceInfo) {
+            framegenController.onPerformanceInfo(performanceInfo)
+            upscaler.onWindow()
             val mbps = bandwidth.update(MoonBridge.getRtpVideoBytesReceived(), System.nanoTime())
             _stats.update { performanceInfo.toStreamStats(mbps, it) }
         }
 
         override fun onPerfUpdateWG(performanceInfo: PerformanceInfo) = Unit
-        override fun onVideoFrameLoss(framesLost: Int, frameNumber: Int) = Unit
+        override fun onVideoFrameLoss(framesLost: Int, frameNumber: Int) = framegenController.onFrameLoss(framesLost, frameNumber)
         override fun isPerfOverlayVisible(): Boolean = true
     }
 

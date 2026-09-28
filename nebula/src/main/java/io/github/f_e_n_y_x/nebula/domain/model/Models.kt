@@ -117,4 +117,6 @@ data class StreamStats(
     val renderMs: Float = 0f,
     val decoder: String = "",
     val hdr: Boolean = false,
+    /** Frame generation and upscaling; null when the stream doesn't report them (demo, V+). */
+    val post: PostProcessStats? = null,
 )
