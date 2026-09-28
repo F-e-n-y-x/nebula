@@ -78,6 +78,10 @@ import io.github.f_e_n_y_x.nebula.MainActivity
 import io.github.f_e_n_y_x.nebula.domain.Orientation
 import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
 import io.github.f_e_n_y_x.nebula.StreamInputSink
+import io.github.f_e_n_y_x.nebula.controls.ControlsStore
+import io.github.f_e_n_y_x.nebula.controls.PadMixer
+import io.github.f_e_n_y_x.nebula.controls.hasControllerZones
+import io.github.f_e_n_y_x.nebula.controls.ui.ControlsEditor
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
 import io.github.f_e_n_y_x.nebula.data.engine.GyroAssist
 import io.github.f_e_n_y_x.nebula.data.engine.GyroToggle
@@ -234,9 +238,18 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     // Mic, clipboard sync, host commands and Sleep PC (phase 1 host-linked features).
     val hostLink = rememberStreamHostState(container, hostId, gameId, live)
 
+    // On-screen controls: the game's profile, else the default, else the Standard pad (which follows Settings).
+    val controlsStore = remember { ControlsStore.get(ctx) }
+    val controlsData by controlsStore.data.collectAsState()
+    val controlsProfile = remember(controlsData, tick) { controlsStore.library(controlsData).resolve(gameKey) }
+    // Edit mode over the live picture: nothing reaches the PC until it closes.
+    var editingControls by remember { mutableStateOf(false) }
+    LaunchedEffect(ended) { if (ended) editingControls = false }
+    val overlaysOn = live && !menu && !editingControls
+
     val input = remember { InputState() }
     input.ui = ui
-    input.active = live && !menu
+    input.active = overlaysOn
     val uiNow by rememberUpdatedState(ui)
     val stream = container.stream
     var inputView by remember { mutableStateOf<StreamInputView?>(null) }
@@ -244,13 +257,19 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     // With a physical controller attached the on-screen controls stay away unless the user keeps
     // them; kept, they drive player 1 together with the controller (never a second player).
     val padPresent = remember(devices) { GamepadMapper.physicalControllerPresent() }
-    val oscShown = live && !menu && ui.osc && (!padPresent || ui.oscWithGamepad)
+    val oscShown = overlaysOn && ui.osc && (!padPresent || ui.oscWithGamepad)
+    // Touch zones marked "Keep with controller" stay while the pad hides the rest; their stick
+    // output is mixed into the physical pad's player (controller moves, touch aims).
+    val zonesShown = overlaysOn && ui.osc && !oscShown && controlsProfile.hasControllerZones()
+    val padMixer = remember(remoteInput) { PadMixer { remoteInput } }
     // Gyro to right stick / mouse (created below); the mapper asks it about the toggle button.
     var gyroAssist by remember { mutableStateOf<GyroAssist?>(null) }
     val gyroAssistNow by rememberUpdatedState(gyroAssist)
+    // Everything the mapper sends (physical pads, the on-screen pad, gyro to right stick) passes
+    // through the mixer, so touch zones steer the same player the controller and gyro drive.
     val pad = remember(remote) {
         GamepadMapper(
-            remote, onMenu = { menu = true }, config = { uiNow.gamepad },
+            { remoteInput?.let { padMixer } }, onMenu = { menu = true }, config = { uiNow.gamepad },
             capabilities = { id, index -> stream.padCapabilities(id, index) ?: GamepadMapper.DEFAULT_CAPS },
             onPadsChanged = { stream.refreshFeedback() },
             keyHook = { key, down -> gyroAssistNow?.onKey(key, down) == true },
@@ -289,8 +308,8 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     }
     // The mapping modes run while the stream has input; passthrough from this device with no
     // controller announces player 1 so the PC builds a motion-capable pad before a game asks.
-    LaunchedEffect(gyroAssist, ui.motion, live, menu, devices) {
-        gyroAssist?.update(live && !menu)
+    LaunchedEffect(gyroAssist, ui.motion, live, overlaysOn, devices) {
+        gyroAssist?.update(overlaysOn)  // paused with the menu and while editing controls
         if (live && MotionRouting.announcePhonePad(ui.motion, padPresent, phoneHasGyro)) pad.announcePlayerOne()
     }
 
@@ -302,9 +321,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         if (uiNow.keyboardKind == KeyboardKind.PHONE) inputView?.toggleKeyboard() else pcKeyboard = !pcKeyboard
     }
     val sink = remember(remote) { StreamKeySink(remote, pad, { uiNow }, keyboardOpen = { pcKeyboardNow }, onMenu = { menu = true }) }
-    DisposableEffect(menu, live) {
-        activity.streamInput = if (!menu && live) sink else null
-        if (menu) { pad.releaseAll(); inputView?.hideKeyboard() }
+    DisposableEffect(menu, live, editingControls) {
+        activity.streamInput = if (overlaysOn) sink else null
+        if (menu || editingControls) { pad.releaseAll(); inputView?.hideKeyboard() }
         onDispose { activity.streamInput = null }
     }
     // Gamepads coming and going; a mouse appearing turns pointer capture on.
@@ -319,14 +338,14 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         onDispose { im?.unregisterInputDeviceListener(l) }
     }
     val hasMouse = remember(devices) { physicalMousePresent() }
-    val capture = live && !menu && !ui.absoluteMouse && ui.mouseCapture && hasMouse
+    val capture = overlaysOn && !ui.absoluteMouse && ui.mouseCapture && hasMouse
     // Pinch zoom of the local picture (V+'s zoom/pan); nothing is sent to the PC.
     var zoom by remember { mutableFloatStateOf(1f) }
     var panX by remember { mutableFloatStateOf(0f) }
     var panY by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(capture, inputView) { inputView?.wantCapture = capture }
     // The input layer gives up focus while the menu or the PC keyboard needs the D-pad.
-    LaunchedEffect(menu, pcKeyboard, live, inputView) { inputView?.inputEnabled = live && !menu && !pcKeyboard }
+    LaunchedEffect(overlaysOn, pcKeyboard, inputView) { inputView?.inputEnabled = overlaysOn && !pcKeyboard }
 
     if (container.isDemo) LaunchedEffect(Unit) { vm.attach(StreamTarget.None) }
 
@@ -436,19 +455,19 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
-        if (oscShown) {
-            OnScreenControls({ pad }, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
+        if (oscShown || zonesShown) {
+            OnScreenControls(remote, { pad }, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown })
         }
         val statsAtTop = ui.stats.enabled && ui.stats.position.row == 0
-        if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (statsAtTop) 60 + (ui.stats.metrics.size.coerceAtMost(8) * if (ui.stats.layout == io.github.f_e_n_y_x.nebula.settings.StatLayout.CARD) 18 else 0) else 12)
-        if (live && !menu && ui.stats.enabled && stats != null) {
+        if (overlaysOn && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (statsAtTop) 60 + (ui.stats.metrics.size.coerceAtMost(8) * if (ui.stats.layout == io.github.f_e_n_y_x.nebula.settings.StatLayout.CARD) 18 else 0) else 12)
+        if (overlaysOn && ui.stats.enabled && stats != null) {
             StatsOverlay(stats, history, ui.stats.copy(opacity = ui.overlayOpacity), draggable = !Nebula.form.isTv) { p ->
                 io.github.f_e_n_y_x.nebula.settings.StatsOverlaySettings.setPosition(prefs, p)
             }
         }
-        StreamMicIndicator(hostLink, visible = live && !menu && !pcKeyboard, prefs = prefs)
-        if (live && !menu && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
-        if (live && !menu && ui.floatBall && !pcKeyboard) {
+        StreamMicIndicator(hostLink, visible = overlaysOn && !pcKeyboard, prefs = prefs)
+        if (overlaysOn && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
+        if (overlaysOn && ui.floatBall && !pcKeyboard) {
             FloatBall(
                 ui,
                 onAction = { action ->
@@ -459,6 +478,13 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     }
                 },
             )
+        }
+
+        if (editingControls && live) {
+            ControlsEditor(
+                store = controlsStore, gameKey = gameKey, gameName = game?.name, startProfileId = controlsProfile.id,
+                onClose = { editingControls = false },
+            ) { /* the live stream shows through */ }
         }
 
         val backFocus = remember { FocusRequester() }
@@ -494,7 +520,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 NebulaButton("Back", onClick = { nav.back() }, style = ButtonStyle.Secondary, modifier = Modifier.focusRequester(backFocus))
                 LaunchedEffect(Unit) { runCatching { backFocus.requestFocus() } }
             }
-            is StreamState.Live -> AnimatedVisibility(hint && !menu, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+            is StreamState.Live -> AnimatedVisibility(hint && !menu && !editingControls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
                 Text(
                     if (Nebula.form.isTv) "Press Back or Start + Select for the menu" else "Back, four-finger tap or Start + Select for the menu · three fingers for the keyboard",
                     style = t.label, color = NebulaColors.textSecondary, textAlign = TextAlign.Center,
@@ -548,6 +574,11 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                         pcKeyboard = true
                     },
                     onOverlayOpacity = { setOverlayOpacity(ctx, it) },
+                    onEditControls = {
+                        menu = false
+                        prefs.put("checkbox_show_onscreen_controls", true)
+                        editingControls = true
+                    },
                     onClipboard = typeClipboard,
                     onShortcut = { remoteInput?.press(it) },
                     onDisconnect = { end(false) },

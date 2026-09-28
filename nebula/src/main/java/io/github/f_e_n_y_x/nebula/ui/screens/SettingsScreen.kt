@@ -134,7 +134,7 @@ fun SettingsScreen(container: AppContainer, nav: Navigator, initialSection: Stri
                 }
                 Box(Modifier.width(1.dp).fillMaxHeight().background(NebulaColors.border))
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(32))) {
-                    if (query.isNotBlank()) SearchResults(query) else SectionBody(open ?: SettingsSection.Stream, settings, vm)
+                    if (query.isNotBlank()) SearchResults(query) else SectionBody(open ?: SettingsSection.Stream, settings, vm, nav)
                 }
             }
         } else {
@@ -149,7 +149,7 @@ fun SettingsScreen(container: AppContainer, nav: Navigator, initialSection: Stri
                 } else {
                     NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back to settings", { open = null })
                     Spacer(Modifier.height(s.dp(12)))
-                    SectionBody(sec, settings, vm)
+                    SectionBody(sec, settings, vm, nav)
                 }
             }
         }
@@ -181,7 +181,7 @@ private fun SectionRow(sec: SettingsSection, selected: Boolean, onClick: () -> U
 }
 
 @Composable
-private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: SettingsViewModel) {
+private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: SettingsViewModel, nav: Navigator) {
     val update: ((StreamSettings) -> StreamSettings) -> Unit = { vm.update(it) }
     val s = Nebula.scale
     Text(sec.title, style = Nebula.type.title, color = NebulaColors.text)
@@ -219,6 +219,11 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
             GamepadFeedbackSection()
             Spacer(Modifier.height(s.dp(12)))
             LegacySettingsList("gamepads")
+        }
+        SettingsSection.Osc -> {
+            io.github.f_e_n_y_x.nebula.controls.ui.ControlsSettingsSection(onOpenEditor = { nav.push(io.github.f_e_n_y_x.nebula.ui.Route.ControlsEditor()) })
+            Spacer(Modifier.height(s.dp(12)))
+            LegacySettingsList("osc")
         }
         SettingsSection.Advanced -> {
             BackgroundSection()

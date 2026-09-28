@@ -52,6 +52,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaStar
 import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
+import io.github.f_e_n_y_x.nebula.controls.ui.ControlsEditorScreen
 import io.github.f_e_n_y_x.nebula.ui.screens.DetailsScreen
 import io.github.f_e_n_y_x.nebula.ui.screens.HostsScreen
 import io.github.f_e_n_y_x.nebula.ui.screens.LibraryScreen
@@ -73,6 +74,8 @@ sealed interface Route {
     data class Stream(val hostId: String, val gameId: String, val mode: DisplayMode) : Route
     /** [section] opens one settings section directly (its enum name, e.g. "Library"). */
     data class Settings(val section: String? = null) : Route
+    /** The on-screen controls editor over a preview; with a game, it can assign a profile to it. */
+    data class ControlsEditor(val hostId: String? = null, val gameId: String? = null) : Route
 }
 
 /**
@@ -179,6 +182,7 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
                 entry<Route.Details> { DetailsScreen(container, nav, it.hostId, it.gameId) }
                 entry<Route.Stream> { StreamScreen(container, nav, it.hostId, it.gameId, it.mode) }
                 entry<Route.Settings> { SettingsScreen(container, nav, it.section) }
+                entry<Route.ControlsEditor> { ControlsEditorScreen(container, nav, it.hostId, it.gameId) }
             },
         )
     }
@@ -223,6 +227,7 @@ private fun debugStart(spec: String?): Route? {
         "stream" -> Route.Stream(host, arg ?: "gta5", DisplayMode.VIRTUAL)
         "mirror" -> Route.Stream(host, arg ?: "gta5", DisplayMode.MIRROR)
         "settings" -> Route.Settings(arg)
+        "controls" -> if (arg == null) Route.ControlsEditor() else Route.ControlsEditor(host, arg)
         else -> null
     }
 }

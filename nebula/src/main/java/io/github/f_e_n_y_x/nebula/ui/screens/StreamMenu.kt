@@ -79,6 +79,8 @@ class StreamMenuActions(
     val onQuit: () -> Unit,
     /** Frame generation quick toggle: (paused, force) → accepted. */
     val onFramegenPause: (Boolean, Boolean) -> Boolean = { _, _ -> false },
+    /** Opens the on-screen controls editor over the stream. */
+    val onEditControls: () -> Unit = {},
 )
 
 /**
@@ -264,7 +266,11 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
             }
         }
         StatsQuick(ui, prefs)
-        ToggleRow("On-screen controls", "Virtual gamepad buttons over the stream.", ui.osc) { prefs.put("checkbox_show_onscreen_controls", it) }
+        io.github.f_e_n_y_x.nebula.controls.ui.ControlsMenuSection(
+            gameKey = gameKey, shown = ui.osc,
+            onShown = { prefs.put("checkbox_show_onscreen_controls", it) },
+            onEdit = actions.onEditControls,
+        )
     }
 }
 
