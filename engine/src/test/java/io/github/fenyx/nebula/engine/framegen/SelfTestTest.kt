@@ -46,6 +46,20 @@ class SelfTestTest {
         assertEquals(SelfTestVerdict.UNSUPPORTED, eval(caps = "vulkan=0 reason=no-loader").verdict)
     }
 
+    @Test fun `a failure names the missing Vulkan extension and the report text carries it in full`() {
+        val noExt = eval(caps = adreno830.replace("external_memory=1", "external_memory=0"))
+        assertEquals("ahb", noExt.firstFailure!!.id)
+        assertEquals("missing VK_KHR_external_memory (ahb=1 external_memory=0 dedicated=1)", noExt.firstFailure!!.detail)
+        val noNull = eval(caps = adreno830.replace("null_descriptor=1", "null_descriptor=0"))
+        assertTrue(noNull.firstFailure!!.detail, noNull.firstFailure!!.detail.startsWith("missing nullDescriptor feature of VK_EXT_robustness2"))
+        val text = noExt.fullText()
+        assertTrue(text, text.contains("FAIL Hardware-buffer import (VK_ANDROID_external_memory_android_hardware_buffer): missing VK_KHR_external_memory"))
+        assertTrue(text, text.contains("raw caps: " + adreno830.replace("external_memory=1", "external_memory=0")))
+        assertTrue(text, text.contains("GPU: Adreno (TM) 830"))
+        // The raw lines survive the saved JSON.
+        assertEquals(noExt.raw, SelfTestReport.fromJson(noExt.toJson())!!.raw)
+    }
+
     @Test fun `DLL and benchmark problems are failures, not unsupported`() {
         assertEquals(SelfTestVerdict.FAILED, eval(dll = null).verdict)
         assertEquals(SelfTestVerdict.FAILED, eval(dll = "lossless-dll-probe-failed: generate-shader-missing").verdict)

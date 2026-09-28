@@ -18,8 +18,16 @@ import kotlinx.coroutines.flow.map
 
 private val Context.nebulaPrefs by preferencesDataStore(name = "nebula")
 
-class PreferencesStore(context: Context) : PreferencesRepository {
+/**
+ * [defaultFps] is the frame rate used until the user picks one: the screen's native (maximum)
+ * refresh rate, so a fresh install on a 120 Hz phone streams at 120.
+ */
+class PreferencesStore(
+    context: Context,
+    private val defaultFps: () -> Int = { io.github.fenyx.nebula.engine.DisplayRefresh.nativeHz(context) },
+) : PreferencesRepository {
     private val store = context.applicationContext.nebulaPrefs
+    private val nativeFps by lazy(defaultFps)
 
     private object Keys {
         val width = intPreferencesKey("stream_width")
@@ -41,7 +49,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
         val d = StreamSettings()
         StreamSettings(
             resolution = Resolution(p[Keys.width] ?: d.resolution.width, p[Keys.height] ?: d.resolution.height),
-            fps = p[Keys.fps] ?: d.fps,
+            fps = p[Keys.fps] ?: nativeFps,
             bitrateKbps = p[Keys.bitrate] ?: d.bitrateKbps,
             codec = p[Keys.codec]?.let { runCatching { VideoCodec.valueOf(it) }.getOrNull() } ?: d.codec,
             defaultMode = p[Keys.defaultMode]?.let { runCatching { DisplayMode.valueOf(it) }.getOrNull() } ?: d.defaultMode,
@@ -52,7 +60,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
         store.edit { p ->
             val current = StreamSettings(
                 Resolution(p[Keys.width] ?: 0, p[Keys.height] ?: 0),
-                p[Keys.fps] ?: 60,
+                p[Keys.fps] ?: nativeFps,
                 p[Keys.bitrate] ?: 30_000,
                 p[Keys.codec]?.let { runCatching { VideoCodec.valueOf(it) }.getOrNull() } ?: VideoCodec.AUTO,
                 p[Keys.defaultMode]?.let { runCatching { DisplayMode.valueOf(it) }.getOrNull() } ?: DisplayMode.VIRTUAL,

@@ -452,9 +452,10 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
                 st.resolution,
             ) { r -> if (r == CUSTOM_SENTINEL) editCustom = true else update { it.copy(resolution = r) } }
         }
-        Setting("Frame rate", "120 fps needs a 120 Hz screen on this device.") {
+        val nativeHz = remember { io.github.fenyx.nebula.engine.DisplayRefresh.nativeHz(ctx) }
+        Setting("Frame rate", "Native is this screen's highest refresh rate ($nativeHz Hz). Higher than the screen can show doesn't look smoother.") {
             Column(verticalArrangement = Arrangement.spacedBy(s.dp(12))) {
-                Segmented(listOf("30" to 30, "60" to 60, "90" to 90, "120" to 120, "144" to 144), st.fps) { f -> update { it.copy(fps = f) } }
+                Segmented(io.github.fenyx.nebula.engine.DisplayRefresh.frameRateChoices(nativeHz), st.fps) { f -> update { it.copy(fps = f) } }
                 SliderField(
                     label = "Exact frame rate", value = st.fps.toFloat(), range = 10f..240f, step = 1f, unit = "fps",
                     onValueChange = { v -> update { it.copy(fps = v.roundToInt()) } },
