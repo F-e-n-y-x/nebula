@@ -100,7 +100,10 @@ fun FramegenMenuSection(
                 FramegenPanelState.Toggle.PAUSE -> if (!onPause(true, false)) notice = "Frame generation can't be paused right now."
                 FramegenPanelState.Toggle.RESUME -> if (!onPause(false, false)) notice = "Frame generation can't be resumed right now."
                 FramegenPanelState.Toggle.FORCE_RESUME -> if (!onPause(false, true)) notice = "Frame generation can't be resumed right now."
-                FramegenPanelState.Toggle.ENABLE -> prefs.put(FramegenKeys.ENABLED, true)
+                FramegenPanelState.Toggle.ENABLE -> {
+                    prefs.put(FramegenKeys.ENABLED, true)
+                    notice = "Frame generation starts with the next stream."
+                }
                 FramegenPanelState.Toggle.DISABLE -> prefs.put(FramegenKeys.ENABLED, false)
                 FramegenPanelState.Toggle.REFUSE_UNSUPPORTED -> notice = "This device can't run frame generation. The full device check is in All frame generation settings."
                 FramegenPanelState.Toggle.REFUSE_NO_ENGINE -> notice = "Import Lossless.dll in All frame generation settings first."
@@ -157,7 +160,7 @@ fun FramegenMenuSection(
         Upscaler(upscaler, state, prefs, onLockedTap = { notice = "The upscaler is off while frame generation is set up for this stream." })
 
         Text(
-            "Changes apply to this stream. The picture pauses for a moment while frame generation restarts with them.",
+            "Quality, flow scale and performance mode apply to this stream within a second. Turning frame generation or the upscaler fully on or off applies from the next stream.",
             style = Nebula.type.label, color = NebulaColors.textMuted, modifier = Modifier.padding(horizontal = s.dp(4)),
         )
         NebulaButton("All frame generation settings", onClick = onOpenSettings, style = ButtonStyle.Secondary, icon = Icons.Outlined.Tune, modifier = Modifier.fillMaxWidth())

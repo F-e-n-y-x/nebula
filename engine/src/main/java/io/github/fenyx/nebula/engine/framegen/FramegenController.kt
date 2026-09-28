@@ -57,6 +57,10 @@ data class FramegenStatus(
 sealed interface FramegenEvent {
     data class AutoOff(val cause: GuardDecision.Cause, val detail: String) : FramegenEvent
     data class Unavailable(val reason: FramegenOffReason) : FramegenEvent
+    /** New settings couldn't start frame generation on this stream; it was paused instead. */
+    data object RestartFailed : FramegenEvent
+    /** A change takes effect from the next stream (on/off can't switch the screen's producer live). */
+    data class NextStream(val detail: String) : FramegenEvent
 }
 
 /**
@@ -84,6 +88,7 @@ class FramegenController(
     private var lastWindowMs = 0L
     @Volatile private var userPaused = false
     @Volatile private var autoOff: GuardDecision.TurnOff? = null
+    private val restartWatch = LiveSettings.RestartWatch()
 
     private val _status = MutableStateFlow(FramegenStatus())
     val status: StateFlow<FramegenStatus> = _status.asStateFlow()
@@ -185,6 +190,7 @@ class FramegenController(
     /** Drops the capture; the decoder must be paused or about to be rebuilt on a direct surface. */
     fun release(decoder: MediaCodecDecoderRenderer?) {
         generation.incrementAndGet()
+        restartWatch.cancel()
         val had = capture != null
         capture?.release()
         capture = null
@@ -221,6 +227,67 @@ class FramegenController(
             )
         }
         return true
+    }
+
+    /**
+     * Settings changed during the stream ([LiveSettings]). While armed and still planned, the new
+     * model and tuning go to the native pipeline and its LSFG context is rebuilt on the frame
+     * generation thread, behind the same capture and surface; the decoder is not touched. While
+     * armed but no longer planned, generation pauses until the next stream. Main thread.
+     */
+    fun applyLive(width: Int, height: Int, fps: Int): LiveSettings.Framegen {
+        val plan = plan(width, height, fps)
+        val action = LiveSettings.framegen(isArmed, plan is FramegenPlan.On)
+        when (action) {
+            LiveSettings.Framegen.RECONFIGURE -> reconfigure((plan as FramegenPlan.On).runtime, width, height)
+            LiveSettings.Framegen.PAUSE_UNTIL_NEXT_STREAM -> {
+                setPaused(true)
+                onEvent(FramegenEvent.NextStream("Frame generation is paused and fully off from the next stream."))
+            }
+            LiveSettings.Framegen.NEXT_STREAM -> onEvent(FramegenEvent.NextStream("Frame generation starts with the next stream."))
+            LiveSettings.Framegen.NONE -> Unit
+        }
+        LimeLog.info("Framegen live settings: $action")
+        return action
+    }
+
+    private fun reconfigure(rt: FramegenRuntime, width: Int, height: Int) {
+        val old = runtime ?: return
+        runtime = rt
+        adaptive.configure(
+            FramegenAdaptiveController.Config(
+                inputFps = rt.inputFps,
+                presentationFps = rt.presentationFps,
+                adaptiveEnabled = rt.adaptive,
+                allowAdaptiveWithoutDoubling = rt.adaptiveOnly,
+                internalWidth = rt.internalWidth,
+                presentMode = rt.presentMode,
+                slowFrameThresholdMs = rt.slowThresholdMs,
+                presentQueueMax = rt.presentQueueMax,
+            ),
+        )
+        guard = ThermalGuard(enabled = rt.thermalGuard)
+        val paused = userPaused || autoOff != null
+        val modelChanged = old.flowScale != rt.flowScale || old.performanceMode != rt.performanceMode || old.internalWidth != rt.internalWidth
+        val gen = generation.get()
+        // Same thread as prewarm and the output-surface changes, so they never overlap.
+        enqueue {
+            if (generation.get() != gen) return@enqueue // released meanwhile
+            FramegenInterceptor.configureLsfgModel(rt.flowScale, rt.performanceMode)
+            FramegenInterceptor.configureTuning(rt.internalWidth, rt.presentMode, rt.slowThresholdMs, rt.presentQueueMax, rt.adaptiveOnly)
+            FramegenInterceptor.configureOutputFrameRate(if (paused) rt.inputFps else rt.presentationFps)
+            if (modelChanged) {
+                // The native reset stops the presenter and drops the LSFG context under the
+                // pipeline lock (frames in flight wait for it); prewarm builds the new one here
+                // instead of on the decoder's frame thread.
+                val started = SystemClock.uptimeMillis()
+                FramegenInterceptor.resetPipeline()
+                val ok = FramegenInterceptor.prewarmContext(width, height)
+                LimeLog.info("Framegen reconfigured (${modelLabel(rt)}) prewarm ok=$ok in ${SystemClock.uptimeMillis() - started} ms")
+            }
+        }
+        if (modelChanged && !paused) restartWatch.started(SystemClock.elapsedRealtime())
+        _status.update { it.copy(targetFps = rt.presentationFps, model = modelLabel(rt), state = if (paused) it.state else FramegenStatus.State.STARTING) }
     }
 
     /** Resets session-level state (auto-off, user pause) for a new stream. */
@@ -271,6 +338,12 @@ class FramegenController(
                 ),
             )
             if (decision is GuardDecision.TurnOff) tripAutoOff(decision, rt)
+        }
+
+        if (restartWatch.onWindow(now, generating, paused)) {
+            LimeLog.warning("Framegen didn't restart with the new settings within ${LiveSettings.RESTART_TIMEOUT_MS} ms; pausing")
+            setPaused(true)
+            onEvent(FramegenEvent.RestartFailed)
         }
 
         val state = when {

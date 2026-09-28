@@ -20,12 +20,12 @@ import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.BandwidthMeter
 import io.github.fenyx.nebula.engine.framegen.FramegenController
 import io.github.fenyx.nebula.engine.framegen.FramegenDll
+import io.github.fenyx.nebula.engine.framegen.FramegenEvent
+import io.github.fenyx.nebula.engine.framegen.LiveSettings
 import io.github.fenyx.nebula.engine.framegen.FramegenKeys
-import io.github.fenyx.nebula.engine.framegen.FramegenPlan
 import io.github.fenyx.nebula.engine.framegen.FramegenSelfTestRunner
 import io.github.fenyx.nebula.engine.framegen.FramegenStatus
 import io.github.fenyx.nebula.engine.framegen.UpscalerConfig
-import io.github.fenyx.nebula.engine.framegen.UpscalerMode
 import io.github.fenyx.nebula.engine.upscale.UpscalerController
 import io.github.fenyx.nebula.engine.upscale.UpscalerStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,7 +86,7 @@ class StreamSession internal constructor(
             in LIVE_FRAMEGEN_KEYS, FramegenKeys.UPSCALER -> {
                 if (key == FramegenKeys.UPSCALER) upscalerSettingsChanged = true else framegenSettingsChanged = true
                 main.removeCallbacks(applyPostProcessing)
-                main.postDelayed(applyPostProcessing, LIVE_APPLY_DEBOUNCE_MS)
+                main.postDelayed(applyPostProcessing, LiveSettings.DEBOUNCE_MS)
             }
             FramegenKeys.UPSCALER_STRENGTH -> upscaler.applyConfig()
         }
@@ -177,7 +177,14 @@ class StreamSession internal constructor(
             LimeLog.info("Surface back; resuming video")
             // The decoder is rebuilt on resume: re-arm the capture path on the new surface first.
             armPostProcessing(newHolder)
-            decoder.resumeProcessing()
+            if (!decoder.resumeProcessing()) {
+                // Without a decoder there's no picture; end cleanly rather than crash.
+                LimeLog.severe("Video couldn't restart on the new surface; disconnecting")
+                framegenController.release(decoder)
+                upscaler.release(decoder)
+                disconnect()
+                return
+            }
             if (audioPaused) {
                 audio.resumeProcessing()
                 audioPaused = false
@@ -265,20 +272,11 @@ class StreamSession internal constructor(
     fun refreshUpscaler() = upscaler.applyConfig()
 
     /**
-     * Applies changed frame generation / upscaler settings (flow scale, model, quality, on/off,
-     * upscaler mode) to the running stream without reconnecting. The decoder is rebuilt on the
-     * same connection, as when coming back from the background, and post-processing re-armed with
-     * the new plan. A new frame generation context picks up the new model. Main thread.
-     */
-    fun restartPostProcessing() {
-        framegenSettingsChanged = true
-        upscalerSettingsChanged = true
-        applyChangedSettings()
-    }
-
-    /**
-     * Rebuilds only when the change matters: frame generation settings while it runs or would
-     * run now; the upscaler mode while frame generation isn't set up (it is off then anyway).
+     * Applies changed frame generation / upscaler settings to the running stream, per
+     * [LiveSettings]: never by rebuilding the decoder or swapping the screen's producer (that
+     * crashed dev10). Model and tuning changes reconfigure frame generation natively; on/off
+     * changes that would need another producer on the SurfaceView wait for the next stream.
+     * Main thread; debounced, so a burst of changes applies once.
      */
     private fun applyChangedSettings() {
         main.removeCallbacks(applyPostProcessing)
@@ -286,20 +284,20 @@ class StreamSession internal constructor(
         val upChanged = upscalerSettingsChanged
         framegenSettingsChanged = false
         upscalerSettingsChanged = false
+        // Backgrounded: the resume re-arms from the saved settings anyway.
         if (ended.get() || _backgrounded.value || !isConnected || !::decoder.isInitialized) return
         val (w, h) = _stats.value.width to _stats.value.height
-        val armed = framegenController.isArmed
-        val fgWanted = framegenController.plan(w, h, videoFps) is FramegenPlan.On
-        val upWanted = UpscalerConfig.from(postPrefs.all).mode != UpscalerMode.OFF
-        val upActive = upscaler.status.value.active != UpscalerMode.OFF
-        val rebuild = (fgChanged && (armed || fgWanted)) || (upChanged && !armed && (upWanted || upActive))
-        if (!rebuild) return
-        LimeLog.info("Post-processing settings changed; rebuilding the decoder on the live stream (framegen=$fgWanted upscaler=$upWanted)")
-        decoder.pauseProcessing()
-        framegenController.release(decoder)
-        upscaler.release(decoder)
-        armPostProcessing(holder)
-        decoder.resumeProcessing()
+        runCatching {
+            if (fgChanged) framegenController.applyLive(w, h, videoFps)
+            if (upChanged) {
+                val mode = UpscalerConfig.from(postPrefs.all).mode
+                when (LiveSettings.upscaler(framegenController.isArmed, upscaler.isArmed, mode)) {
+                    LiveSettings.Upscaler.UPDATE -> upscaler.applyConfig()
+                    LiveSettings.Upscaler.NEXT_STREAM -> listener.onFramegenEvent(FramegenEvent.NextStream("The upscaler change applies from the next stream."))
+                    LiveSettings.Upscaler.NONE -> Unit
+                }
+            }
+        }.onFailure { LimeLog.warning("Applying post-processing settings live failed: ${it.message}") }
     }
 
     /** Ends the stream and asks the host to close the running app. */
@@ -527,15 +525,12 @@ class StreamSession internal constructor(
  * What happens when the stream's surface goes away. [graceMs] = 0 disconnects at once; otherwise
  * the session waits that long for a new surface. [keepAudio] keeps host audio playing meanwhile.
  */
-/** Frame generation settings whose change rebuilds post-processing on a live stream ([StreamSession.restartPostProcessing]). */
+/** Frame generation settings applied to a live stream ([LiveSettings]). */
 internal val LIVE_FRAMEGEN_KEYS = setOf(
     FramegenKeys.ENABLED, FramegenKeys.ADAPTIVE, FramegenKeys.MULTIPLIER, FramegenKeys.QUALITY_PRESET,
     FramegenKeys.CUSTOM_SCALE, FramegenKeys.FLOW_SCALE, FramegenKeys.PERFORMANCE_MODE, FramegenKeys.SLOW_THRESHOLD_MS,
     FramegenKeys.PRESENT_REAL_FIRST, FramegenKeys.THERMAL_GUARD,
 )
-
-/** Slider drags and quick taps settle before the decoder is rebuilt once. */
-internal const val LIVE_APPLY_DEBOUNCE_MS = 700L
 
 data class BackgroundPolicy(val graceMs: Long = 60_000, val keepAudio: Boolean = false)
 

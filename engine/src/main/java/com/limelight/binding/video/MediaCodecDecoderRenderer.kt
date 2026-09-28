@@ -694,9 +694,10 @@ class MediaCodecDecoderRenderer(
         needsIdrOnResume = true
     }
 
-    fun resumeProcessing() {
+    /** Rebuilds the codec after [pauseProcessing]; false (still paused) when it couldn't be configured. */
+    fun resumeProcessing(): Boolean {
         if (!isProcessingPaused) {
-            return
+            return true
         }
 
         LimeLog.info("Resuming video processing")
@@ -722,12 +723,20 @@ class MediaCodecDecoderRenderer(
 
         // 重新初始化解码器
         // 注意：initialWidth, initialHeight 等变量依然保留着
-        initializeDecoder(false)
+        val rc = initializeDecoder(false)
+        if (rc != 0 || videoDecoder == null) {
+            // Nebula: e.g. MediaCodec.configure() refused the surface ("already connected" to
+            // another producer). start() would dereference the null codec and crash the app;
+            // stay paused and let the caller end the stream instead.
+            LimeLog.severe("Video decoder couldn't restart (rc=$rc); staying paused")
+            return false
+        }
 
         // 重新启动渲染线程等
         start()
 
         isProcessingPaused = false
+        return true
     }
 
     private fun createBaseMediaFormat(mimeType: String): MediaFormat {

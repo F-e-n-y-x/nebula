@@ -185,6 +185,21 @@ class FramegenInterceptor {
             }
         }
 
+        /**
+         * Nebula: drops the LSFG context and stops the presenter (under the pipeline lock), so the
+         * next prewarm or frame builds a context with the current model settings. The output
+         * window and its producer connection stay. Call off the main thread.
+         */
+        @JvmStatic
+        fun resetPipeline() {
+            if (!isAvailable()) return
+            try {
+                nativeResetFrameCounter()
+            } catch (t: Throwable) {
+                Log.w(TAG, "failed to reset the frame generation pipeline", t)
+            }
+        }
+
         /** Nebula: "key=value" report of the Vulkan features frame generation needs. */
         @JvmStatic
         fun probeDeviceCaps(): String {
