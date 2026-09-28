@@ -138,7 +138,10 @@ fun StreamMenu(
         ) {
             Header(gameName, mode, stats)
             StatsBlock(stats, full = true)
-            resolution?.let { ResolutionRow(it, onOpen = { picking = true }) }
+            resolution?.let {
+                ResolutionRow(it, onOpen = { picking = true })
+                RotateRow(it, onRotated = actions.onResume)
+            }
             io.github.f_e_n_y_x.nebula.framegen.FramegenMenuCard(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause)
             Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null)
             hostSection?.invoke()

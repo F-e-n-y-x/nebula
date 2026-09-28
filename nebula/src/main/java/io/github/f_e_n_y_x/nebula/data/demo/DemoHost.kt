@@ -246,6 +246,8 @@ class DemoHost(private val context: Context) {
                 delay(600)
                 return Result.failure(IllegalStateException("The PC's encoder doesn't support ${mode.width}×${mode.height}."))
             }
+            // What a Nova host would get: /resume?mode=WxHxFPS&nova_orientation=portrait|landscape.
+            android.util.Log.i(io.github.f_e_n_y_x.nebula.input.LoggingInput.TAG, "resume mode=${mode.encode()} nova_orientation=${if (mode.height > mode.width) "portrait" else "landscape"}")
             delay(800) // /resume, RTSP and the first frame
             demoMode.value = mode
             paused.value = false

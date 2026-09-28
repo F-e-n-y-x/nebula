@@ -2,6 +2,7 @@ package io.github.f_e_n_y_x.nebula
 
 import android.app.Application
 import android.content.Context
+import android.content.res.Configuration
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import io.github.f_e_n_y_x.nebula.domain.LibraryRepository
+import io.github.f_e_n_y_x.nebula.domain.Orientation
 import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
 import io.github.f_e_n_y_x.nebula.domain.ResolvePlayModeUseCase
 import io.github.f_e_n_y_x.nebula.domain.StreamRepository
@@ -48,6 +50,10 @@ class AppContainer(context: Context) {
 
     /** This device's panel size in landscape: what "match this device" streams at. */
     fun deviceResolution(): Pair<Int, Int> = screen()
+
+    /** Which way up the device is held right now. */
+    fun deviceOrientation(): Orientation =
+        if (app.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) Orientation.PORTRAIT else Orientation.LANDSCAPE
 
     val prefs: PreferencesRepository = engine?.let { EnginePreferencesRepository(it, local, screen) } ?: local
     val hosts: HostRepository = engine?.let { EngineHostRepository(it) } ?: demo.hostRepository

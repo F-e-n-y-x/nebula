@@ -75,6 +75,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.MainActivity
+import io.github.f_e_n_y_x.nebula.domain.Orientation
+import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
 import io.github.f_e_n_y_x.nebula.StreamInputSink
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
 import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
@@ -184,11 +186,22 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
 
     // V+'s stream orientation: sensor landscape for a landscape stream (portrait for a portrait
     // one), any orientation with "Follow device rotation". Rotating re-lays out; it never reconnects.
-    val startMode by vm.startMode.collectAsStateWithLifecycle()
+    val orientationMode by vm.orientationMode.collectAsStateWithLifecycle()
+    val streamSettings by vm.settings.collectAsStateWithLifecycle()
+    val portraitFollow = streamSettings.portraitStreaming == PortraitStreaming.FOLLOW_ROTATION
     val squarish = remember { deviceResolution(ctx).let { (w, h) -> isSquarishScreen(w, h) } }
     val orientation = streamOrientation(
-        ui.followRotation, startMode?.width ?: 1, startMode?.height ?: 0, squarish, ui.osc,
+        ui.followRotation, orientationMode?.width ?: 1, orientationMode?.height ?: 0, squarish, ui.osc, portraitFollow,
     )
+    // Portrait streaming "Follow rotation": the screen turned (FULL_USER; Android itself ignores a
+    // phone laid flat and honours the rotation lock), so the stream follows after a short debounce.
+    val screenConfig = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenOrientation = when (screenConfig.orientation) {
+        android.content.res.Configuration.ORIENTATION_PORTRAIT -> Orientation.PORTRAIT
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE -> Orientation.LANDSCAPE
+        else -> null
+    }
+    LaunchedEffect(screenOrientation, portraitFollow) { vm.onScreenOrientation(screenOrientation) }
     DisposableEffect(Unit) {
         val before = activity.requestedOrientation
         onDispose { activity.requestedOrientation = before }
@@ -302,6 +315,8 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         val ch = with(density) { maxHeight.toPx() }
         val vw = stats?.width?.takeIf { it > 0 }?.toFloat() ?: cw
         val vh = stats?.height?.takeIf { it > 0 }?.toFloat() ?: ch
+        // A rotation (portrait ↔ landscape video) starts unzoomed; the rect below then follows the new shape.
+        LaunchedEffect(vh > vw) { zoom = 1f; panX = 0f; panY = 0f }
         // Virtual display already matches this screen: show it pixel for pixel unless told otherwise.
         val scale = if (mode == DisplayMode.VIRTUAL && !ui.scaleVirtual) ScaleMode.FIT else ui.scaleMode
         val base = videoRect(scale, cw, ch, vw, vh, ui.position, ui.offsetX, ui.offsetY)
@@ -466,7 +481,8 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
 
         // Live resolution change: the last frame stays up behind a small "Switching to…" pill.
-        SwitchingOverlay(switchState, switchNote, onNoteShown = vm::clearSwitchNote, modifier = Modifier.align(Alignment.TopCenter))
+        val rotatingTo by vm.rotatingTo.collectAsStateWithLifecycle()
+        SwitchingOverlay(switchState, switchNote, onNoteShown = vm::clearSwitchNote, modifier = Modifier.align(Alignment.TopCenter), rotatingTo = rotatingTo)
 
         AnimatedVisibility(menu && !ended, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             StreamMenu(
@@ -485,6 +501,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     state = switchState,
                     saved = gameVideoMode,
                     onApply = vm::changeResolution,
+                    onRotate = vm::rotate,
                     displayScale = if (scaleSupported) DisplayScaleUi(displayScale, savedScale, onApply = { p, keep ->
                         if (p != displayScale) vm.setDisplayScale(p)
                         prefs.put(scaleKey, if (keep) p else null)
