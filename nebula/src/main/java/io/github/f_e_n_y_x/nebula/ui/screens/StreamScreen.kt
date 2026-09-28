@@ -182,12 +182,18 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         onDispose { bars.show(WindowInsetsCompat.Type.systemBars()) }
     }
 
-    // "Follow device rotation" off: keep the orientation the stream started in.
-    DisposableEffect(ui.followRotation) {
+    // V+'s stream orientation: sensor landscape for a landscape stream (portrait for a portrait
+    // one), any orientation with "Follow device rotation". Rotating re-lays out; it never reconnects.
+    val startMode by vm.startMode.collectAsStateWithLifecycle()
+    val squarish = remember { deviceResolution(ctx).let { (w, h) -> isSquarishScreen(w, h) } }
+    val orientation = streamOrientation(
+        ui.followRotation, startMode?.width ?: 1, startMode?.height ?: 0, squarish, ui.osc,
+    )
+    DisposableEffect(Unit) {
         val before = activity.requestedOrientation
-        if (!ui.followRotation) activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED
         onDispose { activity.requestedOrientation = before }
     }
+    LaunchedEffect(orientation) { activity.requestedOrientation = orientation }
     // "Maximum display brightness for HDR" while the host sends HDR.
     val hdrNow = stats?.hdr == true
     DisposableEffect(hdrNow, ui.hdrMaxBrightness) {
@@ -243,6 +249,13 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     }
     val host by remember(hostId) { container.hosts.observeHosts().map { list -> list.firstOrNull { it.id == hostId } } }.collectAsState(initial = null)
     val unsupported by stream.unsupportedFeatures.collectAsState(initial = emptyList())
+    // Desktop scaling (Foundation `/display-scale`): only when the host advertises it, which Nova
+    // does for Virtual display sessions. The demo host shows it for QA.
+    val scaleSupported = mode == DisplayMode.VIRTUAL && (host?.advertises("display_scale") == true || container.isDemo)
+    val displayScale by vm.displayScale.collectAsStateWithLifecycle()
+    val scaleKey = "$DISPLAY_SCALE_KEY:$gameKey"
+    val savedScale = remember(tick) { prefs.prefs.getInt(scaleKey, 0).takeIf { it > 0 } }
+    LaunchedEffect(live, scaleSupported) { if (live && scaleSupported) savedScale?.let(vm::applySavedDisplayScale) }
     val phoneHasGyro = remember {
         ctx.getSystemService(android.hardware.SensorManager::class.java)?.getDefaultSensor(android.hardware.Sensor.TYPE_GYROSCOPE) != null
     }
@@ -472,6 +485,10 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     state = switchState,
                     saved = gameVideoMode,
                     onApply = vm::changeResolution,
+                    displayScale = if (scaleSupported) DisplayScaleUi(displayScale, savedScale, onApply = { p, keep ->
+                        if (p != displayScale) vm.setDisplayScale(p)
+                        prefs.put(scaleKey, if (keep) p else null)
+                    }) else null,
                 ),
                 supports = { f -> host?.supports(f) ?: true },
                 unsupported = unsupported,
@@ -502,6 +519,8 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     }
 }
 
+/** Per game: the desktop scaling (percent) chosen with "Use for this game from now on". */
+private const val DISPLAY_SCALE_KEY = "nebula_display_scale"
 private const val ASKED_NOTIFY_KEY = "nebula_asked_notification_permission"
 private const val MAX_ZOOM = 4f
 

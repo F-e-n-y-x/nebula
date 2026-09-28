@@ -286,6 +286,11 @@ class DemoHost(private val context: Context) {
             android.util.Log.i(io.github.f_e_n_y_x.nebula.input.LoggingInput.TAG, "bitrate $kbps")
             return true
         }
+        override suspend fun setDisplayScale(percent: Int): Boolean {
+            delay(300)
+            android.util.Log.i(io.github.f_e_n_y_x.nebula.input.LoggingInput.TAG, "display scale $percent%")
+            return true
+        }
     }
 
     companion object {

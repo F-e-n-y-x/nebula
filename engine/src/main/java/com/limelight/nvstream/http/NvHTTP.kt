@@ -769,6 +769,27 @@ class NvHTTP(
         }
     }
 
+    /**
+     * Foundation-style `/display-scale`: asks the host to scale its desktop UI (text, icons) to
+     * [percent] without changing the streamed resolution. Hosts advertise it as the Nova
+     * `display_scale` feature. Answers in the same JSON form as `/rotate-display`.
+     */
+    @Throws(IOException::class)
+    fun setDisplayScale(percent: Int, displayName: String?): Boolean {
+        try {
+            val json = JSONObject(
+                openHttpConnectionToString(httpClientLongConnectTimeout, getHttpsUrl(true), "display-scale", "scale=$percent", displayName),
+            )
+            if (json.optInt("status_code", 0) != 200 || !json.optBoolean("success", false)) {
+                LimeLog.warning("Failed to set display scale: ${json.optString("status_message", "Unknown error")}")
+                return false
+            }
+            return true
+        } catch (e: org.json.JSONException) {
+            throw IOException("Failed to parse display scale response: ${e.message}", e)
+        }
+    }
+
     @Throws(IOException::class, InterruptedException::class)
     fun rotateDisplay(angle: Int, displayName: String?): Boolean {
         try {

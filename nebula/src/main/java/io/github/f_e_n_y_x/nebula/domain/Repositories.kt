@@ -94,6 +94,8 @@ interface StreamRepository {
      * disconnected and may be switched again (to roll back); the start() flow stays open meanwhile.
      */
     suspend fun switchMode(mode: VideoMode): Result<Unit> = Result.failure(UnsupportedOperationException("Changing resolution live isn't supported here."))
+    /** Asks the PC to scale its desktop UI to [percent] (resolution unchanged); true once accepted. */
+    suspend fun setDisplayScale(percent: Int): Boolean = false
     /** Changes the bitrate mid-stream; true once the PC accepted it. */
     suspend fun setBitrate(kbps: Int): Boolean = false
     /** Input for the running stream, or null when nothing is connected. */

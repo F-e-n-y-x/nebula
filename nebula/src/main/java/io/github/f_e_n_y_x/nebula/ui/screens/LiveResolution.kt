@@ -87,6 +87,17 @@ class LiveResolutionUi(
     /** The mode saved for this game, if any. */
     val saved: VideoMode?,
     val onApply: (mode: VideoMode, rememberForGame: Boolean) -> Unit,
+    /** Desktop scaling, when the host advertises `display_scale`; null hides the row. */
+    val displayScale: DisplayScaleUi? = null,
+)
+
+/** The host's desktop UI scale (text, icons) for this stream; the resolution stays as it is. */
+class DisplayScaleUi(
+    /** The percentage applied now (100 until changed). */
+    val current: Int,
+    /** The percentage saved for this game, if any. */
+    val saved: Int?,
+    val onApply: (percent: Int, rememberForGame: Boolean) -> Unit,
 )
 
 /** The stream menu's "Resolution" row: what's streaming and a way to change it. */
@@ -139,9 +150,17 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
     val displayHz = remember { displayRefreshHz(ctx) }
     val showLow = remember { LegacyPrefs(ctx).prefs.getBoolean("checkbox_show_low_resolution_presets", false) }
     var customVersion by remember { mutableIntStateOf(0) }
-    val sizes = remember(customVersion) {
-        ResolutionOptions.sizes(device, customResolutions(ctx).map { (w, h) -> Resolution(w, h) }, showLow, current.resolution)
+    // "For this screen": this display's own size and scaled copies, in the orientation it has now.
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    val screen = remember(config.orientation, config.screenWidthDp, config.screenHeightDp) {
+        screenResolution(ctx).let { (w, h) -> Resolution(w, h) }
     }
+    val screenSizes = remember(screen) { ResolutionOptions.forScreen(screen) }
+    val sizes = remember(customVersion, screenSizes) {
+        ResolutionOptions.standard(screenSizes, device, customResolutions(ctx).map { (w, h) -> Resolution(w, h) }, showLow, current.resolution)
+    }
+    val ds = ui.displayScale
+    var scale by remember { mutableIntStateOf(ds?.current ?: 100) }
     val rates = remember { ResolutionOptions.frameRates(current.fps, displayHz) }
 
     var size by remember { mutableStateOf(current.resolution) }
@@ -151,6 +170,8 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
     val target = VideoMode(size.width, size.height, fps)
     val changesMode = target != current
     val changesSaved = saveForGame != (ui.saved != null) || (saveForGame && ui.saved != target)
+    val changesScale = ds != null && scale != ds.current
+    val changesScaleSaved = ds != null && (if (saveForGame) ds.saved != scale else ds.saved != null)
 
     val two = form.isTv || form.isLandscape || !form.isCompact
     // Typing a custom size: the keyboard leaves little room on phones, so only the entry stays up.
@@ -179,7 +200,13 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
                 verticalArrangement = Arrangement.spacedBy(s.dp(14)),
             ) {
                 val sizesBlock: @Composable () -> Unit = {
-                    if (!typing) SizeGrid(sizes, size, onPick = { size = it; adding = false }, adding = adding, onAdd = { adding = !adding })
+                    if (!typing) {
+                        if (screenSizes.isNotEmpty()) {
+                            SizeGrid(screenSizes, size, current.resolution, onPick = { size = it; adding = false })
+                            MenuLabel("Standard")
+                        }
+                        SizeGrid(sizes, size, current.resolution, onPick = { size = it; adding = false }, adding = adding, onAdd = { adding = !adding })
+                    }
                     if (adding) {
                         CustomSizeEntry(onAdd = { r ->
                             addCustomResolution(ctx, r)
@@ -196,25 +223,39 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
                             Choice("$r", if (r == displayHz) "fps · screen" else "fps", r == fps, Modifier.widthIn(min = s.dp(72))) { fps = r }
                         }
                     }
-                    ToggleRow("Use for this game from now on", "Next time this game starts at this size and frame rate.", saveForGame) { saveForGame = it }
+                    if (ds != null) {
+                        MenuLabel("Desktop scaling")
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                            ResolutionOptions.DESKTOP_SCALES.forEach { p ->
+                                Choice("$p%", if (p == ds.current) "now" else if (p == 100) "default" else "text & icons", p == scale, Modifier.widthIn(min = s.dp(72))) { scale = p }
+                            }
+                        }
+                        Text("Makes text and icons on the PC bigger or smaller; the resolution stays the same.", style = Nebula.type.label, color = NebulaColors.textMuted)
+                    }
+                    ToggleRow(
+                        "Use for this game from now on",
+                        if (ds != null) "Next time this game starts at this size, frame rate and scaling." else "Next time this game starts at this size and frame rate.",
+                        saveForGame,
+                    ) { saveForGame = it }
                 }
                 val actionsBlock: @Composable () -> Unit = {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(s.dp(8), Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                         NebulaButton("Cancel", onClick = onDismiss, style = ButtonStyle.Ghost)
                         val label = when {
                             changesMode -> "Switch to ${target.label}"
-                            changesSaved -> if (saveForGame) "Save for this game" else "Forget for this game"
+                            changesScale -> "Scale to $scale%"
+                            changesSaved || changesScaleSaved -> if (saveForGame) "Save for this game" else "Forget for this game"
                             else -> "No change"
                         }
+                        val any = changesMode || changesSaved || changesScale || changesScaleSaved
                         NebulaButton(
                             label,
                             onClick = {
-                                if (changesMode || changesSaved) {
-                                    ui.onApply(target, saveForGame)
-                                    onApplied()
-                                }
+                                if (changesMode || changesSaved) ui.onApply(target, saveForGame)
+                                if (ds != null && (changesScale || changesScaleSaved)) ds.onApply(scale, saveForGame)
+                                if (any) onApplied()
                             },
-                            style = if (changesMode || changesSaved) ButtonStyle.Primary else ButtonStyle.Secondary,
+                            style = if (any) ButtonStyle.Primary else ButtonStyle.Secondary,
                         )
                     }
                 }
@@ -233,13 +274,13 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
                     if (two) {
                         Row(horizontalArrangement = Arrangement.spacedBy(s.dp(20))) {
                             Column(Modifier.weight(1.15f), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                                MenuLabel(if (typing) "Custom size" else "Size")
+                                MenuLabel(if (typing) "Custom size" else if (screenSizes.isNotEmpty()) "For this screen" else "Size")
                                 sizesBlock()
                             }
                             if (!typing) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(s.dp(12))) { sideBlock() }
                         }
                     } else {
-                        MenuLabel(if (typing) "Custom size" else "Size")
+                        MenuLabel(if (typing) "Custom size" else if (screenSizes.isNotEmpty()) "For this screen" else "Size")
                         sizesBlock()
                         if (!typing) sideBlock()
                     }
@@ -252,7 +293,10 @@ internal fun ResolutionPicker(ui: LiveResolutionUi, onDismiss: () -> Unit, onApp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SizeGrid(sizes: List<ResolutionOption>, selected: Resolution, onPick: (Resolution) -> Unit, adding: Boolean, onAdd: () -> Unit) {
+private fun SizeGrid(
+    sizes: List<ResolutionOption>, selected: Resolution, streaming: Resolution, onPick: (Resolution) -> Unit,
+    adding: Boolean = false, onAdd: (() -> Unit)? = null,
+) {
     val s = Nebula.scale
     val first = remember { FocusRequester() }
     // D-pad and keyboards start on the size that's streaming now.
@@ -261,22 +305,24 @@ private fun SizeGrid(sizes: List<ResolutionOption>, selected: Resolution, onPick
         sizes.forEach { o ->
             val on = o.resolution == selected
             Choice(
-                o.label, o.size, on,
+                o.label, if (o.resolution == streaming) "${o.size} · now" else o.size, on,
                 Modifier.widthIn(min = s.dp(132)).then(if (on) Modifier.focusRequester(first) else Modifier),
             ) { onPick(o.resolution) }
         }
-        val shape = RoundedCornerShape(s.dp(12))
-        Row(
-            Modifier.widthIn(min = s.dp(132)).heightIn(min = s.dp(56))
-                .nebulaClickable(shape, onAdd)
-                .background(if (adding) NebulaColors.accentTint else Color.Transparent, shape)
-                .border(1.dp, NebulaColors.controlBorder, shape)
-                .padding(horizontal = s.dp(14), vertical = s.dp(8)),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(s.dp(8)),
-        ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, tint = NebulaColors.accentText, modifier = Modifier.size(s.dp(18)))
-            Text("Custom size", style = Nebula.type.label, color = NebulaColors.text)
+        if (onAdd != null) {
+            val shape = RoundedCornerShape(s.dp(12))
+            Row(
+                Modifier.widthIn(min = s.dp(132)).heightIn(min = s.dp(56))
+                    .nebulaClickable(shape, onAdd)
+                    .background(if (adding) NebulaColors.accentTint else Color.Transparent, shape)
+                    .border(1.dp, NebulaColors.controlBorder, shape)
+                    .padding(horizontal = s.dp(14), vertical = s.dp(8)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(s.dp(8)),
+            ) {
+                Icon(Icons.Rounded.Add, contentDescription = null, tint = NebulaColors.accentText, modifier = Modifier.size(s.dp(18)))
+                Text("Custom size", style = Nebula.type.label, color = NebulaColors.text)
+            }
         }
     }
 }

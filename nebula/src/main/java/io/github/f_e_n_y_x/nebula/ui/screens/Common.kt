@@ -25,6 +25,20 @@ fun deviceResolution(context: Context): Pair<Int, Int> {
     return max(w, h) to min(w, h)
 }
 
+/** This screen's full size in its current orientation (portrait sizes while the phone is upright). */
+fun screenResolution(context: Context): Pair<Int, Int> {
+    val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    return if (Build.VERSION.SDK_INT >= 30) {
+        val b = wm.maximumWindowMetrics.bounds
+        b.width() to b.height()
+    } else {
+        val m = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        wm.defaultDisplay.getRealMetrics(m)
+        m.widthPixels to m.heightPixels
+    }
+}
+
 fun modeLabel(context: Context, mode: DisplayMode, s: StreamSettings): String = when (mode) {
     DisplayMode.VIRTUAL -> {
         val (w, h) = if (s.resolution.width > 0) s.resolution.width to s.resolution.height else deviceResolution(context)

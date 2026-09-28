@@ -20,6 +20,8 @@ data class Host(
 ) {
     /** True unless a Nova host says it lacks [feature]; other hosts are assumed capable. */
     fun supports(feature: String): Boolean = novaFeatures?.contains(feature) ?: true
+    /** True only when the host lists [feature] (opt-in features stay hidden on non-Nova hosts). */
+    fun advertises(feature: String): Boolean = novaFeatures?.contains(feature) == true
 }
 
 /** Whether a host-linked action is offered. */

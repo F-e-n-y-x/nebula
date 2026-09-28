@@ -746,6 +746,21 @@ open class NvConnection(
         fun onFailure(errorMessage: String)
     }
 
+    /** Asks the host to scale its desktop UI to [percent]; [done] gets whether it accepted, on a worker thread. */
+    fun setDisplayScale(percent: Int, done: (Boolean) -> Unit) {
+        Thread {
+            val ok = try {
+                NvHTTP(context.serverAddress, context.httpsPort, uniqueId, clientName, context.serverCert, cryptoProvider)
+                    .setDisplayScale(percent, context.displayName)
+            } catch (e: Exception) {
+                if (e is InterruptedException) Thread.currentThread().interrupt()
+                LimeLog.warning("Display scale request failed: ${e.message}")
+                false
+            }
+            done(ok)
+        }.start()
+    }
+
     interface DisplayRotationCallback {
         fun onSuccess(angle: Int)
         fun onFailure(errorMessage: String)
