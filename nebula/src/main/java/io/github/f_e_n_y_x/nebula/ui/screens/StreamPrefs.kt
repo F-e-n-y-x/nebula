@@ -35,6 +35,8 @@ data class StreamUiPrefs(
     val oscOpacity: Int,
     val oscL3R3Only: Boolean,
     val oscGuide: Boolean,
+    /** Keep the on-screen controls (and their player 1) while a physical controller is attached. */
+    val oscWithGamepad: Boolean,
     val floatBall: Boolean,
     val floatBallPosition: String,
     val floatBallHideMs: Int,
@@ -56,6 +58,7 @@ data class StreamUiPrefs(
         const val MOUSE_BAR_KEY = "nebula_mouse_bar"
         const val MOUSE_CAPTURE_KEY = "nebula_mouse_capture"
         const val KEYBOARD_KIND_KEY = "nebula_keyboard_kind"
+        const val OSC_WITH_GAMEPAD_KEY = "nebula_osc_with_gamepad"
 
         /** Per-game touch mode chosen from the stream menu; overrides the global default. */
         fun touchModeKey(gameKey: String) = "nebula_touch_mode:$gameKey"
@@ -102,6 +105,7 @@ data class StreamUiPrefs(
                 oscOpacity = i("seekbar_osc_opacity", 90),
                 oscL3R3Only = b("checkbox_only_show_L3R3", false),
                 oscGuide = b("checkbox_show_guide_button", true),
+                oscWithGamepad = b(OSC_WITH_GAMEPAD_KEY, false),
                 floatBall = b("checkbox_enable_float_ball", true),
                 floatBallPosition = s("list_float_ball_position", "center_right"),
                 floatBallHideMs = i("seekbar_float_ball_auto_hide_delay", 2000),

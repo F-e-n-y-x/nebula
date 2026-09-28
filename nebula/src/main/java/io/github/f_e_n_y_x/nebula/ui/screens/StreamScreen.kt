@@ -180,9 +180,14 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     input.ui = ui
     input.active = live && !menu
     val uiNow by rememberUpdatedState(ui)
-    val pad = remember(remote) { GamepadMapper(remote, onMenu = { menu = true }, config = { uiNow.gamepad }) }
     var inputView by remember { mutableStateOf<StreamInputView?>(null) }
     var devices by remember { mutableIntStateOf(0) }
+    // With a physical controller attached the on-screen controls stay away (no second, silent
+    // player on the PC) unless the user keeps them; when shown they own player 1.
+    val padPresent = remember(devices) { GamepadMapper.physicalControllerPresent() }
+    val oscShown = live && !menu && ui.osc && (!padPresent || ui.oscWithGamepad)
+    val oscShownNow by rememberUpdatedState(oscShown)
+    val pad = remember(remote) { GamepadMapper(remote, onMenu = { menu = true }, config = { uiNow.gamepad }, oscSlot = { oscShownNow }) }
 
     // Keys, gamepads and D-pad go to the PC while the menu is closed.
     // On-screen PC keyboard (V+'s custom keyboard); the three-finger tap, float ball and mouse bar open it.
@@ -203,7 +208,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         val l = object : InputManager.InputDeviceListener {
             override fun onInputDeviceAdded(id: Int) { devices++ }
             override fun onInputDeviceRemoved(id: Int) { pad.onDeviceRemoved(id); devices++ }
-            override fun onInputDeviceChanged(id: Int) { devices++ }
+            override fun onInputDeviceChanged(id: Int) { pad.onDeviceChanged(id); devices++ }
         }
         im?.registerInputDeviceListener(l, null)
         onDispose { im?.unregisterInputDeviceListener(l) }
@@ -319,9 +324,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
-        if (live && !menu && ui.osc) OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
-        if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = ui.osc, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
-        if (live && !menu && ui.perf != PerfDetail.OFF && stats != null) PerfOverlay(stats, ui.perf == PerfDetail.FULL, ui.perfOpacity, Modifier.align(if (ui.osc) Alignment.TopCenter else Alignment.TopStart))
+        if (oscShown) OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
+        if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
+        if (live && !menu && ui.perf != PerfDetail.OFF && stats != null) PerfOverlay(stats, ui.perf == PerfDetail.FULL, ui.perfOpacity, Modifier.align(if (oscShown) Alignment.TopCenter else Alignment.TopStart))
         if (live && !menu && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
         if (live && !menu && ui.floatBall && !pcKeyboard) {
             FloatBall(

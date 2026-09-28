@@ -66,9 +66,10 @@ private class OscState(private val remote: () -> RemoteInput?) {
         send()
     }
 
+    /** Lets go of everything; a pad the host never saw isn't announced just to be released. */
     fun release() {
         buttons = 0; lt = 0; rt = 0; lx = 0; ly = 0; rx = 0; ry = 0
-        send()
+        if (announced) send()
     }
 }
 
