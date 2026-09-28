@@ -23,6 +23,9 @@ class EnginePreferences internal constructor(context: Context) {
     /** The saved settings as a ready-to-use request. */
     fun defaultRequest(): StreamRequest = configuration().toStreamRequest()
 
+    /** The saved audio-to-vibration settings (V+ keys checkbox_audio_vibration and friends). */
+    fun audioHaptics(): AudioHapticsConfig = AudioHapticsConfig.from(configuration())
+
     /** Makes [request] the saved default (resolution, fps, bitrate, codec, HDR, audio and known extras). */
     fun save(request: StreamRequest) = edit { request.applyTo(it) }
 

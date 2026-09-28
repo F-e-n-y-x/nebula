@@ -45,6 +45,25 @@ class StreamSession internal constructor(
     private lateinit var decoder: MediaCodecDecoderRenderer
     private lateinit var audio: SmartAudioRenderer
     private var audioPaused = false
+    private var haptics: AudioHapticsDriver? = null
+
+    private val _audioHaptics = MutableStateFlow(AudioHapticsConfig())
+
+    /** Audio-to-vibration as applied to this stream; change it live with [setAudioHaptics]. */
+    val audioHaptics: StateFlow<AudioHapticsConfig> = _audioHaptics.asStateFlow()
+
+    /** False when the SDK couldn't start on this device (audio haptics then stays off). */
+    val audioHapticsAvailable: Boolean get() = haptics != null
+
+    private val _unsupported = MutableStateFlow<Set<HostFeature>>(emptySet())
+
+    /** Host features this stream asked for that Nebula doesn't do yet (see [HostFeature]). */
+    val unsupportedHostFeatures: StateFlow<Set<HostFeature>> = _unsupported.asStateFlow()
+
+    /** The app's controllers, so audio haptics can reach them. Set once gamepads are known. */
+    var audioHapticsGamepad: AudioHapticsGamepadSink?
+        get() = haptics?.gamepad
+        set(value) { haptics?.gamepad = value }
 
     private val _backgrounded = MutableStateFlow(false)
 
@@ -101,6 +120,7 @@ class StreamSession internal constructor(
                 audio.resumeProcessing()
                 audioPaused = false
             }
+            haptics?.setForeground(true)
             _backgrounded.value = false
         }
     }
@@ -123,7 +143,14 @@ class StreamSession internal constructor(
             audioPaused = true
         }
         decoder.pauseProcessing()
+        haptics?.setForeground(false)
         main.postDelayed(graceExpired, background.graceMs)
+    }
+
+    /** Called by [NebulaEngine.startStream] before [start], so the audio renderer can use it. */
+    internal fun useAudioHaptics(driver: AudioHapticsDriver?) {
+        haptics = driver
+        driver?.let { _audioHaptics.value = it.config }
     }
 
     internal fun start(connection: NvConnection, decoder: MediaCodecDecoderRenderer, audio: SmartAudioRenderer) {
@@ -131,6 +158,7 @@ class StreamSession internal constructor(
         this.connection = connection
         this.decoder = decoder
         this.audio = audio
+        MoonBridge.setAudioHapticsSessionHandle(haptics?.nativeHandle ?: 0L)
         input = InputBridge(connection)
         holder.addCallback(surfaceCallback)
         decoder.setRenderTarget(holder)
@@ -176,6 +204,27 @@ class StreamSession internal constructor(
         })
     }
 
+    /**
+     * Applies audio-haptics settings to the running stream. Returns false when the change can't
+     * apply live: Android's audio-coupled generator (music on a fixed device route) is bound to the
+     * audio track, so switching to or from it takes effect on the next stream.
+     */
+    fun setAudioHaptics(config: AudioHapticsConfig): Boolean {
+        val driver = haptics ?: return false
+        val live = AudioHapticsPolicy.wantsSystemCoupled(driver.config) == AudioHapticsPolicy.wantsSystemCoupled(config)
+        driver.update(config)
+        _audioHaptics.value = driver.config
+        return live
+    }
+
+    /**
+     * Tells audio haptics that the host's own rumble is driving this device's vibrator right now,
+     * so the audio effect ducks out instead of fighting it.
+     */
+    fun setGameRumbleOnDevice(active: Boolean) {
+        haptics?.deviceDucked = active
+    }
+
     /** Stops the decoder and detaches from the surface once; returns false if already ending. */
     private fun beginEnd(reason: StreamEndReason): Boolean {
         if (ended.getAndSet(true)) return false
@@ -186,6 +235,11 @@ class StreamSession internal constructor(
             _backgrounded.value = false
         }
         decoder.prepareForStop()
+        haptics?.let { h ->
+            haptics = null
+            MoonBridge.setAudioHapticsSessionHandle(0L)
+            runCatching { h.release() }.onFailure { LimeLog.warning("Audio haptics release failed: ${it.message}") }
+        }
         if (reason == StreamEndReason.USER_QUIT) {
             main.post { listener.onEnded(StreamEndReason.USER_QUIT, 0) }
         }
@@ -200,6 +254,15 @@ class StreamSession internal constructor(
 
     private fun onMain(block: () -> Unit) {
         main.post(block)
+    }
+
+    /** Reports a host request Nebula can't honour yet, once per feature. */
+    private fun unsupported(feature: HostFeature) {
+        val before = _unsupported.value
+        if (feature in before) return
+        _unsupported.value = before + feature
+        LimeLog.info("Host used ${feature.name}; not supported by Nebula yet (planned for ${feature.plannedFor})")
+        onMain { listener.onUnsupportedHostFeature(feature) }
     }
 
     private val connectionListener = object : NvConnectionListener, PerfOverlayListener {
@@ -236,7 +299,11 @@ class StreamSession internal constructor(
                 listener.onRumble(controllerNumber.toInt(), lowFreqMotor.toInt() and 0xFFFF, highFreqMotor.toInt() and 0xFFFF)
             }
 
-        override fun rumbleTriggers(controllerNumber: Short, leftTrigger: Short, rightTrigger: Short) = Unit
+        override fun rumbleTriggers(controllerNumber: Short, leftTrigger: Short, rightTrigger: Short) =
+            onMain {
+                listener.onRumbleTriggers(controllerNumber.toInt(), leftTrigger.toInt() and 0xFFFF, rightTrigger.toInt() and 0xFFFF)
+            }
+
         override fun setAdaptiveTriggers(
             controllerNumber: Short,
             eventFlags: Byte,
@@ -244,7 +311,7 @@ class StreamSession internal constructor(
             typeRight: Byte,
             left: ByteArray,
             right: ByteArray,
-        ) = Unit
+        ) = unsupported(HostFeature.ADAPTIVE_TRIGGERS)
 
         override fun setHdrMode(enabled: Boolean, hdrMetadata: ByteArray?) {
             decoder.setHdrMode(enabled, hdrMetadata)
@@ -258,9 +325,15 @@ class StreamSession internal constructor(
             }
         }
 
-        override fun setMotionEventState(controllerNumber: Short, motionType: Byte, reportRateHz: Short) = Unit
-        override fun setControllerLED(controllerNumber: Short, r: Byte, g: Byte, b: Byte) = Unit
-        override fun ds5HapticsPcm(frame: Ds5HapticsPcmFrame) = Unit
+        override fun setMotionEventState(controllerNumber: Short, motionType: Byte, reportRateHz: Short) {
+            val type = MotionType.fromWire(motionType) ?: return
+            onMain { listener.onMotionRequest(controllerNumber.toInt(), type, reportRateHz.toInt() and 0xFFFF) }
+        }
+
+        override fun setControllerLED(controllerNumber: Short, r: Byte, g: Byte, b: Byte) =
+            onMain { listener.onControllerLed(controllerNumber.toInt(), r.toInt() and 0xFF, g.toInt() and 0xFF, b.toInt() and 0xFF) }
+
+        override fun ds5HapticsPcm(frame: Ds5HapticsPcmFrame) = unsupported(HostFeature.DS5_HAPTICS)
 
         override fun onResolutionChanged(width: Int, height: Int) {
             _stats.update { it.copy(width = width, height = height) }
@@ -275,9 +348,9 @@ class StreamSession internal constructor(
             hotspotX: Int,
             hotspotY: Int,
             bgraPixels: ByteArray?,
-        ) = Unit
+        ) = unsupported(HostFeature.LOCAL_CURSOR)
 
-        override fun onRemoteTextContext(context: RemoteTextContext) = Unit
+        override fun onRemoteTextContext(context: RemoteTextContext) = unsupported(HostFeature.REMOTE_TEXT_CONTEXT)
 
         override fun onPerfUpdateV(performanceInfo: PerformanceInfo) {
             val mbps = bandwidth.update(MoonBridge.getRtpVideoBytesReceived(), System.nanoTime())
@@ -303,6 +376,9 @@ data class BackgroundPolicy(val graceMs: Long = 60_000, val keepAudio: Boolean =
 internal fun PerformanceInfo.toStreamStats(measuredMbps: Double?, previous: StreamStats): StreamStats = StreamStats(
     fps = renderedFps,
     receivedFps = receivedFps,
+    hostFps = totalFps,
+    onePercentLowFps = onePercentLowFps.takeIf { it.isFinite() } ?: 0f,
+    jitterMs = (rttInfo and 0xFFFFFFFFL).toFloat(),
     bitrateKbps = measuredMbps?.let { (it * 1000).toInt() } ?: previous.bitrateKbps,
     latency = LatencyParts(
         hostMs = aveHostProcessingLatency,

@@ -14,6 +14,8 @@ class StatsMappingTest {
             initialHeight = 1440
             renderedFps = 119.5f
             receivedFps = 120f
+            totalFps = 121f
+            onePercentLowFps = 98f
             rttInfo = (8L shl 32) or 2L
             aveHostProcessingLatency = 3.5f
             decodeTimeMs = 2f
@@ -26,6 +28,9 @@ class StatsMappingTest {
         assertEquals(119.5f, stats.fps)
         assertEquals(42_500, stats.bitrateKbps)
         assertEquals(8f, stats.latency.networkMs)
+        assertEquals(2f, stats.jitterMs)
+        assertEquals(121f, stats.hostFps)
+        assertEquals(98f, stats.onePercentLowFps)
         assertEquals(3.5f + 4f + 2f + 4f, stats.latency.totalMs)
         assertEquals(0.5f, stats.lossPercent)
         assertEquals(2560, stats.width)

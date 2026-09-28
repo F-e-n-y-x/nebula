@@ -137,6 +137,12 @@ data class LatencyParts(
 data class StreamStats(
     val fps: Float = 0f,
     val receivedFps: Float = 0f,
+    /** Frames per second the host sent, lost ones included. */
+    val hostFps: Float = 0f,
+    /** 1% low of the rendered frame rate (inverse of the P99 frame interval). */
+    val onePercentLowFps: Float = 0f,
+    /** Round-trip time variance, a jitter estimate. */
+    val jitterMs: Float = 0f,
     val bitrateKbps: Int = 0,
     val latency: LatencyParts = LatencyParts(0f, 0f, 0f, 0f),
     /** Share of frames lost in the last window, 0..100. */
@@ -146,6 +152,28 @@ data class StreamStats(
     val height: Int = 0,
     val hdr: Boolean = false,
 )
+
+/** Controller motion sensor kinds, as the host names them. */
+enum class MotionType(internal val wire: Byte) {
+    ACCEL(com.limelight.nvstream.jni.MoonBridge.LI_MOTION_TYPE_ACCEL),
+    GYRO(com.limelight.nvstream.jni.MoonBridge.LI_MOTION_TYPE_GYRO);
+
+    companion object {
+        internal fun fromWire(wire: Byte): MotionType? = entries.firstOrNull { it.wire == wire }
+    }
+}
+
+/**
+ * Host-to-client features the engine receives but Nebula doesn't implement yet. Each is reported
+ * through [StreamListener.onUnsupportedHostFeature] instead of being dropped silently; [plannedFor]
+ * is the Nebula release that is meant to add it.
+ */
+enum class HostFeature(val title: String, val plannedFor: String, val why: String) {
+    ADAPTIVE_TRIGGERS("Adaptive triggers", "0.4", "Android has no public API for DualSense trigger effects; they need the USB driver path."),
+    LOCAL_CURSOR("Host cursor sync", "0.4", "Drawing the PC's own cursor shape on this device isn't built yet."),
+    DS5_HAPTICS("DualSense haptics", "0.4", "Host-authored DualSense haptics need the USB driver path."),
+    REMOTE_TEXT_CONTEXT("Keyboard on text focus", "0.4", "Opening the keyboard when a PC text field is focused isn't built yet."),
+}
 
 /** Why a stream ended. */
 enum class StreamEndReason { USER_QUIT, DISCONNECTED, HOST_ENDED, ERROR }
@@ -159,7 +187,22 @@ interface StreamListener {
     /** A host or engine message to show the user; [transient] ones fit a toast. */
     fun onMessage(message: String, transient: Boolean) {}
     fun onConnectionQuality(poor: Boolean) {}
+    /** Host game rumble for [controller]; motors are 0–65535, 0/0 stops. */
     fun onRumble(controller: Int, lowFreq: Int, highFreq: Int) {}
+    /** Impulse-trigger rumble (Xbox One/Series and DualSense triggers); 0–65535 each. */
+    fun onRumbleTriggers(controller: Int, left: Int, right: Int) {}
+    /**
+     * The host wants [type] motion samples from [controller] at [rateHz] (0 = stop). Send them with
+     * [InputBridge.motion]; sensors should run only while this is non-zero.
+     */
+    fun onMotionRequest(controller: Int, type: MotionType, rateHz: Int) {}
+    /** The host set the controller's light bar colour. */
+    fun onControllerLed(controller: Int, r: Int, g: Int, b: Int) {}
+    /**
+     * The host used a feature Nebula can't honour yet (see [HostFeature]). Sent once per feature
+     * per session, so the UI can say so instead of silently ignoring it.
+     */
+    fun onUnsupportedHostFeature(feature: HostFeature) {}
     fun onHdrModeChanged(enabled: Boolean) {}
     fun onResolutionChanged(width: Int, height: Int) {}
 }
