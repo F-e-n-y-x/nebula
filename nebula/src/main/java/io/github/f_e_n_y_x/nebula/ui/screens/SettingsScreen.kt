@@ -219,11 +219,6 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
             Spacer(Modifier.height(s.dp(12)))
             LegacySettingsList("gamepads")
         }
-        SettingsSection.FrameGen -> {
-            ComingBanner("Frame generation is coming in 0.4", "These are V+'s frame generation options, kept so your settings carry over. They do nothing in Nebula yet.")
-            Spacer(Modifier.height(s.dp(12)))
-            LegacySettingsList("framegen")
-        }
         SettingsSection.Advanced -> {
             BackgroundSection()
             Spacer(Modifier.height(s.dp(12)))
