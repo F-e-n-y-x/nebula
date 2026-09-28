@@ -17,6 +17,22 @@
     <!-- Host game rumble and audio haptics on this device (controllers need no permission). -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- Settings → About installs Nebula updates (downloaded, checksum- and signer-verified) through
+         PackageInstaller; the user confirms every install and must allow "Install unknown apps". -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!-- Makes the system package installer visible so the updater can check that the install
+         confirmation screen it launches belongs to a system app. -->
+    <queries>
+        <intent>
+            <action android:name="android.content.pm.action.CONFIRM_INSTALL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE" />
+            <data android:scheme="content" />
+        </intent>
+    </queries>
+
     <!-- One APK for phone, tablet and TV: touch is optional, leanback is supported but not required. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -65,5 +81,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/clipboard_file_paths" />
         </provider>
+
+        <!-- PackageInstaller status for self-updates; only reachable through Nebula's own PendingIntent. -->
+        <receiver
+            android:name=".update.UpdateInstallReceiver"
+            android:exported="false" />
     </application>
 </manifest>
