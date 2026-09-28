@@ -6,6 +6,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import com.limelight.nvstream.input.ControllerPacket
 import com.limelight.nvstream.jni.MoonBridge
+import io.github.f_e_n_y_x.nebula.input.ControllerLookup
 import io.github.f_e_n_y_x.nebula.input.RemoteInput
 
 /** Gamepad options, from V+'s preferences. */
@@ -35,8 +36,16 @@ class GamepadMapper(
     private val oscSlot: () -> Boolean = { false },
     private val traitsOf: (deviceId: Int) -> ControllerTraits? = ::deviceTraits,
     private val axesOf: (deviceId: Int) -> GamepadAxes = ::deviceAxes,
-) {
-    private class Pad(val index: Int) {
+    /**
+     * Extra LI_CCAP bits announced for a pad (motors, IMU, light bar) so the host builds a virtual
+     * controller that can rumble and report motion. Arguments: Android device id, player index.
+     */
+    private val capabilities: (deviceId: Int, index: Int) -> Int = { _, _ -> DEFAULT_CAPS },
+    /** A pad was bound to or released from a player slot. */
+    private val onPadsChanged: () -> Unit = {},
+) : ControllerLookup {
+    /** [deviceId] is the device that created the slot (companion nodes share it). */
+    private class Pad(val index: Int, val deviceId: Int) {
         var buttons = 0
         var lt = 0
         var rt = 0
@@ -125,6 +134,7 @@ class GamepadMapper(
         // A companion node going away doesn't unplug the pad it belongs to.
         if (pad in pads.values) return
         if (pad.announced) input()?.gamepad(pad.index, activeMask, 0, 0, 0, 0, 0, 0, 0)
+        onPadsChanged()
     }
 
     /** A device's capabilities changed (e.g. a pad reconnected with another layout). */
@@ -132,6 +142,15 @@ class GamepadMapper(
         traits.remove(deviceId)
         layouts.remove(deviceId)
     }
+
+    // ---- ControllerLookup (rumble, lights and motion find the physical pad here) ----
+
+    override fun deviceIdFor(index: Int): Int? = pads.values.firstOrNull { it.index == index }?.deviceId
+
+    override fun triggers(index: Int): Pair<Int, Int> =
+        pads.values.firstOrNull { it.index == index }?.let { it.lt to it.rt } ?: (0 to 0)
+
+    override fun indices(): Set<Int> = pads.values.map { it.index }.toSet()
 
     /** Releases everything, e.g. when the stream menu opens. */
     fun releaseAll() {
@@ -155,17 +174,17 @@ class GamepadMapper(
             if (owner != null) return@getOrPut owner.value
         }
         if (!config().multiController) {
-            Pad(first)
+            Pad(first, deviceId)
         } else {
             val used = pads.values.map { it.index }.toSet()
-            Pad((first until MAX_PADS).firstOrNull { it !in used } ?: first)
+            Pad((first until MAX_PADS).firstOrNull { it !in used } ?: first, deviceId)
         }
-    }
+    }.also { if (!it.announced) onPadsChanged() }
 
     private fun send(pad: Pad) {
         val bridge = input() ?: return
         if (!pad.announced) {
-            bridge.gamepadArrived(pad.index, activeMask, MoonBridge.LI_CTYPE_UNKNOWN, SUPPORTED, (MoonBridge.LI_CCAP_ANALOG_TRIGGERS.toInt() or MoonBridge.LI_CCAP_RUMBLE.toInt()).toShort())
+            bridge.gamepadArrived(pad.index, activeMask, MoonBridge.LI_CTYPE_UNKNOWN, SUPPORTED, capabilities(pad.deviceId, pad.index).toShort())
             pad.announced = true
         }
         bridge.gamepad(pad.index, activeMask, pad.buttons or pad.hat, pad.lt, pad.rt, pad.lx, pad.ly, pad.rx, pad.ry)
@@ -222,6 +241,7 @@ class GamepadMapper(
         fun physicalControllerPresent(): Boolean = InputDevice.getDeviceIds().any { id ->
             deviceTraits(id)?.let { it.isController && it.hasSticks } == true
         }
+        val DEFAULT_CAPS = MoonBridge.LI_CCAP_ANALOG_TRIGGERS.toInt() or MoonBridge.LI_CCAP_RUMBLE.toInt()
         val MENU_COMBO = ControllerPacket.PLAY_FLAG or ControllerPacket.BACK_FLAG
         val SUPPORTED = ControllerPacket.A_FLAG or ControllerPacket.B_FLAG or ControllerPacket.X_FLAG or ControllerPacket.Y_FLAG or
             ControllerPacket.UP_FLAG or ControllerPacket.DOWN_FLAG or ControllerPacket.LEFT_FLAG or ControllerPacket.RIGHT_FLAG or

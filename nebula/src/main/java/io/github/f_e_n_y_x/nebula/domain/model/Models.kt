@@ -11,7 +11,12 @@ data class Host(
     val gpu: String? = null,
     val version: String? = null,
     val runningGameId: String? = null,
-)
+    /** Nova's advertised /nova/v1 features ("motion", "rumble", …); null when unknown (not Nova). */
+    val features: Set<String>? = null,
+) {
+    /** True unless a Nova host says it lacks [feature]; other hosts are assumed capable. */
+    fun supports(feature: String): Boolean = features?.contains(feature) ?: true
+}
 
 enum class HostStatus { ONLINE, STREAMING, OFFLINE, UNKNOWN }
 
@@ -110,6 +115,10 @@ data class StreamStats(
     val width: Int = 0,
     val height: Int = 0,
     val receivedFps: Float = 0f,
+    /** Frames the host sent per second (received plus lost). */
+    val hostFps: Float = 0f,
+    val onePercentLowFps: Float = 0f,
+    val jitterMs: Float = 0f,
     val lossPercent: Float = 0f,
     val hostMs: Float = 0f,
     val networkMs: Float = 0f,

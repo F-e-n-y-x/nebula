@@ -52,7 +52,7 @@ class AppContainer(context: Context) {
     val prefs: PreferencesRepository = engine?.let { EnginePreferencesRepository(it, local, screen) } ?: local
     val hosts: HostRepository = engine?.let { EngineHostRepository(it) } ?: demo.hostRepository
     val library: LibraryRepository = engine?.let { EngineLibraryRepository(it) } ?: demo.libraryRepository
-    val stream: StreamRepository = engine?.let { EngineStreamRepository(it, screen) } ?: demo.streamRepository
+    val stream: StreamRepository = engine?.let { EngineStreamRepository(it, screen, context) } ?: demo.streamRepository
     val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)
 

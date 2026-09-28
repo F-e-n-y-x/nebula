@@ -42,7 +42,7 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /** State of the on-screen pad (player 1), sent whole on every change. */
-private class OscState(private val remote: () -> RemoteInput?) {
+private class OscState(private val remote: () -> RemoteInput?, private val motionCaps: () -> Int) {
     var buttons = 0
     var lt = 0
     var rt = 0
@@ -55,7 +55,11 @@ private class OscState(private val remote: () -> RemoteInput?) {
     fun send() {
         val o = remote() ?: return
         if (!announced) {
-            o.gamepadArrived(0, 1, MoonBridge.LI_CTYPE_XBOX, GamepadMapper.SUPPORTED, MoonBridge.LI_CCAP_ANALOG_TRIGGERS.toShort())
+            // With this device's sensors as motion source the host needs a motion-capable pad
+            // (it picks a DualSense for an unknown type with gyro/accel); otherwise an Xbox pad.
+            val motion = motionCaps()
+            val type = if (motion != 0) MoonBridge.LI_CTYPE_UNKNOWN else MoonBridge.LI_CTYPE_XBOX
+            o.gamepadArrived(0, 1, type, GamepadMapper.SUPPORTED, (MoonBridge.LI_CCAP_ANALOG_TRIGGERS.toInt() or motion).toShort())
             announced = true
         }
         o.gamepad(0, 1, buttons, lt, rt, lx, ly, rx, ry)
@@ -78,8 +82,8 @@ private class OscState(private val remote: () -> RemoteInput?) {
  * Select/Start (and Guide). Honours opacity, "only L3/R3" and "show Guide" from Settings.
  */
 @Composable
-fun OnScreenControls(remote: () -> RemoteInput?, opacity: Int, l3r3Only: Boolean, showGuide: Boolean) {
-    val state = remember { OscState(remote) }
+fun OnScreenControls(remote: () -> RemoteInput?, opacity: Int, l3r3Only: Boolean, showGuide: Boolean, motionCaps: () -> Int = { 0 }) {
+    val state = remember { OscState(remote, motionCaps) }
     DisposableEffect(Unit) { onDispose { state.release() } }
     val s = Nebula.scale
     val portrait = !Nebula.form.isLandscape

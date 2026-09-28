@@ -2,6 +2,8 @@ package io.github.f_e_n_y_x.nebula.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -207,6 +209,21 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
             Spacer(Modifier.height(s.dp(12)))
             LegacySettingsList("input")
         }
+        SettingsSection.Overlay -> {
+            StatsOverlaySection()
+            Spacer(Modifier.height(s.dp(12)))
+            LegacySettingsList("interface")
+        }
+        SettingsSection.Gamepads -> {
+            GamepadFeedbackSection()
+            Spacer(Modifier.height(s.dp(12)))
+            LegacySettingsList("gamepads")
+        }
+        SettingsSection.FrameGen -> {
+            ComingBanner("Frame generation is coming in 0.4", "These are V+'s frame generation options, kept so your settings carry over. They do nothing in Nebula yet.")
+            Spacer(Modifier.height(s.dp(12)))
+            LegacySettingsList("framegen")
+        }
         SettingsSection.Advanced -> {
             BackgroundSection()
             Spacer(Modifier.height(s.dp(12)))
@@ -282,8 +299,73 @@ private fun VirtualMouseSection() {
         ToggleRow("Natural scrolling", "Content follows your fingers, like a phone. Off scrolls like a mouse wheel.", natural) { natural = it; prefs.put(StreamUiPrefs.NATURAL_SCROLL_KEY, it) }
         ToggleRow("Pinch to zoom", "Zoom and pan the picture on this device; nothing is sent to the PC.", pinch) { pinch = it; prefs.put(StreamUiPrefs.PINCH_ZOOM_KEY, it) }
         ToggleRow("Mouse buttons bar", "Left, middle, right, scroll strip, drag lock and keyboard on screen.", bar) { bar = it; prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, it) }
-        ToggleRow("Local cursor", "Draws a pointer on this device. The PC's cursor also stays in the video until Nova can hide it.", cursor) { cursor = it; prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
+        ToggleRow("Pointer dot", "Draws a dot on this device where the pointer should be, for instant feedback.", cursor) { cursor = it; prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
+        ComingRow("Host cursor sync", "Coming in 0.4", "Showing the PC's real cursor shape here and hiding it in the video needs Nova's cursor channel.")
         ToggleRow("Capture a connected mouse", "Games get raw relative movement and the local pointer hides. Off keeps a free pointer.", capture) { capture = it; prefs.put(StreamUiPrefs.MOUSE_CAPTURE_KEY, it) }
+    }
+}
+
+/** A whole section that isn't built yet. */
+@Composable
+internal fun ComingBanner(title: String, text: String) {
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(14))
+    Column(
+        Modifier.widthIn(max = s.dp(720)).fillMaxWidth().background(NebulaColors.accentTint, shape).border(1.dp, NebulaColors.accent.copy(alpha = 0.5f), shape).padding(s.dp(16)),
+        verticalArrangement = Arrangement.spacedBy(s.dp(4)),
+    ) {
+        Text(title, style = Nebula.type.bodyStrong, color = NebulaColors.text)
+        Text(text, style = Nebula.type.label, color = NebulaColors.textSecondary)
+    }
+}
+
+/** One feature that isn't built yet, in Nebula's own sections. */
+@Composable
+internal fun ComingRow(title: String, badge: String, why: String) {
+    val s = Nebula.scale
+    Row(
+        Modifier.fillMaxWidth().background(NebulaColors.surface, RoundedCornerShape(s.dp(12))).padding(horizontal = s.dp(16), vertical = s.dp(12))
+            .semantics(mergeDescendants = true) { },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).alpha(0.62f)) {
+            Text(title, style = Nebula.type.bodyStrong, color = NebulaColors.text)
+            Text(why, style = Nebula.type.label, color = NebulaColors.textMuted)
+        }
+        Spacer(Modifier.width(s.dp(12)))
+        Pill(badge, color = NebulaColors.accentText, background = NebulaColors.accentTint)
+    }
+}
+
+/** Stats overlay: live preview, layout, position, size, transparency and metrics. */
+@Composable
+private fun StatsOverlaySection() {
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    val tick by prefs.changes().collectAsState(initial = null)
+    val cfg = remember(tick) { io.github.f_e_n_y_x.nebula.settings.StatsOverlaySettings.read(prefs) }
+    Column(Modifier.widthIn(max = Nebula.scale.dp(720))) {
+        SectionTitle("Stats overlay")
+        StatsOverlayControls(prefs, cfg, showToggle = true, showPreview = true)
+    }
+}
+
+/** Gyro passthrough and host rumble. */
+@Composable
+private fun GamepadFeedbackSection() {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    val tick by prefs.changes().collectAsState(initial = null)
+    val motion = remember(tick) { io.github.f_e_n_y_x.nebula.settings.MotionSettings.read(prefs) }
+    val rumble = remember(tick) { io.github.f_e_n_y_x.nebula.settings.RumbleSettings.read(prefs.prefs.all) }
+    val gyro = remember { ctx.getSystemService(android.hardware.SensorManager::class.java)?.getDefaultSensor(android.hardware.Sensor.TYPE_GYROSCOPE) != null }
+    Column(Modifier.widthIn(max = s.dp(720)), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
+        SectionTitle("Gyro")
+        MotionControls(prefs, motion, hostNote = null, phoneHasGyro = gyro)
+        SectionTitle("Rumble")
+        RumbleControls(prefs, rumble, hostNote = null)
+        Text("Controller light bars follow the game on Android 12 and later. Adaptive triggers and DualSense haptics are coming in 0.4.", style = Nebula.type.label, color = NebulaColors.textMuted)
     }
 }
 

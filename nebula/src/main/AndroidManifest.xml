@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Host game rumble and audio haptics on this device (controllers need no permission). -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- One APK for phone, tablet and TV: touch is optional, leanback is supported but not required. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />

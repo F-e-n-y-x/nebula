@@ -45,6 +45,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
+import io.github.f_e_n_y_x.nebula.settings.RowState
+import io.github.f_e_n_y_x.nebula.settings.rowState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import io.github.f_e_n_y_x.nebula.settings.SettingKind
 import io.github.f_e_n_y_x.nebula.settings.SettingSpec
 import io.github.f_e_n_y_x.nebula.settings.legacySettings
@@ -59,31 +64,13 @@ import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import org.json.JSONObject
 
 /** Keys that have a native control elsewhere in Settings, so they aren't listed twice. */
-internal val nativeKeys = setOf("list_resolution", "list_fps", "seekbar_bitrate_kbps", "video_format", "checkbox_stretch_video")
-
-/** Actions from V+ that need screens not yet rebuilt; listed honestly instead of hidden. */
-private val laterActions = mapOf(
-    "pref_framegen_pick_lossless_dll" to "Frame generation arrives in the next part.",
-    "pref_framegen_selftest" to "Frame generation arrives in the next part.",
-    "capability_diagnostic" to "The video capability report is being rebuilt.",
-    "use_external_display" to "External display output is being rebuilt.",
-    "game_menu_cards" to "Configure the stream menu from inside a stream.",
-    "list_perf_overlay_orientation" to "Set from the performance overlay while streaming.",
-    "list_perf_overlay_position" to "Set from the performance overlay while streaming.",
-    "perf_overlay_display_items" to "Set from the performance overlay while streaming.",
-    "controller_diagnostic" to "The controller test screen is being rebuilt.",
-    "controller_mouse_settings" to "Gamepad mouse settings are being rebuilt.",
-    "stick_calibration" to "Stick calibration is being rebuilt.",
-    "config_sync_select_directory" to "Use Export and Import to move settings between devices.",
-    "crown_config_management" to "Not part of Nebula.",
-    "check_for_updates" to "Nebula updates come from your own builds.",
-    "pref_developer_unlock" to "Everything is unlocked in Nebula.",
-    "sponsor_panel" to "Not part of Nebula.",
-    "local_image_picker" to "Nebula uses game art instead of a background image.",
-    "reset_background_image" to "Nebula uses game art instead of a background image.",
-    "about_us" to "See About.",
-    "documentation_handbook" to "See About.",
-    "open_source_notices" to "See About.",
+internal val nativeKeys = setOf(
+    "list_resolution", "list_fps", "seekbar_bitrate_kbps", "video_format", "checkbox_stretch_video",
+    // Stats overlay section
+    "checkbox_enable_perf_overlay", "list_perf_overlay_orientation", "list_perf_overlay_position", "perf_overlay_display_items",
+    "seekbar_perf_overlay_bg_opacity",
+    // Motion and rumble sections
+    "checkbox_gamepad_motion_sensors", "checkbox_gamepad_motion_fallback", "list_game_rumble_mode", "seekbar_vibrate_fallback_strength",
 )
 
 /** How the stream picture fills the screen. Stored as [SCALE_MODE_KEY] in V+'s preferences. */
@@ -125,6 +112,11 @@ internal fun LegacySettingsList(
 @Composable
 internal fun LegacyRow(spec: SettingSpec, prefs: LegacyPrefs) {
     val s = Nebula.scale
+    when (val state = rowState(spec.key)) {
+        is RowState.Coming -> return NotLiveRow(spec, "Coming in ${state.release}", state.why)
+        is RowState.Unavailable -> if (spec.kind !is SettingKind.Action || spec.key !in liveActions) return NotLiveRow(spec, null, state.why)
+        RowState.Live -> Unit
+    }
     val enabled = prefs.enabled(spec)
     val mod = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.45f)
     when (val k = spec.kind) {
@@ -148,6 +140,35 @@ internal fun LegacyRow(spec: SettingSpec, prefs: LegacyPrefs) {
         is SettingKind.Action -> ActionRow(spec, prefs, mod)
     }
 }
+
+/** V+ actions Nebula performs itself. */
+private val liveActions = setOf("custom_resolutions", "config_sync_export", "config_sync_import", "config_sync_import_external_snapshot", "reset_osc")
+
+/**
+ * A setting that isn't live: greyed, not focusable or clickable, with why. [badge] ("Coming in
+ * 0.4") marks planned work; without it the setting is deliberately not part of Nebula.
+ */
+@Composable
+private fun NotLiveRow(spec: SettingSpec, badge: String?, why: String) {
+    val s = Nebula.scale
+    Row(
+        Modifier.fillMaxWidth().card(s).padding(horizontal = s.dp(16), vertical = s.dp(12))
+            .notLiveSemantics(spec.title, badge, why),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).alpha(0.62f)) {
+            Text(spec.title, style = Nebula.type.bodyStrong, color = NebulaColors.text)
+            Text(why, style = Nebula.type.label, color = NebulaColors.textMuted, maxLines = 3)
+        }
+        if (badge != null) {
+            Spacer(Modifier.width(s.dp(12)))
+            Pill(badge, color = NebulaColors.accentText, background = NebulaColors.accentTint)
+        }
+    }
+}
+
+private fun Modifier.notLiveSemantics(title: String, badge: String?, why: String) =
+    this.then(Modifier.semantics(mergeDescendants = true) { contentDescription = listOfNotNull(title, badge, why).joinToString(". "); disabled() })
 
 private fun Modifier.card(s: io.github.f_e_n_y_x.nebula.ui.theme.NebulaScale) =
     this.background(NebulaColors.surface, RoundedCornerShape(s.dp(12)))
@@ -235,7 +256,7 @@ private fun TextRow(spec: SettingSpec, k: SettingKind.Text, prefs: LegacyPrefs, 
 private fun ActionRow(spec: SettingSpec, prefs: LegacyPrefs, mod: Modifier) {
     val s = Nebula.scale
     val ctx = LocalContext.current
-    val later = laterActions[spec.key]
+    val later: String? = null
     val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let { exportSettings(ctx, prefs, it) }
     }
@@ -265,8 +286,6 @@ private fun ActionRow(spec: SettingSpec, prefs: LegacyPrefs, mod: Modifier) {
         }
         if (action != null) {
             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = NebulaColors.textMuted, modifier = Modifier.size(s.dp(20)))
-        } else if (later != null && spec.key.startsWith("pref_framegen")) {
-            Pill("Next part", color = NebulaColors.accentText, background = NebulaColors.accentTint)
         }
     }
     if (editResolutions) CustomResolutionsDialog(onDismiss = { editResolutions = false })

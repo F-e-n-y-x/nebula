@@ -104,6 +104,7 @@ import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
 import kotlin.math.roundToInt
 
 /** Mutable state the Android input objects read; updated from composition. */
@@ -152,11 +153,24 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     var menu by remember { mutableStateOf(false) }
     val live = state is StreamState.Live
     val stats = (state as? StreamState.Live)?.stats
+    // A minute of stats for the graph layout.
+    val history = remember { androidx.compose.runtime.mutableStateListOf<StreamStats>() }
+    LaunchedEffect(stats) {
+        stats?.let { history.add(it); if (history.size > STATS_HISTORY) history.removeAt(0) }
+    }
     val ended = state is StreamState.Failed || state is StreamState.Ended
     var hint by remember { mutableStateOf(true) }
     LaunchedEffect(live) { if (live) { delay(6_000); hint = false } }
 
-    val end = { quit: Boolean -> vm.end(quit); nav.back() }
+    // "Show latency message after streaming": the session's average, like V+.
+    val latencyToast: () -> Unit = {
+        if (ui.latencyToast && history.isNotEmpty()) {
+            val avg = history.map { it.latencyMs }.average()
+            val fps = history.map { it.fps }.average()
+            Toast.makeText(ctx, "Average latency %.1f ms at %.0f fps".format(avg, fps), Toast.LENGTH_LONG).show()
+        }
+    }
+    val end = { quit: Boolean -> latencyToast(); vm.end(quit); nav.back() }
     // Back never leaves a running stream: it toggles the menu. Leaving is Disconnect / Quit.
     BackHandler { if (ended) nav.back() else menu = !menu }
 
@@ -166,6 +180,21 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         bars.hide(WindowInsetsCompat.Type.systemBars())
         onDispose { bars.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+
+    // "Follow device rotation" off: keep the orientation the stream started in.
+    DisposableEffect(ui.followRotation) {
+        val before = activity.requestedOrientation
+        if (!ui.followRotation) activity.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        onDispose { activity.requestedOrientation = before }
+    }
+    // "Maximum display brightness for HDR" while the host sends HDR.
+    val hdrNow = stats?.hdr == true
+    DisposableEffect(hdrNow, ui.hdrMaxBrightness) {
+        val w = activity.window
+        val before = w.attributes.screenBrightness
+        if (hdrNow && ui.hdrMaxBrightness) w.attributes = w.attributes.apply { screenBrightness = 1f }
+        onDispose { w.attributes = w.attributes.apply { screenBrightness = before } }
     }
 
     // The ongoing "Streaming…" notification needs permission on Android 13+; ask once.
@@ -184,6 +213,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     input.ui = ui
     input.active = live && !menu
     val uiNow by rememberUpdatedState(ui)
+    val stream = container.stream
     var inputView by remember { mutableStateOf<StreamInputView?>(null) }
     var devices by remember { mutableIntStateOf(0) }
     // With a physical controller attached the on-screen controls stay away (no second, silent
@@ -191,7 +221,28 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     val padPresent = remember(devices) { GamepadMapper.physicalControllerPresent() }
     val oscShown = live && !menu && ui.osc && (!padPresent || ui.oscWithGamepad)
     val oscShownNow by rememberUpdatedState(oscShown)
-    val pad = remember(remote) { GamepadMapper(remote, onMenu = { menu = true }, config = { uiNow.gamepad }, oscSlot = { oscShownNow }) }
+    val pad = remember(remote) {
+        GamepadMapper(
+            remote, onMenu = { menu = true }, config = { uiNow.gamepad }, oscSlot = { oscShownNow },
+            capabilities = { id, index -> stream.padCapabilities(id, index) ?: GamepadMapper.DEFAULT_CAPS },
+            onPadsChanged = { stream.refreshFeedback() },
+        )
+    }
+    // Rumble, light bar and motion reach the physical pad through the mapper.
+    DisposableEffect(pad) {
+        stream.bindControllers(pad)
+        onDispose { stream.bindControllers(null) }
+    }
+    LaunchedEffect(ui.motion, live) { if (live) stream.refreshFeedback() }
+    var hapticsNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ui.haptics, live) {
+        if (live) hapticsNote = if (stream.applyAudioHaptics(ui.haptics)) null else "Music on this device uses Android's audio-coupled haptics; that change applies from the next stream."
+    }
+    val host by remember(hostId) { container.hosts.observeHosts().map { list -> list.firstOrNull { it.id == hostId } } }.collectAsState(initial = null)
+    val unsupported by stream.unsupportedFeatures.collectAsState(initial = emptyList())
+    val phoneHasGyro = remember {
+        ctx.getSystemService(android.hardware.SensorManager::class.java)?.getDefaultSensor(android.hardware.Sensor.TYPE_GYROSCOPE) != null
+    }
 
     // Keys, gamepads and D-pad go to the PC while the menu is closed.
     // On-screen PC keyboard (V+'s custom keyboard); the three-finger tap, float ball and mouse bar open it.
@@ -328,9 +379,18 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
-        if (oscShown) OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
-        if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
-        if (live && !menu && ui.perf != PerfDetail.OFF && stats != null) PerfOverlay(stats, ui.perf == PerfDetail.FULL, ui.perfOpacity, Modifier.align(if (oscShown) Alignment.TopCenter else Alignment.TopStart))
+        if (oscShown) {
+            OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide, motionCaps = {
+                (stream.padCapabilities(-1, 0) ?: 0) and (com.limelight.nvstream.jni.MoonBridge.LI_CCAP_GYRO.toInt() or com.limelight.nvstream.jni.MoonBridge.LI_CCAP_ACCEL.toInt())
+            })
+        }
+        val statsAtTop = ui.stats.enabled && ui.stats.position.row == 0
+        if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (statsAtTop) 60 + (ui.stats.metrics.size.coerceAtMost(8) * if (ui.stats.layout == io.github.f_e_n_y_x.nebula.settings.StatLayout.CARD) 18 else 0) else 12)
+        if (live && !menu && ui.stats.enabled && stats != null) {
+            StatsOverlay(stats, history, ui.stats.copy(opacity = ui.overlayOpacity), draggable = !Nebula.form.isTv) { p ->
+                io.github.f_e_n_y_x.nebula.settings.StatsOverlaySettings.setPosition(prefs, p)
+            }
+        }
         if (live && !menu && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
         if (live && !menu && ui.floatBall && !pcKeyboard) {
             FloatBall(
@@ -398,6 +458,10 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     saved = gameVideoMode,
                     onApply = vm::changeResolution,
                 ),
+                supports = { f -> host?.supports(f) ?: true },
+                unsupported = unsupported,
+                hapticsNote = hapticsNote,
+                phoneHasGyro = phoneHasGyro,
                 actions = StreamMenuActions(
                     onResume = { menu = false },
                     onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },
@@ -490,27 +554,6 @@ private class StreamKeySink(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
         )
-    }
-}
-
-@Composable
-private fun PerfOverlay(x: StreamStats, full: Boolean, opacity: Int, modifier: Modifier) {
-    val s = Nebula.scale
-    val bg = Color(0xFF0A0A0B).copy(alpha = opacity.coerceIn(0, 100) / 100f)
-    Column(
-        modifier.systemBarsPadding().padding(s.dp(12)).background(bg, RoundedCornerShape(s.dp(10))).padding(horizontal = s.dp(10), vertical = s.dp(6)),
-    ) {
-        Text(
-            "${x.fps} fps · ${"%.0f".format(x.bitrateMbps)} Mbps · ${"%.1f".format(x.latencyMs)} ms",
-            style = Nebula.type.mono, color = NebulaColors.text,
-        )
-        if (full) {
-            Text("${x.resolution} · ${x.codec} · loss ${"%.1f".format(x.lossPercent)}%", style = Nebula.type.mono, color = NebulaColors.textSecondary)
-            Text(
-                "host ${"%.1f".format(x.hostMs)} · net ${"%.1f".format(x.networkMs)} · dec ${"%.1f".format(x.decodeMs)} · ren ${"%.1f".format(x.renderMs)}",
-                style = Nebula.type.mono, color = NebulaColors.textSecondary,
-            )
-        }
     }
 }
 

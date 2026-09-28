@@ -52,6 +52,8 @@ import io.github.f_e_n_y_x.nebula.input.Shortcut
 import io.github.f_e_n_y_x.nebula.input.TouchMode
 import io.github.f_e_n_y_x.nebula.input.menuShortcuts
 import io.github.f_e_n_y_x.nebula.settings.LegacyPrefs
+import io.github.f_e_n_y_x.nebula.settings.StatLayout
+import io.github.f_e_n_y_x.nebula.settings.StatsOverlaySettings
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaConfirmDialog
@@ -95,6 +97,12 @@ fun StreamMenu(
     zoomed: Boolean,
     actions: StreamMenuActions,
     resolution: LiveResolutionUi? = null,
+    /** False when a Nova host says it lacks a feature ("motion", "rumble", …). */
+    supports: (String) -> Boolean = { true },
+    /** Host features this stream used that Nebula doesn't do yet. */
+    unsupported: List<String> = emptyList(),
+    hapticsNote: String? = null,
+    phoneHasGyro: Boolean = true,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -125,9 +133,13 @@ fun StreamMenu(
             verticalArrangement = Arrangement.spacedBy(s.dp(18)),
         ) {
             Header(gameName, mode, stats)
-            StatsBlock(stats, ui.perf == PerfDetail.FULL)
+            StatsBlock(stats, full = true)
             resolution?.let { ResolutionRow(it, onOpen = { picking = true }) }
             Controls(ui, prefs, actions, gameKey, zoomed)
+            FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)
+            if (unsupported.isNotEmpty()) {
+                Text("This game asked for: ${unsupported.joinToString()}.", style = Nebula.type.label, color = NebulaColors.textMuted)
+            }
             Bitrate(bitrateKbps, bitrateNote, actions.onBitrate)
             Keys(actions.onShortcut)
             if (gamepads > 0) Text("$gamepads controller${if (gamepads > 1) "s" else ""} connected · Start + Select opens this menu", style = Nebula.type.label, color = NebulaColors.textMuted)
@@ -231,8 +243,8 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
         }
         ToggleRow("Mouse buttons bar", "Left, middle, right, scroll strip, drag lock and keyboard on screen.", ui.mouseBar) { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, it) }
         ToggleRow(
-            "Local cursor",
-            "Draws a pointer on this device for instant feedback. Your PC's own cursor stays in the video too, until Nova can hide it.",
+            "Pointer dot",
+            "Draws a dot on this device where the pointer should be, for instant feedback. Syncing the PC's real cursor (and hiding it in the video) is coming in 0.4.",
             ui.localCursor,
         ) { prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
         MenuSetting("Picture") {
@@ -241,13 +253,47 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
                 prefs.put("checkbox_stretch_video", m == ScaleMode.STRETCH)
             }
         }
-        MenuSetting("Performance overlay") {
-            Segmented(PerfDetail.entries.map { it.label to it }, ui.perf) { d ->
-                prefs.put("checkbox_enable_perf_overlay", d != PerfDetail.OFF)
-                if (d != PerfDetail.OFF) prefs.put(StreamUiPrefs.PERF_DETAIL_KEY, d.id)
-            }
-        }
+        StatsQuick(ui, prefs)
         ToggleRow("On-screen controls", "Virtual gamepad buttons over the stream.", ui.osc) { prefs.put("checkbox_show_onscreen_controls", it) }
+    }
+}
+
+/** Stats overlay quick switch (Off / Line / Card / Graph) plus the full picker. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StatsQuick(ui: StreamUiPrefs, prefs: LegacyPrefs) {
+    val s = Nebula.scale
+    var picker by remember { mutableStateOf(false) }
+    val current: StatLayout? = if (ui.stats.enabled) ui.stats.layout else null
+    MenuSetting("Stats overlay · ${ui.stats.metrics.size} metrics, ${ui.stats.position.label.lowercase()}") {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            Segmented(listOf<Pair<String, StatLayout?>>("Off" to null) + StatLayout.entries.map { it.label to it }, current) { l ->
+                StatsOverlaySettings.setEnabled(prefs, l != null)
+                if (l != null) StatsOverlaySettings.setLayout(prefs, l)
+            }
+            NebulaButton("Metrics & position", onClick = { picker = true }, style = ButtonStyle.Secondary)
+        }
+    }
+    if (picker) StatsOverlayDialog(prefs, ui.stats) { picker = false }
+}
+
+/** Gyro, rumble and audio haptics for this stream; changes apply live. */
+@Composable
+private fun FeedbackSection(ui: StreamUiPrefs, prefs: LegacyPrefs, supports: (String) -> Boolean, hapticsNote: String?, phoneHasGyro: Boolean) {
+    val s = Nebula.scale
+    Column(verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
+        SectionTitle("Gyro", Modifier.padding(bottom = 0.dp))
+        MotionControls(
+            prefs, ui.motion,
+            hostNote = if (!supports("motion")) "Your PC doesn't report motion support; gyro won't reach games." else null,
+            phoneHasGyro = phoneHasGyro,
+        )
+        SectionTitle("Rumble & haptics", Modifier.padding(bottom = 0.dp))
+        RumbleControls(
+            prefs, io.github.f_e_n_y_x.nebula.settings.RumbleSettings.read(prefs.prefs.all),
+            hostNote = if (!supports("rumble")) "Your PC doesn't report rumble support." else null,
+        )
+        HapticsControls(prefs, ui.haptics, hapticsNote)
     }
 }
 
@@ -314,7 +360,7 @@ private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: St
 private fun OverlayTransparency(opacity: Int, onOpacity: (Int) -> Unit) {
     val s = Nebula.scale
     val transparency = 100 - opacity
-    MenuSetting("Overlay transparency · keyboard, controls, mouse bar, float ball") {
+    MenuSetting("Overlay transparency · keyboard, controls, mouse bar, float ball, stats") {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
             NebulaButton("−", onClick = { onOpacity(opacity + STEP) }, style = ButtonStyle.Secondary, modifier = Modifier.semantics { contentDescription = "Less transparent" })
             SliderField(

@@ -117,6 +117,7 @@ private fun EngineHost.toDomain() = Host(
     paired = paired,
     isNova = isNova,
     version = novaCapabilities?.version?.let { "Nova $it" },
+    features = novaCapabilities?.features,
     runningGameId = runningAppId?.toString(),
 )
 
@@ -226,7 +227,18 @@ class EngineArtworkRepository(private val engine: NebulaEngine) : ArtworkReposit
 class EngineStreamRepository(
     private val engine: NebulaEngine,
     private val deviceResolution: () -> Pair<Int, Int>,
+    context: android.content.Context,
 ) : StreamRepository {
+    private val app = context.applicationContext
+    private val legacy = io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(app)
+    @Volatile private var lookup: io.github.f_e_n_y_x.nebula.input.ControllerLookup? = null
+    private var feedback: ControllerFeedback? = null
+    private var motion: MotionForwarder? = null
+    private var rotation: () -> Int = { 0 }
+
+    private fun motionSettings() = io.github.f_e_n_y_x.nebula.settings.MotionSettings.read(legacy)
+    private fun rumbleSettings() = io.github.f_e_n_y_x.nebula.settings.RumbleSettings.read(legacy.prefs.all)
+
     private val current = kotlinx.coroutines.flow.MutableStateFlow<StreamSession?>(null)
     private var session: StreamSession?
         get() = current.value
@@ -259,6 +271,40 @@ class EngineStreamRepository(
     override suspend fun switchMode(mode: VideoMode): Result<Unit> =
         run?.switchTo(mode) ?: Result.failure(IllegalStateException("Nothing is streaming."))
 
+    override fun bindControllers(lookup: io.github.f_e_n_y_x.nebula.input.ControllerLookup?) {
+        this.lookup = lookup
+    }
+
+    override fun padCapabilities(deviceId: Int, index: Int): Int {
+        val hw = PadHardware.of(android.view.InputDevice.getDevice(deviceId))
+        var caps = hw.capabilities()
+        // This device's sensors stand in for controller 0 when the pad has none.
+        if (index == 0 && !hw.gyro) caps = caps or (motion?.phoneCapabilities() ?: 0)
+        return caps
+    }
+
+    override fun refreshFeedback() {
+        motion?.refresh()
+        announcePhonePadIfNeeded()
+    }
+
+    override fun applyAudioHaptics(settings: io.github.f_e_n_y_x.nebula.settings.HapticsSettings): Boolean =
+        session?.setAudioHaptics(settings.toEngine()) ?: true
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override val unsupportedFeatures: Flow<List<String>> =
+        current.flatMapLatest { s -> s?.unsupportedHostFeatures?.map { set -> set.map { "${it.title} (coming in ${it.plannedFor})" } } ?: kotlinx.coroutines.flow.flowOf(emptyList()) }
+
+    /** Phone as the motion source with no pad attached: announce a motion-capable controller 0 ourselves. */
+    private fun announcePhonePadIfNeeded() {
+        val m = motion ?: return
+        val input = input ?: return
+        val anyPad = lookup?.indices()?.isNotEmpty() == true
+        if (!MotionRouting.announcePhonePad(motionSettings(), anyPad, m.phoneHasGyro)) return
+        input.gamepadArrived(0, 1, com.limelight.nvstream.jni.MoonBridge.LI_CTYPE_UNKNOWN, GamepadMapper.SUPPORTED, (GamepadMapper.DEFAULT_CAPS or m.phoneCapabilities()).toShort())
+        input.gamepad(0, 1, 0, 0, 0, 0, 0, 0, 0)
+    }
+
     override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = callbackFlow {
         val surface = target as? SurfaceStreamTarget ?: error("The engine streams into a SurfaceStreamTarget")
         send(StreamState.Starting)
@@ -267,7 +313,13 @@ class EngineStreamRepository(
             width = w, height = h, fps = settings.fps, bitrateKbps = settings.bitrateKbps, codec = settings.codec.toEngine(),
             novaDisplay = if (mode == DisplayMode.MIRROR) NovaDisplayMode.MIRROR else NovaDisplayMode.VIRTUAL,
         )
-        val r = Run(this, game, surface, request)
+        val fb = ControllerFeedback(app, { lookup }, ::rumbleSettings, onDeviceRumble = { session?.setGameRumbleOnDevice(it) })
+        val mf = MotionForwarder(app, { lookup }, ::motionSettings, rotation = { rotation() }) { c, type, x, y, z -> input?.motion(c, type, x, y, z) }
+        feedback = fb
+        motion = mf
+        @Suppress("DEPRECATION")
+        rotation = { surface.activity.windowManager.defaultDisplay.rotation }
+        val r = Run(this, game, surface, request, fb, mf)
         run = r
         // startStream must run on the main thread with a live surface.
         withContext(Dispatchers.Main.immediate) {
@@ -278,7 +330,13 @@ class EngineStreamRepository(
             if (run === r) run = null
             session?.disconnect()
             session = null
+            releaseFeedback()
         }
+    }
+
+    private fun releaseFeedback() {
+        feedback?.release(); feedback = null
+        motion?.release(); motion = null
     }
 
     override fun stop(quitApp: Boolean) {
@@ -296,6 +354,8 @@ class EngineStreamRepository(
         private val game: Game,
         private val surface: SurfaceStreamTarget,
         @Volatile var request: StreamRequest,
+        private val feedback: ControllerFeedback,
+        private val motion: MotionForwarder,
     ) {
         private var statsJob: Job? = null
 
@@ -314,7 +374,16 @@ class EngineStreamRepository(
                     if (!isMine()) return
                     statsJob?.cancel()
                     statsJob = out.launch { s.stats.collect { out.trySend(StreamState.Live(it.toDomain())) } }
+                    s.audioHapticsGamepad = feedback
+                    announcePhonePadIfNeeded()
                     pending?.complete(Result.success(Unit))
+                }
+
+                override fun onRumble(controller: Int, lowFreq: Int, highFreq: Int) { if (isMine()) feedback.rumble(controller, lowFreq, highFreq) }
+                override fun onRumbleTriggers(controller: Int, left: Int, right: Int) { if (isMine()) feedback.rumbleTriggers(controller, left, right) }
+                override fun onControllerLed(controller: Int, r: Int, g: Int, b: Int) { if (isMine()) feedback.setLed(controller, r, g, b) }
+                override fun onMotionRequest(controller: Int, type: io.github.fenyx.nebula.engine.MotionType, rateHz: Int) {
+                    if (isMine()) motion.onRequest(controller, type, rateHz)
                 }
 
                 override fun onStageFailed(stage: String, errorCode: Int) {
@@ -340,6 +409,7 @@ class EngineStreamRepository(
                             else -> StreamState.Ended(reason.message(errorCode))
                         },
                     )
+                    releaseFeedback()
                     out.channel.close()
                 }
             }
@@ -414,6 +484,13 @@ private fun StreamEndReason.message(errorCode: Int): String? = when (this) {
     StreamEndReason.ERROR -> "The stream stopped with error $errorCode."
 }
 
+private fun io.github.f_e_n_y_x.nebula.settings.HapticsSettings.toEngine() = io.github.fenyx.nebula.engine.AudioHapticsConfig(
+    enabled = enabled,
+    strength = strength,
+    route = io.github.fenyx.nebula.engine.AudioHapticsRoute.fromWire(route),
+    scene = io.github.fenyx.nebula.engine.AudioHapticsScene.fromWire(scene),
+)
+
 private fun EngineStats.toDomain(): StreamStats {
     val d = decoder?.lowercase().orEmpty()
     val codec = when {
@@ -431,6 +508,9 @@ private fun EngineStats.toDomain(): StreamStats {
         width = width,
         height = height,
         receivedFps = receivedFps,
+        hostFps = hostFps,
+        onePercentLowFps = onePercentLowFps,
+        jitterMs = jitterMs,
         lossPercent = lossPercent,
         hostMs = latency.hostMs,
         networkMs = latency.networkMs,

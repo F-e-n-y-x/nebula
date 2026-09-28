@@ -153,7 +153,8 @@ class DemoHost(private val context: Context) {
                         StreamState.Live(
                             StreamStats(
                                 "${m.width}×${m.height}", m.fps, 28f + (t % 5), 5.6f + (t % 3) * 0.3f, "HEVC",
-                                width = m.width, height = m.height, receivedFps = m.fps.toFloat(), lossPercent = 0.1f * (t % 2),
+                                width = m.width, height = m.height, receivedFps = m.fps.toFloat(),
+                                hostFps = m.fps.toFloat(), onePercentLowFps = m.fps * 0.9f - (t % 4), jitterMs = 0.4f + (t % 3) * 0.3f, lossPercent = 0.1f * (t % 2),
                                 hostMs = 1.8f, networkMs = 2.1f + (t % 3) * 0.3f, decodeMs = 1.2f, renderMs = 0.5f, decoder = "c2.android.hevc.decoder",
                             ),
                         ),
