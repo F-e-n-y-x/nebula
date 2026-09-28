@@ -193,7 +193,7 @@ fun rememberStreamHostState(container: AppContainer, hostId: String, gameId: Str
         NebulaChoiceDialog(
             title = "Use your microphone on the PC?",
             text = "Nebula sends this device's microphone to your PC as \"Nova Mic\", for voice chat in games and apps. " +
-                "Audio is only sent while the mic is on in the stream menu, and it pauses when Nebula leaves the screen.",
+                "Audio is only sent while the mic is unmuted, and it pauses whenever Nebula leaves the screen.",
             confirm = "Continue",
             dismiss = "Not now",
             onConfirm = { state.rationale = false; state.ask() },
@@ -301,7 +301,9 @@ fun StreamHostMenuSection(state: StreamHostState, prefs: LegacyPrefs, onTypeClip
             val images = prefs.prefs.getBoolean("checkbox_clipboard_sync_image", false)
             when (state.link.clipboard) {
                 ClipboardMode.SYNCING -> Pill(
-                    "Syncing ${listOfNotNull("text".takeIf { text }, "images".takeIf { images }).joinToString(" and ")} both ways",
+                    listOfNotNull("text".takeIf { text }, "images".takeIf { images }).joinToString(" and ").let { what ->
+                        if (what.isEmpty()) "Clipboard syncs both ways" else "Syncing $what both ways"
+                    },
                     color = NebulaColors.success, background = NebulaColors.successTint,
                 )
                 ClipboardMode.UNSUPPORTED -> Text("$hostName doesn't sync the clipboard. Typing it still works.", style = Nebula.type.label, color = NebulaColors.textMuted)
