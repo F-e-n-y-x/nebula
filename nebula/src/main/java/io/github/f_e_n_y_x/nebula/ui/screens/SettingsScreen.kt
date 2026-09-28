@@ -79,6 +79,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.BuildConfig
+import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Resolution
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
@@ -469,6 +470,12 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
         }
         Setting("Video codec", "Auto picks HEVC when both sides support it.") {
             Segmented(listOf("Auto" to VideoCodec.AUTO, "HEVC" to VideoCodec.HEVC, "H.264" to VideoCodec.H264, "AV1" to VideoCodec.AV1), st.codec) { c -> update { it.copy(codec = c) } }
+        }
+        Setting(
+            "Portrait streaming",
+            "Follow rotation: turn this device and the PC's display turns with it (${dw}×$dh ↔ ${dh}×$dw, a quick reconnect). Off keeps the stream the way it started; Rotate in the stream menu still turns it.",
+        ) {
+            Segmented(listOf("Off" to PortraitStreaming.OFF, "Follow rotation" to PortraitStreaming.FOLLOW_ROTATION), st.portraitStreaming) { v -> update { it.copy(portraitStreaming = v) } }
         }
         if (editCustom) CustomResolutionsDialog(onDismiss = { editCustom = false })
         Setting("Default screen for games", "Used until you choose per game on its page.") {

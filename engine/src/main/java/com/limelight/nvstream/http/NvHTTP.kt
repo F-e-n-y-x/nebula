@@ -874,10 +874,9 @@ class NvHTTP(
         streamConfig.getUseVdd()?.let { useVdd ->
             queryParams += "&useVdd=${if (useVdd) 1 else 0}"
         }
-        // Nova extension: pick the host desktop for this launch; other hosts ignore it.
-        streamConfig.getNovaDisplayMode()?.let { mode ->
-            if (mode == "virtual" || mode == "mirror") queryParams += "&nova_display=$mode"
-        }
+        // Nova extensions: the host desktop for this launch and the orientation the client streams
+        // in; other hosts ignore them.
+        queryParams += novaLaunchQuery(streamConfig.getNovaDisplayMode(), streamConfig.getNovaOrientation())
         // Sunshine extension: touch-keyboard auto-invoke intent. Explicitly
         // sending 0 lets the client override a host-side per-client opt-in.
         streamConfig.getTouchKeyboard()?.let { touchKeyboard ->
@@ -1334,6 +1333,17 @@ class NvHTTP(
                 }
                 throw e.withSunshineErrorCode(sunshineErrorCode)
             }
+        }
+
+        /**
+         * Nova's extra /launch and /resume arguments: `&nova_display=virtual|mirror` and
+         * `&nova_orientation=portrait|landscape`. Unknown values are left out.
+         */
+        fun novaLaunchQuery(displayMode: String?, orientation: String?): String {
+            var q = ""
+            if (displayMode == "virtual" || displayMode == "mirror") q += "&nova_display=$displayMode"
+            if (orientation == "portrait" || orientation == "landscape") q += "&nova_orientation=$orientation"
+            return q
         }
 
         fun parseDisplayCatalog(jsonStr: String): DisplayCatalog {

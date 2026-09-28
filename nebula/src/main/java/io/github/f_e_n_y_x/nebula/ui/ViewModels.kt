@@ -6,6 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.LiveResolutionSwitcher
+import io.github.f_e_n_y_x.nebula.domain.Orientation
+import io.github.f_e_n_y_x.nebula.domain.Portrait
+import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
+import io.github.f_e_n_y_x.nebula.domain.RotationFollower
+import io.github.f_e_n_y_x.nebula.domain.orientation
 import io.github.f_e_n_y_x.nebula.domain.SortLibrary
 import io.github.f_e_n_y_x.nebula.domain.SwitchOutcome
 import io.github.f_e_n_y_x.nebula.domain.SwitchState
@@ -248,7 +253,10 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
             }
             c.prefs.setMode(hostId, gameId, mode)
             val base = c.prefs.streamSettings.first()
-            val initial = startingMode(base, c.prefs.videoModeFor(hostId, gameId).first(), c.deviceResolution())
+            val initial = Portrait.startMode(
+                startingMode(base, c.prefs.videoModeFor(hostId, gameId).first(), c.deviceResolution()),
+                base.portraitStreaming, c.deviceOrientation(),
+            )
             _startMode.value = initial
             val settings = base.copy(resolution = initial.resolution, fps = initial.fps)
             _bitrateKbps.value = settings.bitrateKbps
@@ -301,6 +309,99 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
     }
 
     fun clearSwitchNote() { _switchNote.value = null }
+
+    private val _rotatedFromMenu = MutableStateFlow(false)
+
+    /**
+     * The mode the Activity's orientation follows ([Portrait.orientationMode]): the start mode,
+     * or the current one when following rotation or after Rotate in the menu.
+     */
+    val orientationMode: StateFlow<VideoMode?> = combine(_startMode, _switch, settings, _rotatedFromMenu) { start, sw, st, menu ->
+        val current = when (sw) {
+            is SwitchState.Streaming -> sw.mode
+            is SwitchState.Switching -> sw.to
+            is SwitchState.RollingBack -> sw.to
+            else -> null
+        }
+        Portrait.orientationMode(st.portraitStreaming, start, current, menu)
+    }.stateIn(this, null)
+
+    private val _rotatingTo = MutableStateFlow<VideoMode?>(null)
+    /** The mode a rotation is switching to (for the "Rotating…" pill), or null. */
+    val rotatingTo: StateFlow<VideoMode?> = _rotatingTo.asStateFlow()
+
+    private val follower = RotationFollower()
+    private var followJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * "Follow rotation": the screen now faces [orientation] (null while flat or unknown). After it
+     * has held for the debounce, the stream is switched to the rotated size.
+     */
+    fun onScreenOrientation(orientation: Orientation?) {
+        if (settings.value.portraitStreaming != PortraitStreaming.FOLLOW_ROTATION) {
+            follower.reset()
+            return
+        }
+        follower.observe(orientation, SystemClock.elapsedRealtime())
+        scheduleFollow()
+    }
+
+    private fun scheduleFollow() {
+        followJob?.cancel()
+        val due = follower.dueAt() ?: return
+        followJob = viewModelScope.launch {
+            kotlinx.coroutines.delay((due - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+            // Wait for a running switch (and the stream to be live) before deciding.
+            val sw = switcher ?: return@launch
+            sw.state.first { !it.busy }
+            _state.first { it is StreamState.Live }
+            val target = follower.decide(SystemClock.elapsedRealtime(), sw.mode, sw.state.value.busy) ?: return@launch
+            Log.i(TAG, "Follow rotation: ${sw.mode?.label} → ${target.label}")
+            rotateTo(target)
+        }
+    }
+
+    /**
+     * Turns the stream 90° (portrait ↔ landscape) from the menu: a live mode change to the same
+     * size with width and height swapped, same frame rate and display mode. The screen turns with it.
+     */
+    fun rotate() {
+        val from = switcher?.mode ?: return
+        _rotatedFromMenu.value = true
+        rotateTo(Portrait.rotated(from))
+    }
+
+    private fun rotateTo(target: VideoMode) {
+        val sw = switcher ?: return
+        val from = sw.mode ?: return
+        if (_state.value !is StreamState.Live || target == from) return
+        viewModelScope.launch {
+            _switchNote.value = null
+            _rotatingTo.value = target
+            val outcome = try { sw.switchTo(target) } finally { _rotatingTo.value = null }
+            when (outcome) {
+                is SwitchOutcome.Switched -> {
+                    Log.i(TAG, "Rotate: ${target.label} in ${outcome.elapsedMs} ms")
+                    val way = if (target.orientation == Orientation.PORTRAIT) "portrait" else "landscape"
+                    _switchNote.value = SwitchNote("Now streaming in $way at ${target.label} · %.1f s".format(outcome.elapsedMs / 1000f), ok = true)
+                }
+                is SwitchOutcome.RolledBack -> {
+                    Log.w(TAG, "Rotate: ${target.label} failed (${outcome.reason}); back at ${outcome.restored.label}")
+                    _switchNote.value = SwitchNote("Couldn't rotate to ${target.label}. ${outcome.reason} Back at ${outcome.restored.label}.", ok = false)
+                }
+                is SwitchOutcome.Lost -> {
+                    Log.w(TAG, "Rotate: stream lost: ${outcome.reason}")
+                    _switch.value = sw.state.value
+                    _state.value = StreamState.Failed("Couldn't rotate the stream. ${outcome.reason}")
+                    session?.cancel()
+                    c.onStreamEnded()
+                }
+                SwitchOutcome.Unchanged, SwitchOutcome.Busy -> Unit
+            }
+            // The device may have been turned again meanwhile.
+            scheduleFollow()
+        }
+    }
 
     private suspend fun rememberChoice(target: VideoMode, remember: Boolean) {
         when {

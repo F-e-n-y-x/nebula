@@ -129,6 +129,8 @@ data class StreamSettings(
     val bitrateKbps: Int = 30_000,
     val codec: VideoCodec = VideoCodec.AUTO,
     val defaultMode: DisplayMode = DisplayMode.VIRTUAL,
+    /** "Portrait streaming": Off, or follow the device's rotation (the PC gets a portrait mode). */
+    val portraitStreaming: io.github.f_e_n_y_x.nebula.domain.PortraitStreaming = io.github.f_e_n_y_x.nebula.domain.PortraitStreaming.OFF,
 )
 
 /** How the library shows games, and how much artwork it keeps. */

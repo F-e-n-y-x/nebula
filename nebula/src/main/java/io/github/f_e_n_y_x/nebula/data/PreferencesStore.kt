@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
 import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
@@ -28,6 +29,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
         val bitrate = intPreferencesKey("stream_bitrate_kbps")
         val codec = stringPreferencesKey("stream_codec")
         val defaultMode = stringPreferencesKey("stream_default_mode")
+        val portrait = stringPreferencesKey("stream_portrait_mode")
         val lastHost = stringPreferencesKey("last_host")
         val showDetails = booleanPreferencesKey("library_show_details")
         val showPlaytime = booleanPreferencesKey("library_show_playtime")
@@ -45,6 +47,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
             bitrateKbps = p[Keys.bitrate] ?: d.bitrateKbps,
             codec = p[Keys.codec]?.let { runCatching { VideoCodec.valueOf(it) }.getOrNull() } ?: d.codec,
             defaultMode = p[Keys.defaultMode]?.let { runCatching { DisplayMode.valueOf(it) }.getOrNull() } ?: d.defaultMode,
+            portraitStreaming = p[Keys.portrait]?.let { runCatching { PortraitStreaming.valueOf(it) }.getOrNull() } ?: d.portraitStreaming,
         )
     }
 
@@ -56,6 +59,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
                 p[Keys.bitrate] ?: 30_000,
                 p[Keys.codec]?.let { runCatching { VideoCodec.valueOf(it) }.getOrNull() } ?: VideoCodec.AUTO,
                 p[Keys.defaultMode]?.let { runCatching { DisplayMode.valueOf(it) }.getOrNull() } ?: DisplayMode.VIRTUAL,
+                p[Keys.portrait]?.let { runCatching { PortraitStreaming.valueOf(it) }.getOrNull() } ?: PortraitStreaming.OFF,
             )
             val next = transform(current)
             p[Keys.width] = next.resolution.width
@@ -64,6 +68,7 @@ class PreferencesStore(context: Context) : PreferencesRepository {
             p[Keys.bitrate] = next.bitrateKbps
             p[Keys.codec] = next.codec.name
             p[Keys.defaultMode] = next.defaultMode.name
+            p[Keys.portrait] = next.portraitStreaming.name
         }
     }
 

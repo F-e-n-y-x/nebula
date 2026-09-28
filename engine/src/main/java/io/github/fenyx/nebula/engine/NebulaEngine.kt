@@ -276,6 +276,7 @@ class NebulaEngine private constructor(context: Context) {
             .setControlOnly(prefs.controlOnly)
             .setCustomScreenMode(prefs.screenCombinationMode)
             .setNovaDisplayMode(request.novaDisplay?.wire)
+            .setNovaOrientation(request.orientation.wire)
             .build()
 
         val connection = NvConnection(

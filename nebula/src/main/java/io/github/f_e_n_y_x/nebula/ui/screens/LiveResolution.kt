@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -64,6 +65,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.github.f_e_n_y_x.nebula.domain.Portrait
 import io.github.f_e_n_y_x.nebula.domain.ResolutionOption
 import io.github.f_e_n_y_x.nebula.domain.ResolutionOptions
 import io.github.f_e_n_y_x.nebula.domain.SwitchState
@@ -87,6 +89,8 @@ class LiveResolutionUi(
     /** The mode saved for this game, if any. */
     val saved: VideoMode?,
     val onApply: (mode: VideoMode, rememberForGame: Boolean) -> Unit,
+    /** Turns the stream 90° (a live mode change to H×W); null hides the Rotate row. */
+    val onRotate: (() -> Unit)? = null,
     /** Desktop scaling, when the host advertises `display_scale`; null hides the row. */
     val displayScale: DisplayScaleUi? = null,
 )
@@ -129,6 +133,39 @@ internal fun ResolutionRow(ui: LiveResolutionUi, onOpen: () -> Unit) {
             )
         }
         Text("Change", style = Nebula.type.label, color = if (busy) NebulaColors.textMuted else NebulaColors.accentText)
+    }
+}
+
+/** The stream menu's "Rotate" row: portrait ↔ landscape as a live mode change. */
+@Composable
+internal fun RotateRow(ui: LiveResolutionUi, onRotated: () -> Unit) {
+    val rotate = ui.onRotate ?: return
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(14))
+    val busy = ui.state?.busy == true
+    val current = ui.current
+    Row(
+        Modifier.fillMaxWidth()
+            .nebulaClickable(shape, { if (!busy && current != null) { rotate(); onRotated() } })
+            .background(NebulaColors.surface, shape)
+            .border(1.dp, NebulaColors.controlBorder, shape)
+            .padding(horizontal = s.dp(16), vertical = s.dp(12)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(s.dp(12)),
+    ) {
+        Icon(Icons.Outlined.ScreenRotation, contentDescription = null, tint = NebulaColors.accentText, modifier = Modifier.size(s.dp(22)))
+        Column(Modifier.weight(1f)) {
+            Text(current?.let { Portrait.rotateLabel(it) } ?: "Rotate", style = Nebula.type.bodyStrong, color = NebulaColors.text)
+            Text(
+                when {
+                    busy -> "Switching…"
+                    current == null -> "Available once the stream is live"
+                    else -> "Streams at ${Portrait.rotated(current).label}; the screen turns with it"
+                },
+                style = Nebula.type.label, color = NebulaColors.textMuted,
+            )
+        }
+        Text("Rotate", style = Nebula.type.label, color = if (busy || current == null) NebulaColors.textMuted else NebulaColors.accentText)
     }
 }
 
@@ -395,10 +432,10 @@ private fun MenuLabel(text: String) = Text(text, style = Nebula.type.label, colo
  * screen behind it), then the result for a few seconds.
  */
 @Composable
-internal fun SwitchingOverlay(state: SwitchState?, note: SwitchNote?, onNoteShown: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SwitchingOverlay(state: SwitchState?, note: SwitchNote?, onNoteShown: () -> Unit, modifier: Modifier = Modifier, rotatingTo: VideoMode? = null) {
     val s = Nebula.scale
     val text = when (state) {
-        is SwitchState.Switching -> "Switching to ${state.to.label}…"
+        is SwitchState.Switching -> if (rotatingTo != null) Portrait.rotatingLabel(rotatingTo) else "Switching to ${state.to.label}…"
         is SwitchState.RollingBack -> "Couldn't switch. Going back to ${state.to.label}…"
         else -> null
     }
