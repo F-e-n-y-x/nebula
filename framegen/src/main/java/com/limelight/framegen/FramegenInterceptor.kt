@@ -28,6 +28,8 @@ data class FramegenStats(
         const val MODE_HIGH_INPUT_BYPASS = 1
         const val MODE_SLOW_COOLDOWN = 2
         const val MODE_CADENCE_RECOVER = 3
+        /** Nebula: generation paused (quick toggle or thermal auto-off); real frames only. */
+        const val MODE_PAUSED = 4
     }
 }
 
@@ -158,6 +160,57 @@ class FramegenInterceptor {
             }
         }
 
+        /**
+         * Nebula: LSFG flow scale (0.25..1.0) and the 3.1P performance model. Takes effect when
+         * the next context is created.
+         */
+        @JvmStatic
+        fun configureLsfgModel(flowScale: Float, performanceMode: Boolean) {
+            if (!isAvailable()) return
+            try {
+                nativeSetLsfgModel(flowScale.coerceIn(0.25f, 1f), performanceMode)
+            } catch (t: Throwable) {
+                Log.w(TAG, "failed to configure the LSFG model", t)
+            }
+        }
+
+        /** Nebula: stop generating (present decoded frames only) without leaving the capture path. */
+        @JvmStatic
+        fun setGenerationPaused(paused: Boolean) {
+            if (!isAvailable()) return
+            try {
+                nativeSetGenerationPaused(paused)
+            } catch (t: Throwable) {
+                Log.w(TAG, "failed to pause frame generation", t)
+            }
+        }
+
+        /** Nebula: "key=value" report of the Vulkan features frame generation needs. */
+        @JvmStatic
+        fun probeDeviceCaps(): String {
+            if (!isAvailable()) return "vulkan=0 reason=native-unavailable"
+            return try {
+                nativeProbeDeviceCaps()
+            } catch (t: Throwable) {
+                "vulkan=0 reason=${t.javaClass.simpleName}"
+            }
+        }
+
+        /**
+         * Nebula: times LSFG alone on synthetic frames of [width]x[height] (the DLL path must be
+         * configured first). Returns "ok ... median_ms=..." or "error=...". Run it away from a
+         * live stream: it needs the native pipeline idle.
+         */
+        @JvmStatic
+        fun runBenchmark(width: Int, height: Int, frames: Int, flowScale: Float, performanceMode: Boolean): String {
+            if (!isAvailable()) return "error=native-unavailable"
+            return try {
+                nativeRunBenchmark(width, height, frames, flowScale, performanceMode)
+            } catch (t: Throwable) {
+                "error=${t.javaClass.simpleName}: ${t.message}"
+            }
+        }
+
         @JvmStatic
         fun prewarmContext(width: Int, height: Int): Boolean {
             if (!isAvailable()) return false
@@ -196,6 +249,24 @@ class FramegenInterceptor {
                 null
             }
         }
+
+        @JvmStatic
+        private external fun nativeSetLsfgModel(flowScale: Float, performanceMode: Boolean)
+
+        @JvmStatic
+        private external fun nativeSetGenerationPaused(paused: Boolean)
+
+        @JvmStatic
+        private external fun nativeProbeDeviceCaps(): String
+
+        @JvmStatic
+        private external fun nativeRunBenchmark(
+            width: Int,
+            height: Int,
+            frames: Int,
+            flowScale: Float,
+            performanceMode: Boolean
+        ): String
 
         @JvmStatic
         private external fun nativePrewarmContext(width: Int, height: Int): Boolean

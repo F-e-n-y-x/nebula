@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- :framegen needs API 29; every call into it is gated on FramegenInterceptor.isAvailable(). -->
+    <uses-sdk tools:overrideLibrary="com.limelight.framegen" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+
+    <application>
+        <!-- Frame generation device check; its own process so a driver crash can't take the app down. -->
+        <service
+            android:name="io.github.fenyx.nebula.engine.framegen.FramegenSelfTestService"
+            android:exported="false"
+            android:process=":framegen_selftest" />
+    </application>
 </manifest>

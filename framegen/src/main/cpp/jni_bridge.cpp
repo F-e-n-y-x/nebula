@@ -259,3 +259,40 @@ Java_com_limelight_framegen_FramegenInterceptor_nativeProbeLosslessDll(
     env->ReleaseStringUTFChars(jDllPath, rawPath);
     return env->NewStringUTF(result.c_str());
 }
+
+// ---- Nebula additions -------------------------------------------------------------------------
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_limelight_framegen_FramegenInterceptor_nativeSetLsfgModel(
+        JNIEnv * /*env*/, jclass /* clazz */, jfloat flowScale, jboolean performanceMode) {
+    FramegenPipeline::setLsfgModel(static_cast<float>(flowScale), performanceMode == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_limelight_framegen_FramegenInterceptor_nativeSetGenerationPaused(
+        JNIEnv * /*env*/, jclass /* clazz */, jboolean paused) {
+    FramegenPipeline::setGenerationPaused(paused == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_limelight_framegen_FramegenInterceptor_nativeProbeDeviceCaps(
+        JNIEnv *env, jclass /* clazz */) {
+    std::string result;
+    try {
+        result = FramegenPipeline::probeDeviceCaps();
+    } catch (const std::exception& e) {
+        result = std::string("vulkan=0 reason=probe-exception:") + e.what();
+    }
+    LOGI("nativeProbeDeviceCaps -> %s", result.c_str());
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_limelight_framegen_FramegenInterceptor_nativeRunBenchmark(
+        JNIEnv *env, jclass /* clazz */, jint width, jint height, jint frames,
+        jfloat flowScale, jboolean performanceMode) {
+    const std::string result = FramegenPipeline::runLsfgBenchmark(
+        static_cast<int>(width), static_cast<int>(height), static_cast<int>(frames),
+        static_cast<float>(flowScale), performanceMode == JNI_TRUE);
+    return env->NewStringUTF(result.c_str());
+}

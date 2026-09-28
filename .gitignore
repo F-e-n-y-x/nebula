@@ -81,3 +81,9 @@ tools/mock-sunshine/.generated/
 
 # Baseline profile binary artifacts
 app/nonRoot/release/baselineProfiles/
+
+# Proprietary frame generation engine (Lossless Scaling by THS). Private builds inject it from
+# outside git (local.properties nebulaLosslessDll=/path/Lossless.dll); it must never be committed.
+# tools/check-private-assets.sh (CI) and :nebula:checkNoProprietaryFiles enforce this.
+*.dll
+**/private-assets/

@@ -115,3 +115,119 @@ dependencies {
     androidTestImplementation libs.androidx.test.runner
     debugImplementation libs.androidx.compose.ui.test.manifest
 }
+
+// ---- Private Lossless.dll for frame generation ----------------------------------------------
+// Lossless.dll is proprietary (Lossless Scaling by THS). It is packaged as
+// assets/framegen/Lossless.dll (+ .sha256) only in the owner's private builds, from a path
+// outside git: -PnebulaLosslessDll=/path, local.properties nebulaLosslessDll=/path, or the
+// git-ignored nebula/private-assets/framegen/Lossless.dll. On first run the app stages it into
+// noBackupFilesDir. A public build (-PnebulaPublicBuild=true, or CI=true) refuses a configured
+// DLL and fails if one reaches the merged assets; every build fails if git tracks a *.dll.
+def nebulaPublicBuild = (project.findProperty("nebulaPublicBuild") ?: "false").toString().toBoolean() ||
+        System.getenv("CI") == "true"
+def nebulaDllSetting = (project.findProperty("nebulaLosslessDll") ?: localProperties.getProperty("nebulaLosslessDll") ?: "").toString().trim()
+def nebulaDllFile = nebulaDllSetting.isEmpty() ? file("private-assets/framegen/Lossless.dll") : file(nebulaDllSetting)
+if (nebulaPublicBuild && nebulaDllFile.isFile()) {
+    throw new GradleException("Public build with a Lossless.dll configured (${nebulaDllFile}); " +
+            "the DLL is proprietary and only allowed in private builds. Remove nebulaLosslessDll.")
+}
+def nebulaBundledDll = (!nebulaPublicBuild && nebulaDllFile.isFile()) ? nebulaDllFile : null
+if (!nebulaDllSetting.isEmpty() && nebulaBundledDll == null && !nebulaPublicBuild) {
+    logger.warn("nebulaLosslessDll=${nebulaDllSetting} does not exist; building without the bundled DLL")
+}
+
+abstract class NebulaFramegenAssetsTask extends DefaultTask {
+    @org.gradle.api.tasks.Optional
+    @org.gradle.api.tasks.InputFile
+    @org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.NONE)
+    abstract RegularFileProperty getDll()
+
+    @org.gradle.api.tasks.OutputDirectory
+    abstract DirectoryProperty getOutputDir()
+
+    @org.gradle.api.tasks.TaskAction
+    void generate() {
+        def out = new File(outputDir.get().asFile, "framegen")
+        out.deleteDir()
+        if (!dll.isPresent()) return
+        out.mkdirs()
+        def src = dll.get().asFile
+        new File(out, "Lossless.dll").bytes = src.bytes
+        def digest = java.security.MessageDigest.getInstance("SHA-256").digest(src.bytes)
+        new File(out, "Lossless.dll.sha256").text = digest.encodeHex().toString()
+    }
+}
+
+/** Fails a public build whose merged assets contain the proprietary DLL. */
+abstract class NebulaVerifyPublicAssetsTask extends DefaultTask {
+    @org.gradle.api.tasks.InputFiles
+    @org.gradle.api.tasks.PathSensitive(org.gradle.api.tasks.PathSensitivity.RELATIVE)
+    abstract DirectoryProperty getAssets()
+
+    @org.gradle.api.tasks.Input
+    abstract Property<Boolean> getPublicBuild()
+
+    @org.gradle.api.tasks.OutputFile
+    abstract RegularFileProperty getReport()
+
+    @org.gradle.api.tasks.TaskAction
+    void verify() {
+        def dlls = []
+        assets.get().asFile.eachFileRecurse { f -> if (f.name.toLowerCase().endsWith(".dll")) dlls << f }
+        if (publicBuild.get() && !dlls.isEmpty()) {
+            throw new GradleException("Public build would ship a proprietary DLL: ${dlls}")
+        }
+        report.get().asFile.text = "public=${publicBuild.get()} dlls=${dlls.collect { it.name }}\n"
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def cap = variant.name.capitalize()
+        def gen = tasks.register("generate${cap}NebulaFramegenAssets", NebulaFramegenAssetsTask) {
+            if (nebulaBundledDll != null) dll.set(nebulaBundledDll)
+            outputDir.set(layout.buildDirectory.dir("generated/nebula-assets/${variant.name}"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(gen, NebulaFramegenAssetsTask::getOutputDir)
+        def verify = tasks.register("verify${cap}PublicAssets", NebulaVerifyPublicAssetsTask) {
+            assets.set(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.ASSETS.INSTANCE))
+            publicBuild.set(nebulaPublicBuild)
+            report.set(layout.buildDirectory.file("reports/nebula-assets/${variant.name}.txt"))
+        }
+        tasks.configureEach { t -> if (t.name == "package${cap}") t.dependsOn(verify) }
+    }
+}
+
+/** Every build fails while git tracks a DLL or anything under private-assets/. */
+abstract class NebulaCheckNoProprietaryFilesTask extends DefaultTask {
+    @javax.inject.Inject
+    abstract org.gradle.process.ExecOperations getExecOps()
+
+    @org.gradle.api.tasks.Internal
+    abstract DirectoryProperty getRepoRoot()
+
+    @org.gradle.api.tasks.TaskAction
+    void check() {
+        def out = new ByteArrayOutputStream()
+        def result = execOps.exec {
+            workingDir repoRoot.get().asFile
+            commandLine "git", "ls-files", "--", "*.dll", "*.DLL", "**/private-assets/**", "private-assets/**"
+            standardOutput = out
+            errorOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        if (result.exitValue != 0) {
+            logger.warn("checkNoProprietaryFiles: git unavailable; skipped")
+            return
+        }
+        def tracked = out.toString().trim()
+        if (!tracked.isEmpty()) {
+            throw new GradleException("Proprietary files are tracked by git (private builds only):\n${tracked}")
+        }
+    }
+}
+def nebulaCheckNoProprietaryFiles = tasks.register("checkNoProprietaryFiles", NebulaCheckNoProprietaryFilesTask) {
+    repoRoot.set(rootProject.layout.projectDirectory)
+    outputs.upToDateWhen { false }
+}
+tasks.named("preBuild") { dependsOn(nebulaCheckNoProprietaryFiles) }

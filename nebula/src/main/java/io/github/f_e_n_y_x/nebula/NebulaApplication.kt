@@ -77,7 +77,10 @@ class NebulaApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        // The frame generation device check runs in its own process and needs none of the app.
+        if (io.github.f_e_n_y_x.nebula.framegen.FramegenAppSetup.isSelfTestProcess()) return
         container = AppContainer(this)
+        io.github.f_e_n_y_x.nebula.framegen.FramegenAppSetup.onAppStart(this)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =
