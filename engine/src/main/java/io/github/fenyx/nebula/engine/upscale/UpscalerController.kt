@@ -26,6 +26,9 @@ class UpscalerController(private val context: Context) {
     private val _status = MutableStateFlow(UpscalerStatus())
     val status: StateFlow<UpscalerStatus> = _status.asStateFlow()
 
+    /** True while decoded frames go through the upscaler. */
+    val isArmed: Boolean get() = renderer != null
+
     fun config(): UpscalerConfig = UpscalerConfig.from(FramegenDll.prefs(context).all)
 
     /** Arms the upscaler for a [width]x[height] SDR stream presenting on [target]; true when armed. */

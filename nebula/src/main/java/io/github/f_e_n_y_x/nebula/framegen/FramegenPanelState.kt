@@ -110,7 +110,7 @@ fun framegenPanelState(
         )
         config.dllPath == null -> Quad(S.NO_ENGINE, "No engine", T.WARNING, FramegenOffReason.NO_ENGINE.message)
         verdict == SelfTestVerdict.NOT_RUN -> Quad(S.NEEDS_CHECK, "Not checked", T.WARNING, checkDetail)
-        config.enabled -> Quad(S.NOT_RUNNING, "Not running", T.NEUTRAL, post?.note ?: "Frame generation isn't running on this stream.")
+        config.enabled -> Quad(S.NOT_RUNNING, "Not running", T.NEUTRAL, post?.note ?: "Frame generation starts with the next stream.")
         else -> Quad(S.OFF, "Off", T.NEUTRAL, "Doubles the frame rate on this device, e.g. 60 fps streamed, 120 fps on screen. Adds about half a frame of latency.")
     }
     val stats = if (status == S.RUNNING) {

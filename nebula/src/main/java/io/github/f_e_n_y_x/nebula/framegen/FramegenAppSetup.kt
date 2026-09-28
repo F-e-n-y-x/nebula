@@ -56,6 +56,9 @@ object FramegenAppSetup {
             is FramegenEvent.Unavailable -> if (event.reason != FramegenOffReason.DISABLED) {
                 Toast.makeText(ctx, event.reason.message, Toast.LENGTH_LONG).show()
             }
+            FramegenEvent.RestartFailed ->
+                Toast.makeText(ctx, "Frame generation couldn't restart with the new settings, so it's paused. The stream continues.", Toast.LENGTH_LONG).show()
+            is FramegenEvent.NextStream -> Toast.makeText(ctx, event.detail, Toast.LENGTH_SHORT).show()
         }
     }
 
