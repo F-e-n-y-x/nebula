@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Gamepad
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Mouse
 import androidx.compose.material.icons.outlined.TouchApp
@@ -105,6 +106,7 @@ private enum class SettingsSection(val title: String, val summary: String, val i
     FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, "framegen"),
     Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, null),
     Advanced("Advanced", "Backup, restore and everything else", Icons.Outlined.Tune, "advanced"),
+    Diagnostics("Diagnostics", "Capability report, controller test, stick calibration, logs", Icons.Outlined.MonitorHeart, null),
     About("About", "Version, updates, licenses, credits", Icons.Outlined.Info, null),
 }
 
@@ -204,6 +206,7 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
             UpdateSection()
         }
         SettingsSection.Library -> LibrarySection(vm)
+        SettingsSection.Diagnostics -> io.github.f_e_n_y_x.nebula.diagnostics.ui.DiagnosticsHub()
         SettingsSection.Input -> {
             VirtualMouseSection()
             Spacer(Modifier.height(s.dp(12)))

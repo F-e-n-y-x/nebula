@@ -7,6 +7,8 @@ import android.view.MotionEvent
 import com.limelight.nvstream.input.ControllerPacket
 import com.limelight.nvstream.jni.MoonBridge
 import io.github.f_e_n_y_x.nebula.input.ControllerLookup
+import io.github.f_e_n_y_x.nebula.diagnostics.StickCalibration
+import io.github.f_e_n_y_x.nebula.diagnostics.StickCalibrations
 import io.github.f_e_n_y_x.nebula.input.RemoteInput
 
 /** Gamepad options, from V+'s preferences. */
@@ -93,6 +95,9 @@ class GamepadMapper(
     private val activeMask: Int
         get() = pads.values.fold(0) { m, p -> m or (1 shl p.index) }
 
+    /** A pad's saved stick calibration (Settings → Diagnostics), or null for the global deadzone. */
+    var calibrationOf: (deviceId: Int) -> StickCalibration? = StickCalibrations::forDevice
+
     /** How many host controllers are mapped right now. */
     val count: Int get() = pads.values.distinct().size
 
@@ -152,7 +157,7 @@ class GamepadMapper(
                 if (a in seen) v else -1f
             } else v
         }
-        val v = layout.read(read, config().deadzone)
+        val v = layout.read(read, config().deadzone, calibrationOf(deviceId))
         pad.lx = v.lx; pad.ly = v.ly; pad.rx = v.rx; pad.ry = v.ry
         // Pads with digital L2/R2 keys have no trigger axes; leave what the keys set.
         if (layout.leftTrigger >= 0) pad.lt = v.lt

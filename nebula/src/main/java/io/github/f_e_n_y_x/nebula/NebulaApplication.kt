@@ -58,7 +58,11 @@ class AppContainer(context: Context) {
     val prefs: PreferencesRepository = engine?.let { EnginePreferencesRepository(it, local, screen) } ?: local
     val hosts: HostRepository = engine?.let { EngineHostRepository(it) } ?: demo.hostRepository
     val library: LibraryRepository = engine?.let { EngineLibraryRepository(it) } ?: demo.libraryRepository
-    val stream: StreamRepository = engine?.let { EngineStreamRepository(it, screen, context) } ?: demo.streamRepository
+    /** The last few streams' summaries (Settings → Diagnostics). */
+    val sessionHistory = io.github.f_e_n_y_x.nebula.diagnostics.SessionHistory(context)
+    val stream: StreamRepository = io.github.f_e_n_y_x.nebula.diagnostics.RecordingStreamRepository(
+        engine?.let { EngineStreamRepository(it, screen, context) } ?: demo.streamRepository, sessionHistory::add,
+    )
     val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)
     /** Pinned games, per host, stored on this device only. */
@@ -81,6 +85,7 @@ class AppContainer(context: Context) {
     fun isMetered(): Boolean = connectivity?.isActiveNetworkMetered == true
 
     init {
+        io.github.f_e_n_y_x.nebula.diagnostics.StickCalibrations.install(app)
         // Keep the engine's cache limit in step with the setting.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             prefs.libraryOptions.map { it.cacheLimitMb }.distinctUntilChanged().collect { artwork.setLimit(it * 1024L * 1024L) }

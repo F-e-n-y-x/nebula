@@ -1,6 +1,8 @@
 package io.github.f_e_n_y_x.nebula.data.engine
 
 import android.view.MotionEvent
+import io.github.f_e_n_y_x.nebula.diagnostics.StickCalibration
+import io.github.f_e_n_y_x.nebula.diagnostics.StickShape
 import kotlin.math.hypot
 
 /**
@@ -26,16 +28,21 @@ data class GamepadAxes(
 
     /**
      * Reads one event's axes through this layout. [axis] returns an axis value (MotionEvent's
-     * getAxisValue). The deadzone is radial per stick, as in moonlight.
+     * getAxisValue). The deadzone is radial per stick, as in moonlight. A saved [calibration]
+     * (Settings → Diagnostics) replaces the deadzone with that pad's own per-stick shape.
      */
-    fun read(axis: (Int) -> Float, deadzone: Float): Values {
-        val (lx, ly) = stick(axis, leftX, leftY, deadzone)
-        val (rx, ry) = stick(axis, rightX, rightY, deadzone)
+    fun read(axis: (Int) -> Float, deadzone: Float, calibration: StickCalibration? = null): Values {
+        val (lx, ly) = stick(axis, leftX, leftY, deadzone, calibration?.left)
+        val (rx, ry) = stick(axis, rightX, rightY, deadzone, calibration?.right)
         return Values(lx, ly, rx, ry, trigger(axis, leftTrigger), trigger(axis, rightTrigger))
     }
 
-    private fun stick(axis: (Int) -> Float, xAxis: Int, yAxis: Int, deadzone: Float): Pair<Int, Int> {
+    private fun stick(axis: (Int) -> Float, xAxis: Int, yAxis: Int, deadzone: Float, shape: StickShape?): Pair<Int, Int> {
         if (xAxis < 0 || yAxis < 0) return 0 to 0
+        if (shape != null) {
+            val (x, y) = shape.apply(axis(xAxis), axis(yAxis))
+            return toShort(x) to toShort(-y)
+        }
         val x = axis(xAxis)
         val y = axis(yAxis)
         if (hypot(x, y) <= deadzone) return 0 to 0

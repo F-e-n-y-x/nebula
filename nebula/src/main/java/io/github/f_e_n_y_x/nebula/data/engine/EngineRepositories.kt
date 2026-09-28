@@ -499,6 +499,10 @@ class EngineStreamRepository(
             // Callbacks are posted to the main thread, so they run after `mine` is set below.
             fun isMine() = mine != null && session === mine
             val listener = object : StreamListener {
+                override fun onStageStarting(stage: String) {
+                    if (isMine()) io.github.f_e_n_y_x.nebula.diagnostics.ConnectionTimeline.shared.stage(stage)
+                }
+
                 override fun onConnected() {
                     val s = mine ?: return
                     if (!isMine()) return

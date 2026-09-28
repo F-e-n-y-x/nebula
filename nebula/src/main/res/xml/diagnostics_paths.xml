@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Diagnostics zips; only this cache folder is exposed. -->
+    <cache-path name="diagnostics" path="diagnostics/" />
+</paths>
