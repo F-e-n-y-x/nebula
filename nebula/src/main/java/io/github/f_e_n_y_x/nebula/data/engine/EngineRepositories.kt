@@ -345,8 +345,14 @@ class EngineStreamRepository(
 
     override fun reattach(target: StreamTarget) {
         val surface = target as? SurfaceStreamTarget ?: return
+        // A live resolution switch waiting for its fresh surface takes it; otherwise the running
+        // session moves onto it (back from the background).
+        if (run?.offerSurface(surface) == true) return
         session?.attachSurface(surface.holder)
     }
+
+    private val surfaceGen = kotlinx.coroutines.flow.MutableStateFlow(0)
+    override val surfaceGeneration: Flow<Int> = surfaceGen
 
     override suspend fun setBitrate(kbps: Int): Boolean {
         val ok = session?.setBitrate(kbps) ?: false
@@ -447,12 +453,49 @@ class EngineStreamRepository(
     private inner class Run(
         private val out: ProducerScope<StreamState>,
         private val game: Game,
-        private val surface: SurfaceStreamTarget,
+        @Volatile private var surface: SurfaceStreamTarget,
         @Volatile var request: StreamRequest,
         private val feedback: ControllerFeedback,
         private val motion: MotionForwarder,
     ) {
         private var statsJob: Job? = null
+
+        /** Set while a switch waits for the stream screen's new SurfaceView. */
+        @Volatile
+        private var surfaceWaiter: CompletableDeferred<SurfaceStreamTarget>? = null
+
+        /** Hands a newly created surface to a switch waiting for one; false when none waits. Main thread. */
+        fun offerSurface(target: SurfaceStreamTarget): Boolean {
+            val w = surfaceWaiter ?: return false
+            if (target.holder.surface?.isValid != true) return false
+            surfaceWaiter = null
+            return w.complete(target)
+        }
+
+        /**
+         * Asks the stream screen for a new SurfaceView and waits for it. Keeps the current surface
+         * when none arrives in time (a screen without a SurfaceView, e.g. in tests).
+         */
+        private suspend fun renewSurface() {
+            val waiter = CompletableDeferred<SurfaceStreamTarget>()
+            withContext(Dispatchers.Main.immediate) {
+                surfaceWaiter = waiter
+                surfaceGen.value = surfaceGen.value + 1
+            }
+            val fresh = withTimeoutOrNull(SURFACE_TIMEOUT_MS) { waiter.await() }
+            withContext(Dispatchers.Main.immediate) { if (surfaceWaiter === waiter) surfaceWaiter = null }
+            if (fresh != null) surface = fresh
+            else android.util.Log.w("Nebula", "Live resolution: no new video surface within $SURFACE_TIMEOUT_MS ms; reusing the old one")
+        }
+
+        /** Ends [s] and waits (up to [STOP_TIMEOUT_MS]) until its connection is torn down. */
+        private suspend fun stopAndWait(s: StreamSession) {
+            val stopped = CompletableDeferred<Unit>()
+            s.disconnect { stopped.complete(Unit) }
+            if (withTimeoutOrNull(STOP_TIMEOUT_MS) { stopped.await() } == null) {
+                android.util.Log.w("Nebula", "Live resolution: the old connection took over $STOP_TIMEOUT_MS ms to stop")
+            }
+        }
 
         /** Set while a switch waits for its new connection; failures complete it instead of ending the flow. */
         @Volatile
@@ -534,14 +577,12 @@ class EngineStreamRepository(
                 }
             }
             if (old != null) {
-                val stopped = CompletableDeferred<Unit>()
-                old.disconnect { stopped.complete(Unit) }
-                if (withTimeoutOrNull(STOP_TIMEOUT_MS) { stopped.await() } == null) {
-                    android.util.Log.w("Nebula", "Live resolution: the old connection took over $STOP_TIMEOUT_MS ms to stop")
-                }
+                stopAndWait(old)
                 // Let the PC see the disconnect before /resume, so it reconfigures the display.
                 delay(HOST_SETTLE_MS)
             }
+            // Every connection gets a new surface: the old one may still have a producer attached.
+            renewSurface()
             val req = request.copy(width = mode.width, height = mode.height, fps = mode.fps, resumeOnly = true)
             val result = CompletableDeferred<Result<Unit>>()
             pending = result
@@ -553,7 +594,9 @@ class EngineStreamRepository(
                 if (r.isSuccess) {
                     request = req
                 } else {
-                    withContext(Dispatchers.Main.immediate) { session?.disconnect(); session = null }
+                    // Tear the failed attempt down completely before a rollback starts the next one.
+                    val failed = withContext(Dispatchers.Main.immediate) { session.also { session = null } }
+                    if (failed != null) stopAndWait(failed)
                 }
                 return r
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -575,6 +618,9 @@ class EngineStreamRepository(
          * serverinfo round trip; this small pause covers a busy host.
          */
         const val HOST_SETTLE_MS = 250L
+
+        /** How long a switch waits for the stream screen's new SurfaceView. */
+        const val SURFACE_TIMEOUT_MS = 2_000L
     }
 }
 

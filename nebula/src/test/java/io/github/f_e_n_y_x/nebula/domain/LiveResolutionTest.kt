@@ -177,6 +177,17 @@ class LiveResolutionSwitcherTest {
         assertEquals(SwitchState.Streaming(P1080), sw.state.value)
     }
 
+    // The owner's S25 against a Virtual display: stopping the old connection, a new surface,
+    // /resume and the RTSP handshake took longer than the old 10 s budget, so the attempt was cut
+    // off mid-handshake. The default budget leaves room for a slow host.
+    @Test fun aSlowButHealthyReconnectIsNotCutOff() = runTest {
+        val host = FakeHost(latencyMs = 14_000)
+        val sw = LiveResolutionSwitcher(P1080, host::reconnect, clock = { testScheduler.currentTime })
+        assertEquals(SwitchOutcome.Switched(P1440, 14_000), sw.switchTo(P1440))
+        assertEquals(listOf(P1440), host.attempts)
+        assertTrue(LiveResolutionSwitcher.DEFAULT_ATTEMPT_TIMEOUT_MS >= 20_000)
+    }
+
     @Test fun anExceptionFromTheConnectionCountsAsAFailure() = runTest {
         var calls = 0
         val sw = LiveResolutionSwitcher(
