@@ -70,10 +70,10 @@ object DefaultProfiles {
             )
 
         if (land) {
-            trig("lt", "LT", Side.LEFT, 0.06f, 0.09f)
-            btn("lb", "LB", PadFlags.LB, 0.16f, 0.09f, size = 44f, w = 68f, shape = ElementShape.PILL)
-            btn("rb", "RB", PadFlags.RB, 0.84f, 0.09f, size = 44f, w = 68f, shape = ElementShape.PILL)
-            trig("rt", "RT", Side.RIGHT, 0.94f, 0.09f)
+            trig("lt", "LT", Side.LEFT, 0.085f, 0.12f)
+            btn("lb", "LB", PadFlags.LB, 0.19f, 0.12f, size = 44f, w = 68f, shape = ElementShape.PILL)
+            btn("rb", "RB", PadFlags.RB, 0.81f, 0.12f, size = 44f, w = 68f, shape = ElementShape.PILL)
+            trig("rt", "RT", Side.RIGHT, 0.915f, 0.12f)
             add(ControlElement("dpad", ElementKind.DPAD, 0.105f, 0.45f, 124f, 124f, bindings = PadFlags.DPAD.map { Binding.Pad(it) }))
             stick("ls", "LS", StickOutput.LEFT, PadFlags.LS_CLK, 0.225f, 0.78f, 120f)
             stick("rs", "RS", StickOutput.RIGHT, PadFlags.RS_CLK, 0.70f, 0.80f, 108f)
@@ -118,7 +118,7 @@ object DefaultProfiles {
      */
     fun gtaTouchCamera(): ControlsProfile {
         val zone = newElement(ElementKind.ZONE, "camera").copy(
-            label = "Camera", sensitivity = 1.2f, acceleration = 1.3f, opacity = 0.35f,
+            label = "Camera", sensitivity = 1.2f, acceleration = 1f, opacity = 0.35f,
         )
         return ControlsProfile(
             id = ControlsProfile.GTA_ID,
@@ -139,8 +139,41 @@ object DefaultProfiles {
         )
     }
 
+    /**
+     * "GTA V: touch only": no controller needed. A floating move stick on the left half, the
+     * Standard buttons, RT and LT that fire at once and look when dragged, and the rest of the
+     * right side looks (mouse look by default, [LookOutput]; outside touches never click).
+     */
+    fun gtaTouchOnly(o: StandardOptions = StandardOptions()): ControlsProfile {
+        fun shooter(l: List<ControlElement>, portrait: Boolean): List<ControlElement> {
+            val kept = l.filterNot { it.id == "ls" || it.id == "rs" || it.id == "l3" || it.id == "r3" }
+                .map { if (it.id == "rt" || it.id == "lt") it.copy(lookThrough = true) else it }
+            val move = newElement(ElementKind.ZONE, "move").copy(
+                label = "Move", zone = ZoneType.FLOATING_STICK, stick = StickOutput.LEFT,
+                x = 0.25f, y = if (portrait) 0.8f else 0.62f, width = 0.5f, height = if (portrait) 0.4f else 0.6f,
+                opacity = 0.25f, keepWithController = false, deadzone = 0.1f,
+            )
+            val r3 = ControlElement("r3", ElementKind.BUTTON, if (portrait) 0.9f else 0.7f, if (portrait) 0.955f else 0.9f, 40f, 40f, label = "R3", bindings = listOf(Binding.Pad(PadFlags.RS_CLK)))
+            val l3 = ControlElement("l3", ElementKind.BUTTON, if (portrait) 0.1f else 0.3f, if (portrait) 0.955f else 0.9f, 40f, 40f, label = "L3", bindings = listOf(Binding.Pad(PadFlags.LS_CLK)))
+            return listOf(move) + kept + listOf(l3, r3)
+        }
+        return ControlsProfile(
+            id = ControlsProfile.GTA_TOUCH_ID,
+            name = "GTA V: touch only",
+            landscape = shooter(landscape(o), portrait = false),
+            portrait = shooter(portrait(o), portrait = true),
+            origin = "builtin",
+        )
+    }
+
+    /** Suggested profile for a game, by name: GTA V gets the touch-only preset. */
+    fun suggestedFor(gameName: String?): String? {
+        val n = gameName?.lowercase() ?: return null
+        return if ("grand theft auto" in n || Regex("""\bgta\b""").containsMatchIn(n)) ControlsProfile.GTA_TOUCH_ID else null
+    }
+
     /** Ready-made profiles after Standard. */
-    fun presets(): List<ControlsProfile> = listOf(gtaTouchCamera(), gtaMouseCamera())
+    fun presets(): List<ControlsProfile> = listOf(gtaTouchOnly(), gtaTouchCamera(), gtaMouseCamera())
 
     fun landscape(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.LANDSCAPE, o)
     fun portrait(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.PORTRAIT, o)

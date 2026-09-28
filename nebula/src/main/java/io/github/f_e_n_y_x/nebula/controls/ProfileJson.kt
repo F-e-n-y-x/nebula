@@ -135,6 +135,8 @@ object ProfileJson {
         .put("invertY", e.invertY)
         .put("showRing", e.showRing)
         .put("keepWithController", e.keepWithController)
+        .put("lookThrough", e.lookThrough)
+        .put("antiDeadzone", e.antiDeadzone.toDouble())
 
     /** Null for an element this version doesn't know (a newer kind); the rest of the profile still loads. */
     fun elementFromJson(o: JSONObject): ControlElement? {
@@ -172,6 +174,8 @@ object ProfileJson {
             invertY = o.optBoolean("invertY", false),
             showRing = o.optBoolean("showRing", true),
             keepWithController = o.optBoolean("keepWithController", false),
+            lookThrough = o.optBoolean("lookThrough", false),
+            antiDeadzone = o.optDouble("antiDeadzone", ControlElement.DEFAULT_ANTI_DEADZONE.toDouble()).toFloat().coerceIn(0f, 0.45f),
         ).clampedSize()
     }
 }

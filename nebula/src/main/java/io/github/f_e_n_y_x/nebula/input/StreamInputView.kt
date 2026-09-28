@@ -186,6 +186,61 @@ class StreamInputView(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         if (hasWindowFocus) updateCapture()
+        // Focus lost (notification shade, dialog): nothing may stay held on the PC.
+        else router()?.cancel(android.os.SystemClock.uptimeMillis())
+    }
+
+    /**
+     * The on-screen controls' finger router while they're shown; null sends every finger to the
+     * trackpad gestures as before. The router passes on only the fingers it leaves to the
+     * background ([background]), so the stick and buttons never count as trackpad fingers.
+     */
+    var router: (() -> io.github.f_e_n_y_x.nebula.controls.TouchRouter?) = { null }
+
+    /** The trackpad gestures, as the router's background layer. */
+    val background = object : io.github.f_e_n_y_x.nebula.controls.BackgroundTouches {
+        override fun down(f: Finger, t: Long) { gestures.down(f, t); postDelayed(longPress, TouchGestures.LONG_PRESS_MS) }
+        override fun pointerDown(f: Finger, all: List<Finger>, t: Long) { removeCallbacks(longPress); gestures.pointerDown(f, all, t) }
+        override fun move(all: List<Finger>, t: Long) { gestures.move(all, t); if (!gestures.awaitingLongPress) removeCallbacks(longPress) }
+        override fun pointerUp(f: Finger, remaining: List<Finger>, t: Long) = gestures.pointerUp(f, remaining, t)
+        override fun up(f: Finger, t: Long) { removeCallbacks(longPress); gestures.up(f, t) }
+        override fun cancel() { removeCallbacks(longPress); gestures.cancel() }
+    }
+
+    private val location = IntArray(2)
+    private val ticker = object : Runnable {
+        override fun run() {
+            val r = router() ?: return
+            r.tick(android.os.SystemClock.uptimeMillis())
+            if (r.ticking) postDelayed(this, io.github.f_e_n_y_x.nebula.controls.CameraStick.TICK_MS) else ticking = false
+        }
+    }
+    private var ticking = false
+
+    private fun kickTicker(r: io.github.f_e_n_y_x.nebula.controls.TouchRouter) {
+        if (r.ticking && !ticking) { ticking = true; postDelayed(ticker, io.github.f_e_n_y_x.nebula.controls.CameraStick.TICK_MS) }
+    }
+
+    /** Routes one touch event by pointer id; coordinates go to window px, like the overlay's layout. */
+    private fun route(r: io.github.f_e_n_y_x.nebula.controls.TouchRouter, e: MotionEvent): Boolean {
+        getLocationInWindow(location)
+        val ox = location[0].toFloat()
+        val oy = location[1].toFloat()
+        val t = e.eventTime
+        if (e.actionMasked == MotionEvent.ACTION_CANCEL || (e.flags and MotionEvent.FLAG_CANCELED) != 0) {
+            r.cancel(t)
+            return true
+        }
+        val i = e.actionIndex
+        when (e.actionMasked) {
+            // A first finger while the router still owns some means an UP was lost: release them.
+            MotionEvent.ACTION_DOWN -> { if (r.fingerCount > 0) r.cancel(t); r.down(e.getPointerId(i), e.getX(i) + ox, e.getY(i) + oy, t) }
+            MotionEvent.ACTION_POINTER_DOWN -> r.down(e.getPointerId(i), e.getX(i) + ox, e.getY(i) + oy, t)
+            MotionEvent.ACTION_MOVE -> r.move((0 until e.pointerCount).map { Finger(e.getPointerId(it), e.getX(it) + ox, e.getY(it) + oy) }, t)
+            MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP -> r.up(e.getPointerId(i), t)
+        }
+        kickTicker(r)
+        return true
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -194,6 +249,7 @@ class StreamInputView(
             if (wantCapture && !hasPointerCapture()) updateCapture()
             return mouse.onEvent(e, captured = false)
         }
+        router()?.let { return route(it, e) }
         val t = e.eventTime
         val i = e.actionIndex
         when (e.actionMasked) {

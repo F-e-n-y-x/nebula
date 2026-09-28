@@ -146,10 +146,14 @@ class LoggingInput : RemoteInput {
     @Volatile var lastPad: IntArray? = null
         private set
 
+    /** When RT changed value (uptime ms, value), for device tests. */
+    val rtChanges: MutableList<Pair<Long, Int>> = java.util.Collections.synchronizedList(mutableListOf())
+
     /** Every controller number announced, in order, for device tests. */
     val arrivals: MutableList<Int> = java.util.Collections.synchronizedList(mutableListOf())
 
     override fun gamepad(controller: Int, activeMask: Int, buttons: Int, lt: Int, rt: Int, lx: Int, ly: Int, rx: Int, ry: Int) {
+        if (lastPad?.get(3) != rt) rtChanges += android.os.SystemClock.uptimeMillis() to rt
         lastPad = intArrayOf(controller, buttons, lt, rt, lx, ly, rx, ry)
         log("pad $controller mask=$activeMask buttons=0x${buttons.toString(16)} lt=$lt rt=$rt l=$lx,$ly r=$rx,$ry")
     }

@@ -255,6 +255,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     val uiNow by rememberUpdatedState(ui)
     val stream = container.stream
     var inputView by remember { mutableStateOf<StreamInputView?>(null) }
+    val routing = remember { RouterSlot() }
     var devices by remember { mutableIntStateOf(0) }
     // With a physical controller attached the on-screen controls stay away unless the user keeps
     // them; kept, they drive player 1 together with the controller (never a second player).
@@ -429,10 +430,10 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     }
                     val gestures = TouchGestures(
                         // With the on-screen controls up, the picture only reaches the PC if the profile says so.
-                        out = { remoteInput.takeIf { input.active && input.outside != io.github.f_e_n_y_x.nebula.controls.OutsideTouch.NOTHING } },
+                        out = { remoteInput.takeIf { input.active && input.outside != io.github.f_e_n_y_x.nebula.controls.OutsideTouch.OFF && input.outside != io.github.f_e_n_y_x.nebula.controls.OutsideTouch.LOOK } },
                         config = {
                             val c = input.ui?.touch ?: io.github.f_e_n_y_x.nebula.input.TouchConfig()
-                            if (input.outside == io.github.f_e_n_y_x.nebula.controls.OutsideTouch.DIRECT) c.copy(mode = TouchMode.TOUCH) else c
+                            if (input.outside == io.github.f_e_n_y_x.nebula.controls.OutsideTouch.TOUCH) c.copy(mode = TouchMode.TOUCH) else c
                         },
                         video = { input.rect },
                         viewWidth = { input.viewWidth },
@@ -444,7 +445,11 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                         navButtons = { input.ui?.mouseNavButtons == true },
                         video = { input.rect },
                     )
-                    StreamInputView(c, gestures, mouse) { remoteInput.takeIf { input.active } }.also { inputView = it }
+                    StreamInputView(c, gestures, mouse) { remoteInput.takeIf { input.active } }.also {
+                        // While the on-screen controls are up, every finger goes through their router.
+                        it.router = { routing.router?.takeIf { input.active } }
+                        inputView = it
+                    }
                 },
                 modifier = Modifier.fillMaxSize(),
             )
@@ -462,9 +467,14 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
-        input.outside = if (oscShown || zonesShown) remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(prefs, controlsProfile.id) } else null
+        val outsideMode = remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(prefs, controlsProfile.id) }
+        val lookMode = remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.LookOutput.read(prefs, controlsProfile.id) }
+        input.outside = if (oscShown || zonesShown) outsideMode else null
         if (oscShown || zonesShown) {
-            OnScreenControls(remote, { pad }, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown })
+            OnScreenControls(
+                remote, { pad }, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown },
+                routing = routing, outside = outsideMode, look = lookMode, background = { inputView?.background },
+            )
         }
         val statsAtTop = ui.stats.enabled && ui.stats.position.row == 0
         if (overlaysOn && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (statsAtTop) 60 + (ui.stats.metrics.size.coerceAtMost(8) * if (ui.stats.layout == io.github.f_e_n_y_x.nebula.settings.StatLayout.CARD) 18 else 0) else 12)
@@ -569,6 +579,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 unsupported = unsupported,
                 hapticsNote = hapticsNote,
                 phoneHasGyro = phoneHasGyro,
+                controlsProfileId = controlsProfile.id.takeIf { ui.osc },
                 actions = StreamMenuActions(
                     onResume = { menu = false },
                     onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },

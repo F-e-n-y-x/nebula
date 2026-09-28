@@ -163,6 +163,9 @@ class ControlsInput(
         keyDirs.clear()
         _latched.value = emptySet()
         val padWasUsed = announced
+        minHold.values.forEach { it.cancel() }; minHold.clear()
+        deferredRelease.values.forEach { it.cancel() }; deferredRelease.clear()
+        resend?.cancel(); resend = null
         buttons = 0; lt = 0; rt = 0; lx = 0; ly = 0; rx = 0; ry = 0
         counts.clear()
         mixer()?.let { it.touchStick(Side.LEFT, 0, 0); it.touchStick(Side.RIGHT, 0, 0) }
@@ -198,11 +201,41 @@ class ControlsInput(
         if (n <= 0) { counts.remove(key); apply(b, false) } else counts[key] = n
     }
 
+    /** Running while a digital press is younger than [MIN_HOLD_MS], per binding token. */
+    private val minHold = HashMap<String, Job>()
+    private val deferredRelease = HashMap<String, Job>()
+    private var resend: Job? = null
+
+    /**
+     * Pad buttons and triggers are held at least [MIN_HOLD_MS]: moonlight-common-c merges queued
+     * controller packets unless the button flags change (a trigger change never ends a batch), and
+     * games read input once a frame, so a quick tap could vanish while sticks are streaming.
+     */
+    private fun padPress(token: String, down: Boolean, set: (Boolean) -> Unit) {
+        if (down) {
+            deferredRelease.remove(token)?.cancel()
+            set(true); send()
+            minHold[token]?.cancel()
+            minHold[token] = scope.launch { delay(MIN_HOLD_MS) }
+            return
+        }
+        val hold = minHold.remove(token)
+        if (hold != null && hold.isActive) {
+            deferredRelease[token] = scope.launch {
+                hold.join()
+                deferredRelease.remove(token)
+                set(false); send()
+            }
+        } else {
+            set(false); send()
+        }
+    }
+
     private fun apply(b: Binding, down: Boolean) {
         when (b) {
             Binding.None -> Unit
-            is Binding.Pad -> { buttons = if (down) buttons or b.flag else buttons and b.flag.inv(); send() }
-            is Binding.Trigger -> { if (b.side == Side.LEFT) lt = if (down) 255 else 0 else rt = if (down) 255 else 0; send() }
+            is Binding.Pad -> padPress(b.token(), down) { on -> buttons = if (on) buttons or b.flag else buttons and b.flag.inv() }
+            is Binding.Trigger -> padPress(b.token(), down) { on -> if (b.side == Side.LEFT) lt = if (on) 255 else 0 else rt = if (on) 255 else 0 }
             is Binding.Key -> out()?.virtualKey(b.vk, down, modifiersFor())
             is Binding.Mouse -> out()?.button(mouseOf(b.button), down)
             is Binding.Wheel -> if (down) scrollOnce(b)
@@ -244,6 +277,13 @@ class ControlsInput(
     }
 
     private fun send() {
+        sendNow()
+        // One full-state resend shortly after the last change: cheap insurance against a dropped packet.
+        resend?.cancel()
+        resend = scope.launch { delay(RESEND_MS); sendNow() }
+    }
+
+    private fun sendNow() {
         if (pad()?.state(buttons, lt, rt, lx, ly, rx, ry) == true) { announced = true; return }
         val o = out() ?: return
         if (!announced) {
@@ -259,6 +299,8 @@ class ControlsInput(
 
     companion object {
         const val AXIS_MAX = 32766
+        const val MIN_HOLD_MS = 50L
+        const val RESEND_MS = 100L
         const val WHEEL_REPEAT_MS = 120L
         /** The standard Xbox set, as GamepadMapper announces for physical pads. */
         val SUPPORTED = listOf(

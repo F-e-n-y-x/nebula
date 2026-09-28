@@ -198,19 +198,62 @@ class ZoneTouchDeviceTest {
         assertEquals("no mouse or touch reached the PC from on-screen controls", before, demo.pointerEvents.get())
     }
 
-    @Test fun touchesOutsideTheControlsDoNothingByDefault() {
+    private fun setOutside(v: String) {
         ctx.getSharedPreferences(ctx.packageName + "_preferences", android.content.Context.MODE_PRIVATE).edit()
-            .remove("nebula_osc_outside_touch:p-zonetest").commit()
+            .putString("nebula_osc_outside_touch:p-zonetest", v).commit()
         instr.waitForIdleSync()
         SystemClock.sleep(500)
+    }
+
+    /** Top centre of the picture, above the zone: no element there. */
+    private fun emptySpot(): Offset { val z = bounds("osc:camera"); return Offset(z.left - 40f, z.top * 0.5f) }
+
+    @Test fun touchesOutsideTheControlsDoNothingWhenOff() {
+        setOutside("nothing")
         val before = demo.pointerEvents.get()
-        // Top centre of the picture, above the zone: no element there.
-        val z = bounds("osc:camera")
-        val spot = Offset(z.left - 40f, z.top * 0.5f)
+        val spot = emptySpot()
         fingerDown(0, spot)
         points[0] = spot + Offset(80f, 30f); send(MotionEvent.ACTION_MOVE)
         fingerUp(0)
         instr.waitForIdleSync()
-        assertEquals("a stray touch on the picture must not click or move the PC mouse", before, demo.pointerEvents.get())
+        assertEquals("Off: a stray touch must not click or move the PC mouse", before, demo.pointerEvents.get())
+    }
+
+    @Test fun trackpadFingerMovesTheMouseWhileStickAndRtAreHeld() {
+        setOutside("trackpad")
+        val ls = bounds("osc:ls"); val rtBox = bounds("osc:rt")
+        fingerDown(0, ls.center)
+        drag(0, -ls.width / 3, 0f, steps = 3)
+        fingerDown(1, rtBox.center)
+        assertEquals(255, rt())
+        val beforeBg = demo.pointerEvents.get()
+        fingerDown(2, emptySpot())
+        drag(2, 120f, 40f, steps = 6)
+        assertTrue("the background finger moves the mouse", demo.pointerEvents.get() > beforeBg)
+        assertTrue("left stick still held: ${lx()}", lx() < -5000)
+        assertEquals("RT still held", 255, rt())
+        // Only the stick finger moves now: the mouse must not.
+        val beforeStick = demo.pointerEvents.get()
+        drag(0, -ls.width / 3, 10f, steps = 4)
+        assertEquals("fingers on the controls never move the mouse", beforeStick, demo.pointerEvents.get())
+        fingerUp(2); fingerUp(1); fingerUp(0)
+        instr.waitForIdleSync()
+        SystemClock.sleep(100)
+        assertEquals(0, rt()); assertEquals(0, lx())
+    }
+
+    @Test fun aFiveMillisecondRtTapIsHeldForFiftyMilliseconds() {
+        val rtBox = bounds("osc:rt")
+        demo.rtChanges.clear()
+        fingerDown(0, rtBox.center)
+        SystemClock.sleep(5)
+        fingerUp(0)
+        SystemClock.sleep(200)
+        instr.waitForIdleSync()
+        val changes = demo.rtChanges.toList()
+        assertEquals("pressed then released once: $changes", listOf(255, 0), changes.map { it.second })
+        val held = changes[1].first - changes[0].first
+        assertTrue("a quick tap is held at least 50 ms (was $held ms)", held >= 50)
+        assertTrue("and then released, not stuck (was $held ms)", held < 200)
     }
 }

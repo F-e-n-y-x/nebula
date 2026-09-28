@@ -133,7 +133,12 @@ data class ControlElement(
     val showRing: Boolean = true,
     /** Zone only: keeps working while a physical controller hides the other on-screen controls. */
     val keepWithController: Boolean = false,
+    /** Button / trigger: after [LOOK_THROUGH_DP] of drag the same finger also looks (fire and aim). */
+    val lookThrough: Boolean = false,
+    /** Camera → stick: smallest push once the finger moves (0–0.45), to clear the game's stick deadzone. */
+    val antiDeadzone: Float = DEFAULT_ANTI_DEADZONE,
 ) {
+
     /** Zones are sized as a share of the controls area; everything else in dp. */
     val areaSized: Boolean get() = kind == ElementKind.ZONE
 
@@ -150,6 +155,9 @@ data class ControlElement(
     )
 
     companion object {
+        /** GTA V's stick deadzone is about 20 %. */
+        const val DEFAULT_ANTI_DEADZONE = 0.22f
+        const val LOOK_THROUGH_DP = 12f
         const val MIN_SIZE_DP = 28f
         const val MAX_SIZE_DP = 360f
         const val MIN_OPACITY = 0.1f
@@ -186,6 +194,7 @@ data class ControlsProfile(
         const val STANDARD_ID = "builtin:standard"
         const val GTA_ID = "builtin:gta-touch-camera"
         const val GTA_MOUSE_ID = "builtin:gta-mouse-camera"
+        const val GTA_TOUCH_ID = "builtin:gta-touch-only"
     }
 }
 

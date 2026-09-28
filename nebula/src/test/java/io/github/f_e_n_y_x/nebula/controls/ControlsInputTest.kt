@@ -5,6 +5,7 @@ import io.github.f_e_n_y_x.nebula.input.RemoteInput
 import io.github.fenyx.nebula.engine.MouseButton
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -44,6 +45,7 @@ class ControlsInputTest {
         assertEquals(PadFlags.A, out.buttons)
         assertEquals(1, out.arrived)
         input.elementUp(a)
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent() // held at least 50 ms
         assertEquals(0, out.buttons)
 
         val t = a.copy(id = "t", mode = PressMode.TOGGLE, bindings = listOf(Binding.Pad(PadFlags.B)))
@@ -51,6 +53,7 @@ class ControlsInputTest {
         assertEquals(PadFlags.B, out.buttons)
         assertEquals(setOf("t"), input.latched.value)
         input.elementDown(t); input.elementUp(t)
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
         assertEquals(0, out.buttons)
         assertTrue(input.latched.value.isEmpty())
         assertEquals(1, out.arrived)
@@ -88,6 +91,7 @@ class ControlsInputTest {
         input.dpad(d, setOf(0, 2))
         assertEquals(PadFlags.UP or PadFlags.LEFT, out.buttons)
         input.dpad(d, emptySet())
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
         assertEquals(0, out.buttons)
     }
 
@@ -102,7 +106,9 @@ class ControlsInputTest {
         input.stick(s, 0f, -1f)
         assertEquals(-ControlsInput.AXIS_MAX, out.ly)
         input.click(s)
-        assertEquals(0, out.buttons) // L3 pressed and released
+        assertEquals(PadFlags.LS_CLK, out.buttons) // L3 held long enough for the game to see it
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
+        assertEquals(0, out.buttons)
     }
 
     @Test

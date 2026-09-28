@@ -321,7 +321,7 @@ class GamepadMapper(
         if (!pad.announced) {
             pad.caps = capabilities(pad.deviceId, pad.index)
             log("announce player ${pad.index + 1} for ${if (pad.deviceId == PHONE_PAD) "the phone pad (on-screen controls / gyro)" else "device ${pad.deviceId} ${traitsFor(pad.deviceId)}"}, caps 0x${pad.caps.toString(16)}, attached ${attached()}")
-            bridge.gamepadArrived(pad.index, activeMask, MoonBridge.LI_CTYPE_UNKNOWN, SUPPORTED, pad.caps.toShort())
+            bridge.gamepadArrived(pad.index, activeMask, typeFor(pad.caps), SUPPORTED, pad.caps.toShort())
             pad.announced = true
         }
         bridge.gamepad(
@@ -334,6 +334,13 @@ class GamepadMapper(
     }
 
     private fun stick(v: Int) = v.coerceIn(-32768, 32767)
+
+    /**
+     * An Xbox pad (what XInput games expect) unless motion is announced: then the type is left
+     * open so the host builds a motion-capable pad (Nova picks a DualSense).
+     */
+    private fun typeFor(caps: Int): Byte =
+        if (caps and (MoonBridge.LI_CCAP_GYRO.toInt() or MoonBridge.LI_CCAP_ACCEL.toInt()) != 0) MoonBridge.LI_CTYPE_UNKNOWN else MoonBridge.LI_CTYPE_XBOX
 
     private fun flagFor(keyCode: Int, flip: Boolean): Int? = when (keyCode) {
         KeyEvent.KEYCODE_BUTTON_A -> if (flip) ControllerPacket.B_FLAG else ControllerPacket.A_FLAG

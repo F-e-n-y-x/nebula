@@ -16,6 +16,7 @@ private class PadRecorder : RemoteInput {
 
     val arrivals = mutableListOf<Int>()
     val arrivalCaps = mutableListOf<Int>()
+    val arrivalTypes = mutableListOf<Byte>()
     val states = mutableListOf<State>()
     val last: State get() = states.last()
 
@@ -34,6 +35,7 @@ private class PadRecorder : RemoteInput {
     override fun gamepadArrived(controller: Int, activeMask: Int, type: Byte, supportedButtons: Int, capabilities: Short) {
         arrivals += controller
         arrivalCaps += capabilities.toInt()
+        arrivalTypes += type
     }
 }
 
@@ -374,5 +376,28 @@ class GamepadMapperTest {
         mapper.onMotion(1, true) { a -> if (a == MotionEvent.AXIS_RZ) 0f else if (a == MotionEvent.AXIS_Z) -1f else 0f }
         assertTrue("half-pressed RT now reads as half: ${out.last.rt}", out.last.rt in 120..135)
         assertEquals(0, out.last.lt)
+    }
+
+    @Test
+    fun `pads are announced as Xbox pads unless motion is in use`() {
+        pad(7, androidXbox)
+        press(7, KeyEvent.KEYCODE_BUTTON_A)
+        assertEquals(com.limelight.nvstream.jni.MoonBridge.LI_CTYPE_XBOX, out.arrivalTypes.last())
+        caps = { _, _ -> GamepadMapper.DEFAULT_CAPS or com.limelight.nvstream.jni.MoonBridge.LI_CCAP_GYRO.toInt() }
+        pad(9, androidXbox, product = 0x0b12)
+        press(9, KeyEvent.KEYCODE_BUTTON_A)
+        assertEquals(com.limelight.nvstream.jni.MoonBridge.LI_CTYPE_UNKNOWN, out.arrivalTypes.last())
+    }
+
+    @Test
+    fun `on-screen RT merges with a physical pad's trigger by maximum`() {
+        pad(7, androidXbox)
+        mapper.onMotion(7, true) { if (it == MotionEvent.AXIS_RTRIGGER) 0.5f else 0f }
+        val half = out.last.rt
+        mapper.onScreenState(0, 0, 255, 0, 0, 0, 0)
+        assertEquals(255, out.last.rt)
+        mapper.onScreenState(0, 0, 0, 0, 0, 0, 0)
+        assertEquals(half, out.last.rt)
+        assertEquals(1, out.arrivals.size)
     }
 }

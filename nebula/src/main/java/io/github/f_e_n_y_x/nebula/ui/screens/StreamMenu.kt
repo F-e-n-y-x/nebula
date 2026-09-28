@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import io.github.f_e_n_y_x.nebula.controls.OutsideTouch
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -109,6 +110,8 @@ fun StreamMenu(
     unsupported: List<String> = emptyList(),
     hapticsNote: String? = null,
     phoneHasGyro: Boolean = true,
+    /** The on-screen controls' profile while they're on, for the "touch outside controls" toggle. */
+    controlsProfileId: String? = null,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -153,7 +156,7 @@ fun StreamMenu(
                 RotateRow(it, onRotated = actions.onResume)
             }
             io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
-            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null)
+            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId)
             hostSection?.invoke()
             FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)
             if (unsupported.isNotEmpty()) {
@@ -238,7 +241,7 @@ private fun Stat(label: String, value: String) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean) {
+private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean, controlsProfileId: String? = null) {
     val s = Nebula.scale
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
@@ -251,6 +254,15 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
             if (zoomed) NebulaButton("Reset zoom", onClick = actions.onResetZoom, style = ButtonStyle.Secondary)
         }
         OverlayTransparency(ui.overlayOpacity, actions.onOverlayOpacity)
+        if (controlsProfileId != null) {
+            var outside by remember(controlsProfileId) { mutableStateOf(OutsideTouch.read(prefs, controlsProfileId)) }
+            MenuSetting("Touch outside controls · remembered for these controls") {
+                Segmented(listOf("Mouse" to OutsideTouch.TRACKPAD, "Look" to OutsideTouch.LOOK, "Off" to OutsideTouch.OFF), outside) { v ->
+                    outside = v
+                    OutsideTouch.write(prefs, controlsProfileId, v)
+                }
+            }
+        }
         MenuSetting("Touch · remembered for this game") {
             Segmented(TouchMode.entries.map { it.label to it }, ui.touch.mode) { m -> prefs.put(StreamUiPrefs.touchModeKey(gameKey), m.pref) }
         }

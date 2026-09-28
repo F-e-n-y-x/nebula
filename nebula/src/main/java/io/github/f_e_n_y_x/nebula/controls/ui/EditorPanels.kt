@@ -336,6 +336,11 @@ private fun ZoneFields(e: ControlElement, onEdit: (String?, (ControlElement) -> 
             }
         }
     }
+    if (e.zone == io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_STICK) {
+        Field("Minimum push", "Every swipe pushes the stick at least this far, past the game's own stick deadzone. 22 % suits GTA V; use 0–5 % if the game's aim deadzone is 0.") {
+            Segmented(listOf("0 %" to 0f, "5 %" to 0.05f, "12 %" to 0.12f, "22 %" to 0.22f, "35 %" to 0.35f), listOf(0f, 0.05f, 0.12f, 0.22f, 0.35f).minByOrNull { kotlin.math.abs(it - e.antiDeadzone) } ?: 0.22f) { v -> onEdit(null) { it.copy(antiDeadzone = v) } }
+        }
+    }
     if (e.zone == io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK) {
         ToggleRow("Show the ring", "Draw the stick where your thumb is while you hold it.", e.showRing) { v -> onEdit(null) { it.copy(showRing = v) } }
         Field("Dead zone") {
@@ -391,6 +396,11 @@ private fun DirectionFields(e: ControlElement, onEdit: (String?, (ControlElement
 private fun PressModeField(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
     Field("Behaviour", if (e.mode == PressMode.TOGGLE) "Tap once to hold it down, tap again to let go." else "Held while your finger is on it.") {
         Segmented(PressMode.entries.map { it.label to it }, e.mode) { m -> onEdit(null) { it.copy(mode = m) } }
+    }
+    if (e.kind == ElementKind.BUTTON || e.kind == ElementKind.TRIGGER) {
+        Field("Fire and look", "Pressed at once; drag the same finger to look around too (like RT in mobile shooters).") {
+            Segmented(listOf("Off" to false, "On" to true), e.lookThrough) { v -> onEdit(null) { it.copy(lookThrough = v) } }
+        }
     }
 }
 
@@ -558,6 +568,17 @@ internal fun ProfilesPanel(
     Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(18)), verticalArrangement = Arrangement.spacedBy(s.dp(16))) {
         PanelHeader("Profiles", current.name, onClose)
 
+        val suggested = io.github.f_e_n_y_x.nebula.controls.DefaultProfiles.suggestedFor(gameName)?.let { lib.find(it) }
+        if (suggested != null && gameKey != null && lib.assignedTo(gameKey) != suggested.id) {
+            Field("Suggested for ${gameName ?: "this game"}", "${suggested.name}: plays with touch alone; a floating move stick, fire-and-look triggers, swipe right to look.") {
+                SmallAction("Use ${suggested.name}", null, {
+                    store.update { l -> l.assign(gameKey, suggested.id) }
+                    open(suggested)
+                    onChanged()
+                })
+            }
+        }
+
         if (gameKey != null) {
             val assigned = lib.assignedTo(gameKey)
             val default = lib.resolve(null)
@@ -574,10 +595,17 @@ internal fun ProfilesPanel(
 
         val legacy = remember { io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx) }
         var outside by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(legacy, current.id)) }
-        Field("Touch outside the controls", "What a finger on the picture does while these controls are shown. Nothing keeps stray touches from clicking or moving the PC's mouse.") {
+        Field("Touches outside controls", outside.help) {
             Segmented(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.entries.map { it.label to it }, outside) { v ->
                 outside = v
                 io.github.f_e_n_y_x.nebula.controls.OutsideTouch.write(legacy, current.id, v)
+            }
+        }
+        var lookOut by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.LookOutput.read(legacy, current.id)) }
+        Field("Look with", lookOut.help + " Used by the Look area and by fire-and-look buttons.") {
+            Segmented(io.github.f_e_n_y_x.nebula.controls.LookOutput.entries.map { it.label to it }, lookOut) { v ->
+                lookOut = v
+                io.github.f_e_n_y_x.nebula.controls.LookOutput.write(legacy, current.id, v)
             }
         }
 

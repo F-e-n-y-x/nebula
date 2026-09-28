@@ -108,7 +108,7 @@ class ProfileModelTest {
         assertEquals(a.id, l6.assignedTo("h:gt"))
         // The built-in can't be deleted.
         assertSame(l6, l6.delete(ControlsProfile.STANDARD_ID))
-        assertEquals(listOf("Standard gamepad", "GTA V: controller + touch camera (right half)", "GTA V: controller + mouse camera (right half)", "Racing wheel", "Racing wheel copy 2"), l6.all.map { it.name })
+        assertEquals(listOf("Standard gamepad", "GTA V: touch only", "GTA V: controller + touch camera (right half)", "GTA V: controller + mouse camera (right half)", "Racing wheel", "Racing wheel copy 2"), l6.all.map { it.name })
     }
 
     @Test

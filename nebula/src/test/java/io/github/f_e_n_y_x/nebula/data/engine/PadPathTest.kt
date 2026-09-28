@@ -16,6 +16,8 @@ import io.github.f_e_n_y_x.nebula.input.RemoteInput
 import io.github.f_e_n_y_x.nebula.settings.GyroMode
 import io.github.f_e_n_y_x.nebula.settings.MotionSettings
 import io.github.fenyx.nebula.engine.MouseButton
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -52,6 +54,7 @@ private class Wire : RemoteInput {
  * End to end through the same objects StreamScreen wires together (0.3.0-dev10 regression: two
  * pads on the PC with only the on-screen controls and phone gyro to right stick).
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PadPathTest {
     private val wire = Wire()
     private val mixer = PadMixer { wire }
@@ -95,6 +98,7 @@ class PadPathTest {
         assertEquals(listOf(Wire.Arrival(0, 1)), wire.arrivals)
         assertEquals(Wire.State(0, 1, PadFlags.A, 0, 0, 0, 0, 0, 0), wire.last)
         input.elementUp(a)
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
         assertTrue(wire.last.atRest)
 
         val left = stick("ls", StickOutput.LEFT)
@@ -115,9 +119,10 @@ class PadPathTest {
         val rt = button("rt", Binding.Trigger(Side.RIGHT), ElementKind.TRIGGER)
         input.elementDown(lt)
         assertEquals(255, wire.last.lt); assertEquals(0, wire.last.rt)
-        input.elementUp(lt); input.elementDown(rt)
+        input.elementUp(lt); advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent(); input.elementDown(rt)
         assertEquals(0, wire.last.lt); assertEquals(255, wire.last.rt)
         input.elementUp(rt)
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
         assertTrue(wire.last.atRest)
 
         // Phone gyro to right stick lands on the same controller and adds to the on-screen stick.
@@ -202,9 +207,12 @@ class PadPathTest {
     /** What handleZone does for a "Camera → stick" zone: drag samples through CameraStick into setStick, then 0 on lift. */
     private fun dragCameraZone(input: ControlsInput, zone: ControlElement) {
         val side = if (zone.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT
-        val cam = io.github.f_e_n_y_x.nebula.controls.CameraStick(zone.sensitivity, zone.acceleration, zone.invertY)
+        val cam = io.github.f_e_n_y_x.nebula.controls.CameraStick(zone.sensitivity, zone.acceleration, zone.antiDeadzone, zone.invertY)
+        var t = 0L
         repeat(10) {
-            val (x, y) = cam.move(12f, -6f, 16)
+            t += 16
+            cam.add(12f, -6f, t)
+            val (x, y) = cam.tick(t)
             input.setStick(side, x, y)
         }
     }
