@@ -5,7 +5,6 @@ import io.github.f_e_n_y_x.nebula.input.RemoteInput
 import io.github.fenyx.nebula.engine.MouseButton
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -114,7 +113,7 @@ class ControlsInputTest {
         input.elementDown(m) // a second tap while playing is ignored
         advanceTimeBy(10)
         assertEquals(listOf("vk 81 down m0"), out.events)
-        advanceUntilIdle()
+        advanceTimeBy(1000) // macros run in backgroundScope, which advanceUntilIdle skips
         assertEquals(listOf("vk 81 down m0", "vk 81 up m0", "LEFT down", "LEFT up"), out.events)
     }
 

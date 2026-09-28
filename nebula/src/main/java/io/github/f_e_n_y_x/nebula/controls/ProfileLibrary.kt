@@ -15,14 +15,16 @@ class ProfileLibrary(
     private val builtIn: ControlsProfile,
     private val newId: () -> String,
     private val now: () -> Long,
+    /** Read-only ready-made profiles (the GTA V touch-camera preset). */
+    private val presets: List<ControlsProfile> = DefaultProfiles.presets(),
 ) {
-    /** Built-in first, then the user's profiles by name. */
-    val all: List<ControlsProfile> get() = listOf(builtIn) + data.profiles.sortedBy { it.name.lowercase() }
+    /** Built-ins first, then the user's profiles by name. */
+    val all: List<ControlsProfile> get() = listOf(builtIn) + presets + data.profiles.sortedBy { it.name.lowercase() }
 
     fun find(id: String?): ControlsProfile? = when (id) {
         null -> null
         builtIn.id -> builtIn
-        else -> data.profiles.firstOrNull { it.id == id }
+        else -> presets.firstOrNull { it.id == id } ?: data.profiles.firstOrNull { it.id == id }
     }
 
     /** The profile for [gameKey]: its own assignment, else the default, else Standard. */
@@ -47,7 +49,7 @@ class ProfileLibrary(
     fun save(p: ControlsProfile): Pair<ProfileLibrary, ControlsProfile> {
         val t = now()
         if (p.isBuiltIn) {
-            val copy = p.copy(id = newId(), name = uniqueName("My controls"), origin = null, createdAtMs = t, updatedAtMs = t)
+            val copy = p.copy(id = newId(), name = uniqueName(if (p.id == builtIn.id) "My controls" else "My ${p.name}".take(MAX_NAME)), origin = null, createdAtMs = t, updatedAtMs = t)
             val active = if (data.activeProfileId == p.id) copy.id else data.activeProfileId
             return with(data.copy(profiles = data.profiles + copy, activeProfileId = active)) to copy
         }
@@ -97,7 +99,7 @@ class ProfileLibrary(
         return with(data.copy(games = games))
     }
 
-    private fun with(d: StoreData) = ProfileLibrary(d, builtIn, newId, now)
+    private fun with(d: StoreData) = ProfileLibrary(d, builtIn, newId, now, presets)
 
     companion object {
         const val MAX_NAME = 40

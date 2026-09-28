@@ -43,6 +43,7 @@ class ControlsStore private constructor(context: Context) {
             style = PadStyle.of(all["list_osc_layout"] as? String),
             showGuide = b("checkbox_show_guide_button", true),
             l3r3Buttons = b("checkbox_only_show_L3R3", false),
+            portraitHalfHeight = b("checkbox_half_height_osc_portrait", true),
         )
     }
 

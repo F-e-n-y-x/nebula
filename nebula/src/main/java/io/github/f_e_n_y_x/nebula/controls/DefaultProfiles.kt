@@ -15,6 +15,8 @@ data class StandardOptions(
     val showGuide: Boolean = true,
     /** Separate L3 / R3 buttons instead of clicking the sticks. */
     val l3r3Buttons: Boolean = false,
+    /** Portrait keeps the pad in the lower half, under the picture (V+ "half-height portrait"); off uses the landscape layout full screen. */
+    val portraitHalfHeight: Boolean = true,
 )
 
 /**
@@ -27,7 +29,7 @@ object DefaultProfiles {
         id = ControlsProfile.STANDARD_ID,
         name = "Standard gamepad",
         landscape = landscape(o),
-        portrait = portrait(o),
+        portrait = if (o.portraitHalfHeight) portrait(o) else null,
         origin = "builtin",
     )
 
@@ -108,6 +110,27 @@ object DefaultProfiles {
         }
         return out
     }
+
+    /**
+     * "GTA V: controller + touch camera (right half)": a controller in hand moves, drives and
+     * shoots; a thumb on the right half of the screen aims (right stick). Nothing else on screen,
+     * and the zone stays when the controller hides the other controls.
+     */
+    fun gtaTouchCamera(): ControlsProfile {
+        val zone = newElement(ElementKind.ZONE, "camera").copy(
+            label = "Camera", sensitivity = 1.2f, acceleration = 1.3f, opacity = 0.35f,
+        )
+        return ControlsProfile(
+            id = ControlsProfile.GTA_ID,
+            name = "GTA V: controller + touch camera (right half)",
+            landscape = listOf(zone),
+            portrait = listOf(zone.copy(y = 0.3f, height = 0.6f)),
+            origin = "builtin",
+        )
+    }
+
+    /** Ready-made profiles after Standard. */
+    fun presets(): List<ControlsProfile> = listOf(gtaTouchCamera())
 
     fun landscape(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.LANDSCAPE, o)
     fun portrait(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.PORTRAIT, o)

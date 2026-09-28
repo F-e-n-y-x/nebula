@@ -20,6 +20,7 @@ class ProfileJsonTest {
             newElement(ElementKind.COMBO, "c").copy(bindings = listOf(Binding.Key(0xA2), Binding.Key(0xA0), Binding.Key(0x1B))),
             newElement(ElementKind.DPAD, "d"),
             newElement(ElementKind.TRIGGER, "r").copy(bindings = listOf(Binding.Wheel(false))),
+            newElement(ElementKind.ZONE, "z").copy(zone = ZoneType.FLOATING_STICK, stick = StickOutput.LEFT, showRing = false, invertY = true, acceleration = 1.6f, keepWithController = true, width = 0.4f, height = 0.7f),
         ),
         portrait = listOf(newElement(ElementKind.BUTTON, "only").copy(x = 0.25f, y = 0.8f)),
         createdAtMs = 5, updatedAtMs = 9,

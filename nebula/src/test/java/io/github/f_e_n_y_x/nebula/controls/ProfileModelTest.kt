@@ -108,7 +108,7 @@ class ProfileModelTest {
         assertEquals(a.id, l6.assignedTo("h:gt"))
         // The built-in can't be deleted.
         assertSame(l6, l6.delete(ControlsProfile.STANDARD_ID))
-        assertEquals(listOf("Standard gamepad", "Racing wheel", "Racing wheel copy 2"), l6.all.map { it.name })
+        assertEquals(listOf("Standard gamepad", "GTA V: controller + touch camera (right half)", "Racing wheel", "Racing wheel copy 2"), l6.all.map { it.name })
     }
 
     @Test
@@ -131,5 +131,34 @@ class ProfileModelTest {
         assertEquals("Standard gamepad 2", a.name)
         val (_, b) = l1.add(ControlsProfile("x", "   ", emptyList()))
         assertEquals("Imported controls", b.name)
+    }
+
+    @Test
+    fun gtaPresetIsAReadOnlyTouchCameraKeptWithTheController() {
+        val l = lib()
+        val gta = l.find(ControlsProfile.GTA_ID)!!
+        assertTrue(gta.isBuiltIn)
+        assertTrue(gta.hasControllerZones())
+        val zone = gta.landscape.single()
+        assertEquals(ElementKind.ZONE, zone.kind)
+        assertEquals(ZoneType.CAMERA_STICK, zone.zone)
+        assertEquals(StickOutput.RIGHT, zone.stick)
+        assertEquals(0.75f, zone.x); assertEquals(0.5f, zone.width); assertEquals(1f, zone.height)
+        // Assignable to a game as-is; editing it saves a copy.
+        assertEquals(gta, l.assign("pc:gta5", gta.id).resolve("pc:gta5"))
+        assertSame(l, l.delete(gta.id))
+        val (_, copy) = l.save(gta.copy(landscape = listOf(zone.copy(sensitivity = 2f))))
+        assertFalse(copy.isBuiltIn)
+        assertTrue(copy.name.startsWith("My GTA V"))
+        assertFalse(DefaultProfiles.standard().hasControllerZones())
+    }
+
+    @Test
+    fun zonesAreSizedAsAShareOfTheScreen() {
+        val z = newElement(ElementKind.ZONE, "z").copy(width = 3f, height = 0.01f).clampedSize()
+        assertEquals(1f, z.width)
+        assertEquals(ControlElement.MIN_ZONE, z.height)
+        val halfHeight = DefaultProfiles.standard(StandardOptions(portraitHalfHeight = false))
+        assertNull(halfHeight.portrait)
     }
 }

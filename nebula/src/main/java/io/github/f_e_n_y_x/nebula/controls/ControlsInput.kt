@@ -19,7 +19,17 @@ import kotlin.math.roundToInt
  * Toggle elements latch on the first press and release on the next; [latched] exposes which are
  * on so the renderer can show it. Macros play on their own coroutine in [scope].
  */
-class ControlsInput(private val out: () -> RemoteInput?, private val scope: CoroutineScope) {
+class ControlsInput(
+    private val out: () -> RemoteInput?,
+    private val scope: CoroutineScope,
+    /** LI_CCAP gyro/accel bits when this device's sensors act as the pad's motion source. */
+    private val motionCaps: () -> Int = { 0 },
+    /**
+     * Set while a physical controller owns player 1 and only "keep with controller" zones show:
+     * zone sticks then steer that controller's sticks instead of a separate on-screen pad.
+     */
+    private val mixer: () -> PadMixer? = { null },
+) {
     private var buttons = 0
     private var lt = 0
     private var rt = 0
@@ -75,10 +85,7 @@ class ControlsInput(private val out: () -> RemoteInput?, private val scope: Coro
         when (e.stick) {
             StickOutput.LEFT, StickOutput.RIGHT -> {
                 val (x, y) = applyDeadzone(nx, ny, e.deadzone)
-                val ax = (x * AXIS_MAX).roundToInt()
-                val ay = (y * AXIS_MAX).roundToInt()
-                if (e.stick == StickOutput.LEFT) { lx = ax; ly = ay } else { rx = ax; ry = ay }
-                send()
+                setStick(if (e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT, x, y)
             }
             StickOutput.KEYS -> {
                 val dz = e.deadzone.coerceIn(0.05f, 0.9f)
@@ -95,6 +102,19 @@ class ControlsInput(private val out: () -> RemoteInput?, private val scope: Coro
             }
         }
     }
+
+    /** Sets a gamepad stick directly (−1..1, y up): camera zones, which do their own shaping. */
+    fun setStick(side: Side, x: Float, y: Float) {
+        val ax = (x.coerceIn(-1f, 1f) * AXIS_MAX).roundToInt()
+        val ay = (y.coerceIn(-1f, 1f) * AXIS_MAX).roundToInt()
+        val m = mixer()
+        if (m != null) { m.touchStick(side, ax, ay); return }
+        if (side == Side.LEFT) { if (lx == ax && ly == ay) return; lx = ax; ly = ay } else { if (rx == ax && ry == ay) return; rx = ax; ry = ay }
+        send()
+    }
+
+    /** Relative mouse movement in PC pixels (camera → mouse zones). */
+    fun mouseMove(dx: Int, dy: Int) { if (dx != 0 || dy != 0) out()?.move(dx, dy) }
 
     /** Stick or touchpad click (L3 / R3, tap to click). */
     fun click(e: ControlElement) {
@@ -121,6 +141,7 @@ class ControlsInput(private val out: () -> RemoteInput?, private val scope: Coro
         val padWasUsed = announced
         buttons = 0; lt = 0; rt = 0; lx = 0; ly = 0; rx = 0; ry = 0
         counts.clear()
+        mixer()?.let { it.touchStick(Side.LEFT, 0, 0); it.touchStick(Side.RIGHT, 0, 0) }
         if (padWasUsed) send()
     }
 
@@ -132,7 +153,8 @@ class ControlsInput(private val out: () -> RemoteInput?, private val scope: Coro
         val gone = before.filter { it !in binds }
         val added = binds.filter { it !in before }
         if (binds.isEmpty()) heldBy.remove(owner) else heldBy[owner] = binds
-        gone.forEach { release(it); if (it is Binding.Wheel) wheels.remove(owner + it.token())?.cancel() }
+        // Let go in reverse order: Ctrl+C releases C, then Ctrl.
+        gone.asReversed().forEach { release(it); if (it is Binding.Wheel) wheels.remove(owner + it.token())?.cancel() }
         added.forEach { b ->
             press(b)
             if (b is Binding.Wheel) wheels[owner + b.token()] = scope.launch { while (true) { delay(WHEEL_REPEAT_MS); scrollOnce(b) } }
@@ -200,8 +222,11 @@ class ControlsInput(private val out: () -> RemoteInput?, private val scope: Coro
     private fun send() {
         val o = out() ?: return
         if (!announced) {
-            // MoonBridge.LI_CTYPE_XBOX, LI_CCAP_ANALOG_TRIGGERS
-            o.gamepadArrived(0, 1, 0x01, SUPPORTED, 0x01)
+            // With this device's sensors as motion source the host needs a motion-capable pad (it
+            // picks a DualSense for an unknown type with gyro/accel); otherwise an Xbox pad.
+            // MoonBridge.LI_CTYPE_UNKNOWN / LI_CTYPE_XBOX, LI_CCAP_ANALOG_TRIGGERS.
+            val motion = motionCaps()
+            o.gamepadArrived(0, 1, if (motion != 0) 0x00 else 0x01, SUPPORTED, (0x01 or motion).toShort())
             announced = true
         }
         o.gamepad(0, 1, buttons, lt, rt, lx, ly, rx, ry)

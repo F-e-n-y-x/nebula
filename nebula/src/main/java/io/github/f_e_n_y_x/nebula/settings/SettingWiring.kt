@@ -30,7 +30,7 @@ sealed interface Wiring {
 }
 
 private const val DS5 = "DualSense haptics and the USB controller driver are coming in 0.4."
-private const val EDITOR = "Arrives with the on-screen controls editor in 0.4."
+private const val CROWN = "Nebula's controls profiles replace Crown: Settings → On-screen controls → Open controls editor, where V+ Crown profiles can be imported."
 private const val DIAG = "The diagnostics screens are being rebuilt for 0.3.0."
 
 private val RUMBLE = setOf("rumble", "rumbleTriggers", "setControllerLED")
@@ -185,16 +185,16 @@ val settingWiring: Map<String, Wiring> = mapOf(
     "pointer_velocity_factor" to Wiring.Nebula(),
     // On-screen controls
     "checkbox_show_onscreen_controls" to Wiring.Nebula(),
-    "list_osc_layout" to Wiring.ComingSoon("0.4", EDITOR),
+    "list_osc_layout" to Wiring.Nebula(),
     "checkbox_only_show_L3R3" to Wiring.Nebula(),
     "checkbox_show_guide_button" to Wiring.Nebula(),
-    "checkbox_half_height_osc_portrait" to Wiring.ComingSoon("0.4", EDITOR),
+    "checkbox_half_height_osc_portrait" to Wiring.Nebula(),
     "seekbar_osc_opacity" to Wiring.Nebula(),
     "nebula_osc_with_gamepad" to Wiring.Nebula(),
     "reset_osc" to Wiring.Action,
     // Advanced
-    "checkbox_show_onscreen_keyboard" to Wiring.NotInNebula("Crown profiles are V+ only; Nebula's controls editor comes in 0.4."),
-    "crown_config_management" to Wiring.NotInNebula("Crown profiles are V+ only; Nebula's controls editor comes in 0.4."),
+    "checkbox_show_onscreen_keyboard" to Wiring.NotInNebula(CROWN),
+    "crown_config_management" to Wiring.NotInNebula(CROWN),
     "config_sync_export" to Wiring.Action,
     "config_sync_import" to Wiring.Action,
     "config_sync_select_directory" to Wiring.NotInNebula("Use Save a backup file and Restore to move settings between devices."),

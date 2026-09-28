@@ -130,6 +130,11 @@ object ProfileJson {
             },
         )
         .apply { e.tint?.let { put("tint", "#%08X".format(it)) } }
+        .put("zone", e.zone.id)
+        .put("acceleration", e.acceleration.toDouble())
+        .put("invertY", e.invertY)
+        .put("showRing", e.showRing)
+        .put("keepWithController", e.keepWithController)
 
     /** Null for an element this version doesn't know (a newer kind); the rest of the profile still loads. */
     fun elementFromJson(o: JSONObject): ControlElement? {
@@ -162,6 +167,11 @@ object ProfileJson {
             sensitivity = o.optDouble("sensitivity", 1.0).toFloat().coerceIn(0.1f, 5f),
             steps = steps,
             tint = o.optString("tint").takeIf { it.startsWith("#") && it.length == 9 }?.drop(1)?.toLongOrNull(16),
+            zone = ZoneType.entries.firstOrNull { it.id == o.optString("zone") } ?: ZoneType.CAMERA_STICK,
+            acceleration = o.optDouble("acceleration", 1.0).toFloat(),
+            invertY = o.optBoolean("invertY", false),
+            showRing = o.optBoolean("showRing", true),
+            keepWithController = o.optBoolean("keepWithController", false),
         ).clampedSize()
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -22,11 +21,20 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.f_e_n_y_x.nebula.controls.ControlElement
 import io.github.f_e_n_y_x.nebula.controls.ControlsInput
+import io.github.f_e_n_y_x.nebula.controls.CameraMouse
+import io.github.f_e_n_y_x.nebula.controls.CameraStick
 import io.github.f_e_n_y_x.nebula.controls.ElementKind
+import io.github.f_e_n_y_x.nebula.controls.Side
+import io.github.f_e_n_y_x.nebula.controls.StickOutput
+import io.github.f_e_n_y_x.nebula.controls.ZoneType
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -38,12 +46,20 @@ fun Modifier.controlsArea(): Modifier = this.fillMaxSize().displayCutoutPadding(
 internal fun Modifier.elementBounds(e: ControlElement, areaW: Int, areaH: Int): Modifier {
     return this
         .offset {
-            val w = e.width.dp.roundToPx()
-            val h = e.height.dp.roundToPx()
-            IntOffset((e.x * areaW - w / 2f).roundToInt(), (e.y * areaH - h / 2f).roundToInt())
+            val sz = e.sizePx(areaW, areaH, this)
+            IntOffset((e.x * areaW - sz.width / 2f).roundToInt(), (e.y * areaH - sz.height / 2f).roundToInt())
         }
-        .size(e.width.dp, e.height.dp)
+        .layout { m, _ ->
+            val sz = e.sizePx(areaW, areaH, this)
+            val p = m.measure(Constraints.fixed(sz.width.coerceAtLeast(1), sz.height.coerceAtLeast(1)))
+            layout(p.width, p.height) { p.place(0, 0) }
+        }
 }
+
+/** Pixel size: zones are a share of the area, everything else dp. */
+internal fun ControlElement.sizePx(areaW: Int, areaH: Int, density: Density): IntSize =
+    if (areaSized) IntSize((width * areaW).roundToInt(), (height * areaH).roundToInt())
+    else with(density) { IntSize(width.dp.roundToPx(), height.dp.roundToPx()) }
 
 /**
  * The live on-screen controls for one layout. Each element is its own small touch target, so
@@ -56,7 +72,8 @@ fun ControlsOverlay(elements: List<ControlElement>, input: ControlsInput, opacit
     BoxWithConstraints(modifier.controlsArea()) {
         val w = constraints.maxWidth
         val h = constraints.maxHeight
-        elements.forEach { e ->
+        // Zones first, so a button on top of a zone still gets its touches.
+        elements.sortedBy { it.kind != ElementKind.ZONE }.forEach { e ->
             key(e.id) {
                 val look = remember { ElementLook() }
                 val on = remember(e.id) { derivedStateOf { e.id in latched } }
@@ -161,6 +178,7 @@ private suspend fun PointerInputScope.handle(e: ControlElement, look: ElementLoo
             }
             if (System.currentTimeMillis() - start < TAP_MS && travelled < radius * 0.25f) input.click(e)
         }
+        ElementKind.ZONE -> handleZone(e, look, input)
         ElementKind.TOUCHPAD -> awaitEachGesture {
             val first = awaitFirstDown(requireUnconsumed = false)
             first.consume()
@@ -187,3 +205,79 @@ private suspend fun PointerInputScope.handle(e: ControlElement, look: ElementLoo
 }
 
 private const val DPAD_T = 0.35f
+
+/** Radius of a floating joystick spawned in a zone. */
+internal val FLOAT_RING = 64.dp
+
+private suspend fun PointerInputScope.handleZone(e: ControlElement, look: ElementLook, input: ControlsInput) = awaitEachGesture {
+    val first = awaitFirstDown(requireUnconsumed = false)
+    first.consume()
+    val id = first.id
+    val side = if (e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT
+    look.pressed.value = true
+    look.origin.value = first.position
+    try {
+        when (e.zone) {
+            ZoneType.FLOATING_STICK -> {
+                val radius = FLOAT_RING.toPx()
+                val origin = first.position
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    ev.changes.forEach { it.consume() }
+                    val c = ev.changes.firstOrNull { it.id == id } ?: break
+                    if (!c.pressed) break
+                    var d = (c.position - origin) / radius
+                    val m = hypot(d.x, d.y)
+                    if (m > 1f) d /= m
+                    look.knob.value = d
+                    val (x, y) = ControlsInput.applyDeadzone(d.x, -d.y, e.deadzone)
+                    input.setStick(side, x, y)
+                }
+            }
+            ZoneType.CAMERA_STICK -> {
+                val cam = CameraStick(e.sensitivity, e.acceleration, e.invertY)
+                var lastMove = first.uptimeMillis
+                var now = first.uptimeMillis
+                while (true) {
+                    val ev = withTimeoutOrNull(CameraStick.TICK_MS) { awaitPointerEvent() }
+                    if (ev == null) {
+                        now += CameraStick.TICK_MS
+                        val (x, y) = cam.idle(now - lastMove)
+                        look.knob.value = androidx.compose.ui.geometry.Offset(x, -y)
+                        input.setStick(side, x, y)
+                        continue
+                    }
+                    ev.changes.forEach { it.consume() }
+                    val c = ev.changes.firstOrNull { it.id == id } ?: break
+                    if (!c.pressed) break
+                    now = c.uptimeMillis
+                    val d = c.positionChange()
+                    if (d.x == 0f && d.y == 0f) continue
+                    val (x, y) = cam.move(d.x / density, d.y / density, c.uptimeMillis - c.previousUptimeMillis)
+                    lastMove = c.uptimeMillis
+                    look.origin.value = c.position
+                    look.knob.value = androidx.compose.ui.geometry.Offset(x, -y)
+                    input.setStick(side, x, y)
+                }
+            }
+            ZoneType.CAMERA_MOUSE -> {
+                val mouse = CameraMouse(e.sensitivity, e.acceleration, e.invertY)
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    ev.changes.forEach { it.consume() }
+                    val c = ev.changes.firstOrNull { it.id == id } ?: break
+                    if (!c.pressed) break
+                    val d = c.positionChange()
+                    look.origin.value = c.position
+                    val (mx, my) = mouse.move(d.x, d.y, c.uptimeMillis - c.previousUptimeMillis, density)
+                    input.mouseMove(mx, my)
+                }
+            }
+        }
+    } finally {
+        look.pressed.value = false
+        look.knob.value = androidx.compose.ui.geometry.Offset.Zero
+        look.origin.value = androidx.compose.ui.geometry.Offset.Unspecified
+        if (e.zone != ZoneType.CAMERA_MOUSE) input.setStick(side, 0f, 0f)
+    }
+}

@@ -58,6 +58,7 @@ fun ElementFace(e: ControlElement, look: ElementLook, latched: State<Boolean>, m
                 ElementKind.STICK -> drawStick(e, look)
                 ElementKind.DPAD -> drawDpad(look.dirs.value)
                 ElementKind.TOUCHPAD -> drawTouchpad(down)
+                ElementKind.ZONE -> drawZone(e, look)
                 else -> drawButton(e.shape, down, latched.value)
             }
         },
@@ -72,6 +73,17 @@ fun ElementFace(e: ControlElement, look: ElementLook, latched: State<Boolean>, m
                 color = if (e.kind == ElementKind.STICK) NebulaColors.textSecondary else color,
                 textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = if (e.kind == ElementKind.TOUCHPAD) Modifier.align(Alignment.TopCenter).padding(top = 8.dp) else Modifier,
+            )
+        }
+        if (e.kind == ElementKind.ZONE) {
+            val what = when (e.zone) {
+                io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_MOUSE -> "Camera → mouse"
+                io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_STICK -> "Camera → ${if (e.stick == StickOutput.LEFT) "left" else "right"} stick"
+                io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> "Floating ${if (e.stick == StickOutput.LEFT) "left" else "right"} stick"
+            } + if (e.keepWithController) " · with controller" else ""
+            Text(
+                what, style = t.label, color = NebulaColors.textSecondary, textAlign = TextAlign.Center,
+                modifier = Modifier.align(Alignment.Center).padding(top = 40.dp),
             )
         }
         if (e.kind == ElementKind.COMBO || e.kind == ElementKind.MACRO) {
@@ -159,6 +171,32 @@ private fun DrawScope.drawDpad(dirs: Set<Int>) {
             }
         }
         drawPath(p, if (i in dirs) Color.White else NebulaColors.textSecondary, style = Stroke(2.dp.toPx()))
+    }
+}
+
+private fun DrawScope.drawZone(e: ControlElement, look: ElementLook) {
+    val r = CornerRadius(18.dp.toPx())
+    val down = look.pressed.value
+    drawRoundRect(if (down) Color(0x1FB7A2FF) else Color(0x14FFFFFF), cornerRadius = r)
+    drawRoundRect(
+        if (down) NebulaColors.accentText else Color(0x59FFFFFF), cornerRadius = r,
+        style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(18f, 12f))),
+    )
+    val o = look.origin.value.takeIf { it.isSpecified() } ?: return
+    when (e.zone) {
+        io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> if (e.showRing) {
+            val ring = FLOAT_RING.toPx()
+            drawCircle(Color(0x66111113), ring, o)
+            drawCircle(NebulaColors.accentText, ring, o, style = Stroke(1.5.dp.toPx()))
+            val k = look.knob.value
+            drawCircle(KnobColor, ring * 0.42f, o + Offset(k.x * ring * 0.58f, k.y * ring * 0.58f))
+        }
+        else -> {
+            // Where the thumb is, with a short tail showing the stick push.
+            val k = look.knob.value
+            drawCircle(Color(0x33B7A2FF), 26.dp.toPx(), o)
+            drawLine(NebulaColors.accentText, o, o + Offset(k.x, k.y) * 40.dp.toPx(), 3.dp.toPx())
+        }
     }
 }
 

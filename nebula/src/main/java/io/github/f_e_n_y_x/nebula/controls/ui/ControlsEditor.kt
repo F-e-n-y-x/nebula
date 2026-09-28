@@ -238,7 +238,8 @@ fun ControlsEditor(
                 gx.forEach { drawLine(NebulaColors.accentText, Offset(it, 0f), Offset(it, size.height), 1.dp.toPx()) }
                 gy.forEach { drawLine(NebulaColors.accentText, Offset(0f, it), Offset(size.width, it), 1.dp.toPx()) }
             }
-            editor.elements.forEach { e ->
+            // Zones sit under everything else, as they do while playing.
+            editor.elements.sortedBy { it.kind != ElementKind.ZONE }.forEach { e ->
                 key(e.id) {
                     EditableElement(
                         e = e, selected = e.id == editor.selectedId, areaW = w, areaH = h, opacity = globalOpacity,
@@ -270,14 +271,23 @@ fun ControlsEditor(
             onGrid = { gridOn = !gridOn },
             onAdd = { panel = if (panel == Panel.LIBRARY) Panel.NONE else Panel.LIBRARY },
             onSave = save,
-            modifier = Modifier.align(if (toolbarAtBottom) Alignment.BottomCenter else Alignment.TopCenter),
+            // A side panel takes one edge; the toolbar moves to the other so neither covers the other.
+            modifier = Modifier.align(
+                when {
+                    toolbarAtBottom -> Alignment.BottomCenter
+                    sideDock && panel != Panel.NONE && dock == Dock.START -> Alignment.TopEnd
+                    sideDock && panel != Panel.NONE && dock == Dock.END -> Alignment.TopStart
+                    else -> Alignment.TopCenter
+                },
+            ),
         )
 
         if (panel == Panel.NONE && editor.selectedId == null) {
             Hint(
                 if (editor.elements.isEmpty()) "Tap + to add a button, stick, D-pad or touchpad"
                 else "Tap to select · drag to move · pinch or drag the corner to resize",
-                Modifier.align(Alignment.BottomCenter),
+                // Under the toolbar, where no default control sits.
+                Modifier.align(Alignment.TopCenter).padding(top = Nebula.scale.dp(76)),
             )
         }
 
@@ -296,7 +306,7 @@ fun ControlsEditor(
                     }
                     Panel.LIBRARY -> ElementLibrary(
                         onPick = { kind ->
-                            act { add(kind, 0.5f, if (orientation == LayoutOrientation.PORTRAIT) 0.72f else 0.5f) }
+                            act { if (kind == ElementKind.ZONE) add(kind, 0.75f, 0.5f) else add(kind, 0.5f, if (orientation == LayoutOrientation.PORTRAIT) 0.72f else 0.5f) }
                             panel = Panel.INSPECTOR
                         },
                         onClose = { panel = Panel.NONE },
@@ -336,6 +346,7 @@ internal fun ControlElement.keepsAspect() = kind == ElementKind.DPAD || (kind ==
 private fun resizeBy(editor: LayoutEditor, id: String, zoom: Float, gridOn: Boolean) {
     val e = editor.elements.firstOrNull { it.id == id } ?: return
     // Snap only coarse pinches to the grid, or small steps get eaten.
+    if (e.areaSized) { editor.resizeTo(id, e.width * zoom, e.height * zoom); return }
     val nw = Snapping.size(e.width * zoom, GRID_DP / 2, false)
     val nh = if (e.keepsAspect()) nw else Snapping.size(e.height * zoom, GRID_DP / 2, false)
     editor.resizeTo(id, if (gridOn) nw.roundToInt().toFloat() else nw, if (gridOn) nh.roundToInt().toFloat() else nh)
@@ -367,13 +378,15 @@ private fun EditableElement(
                     down.consume()
                     if (editor.selectedId != e.id) { editor.select(e.id); onChanged() }
                     val start = editor.elements.firstOrNull { it.id == e.id } ?: return@awaitEachGesture
-                    val wPx = with(density) { start.width.dp.toPx() }
-                    val hPx = with(density) { start.height.dp.toPx() }
+                    val sz = start.sizePx(areaW, areaH, density)
+                    val wPx = sz.width.toFloat()
+                    val hPx = sz.height.toFloat()
                     var left = start.x * areaW - wPx / 2
                     var top = start.y * areaH - hPx / 2
                     val others = editor.elements.filter { it.id != e.id }.map { o ->
-                        val ow = with(density) { o.width.dp.toPx() }
-                        val oh = with(density) { o.height.dp.toPx() }
+                        val osz = o.sizePx(areaW, areaH, density)
+                        val ow = osz.width.toFloat()
+                        val oh = osz.height.toFloat()
                         SnapBox(o.x * areaW - ow / 2, o.y * areaH - oh / 2, ow, oh)
                     }
                     val threshold = with(density) { SNAP_DP.dp.toPx() }
@@ -412,7 +425,7 @@ private fun EditableElement(
             }
             .semantics { contentDescription = "${e.kind.label} ${e.label}".trim() + if (selected) ", selected" else "" },
     ) {
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = (opacity * e.opacity).coerceAtLeast(0.35f) }) {
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = (opacity * e.opacity).coerceAtLeast(if (e.kind == ElementKind.ZONE) 0.85f else 0.35f) }) {
             ElementFace(e, look, latched)
         }
         // Every element shows its bounds; the selected one in accent.
@@ -442,14 +455,19 @@ private fun ResizeHandle(e: ControlElement, areaW: Int, areaH: Int, editor: Layo
     Box(
         Modifier
             .offset {
-                val w = e.width.dp.roundToPx()
-                val h = e.height.dp.roundToPx()
+                val sz = e.sizePx(areaW, areaH, this)
+                val w = sz.width
+                val h = sz.height
                 val t = touch.roundToPx()
-                IntOffset((e.x * areaW + w / 2f - t / 2f + 3.dp.toPx()).roundToInt(), (e.y * areaH + h / 2f - t / 2f + 3.dp.toPx()).roundToInt())
+                // Kept on screen even for a zone that fills the screen.
+                IntOffset(
+                    (e.x * areaW + w / 2f - t / 2f + 3.dp.toPx()).roundToInt().coerceIn(0, (areaW - t).coerceAtLeast(0)),
+                    (e.y * areaH + h / 2f - t / 2f + 3.dp.toPx()).roundToInt().coerceIn(0, (areaH - t).coerceAtLeast(0)),
+                )
             }
             .size(touch)
             .semantics { contentDescription = "Resize" }
-            .pointerInput(e.id, gridOn) {
+            .pointerInput(e.id, gridOn, areaW, areaH) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false).consume()
                     editor.beginGesture()
@@ -461,15 +479,27 @@ private fun ResizeHandle(e: ControlElement, areaW: Int, areaH: Int, editor: Layo
                         ev.changes.forEach { c ->
                             val d = c.positionChange()
                             // The handle is the bottom-right corner; the centre stays put, so each side grows by 2×.
-                            w += with(density) { (d.x * 2).toDp().value }
-                            h += with(density) { (d.y * 2).toDp().value }
+                            if (s0.areaSized) {
+                                w += d.x * 2 / areaW
+                                h += d.y * 2 / areaH
+                            } else {
+                                w += with(density) { (d.x * 2).toDp().value }
+                                h += with(density) { (d.y * 2).toDp().value }
+                            }
                             c.consume()
                         }
                         val cur = editor.elements.firstOrNull { it.id == e.id } ?: break
-                        val nw = Snapping.size(w, GRID_DP / 2, gridOn)
-                        val nh = if (cur.keepsAspect()) nw else Snapping.size(h, GRID_DP / 2, gridOn)
-                        editor.resizeTo(e.id, nw, nh)
-                        onChanged()
+                        if (cur.areaSized) {
+                            // Zones snap to 1/20 of the screen with the grid on.
+                            val step = if (gridOn) 0.05f else 0f
+                            editor.resizeTo(e.id, if (step > 0) Snapping.toGrid(w, step) else w, if (step > 0) Snapping.toGrid(h, step) else h)
+                            onChanged()
+                        } else {
+                            val nw = Snapping.size(w, GRID_DP / 2, gridOn)
+                            val nh = if (cur.keepsAspect()) nw else Snapping.size(h, GRID_DP / 2, gridOn)
+                            editor.resizeTo(e.id, nw, nh)
+                            onChanged()
+                        }
                     } while (ev.changes.any { it.pressed })
                     editor.endGesture()
                     onChanged()

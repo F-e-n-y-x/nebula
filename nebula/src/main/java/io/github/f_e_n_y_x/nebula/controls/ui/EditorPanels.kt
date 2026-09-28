@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.FlipToFront
 import androidx.compose.material.icons.rounded.Games
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.PanTool
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.TouchApp
@@ -190,7 +191,7 @@ internal fun Inspector(
         if (e.kind != ElementKind.DPAD) {
             Field("Label") { TextInput(e.label, { v -> onEdit("label") { it.copy(label = v.take(24)) } }, "No label") }
         }
-        Field("Size") {
+        if (e.areaSized) ZoneAreaField(e, onEdit) else Field("Size") {
             SliderField(
                 label = if (e.keepsAspect()) "Size" else "Width", value = e.width, range = ControlElement.MIN_SIZE_DP..ControlElement.MAX_SIZE_DP, step = 2f, unit = "dp",
                 onValueChange = { v -> onEdit("w") { if (it.keepsAspect()) it.copy(width = v, height = v) else it.copy(width = v) } },
@@ -285,6 +286,7 @@ internal fun Inspector(
                     )
                 }
             }
+            ElementKind.ZONE -> ZoneFields(e, onEdit)
             ElementKind.TOUCHPAD -> {
                 Field("Tap sends") { BindingRow("Tap", e.click) { b -> onEdit(null) { it.copy(click = b) } } }
                 Field("Pointer speed", "Drag inside the pad to move the PC's mouse.") {
@@ -296,6 +298,72 @@ internal fun Inspector(
             }
         }
     }
+}
+
+/** A zone's area: quick halves plus width and height as a share of the screen. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ZoneAreaField(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
+    val s = Nebula.scale
+    Field("Area", "Drag the zone to move it; drag its corner or pinch to resize.") {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            SmallAction("Right half", null, { onEdit(null) { it.copy(x = 0.75f, y = 0.5f, width = 0.5f, height = 1f) } })
+            SmallAction("Left half", null, { onEdit(null) { it.copy(x = 0.25f, y = 0.5f, width = 0.5f, height = 1f) } })
+            SmallAction("Whole screen", null, { onEdit(null) { it.copy(x = 0.5f, y = 0.5f, width = 1f, height = 1f) } })
+        }
+        Text("Width", style = Nebula.type.label, color = NebulaColors.textMuted)
+        SliderField(
+            label = "Width", value = e.width * 100f, range = ControlElement.MIN_ZONE * 100f..100f, step = 5f, unit = "%",
+            onValueChange = { v -> onEdit("zw") { it.copy(width = v / 100f) } },
+        )
+        Text("Height", style = Nebula.type.label, color = NebulaColors.textMuted)
+        SliderField(
+            label = "Height", value = e.height * 100f, range = ControlElement.MIN_ZONE * 100f..100f, step = 5f, unit = "%",
+            onValueChange = { v -> onEdit("zh") { it.copy(height = v / 100f) } },
+        )
+    }
+}
+
+@Composable
+private fun ZoneFields(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
+    Field("Type", e.zone.help) {
+        Segmented(io.github.f_e_n_y_x.nebula.controls.ZoneType.entries.map { it.label to it }, e.zone) { z -> onEdit(null) { it.copy(zone = z) } }
+    }
+    if (e.zone != io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_MOUSE) {
+        Field("Stick") {
+            Segmented(listOf("Left stick" to StickOutput.LEFT, "Right stick" to StickOutput.RIGHT), if (e.stick == StickOutput.LEFT) StickOutput.LEFT else StickOutput.RIGHT) { o ->
+                onEdit(null) { it.copy(stick = o) }
+            }
+        }
+    }
+    if (e.zone == io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK) {
+        ToggleRow("Show the ring", "Draw the stick where your thumb is while you hold it.", e.showRing) { v -> onEdit(null) { it.copy(showRing = v) } }
+        Field("Dead zone") {
+            SliderField(
+                label = "Dead zone", value = e.deadzone * 100f, range = 0f..50f, step = 1f, unit = "%",
+                onValueChange = { v -> onEdit("deadzone") { it.copy(deadzone = v / 100f) } },
+            )
+        }
+    } else {
+        Field("Sensitivity", if (e.zone == io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_STICK) "How fast a drag reaches a full stick push." else "Mouse movement per finger movement.") {
+            SliderField(
+                label = "Sensitivity", value = e.sensitivity * 100f, range = 10f..400f, step = 10f, unit = "%",
+                onValueChange = { v -> onEdit("sens") { it.copy(sensitivity = v / 100f) } },
+            )
+        }
+        Field("Acceleration", "100% is linear. Higher makes slow drags finer and flicks faster.") {
+            SliderField(
+                label = "Acceleration", value = e.acceleration * 100f, range = 50f..250f, step = 10f, unit = "%",
+                onValueChange = { v -> onEdit("accel") { it.copy(acceleration = v / 100f) } },
+            )
+        }
+        ToggleRow("Invert Y", "Drag up to look down, like a flight stick.", e.invertY) { v -> onEdit(null) { it.copy(invertY = v) } }
+    }
+    ToggleRow(
+        "Keep with controller",
+        "Stays active when a physical controller hides the other on-screen controls; its stick joins the controller's (move with the pad, aim with your thumb).",
+        e.keepWithController,
+    ) { v -> onEdit(null) { it.copy(keepWithController = v) } }
 }
 
 private val WASD = listOf(0x57, 0x53, 0x41, 0x44).map { Binding.Key(it) }
@@ -403,6 +471,7 @@ private val libraryItems = listOf(
     LibraryItem(ElementKind.STICK, Icons.Rounded.ControlCamera, "Left or right analog stick, or four direction keys. Can float."),
     LibraryItem(ElementKind.DPAD, Icons.Rounded.Games, "Four directions with diagonals: D-pad, WASD or arrows."),
     LibraryItem(ElementKind.TRIGGER, Icons.Rounded.Crop75, "LT or RT, fully pressed while held."),
+    LibraryItem(ElementKind.ZONE, Icons.Rounded.PanTool, "A screen area for camera look (stick or mouse) or a floating joystick. Can keep working with a controller."),
     LibraryItem(ElementKind.TOUCHPAD, Icons.Rounded.TouchApp, "A region that moves the PC's mouse; tap to click."),
     LibraryItem(ElementKind.COMBO, Icons.Rounded.Link, "Several buttons or keys pressed together."),
     LibraryItem(ElementKind.MACRO, Icons.Rounded.Repeat, "A timed sequence of presses, played once per tap."),

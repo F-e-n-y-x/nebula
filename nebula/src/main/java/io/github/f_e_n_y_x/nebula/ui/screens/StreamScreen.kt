@@ -77,6 +77,8 @@ import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.MainActivity
 import io.github.f_e_n_y_x.nebula.StreamInputSink
 import io.github.f_e_n_y_x.nebula.controls.ControlsStore
+import io.github.f_e_n_y_x.nebula.controls.PadMixer
+import io.github.f_e_n_y_x.nebula.controls.hasControllerZones
 import io.github.f_e_n_y_x.nebula.controls.ui.ControlsEditor
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
 import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
@@ -241,9 +243,13 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     val padPresent = remember(devices) { GamepadMapper.physicalControllerPresent() }
     val oscShown = overlaysOn && ui.osc && (!padPresent || ui.oscWithGamepad)
     val oscShownNow by rememberUpdatedState(oscShown)
+    // Touch zones marked "Keep with controller" stay while the pad hides the rest; their stick
+    // output is mixed into the physical pad's player (controller moves, touch aims).
+    val zonesShown = overlaysOn && ui.osc && !oscShown && controlsProfile.hasControllerZones()
+    val padMixer = remember(remoteInput) { PadMixer { remoteInput } }
     val pad = remember(remote) {
         GamepadMapper(
-            remote, onMenu = { menu = true }, config = { uiNow.gamepad }, oscSlot = { oscShownNow },
+            { remoteInput?.let { padMixer } }, onMenu = { menu = true }, config = { uiNow.gamepad }, oscSlot = { oscShownNow },
             capabilities = { id, index -> stream.padCapabilities(id, index) ?: GamepadMapper.DEFAULT_CAPS },
             onPadsChanged = { stream.refreshFeedback() },
         )
@@ -407,7 +413,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
 
         if (oscShown || zonesShown) {
-            OnScreenControls(remote, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, motionCaps = {
+            OnScreenControls(remote, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown }, motionCaps = {
                 (stream.padCapabilities(-1, 0) ?: 0) and (com.limelight.nvstream.jni.MoonBridge.LI_CCAP_GYRO.toInt() or com.limelight.nvstream.jni.MoonBridge.LI_CCAP_ACCEL.toInt())
             })
         }

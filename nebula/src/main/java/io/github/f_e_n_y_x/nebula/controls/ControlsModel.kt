@@ -71,6 +71,15 @@ enum class ElementKind(val id: String, val label: String) {
     COMBO("combo", "Combo"),
     /** A timed sequence played once per press. */
     MACRO("macro", "Macro"),
+    /** A screen area (e.g. the right half) for camera look or a floating stick; sized as a share of the screen. */
+    ZONE("zone", "Touch zone"),
+}
+
+/** What a [ElementKind.ZONE] does with a finger. */
+enum class ZoneType(val id: String, val label: String, val help: String) {
+    CAMERA_STICK("camera_stick", "Camera → stick", "Drag to look: finger speed becomes stick deflection, back to centre when you stop or lift."),
+    CAMERA_MOUSE("camera_mouse", "Camera → mouse", "Drag to look with relative mouse movement."),
+    FLOATING_STICK("floating_stick", "Floating joystick", "A stick appears where your thumb lands; drag to push it."),
 }
 
 /** Hold: pressed while the finger is down. Toggle: first tap latches, second tap releases. */
@@ -115,13 +124,26 @@ data class ControlElement(
     val steps: List<MacroStep> = emptyList(),
     /** Label tint (ARGB), e.g. the face-button colours; null uses the theme text colour. */
     val tint: Long? = null,
+    /** Zone only: what it does ([stick] picks which stick for the stick types). */
+    val zone: ZoneType = ZoneType.CAMERA_STICK,
+    /** Zone only: response curve exponent; 1 is linear, above 1 slow moves get finer and fast ones stronger. */
+    val acceleration: Float = 1f,
+    val invertY: Boolean = false,
+    /** Floating joystick zone: draw the ring where the thumb is. */
+    val showRing: Boolean = true,
+    /** Zone only: keeps working while a physical controller hides the other on-screen controls. */
+    val keepWithController: Boolean = false,
 ) {
+    /** Zones are sized as a share of the controls area; everything else in dp. */
+    val areaSized: Boolean get() = kind == ElementKind.ZONE
+
     val binding: Binding get() = bindings.firstOrNull() ?: Binding.None
 
     /** Size limits so an element can't vanish or swallow the screen. */
     fun clampedSize(): ControlElement = copy(
-        width = width.coerceIn(MIN_SIZE_DP, MAX_SIZE_DP),
-        height = height.coerceIn(MIN_SIZE_DP, MAX_SIZE_DP),
+        width = if (areaSized) width.coerceIn(MIN_ZONE, 1f) else width.coerceIn(MIN_SIZE_DP, MAX_SIZE_DP),
+        height = if (areaSized) height.coerceIn(MIN_ZONE, 1f) else height.coerceIn(MIN_SIZE_DP, MAX_SIZE_DP),
+        acceleration = acceleration.coerceIn(0.5f, 2.5f),
         opacity = opacity.coerceIn(MIN_OPACITY, 1f),
         x = x.coerceIn(0f, 1f),
         y = y.coerceIn(0f, 1f),
@@ -131,6 +153,8 @@ data class ControlElement(
         const val MIN_SIZE_DP = 28f
         const val MAX_SIZE_DP = 360f
         const val MIN_OPACITY = 0.1f
+        /** Smallest zone, as a share of the screen side. */
+        const val MIN_ZONE = 0.08f
     }
 }
 
@@ -160,6 +184,7 @@ data class ControlsProfile(
     companion object {
         const val BUILTIN_PREFIX = "builtin:"
         const val STANDARD_ID = "builtin:standard"
+        const val GTA_ID = "builtin:gta-touch-camera"
     }
 }
 
@@ -173,6 +198,10 @@ fun newElement(kind: ElementKind, id: String, x: Float = 0.5f, y: Float = 0.5f):
     ElementKind.COMBO -> ControlElement(
         id, kind, x, y, 72f, 48f, label = "LB+RB", shape = ElementShape.PILL,
         bindings = listOf(Binding.Pad(PadFlags.LB), Binding.Pad(PadFlags.RB)),
+    )
+    ElementKind.ZONE -> ControlElement(
+        id, kind, 0.75f, 0.5f, 0.5f, 1f, label = "Camera", shape = ElementShape.SQUARE,
+        zone = ZoneType.CAMERA_STICK, stick = StickOutput.RIGHT, keepWithController = true, deadzone = 0f,
     )
     ElementKind.MACRO -> ControlElement(
         id, kind, x, y, 72f, 48f, label = "Macro", shape = ElementShape.PILL,
@@ -223,3 +252,6 @@ fun Binding.describe(): String = when (this) {
     is Binding.Mouse -> button.label
     is Binding.Wheel -> if (up) "Wheel up" else "Wheel down"
 }
+
+/** True when some zone keeps working with a physical controller attached. */
+fun ControlsProfile.hasControllerZones(): Boolean = (landscape + portrait.orEmpty()).any { it.kind == ElementKind.ZONE && it.keepWithController }
