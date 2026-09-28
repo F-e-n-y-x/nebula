@@ -48,6 +48,7 @@ class StreamConfiguration private constructor() {
     private var enableMic: Boolean = false
     private var useVdd: Boolean? = null
     private var novaDisplayMode: String? = null
+    private var novaOrientation: String? = null
     private var controlOnly: Boolean = false
     /** Sunshine extension: ask the host to auto-invoke its touch keyboard. Default = undeclared (null). */
     private var touchKeyboard: Boolean? = null
@@ -79,6 +80,8 @@ class StreamConfiguration private constructor() {
     fun getUseVdd(): Boolean? = useVdd
     /** Nova host display mode for this launch: "virtual", "mirror", or null (host default). */
     fun getNovaDisplayMode(): String? = novaDisplayMode
+    /** Orientation the client streams in, sent to Nova hosts: "portrait", "landscape", or null. */
+    fun getNovaOrientation(): String? = novaOrientation
     fun getTouchKeyboard(): Boolean? = touchKeyboard
     fun getControlOnly(): Boolean = controlOnly
 
@@ -127,6 +130,7 @@ class StreamConfiguration private constructor() {
         }
         fun setUseVdd(value: Boolean?): Builder = apply { config.useVdd = value }
         fun setNovaDisplayMode(value: String?): Builder = apply { config.novaDisplayMode = value }
+        fun setNovaOrientation(value: String?): Builder = apply { config.novaOrientation = value }
         fun setTouchKeyboard(value: Boolean?): Builder = apply { config.touchKeyboard = value }
         fun setEnableMic(enable: Boolean): Builder = apply { config.enableMic = enable }
         fun setControlOnly(controlOnly: Boolean): Builder = apply { config.controlOnly = controlOnly }

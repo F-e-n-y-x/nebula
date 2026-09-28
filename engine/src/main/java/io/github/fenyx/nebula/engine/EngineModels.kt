@@ -178,7 +178,20 @@ data class StreamRequest(
      * running on the host any more.
      */
     val resumeOnly: Boolean = false,
-)
+) {
+    /** The orientation this request streams in; sent to Nova as `nova_orientation`. */
+    val orientation: StreamOrientation get() = StreamOrientation.of(width, height)
+}
+
+/** Portrait when the stream is taller than wide, else landscape. */
+enum class StreamOrientation(val wire: String) {
+    PORTRAIT("portrait"),
+    LANDSCAPE("landscape");
+
+    companion object {
+        fun of(width: Int, height: Int): StreamOrientation = if (height > width) PORTRAIT else LANDSCAPE
+    }
+}
 
 /** Split of the end-to-end latency the client can measure. */
 data class LatencyParts(
