@@ -1,6 +1,7 @@
 package io.github.fenyx.nebula.engine
 
 import android.app.Activity
+import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Handler
@@ -18,7 +19,13 @@ import com.limelight.nvstream.RemoteTextContext
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.BandwidthMeter
 import io.github.fenyx.nebula.engine.framegen.FramegenController
+import io.github.fenyx.nebula.engine.framegen.FramegenDll
+import io.github.fenyx.nebula.engine.framegen.FramegenKeys
+import io.github.fenyx.nebula.engine.framegen.FramegenPlan
+import io.github.fenyx.nebula.engine.framegen.FramegenSelfTestRunner
 import io.github.fenyx.nebula.engine.framegen.FramegenStatus
+import io.github.fenyx.nebula.engine.framegen.UpscalerConfig
+import io.github.fenyx.nebula.engine.framegen.UpscalerMode
 import io.github.fenyx.nebula.engine.upscale.UpscalerController
 import io.github.fenyx.nebula.engine.upscale.UpscalerStatus
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,6 +71,26 @@ class StreamSession internal constructor(
 
     /** What the decoder-output upscaler is doing. */
     val upscaling: StateFlow<UpscalerStatus> get() = upscaler.status
+
+    private val postPrefs = FramegenDll.prefs(activity.applicationContext)
+    private var framegenSettingsChanged = false
+    private var upscalerSettingsChanged = false
+    private val applyPostProcessing = Runnable { applyChangedSettings() }
+
+    /**
+     * Frame generation and upscaler settings changed (stream menu panel, or Settings): apply them
+     * to this stream. Held as a field because SharedPreferences keeps listeners weakly.
+     */
+    private val postPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        when (key) {
+            in LIVE_FRAMEGEN_KEYS, FramegenKeys.UPSCALER -> {
+                if (key == FramegenKeys.UPSCALER) upscalerSettingsChanged = true else framegenSettingsChanged = true
+                main.removeCallbacks(applyPostProcessing)
+                main.postDelayed(applyPostProcessing, LIVE_APPLY_DEBOUNCE_MS)
+            }
+            FramegenKeys.UPSCALER_STRENGTH -> upscaler.applyConfig()
+        }
+    }
 
     private var haptics: AudioHapticsDriver? = null
 
@@ -213,6 +240,9 @@ class StreamSession internal constructor(
         holder.addCallback(surfaceCallback)
         decoder.setRenderTarget(holder)
         framegenController.newSession()
+        // Stops a device check still running: it must not share the GPU with a live stream.
+        FramegenSelfTestRunner.onStreamStarted(activity)
+        postPrefs.registerOnSharedPreferenceChangeListener(postPrefsListener)
         armPostProcessing(holder)
         connection.start(audio, decoder, connectionListener)
     }
@@ -233,6 +263,44 @@ class StreamSession internal constructor(
 
     /** Applies a changed upscaler strength (Settings or stream menu) to the running stream. */
     fun refreshUpscaler() = upscaler.applyConfig()
+
+    /**
+     * Applies changed frame generation / upscaler settings (flow scale, model, quality, on/off,
+     * upscaler mode) to the running stream without reconnecting. The decoder is rebuilt on the
+     * same connection, as when coming back from the background, and post-processing re-armed with
+     * the new plan. A new frame generation context picks up the new model. Main thread.
+     */
+    fun restartPostProcessing() {
+        framegenSettingsChanged = true
+        upscalerSettingsChanged = true
+        applyChangedSettings()
+    }
+
+    /**
+     * Rebuilds only when the change matters: frame generation settings while it runs or would
+     * run now; the upscaler mode while frame generation isn't set up (it is off then anyway).
+     */
+    private fun applyChangedSettings() {
+        main.removeCallbacks(applyPostProcessing)
+        val fgChanged = framegenSettingsChanged
+        val upChanged = upscalerSettingsChanged
+        framegenSettingsChanged = false
+        upscalerSettingsChanged = false
+        if (ended.get() || _backgrounded.value || !isConnected || !::decoder.isInitialized) return
+        val (w, h) = _stats.value.width to _stats.value.height
+        val armed = framegenController.isArmed
+        val fgWanted = framegenController.plan(w, h, videoFps) is FramegenPlan.On
+        val upWanted = UpscalerConfig.from(postPrefs.all).mode != UpscalerMode.OFF
+        val upActive = upscaler.status.value.active != UpscalerMode.OFF
+        val rebuild = (fgChanged && (armed || fgWanted)) || (upChanged && !armed && (upWanted || upActive))
+        if (!rebuild) return
+        LimeLog.info("Post-processing settings changed; rebuilding the decoder on the live stream (framegen=$fgWanted upscaler=$upWanted)")
+        decoder.pauseProcessing()
+        framegenController.release(decoder)
+        upscaler.release(decoder)
+        armPostProcessing(holder)
+        decoder.resumeProcessing()
+    }
 
     /** Ends the stream and asks the host to close the running app. */
     fun quit() {
@@ -311,8 +379,12 @@ class StreamSession internal constructor(
         }
         decoder.prepareForStop()
         main.post {
+            main.removeCallbacks(applyPostProcessing)
+            postPrefs.unregisterOnSharedPreferenceChangeListener(postPrefsListener)
             framegenController.shutdown(decoder)
             upscaler.release(decoder)
+            // A device check asked for during the stream runs now.
+            FramegenSelfTestRunner.onStreamEnded(activity)
         }
         haptics?.let { h ->
             haptics = null
@@ -455,6 +527,16 @@ class StreamSession internal constructor(
  * What happens when the stream's surface goes away. [graceMs] = 0 disconnects at once; otherwise
  * the session waits that long for a new surface. [keepAudio] keeps host audio playing meanwhile.
  */
+/** Frame generation settings whose change rebuilds post-processing on a live stream ([StreamSession.restartPostProcessing]). */
+internal val LIVE_FRAMEGEN_KEYS = setOf(
+    FramegenKeys.ENABLED, FramegenKeys.ADAPTIVE, FramegenKeys.MULTIPLIER, FramegenKeys.QUALITY_PRESET,
+    FramegenKeys.CUSTOM_SCALE, FramegenKeys.FLOW_SCALE, FramegenKeys.PERFORMANCE_MODE, FramegenKeys.SLOW_THRESHOLD_MS,
+    FramegenKeys.PRESENT_REAL_FIRST, FramegenKeys.THERMAL_GUARD,
+)
+
+/** Slider drags and quick taps settle before the decoder is rebuilt once. */
+internal const val LIVE_APPLY_DEBOUNCE_MS = 700L
+
 data class BackgroundPolicy(val graceMs: Long = 60_000, val keepAudio: Boolean = false)
 
 /** Maps a decoder stats window onto [StreamStats]; [measuredMbps] is null until measured. */

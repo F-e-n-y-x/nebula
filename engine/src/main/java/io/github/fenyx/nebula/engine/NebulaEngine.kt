@@ -244,8 +244,8 @@ class NebulaEngine private constructor(context: Context) {
         // whole connection, so only ask when a phase-1 host advertises "mic".
         val micRequested = prefs.enableMic && (!phase1 || caps!!.has(NovaFeature.MIC))
 
-        @Suppress("DEPRECATION")
-        val refreshRate = activity.windowManager.defaultDisplay.refreshRate
+        // The panel's highest refresh rate, not Display.getRefreshRate(): adaptive refresh reports 60 while idle.
+        val refreshRate = DisplayRefresh.nativeRefresh(activity)
         val extras = request.extras
         val config = StreamConfiguration.Builder()
             .setResolution(prefs.width, prefs.height)

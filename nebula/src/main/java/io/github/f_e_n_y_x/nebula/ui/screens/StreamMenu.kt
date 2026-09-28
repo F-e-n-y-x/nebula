@@ -116,8 +116,14 @@ fun StreamMenu(
     var confirmQuit by remember { mutableStateOf(false) }
     // The resolution picker replaces the panel; Back returns to it, applying closes the menu.
     var picking by remember { mutableStateOf(false) }
+    // "All frame generation settings": the Settings page over the stream; Back returns here.
+    var framegenSettings by remember { mutableStateOf(false) }
     if (picking && resolution != null) {
         ResolutionPicker(resolution, onDismiss = { picking = false }, onApplied = { picking = false; actions.onResume() })
+        return
+    }
+    if (framegenSettings) {
+        io.github.f_e_n_y_x.nebula.framegen.FramegenSettingsSheet(onBack = { framegenSettings = false })
         return
     }
     Box(Modifier.fillMaxSize()) {
@@ -144,7 +150,7 @@ fun StreamMenu(
                 ResolutionRow(it, onOpen = { picking = true })
                 RotateRow(it, onRotated = actions.onResume)
             }
-            io.github.f_e_n_y_x.nebula.framegen.FramegenMenuCard(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause)
+            io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
             Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null)
             hostSection?.invoke()
             FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)

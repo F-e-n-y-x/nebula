@@ -21,7 +21,9 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -52,6 +54,7 @@ import io.github.fenyx.nebula.engine.framegen.FramegenKeys
 import io.github.fenyx.nebula.engine.framegen.FramegenSelfTestRunner
 import io.github.fenyx.nebula.engine.framegen.QualityPreset
 import io.github.fenyx.nebula.engine.framegen.SelfTestReport
+import io.github.fenyx.nebula.engine.framegen.SelfTestStart
 import io.github.fenyx.nebula.engine.framegen.SelfTestState
 import io.github.fenyx.nebula.engine.framegen.SelfTestVerdict
 import io.github.fenyx.nebula.engine.framegen.UpscalerConfig
@@ -80,10 +83,20 @@ fun FramegenSettingsSection() {
     val dll = remember(tick) { FramegenDll.describe(prefs.prefs) }
     val bundled = remember { FramegenDll.hasBundled(ctx) }
     val running = test is SelfTestState.Running
+    val streaming by FramegenSelfTestRunner.streaming.collectAsState()
+    val queued by FramegenSelfTestRunner.queuedAfterStream.collectAsState()
     val unsupported = verdict == SelfTestVerdict.UNSUPPORTED
+    // During a stream (this page over the stream menu) the check is refused; the card offers to
+    // run it when the stream ends instead.
     val runTest = {
         val (w, h) = deviceResolution(ctx)
-        FramegenSelfTestRunner.start(ctx, maxOf(w, h), minOf(w, h))
+        if (FramegenSelfTestRunner.start(ctx, maxOf(w, h), minOf(w, h)) == SelfTestStart.REFUSED_STREAMING) {
+            Toast.makeText(ctx, "Run the device check when you're not streaming.", Toast.LENGTH_LONG).show()
+        }
+    }
+    val runAfterStream = {
+        val (w, h) = deviceResolution(ctx)
+        FramegenSelfTestRunner.runAfterStream(ctx, maxOf(w, h), minOf(w, h))
     }
 
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -125,7 +138,10 @@ fun FramegenSettingsSection() {
         }
 
         // ---- Device check ----
-        SelfTestCard(test, report, canRun = dll != null && !running, onRun = runTest)
+        SelfTestCard(
+            test, report, canRun = dll != null && !running, streaming = streaming, queued = queued,
+            onRun = runTest, onRunAfterStream = runAfterStream, onCancelQueued = FramegenSelfTestRunner::cancelQueued,
+        )
 
         // ---- Frame generation ----
         SectionTitle("Frame generation", Modifier.padding(top = s.dp(10)))
@@ -142,6 +158,11 @@ fun FramegenSettingsSection() {
                 }
                 if (on && dll == null) {
                     Toast.makeText(ctx, "Import Lossless.dll first.", Toast.LENGTH_SHORT).show()
+                    return@ToggleRow
+                }
+                if (on && streaming && verdict != SelfTestVerdict.PASSED && verdict != SelfTestVerdict.SLOW) {
+                    // Never checked (or failed) and a stream is running: don't try it on the live stream.
+                    Toast.makeText(ctx, "Run the device check when you're not streaming. Use \"Check when the stream ends\" above.", Toast.LENGTH_LONG).show()
                     return@ToggleRow
                 }
                 prefs.put(FramegenKeys.ENABLED, on)
@@ -197,16 +218,28 @@ fun FramegenSettingsSection() {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SelfTestCard(test: SelfTestState, report: SelfTestReport?, canRun: Boolean, onRun: () -> Unit) {
+private fun SelfTestCard(
+    test: SelfTestState,
+    report: SelfTestReport?,
+    canRun: Boolean,
+    streaming: Boolean,
+    queued: Boolean,
+    onRun: () -> Unit,
+    onRunAfterStream: () -> Unit,
+    onCancelQueued: () -> Unit,
+) {
     val s = Nebula.scale
+    val ctx = LocalContext.current
     SectionTitle("Device check", Modifier.padding(top = s.dp(10)))
     Card {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Can this device run frame generation?", style = Nebula.type.bodyStrong, color = NebulaColors.text)
                 Text(
-                    when (test) {
-                        is SelfTestState.Running -> "Checking: ${stageLabel(test.stage)}…"
+                    when {
+                        test is SelfTestState.Running -> "Checking: ${stageLabel(test.stage)}…"
+                        queued -> "Runs when this stream ends." + (report?.let { " Last result: ${it.summary}" } ?: "")
+                        streaming -> (report?.summary?.let { "$it. " } ?: "") + "Run the device check when you're not streaming: it can't share the GPU with a live stream."
                         else -> report?.summary ?: "Not checked yet. It runs by itself the first time you turn frame generation on."
                     },
                     style = Nebula.type.label, color = NebulaColors.textSecondary,
@@ -230,14 +263,26 @@ private fun SelfTestCard(test: SelfTestState, report: SelfTestReport?, canRun: B
                         Spacer(Modifier.width(s.dp(8)))
                         Column {
                             Text(c.title, style = Nebula.type.label, color = NebulaColors.text)
-                            Text(c.detail, style = Nebula.type.label, color = NebulaColors.textMuted, maxLines = 3)
+                            // In full: which requirement failed, with the Vulkan feature or extension name.
+                            Text(c.detail, style = Nebula.type.label, color = if (c.passed) NebulaColors.textMuted else NebulaColors.textSecondary)
                         }
                     }
                 }
             }
         }
-        FlowRow(Modifier.padding(top = s.dp(10))) {
-            NebulaButton(if (report == null) "Run check" else "Run again", onClick = { if (canRun) onRun() }, style = if (canRun) ButtonStyle.Secondary else ButtonStyle.Ghost, icon = Icons.Outlined.Refresh)
+        FlowRow(Modifier.padding(top = s.dp(10)), horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            when {
+                streaming && queued -> NebulaButton("Don't check after the stream", onClick = onCancelQueued, style = ButtonStyle.Ghost, icon = Icons.Outlined.Schedule)
+                streaming -> NebulaButton("Check when the stream ends", onClick = onRunAfterStream, style = ButtonStyle.Secondary, icon = Icons.Outlined.Schedule)
+                else -> NebulaButton(if (report == null) "Run check" else "Run again", onClick = { if (canRun) onRun() }, style = if (canRun) ButtonStyle.Secondary else ButtonStyle.Ghost, icon = Icons.Outlined.Refresh)
+            }
+            if (report != null && test !is SelfTestState.Running) {
+                NebulaButton("Copy details", onClick = {
+                    val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                    cm?.setPrimaryClip(android.content.ClipData.newPlainText("Nebula frame generation device check", report.fullText()))
+                    Toast.makeText(ctx, "Device check details copied", Toast.LENGTH_SHORT).show()
+                }, style = ButtonStyle.Ghost, icon = Icons.Outlined.ContentCopy)
+            }
         }
     }
 }
@@ -270,7 +315,7 @@ private fun UpscalerSettings(prefs: LegacyPrefs, tick: String?) {
         "Sharpens or enlarges the decoded picture to this screen's resolution: useful when streaming 1080p to a 1440p screen. " +
             "Used when frame generation isn't running; off keeps the zero-copy video path. Not for HDR streams.",
     ) {
-        Segmented(UpscalerMode.entries.map { shortLabel(it) to it }, cfg.mode) {
+        Segmented(UpscalerMode.entries.map { upscalerShortLabel(it) to it }, cfg.mode) {
             prefs.put(FramegenKeys.UPSCALER, it.id)
             ctx.container.stream.refreshUpscaler()
         }
@@ -294,13 +339,6 @@ private fun UpscalerSettings(prefs: LegacyPrefs, tick: String?) {
         "Temporal upscalers (SGSR 2, FSR 2 and later) need motion vectors and depth from the game, which a video stream doesn't carry.",
         style = Nebula.type.label, color = NebulaColors.textMuted,
     )
-}
-
-private fun shortLabel(m: UpscalerMode) = when (m) {
-    UpscalerMode.OFF -> "Off"
-    UpscalerMode.SHARPEN -> "Sharpen"
-    UpscalerMode.SGSR1 -> "SGSR 1"
-    UpscalerMode.FSR1 -> "FSR 1"
 }
 
 @Composable

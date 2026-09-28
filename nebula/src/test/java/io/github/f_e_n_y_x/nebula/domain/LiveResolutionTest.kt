@@ -292,4 +292,12 @@ class VideoModeTest {
         assertEquals(P1080, StreamViewModel.startingMode(settings, null, 2340 to 1080))
         assertEquals(VideoMode(2340, 1080, 90), StreamViewModel.startingMode(StreamSettings(resolution = Resolution.Native, fps = 90), null, 2340 to 1080))
     }
+
+    /** Regression (dev9.1): Settings at 120 fps must start the stream at 120, Virtual display or Mirror. */
+    @Test fun settingsFrameRateReachesTheStartRequest() {
+        val settings = StreamSettings(resolution = Resolution.Native, fps = 120)
+        assertEquals(VideoMode(2340, 1080, 120), StreamViewModel.startingMode(settings, null, 2340 to 1080))
+        // Only a mode the user saved for the game ("Use for this game") overrides it.
+        assertEquals(VideoMode(2340, 1080, 60), StreamViewModel.startingMode(settings, VideoMode(2340, 1080, 60), 2340 to 1080))
+    }
 }

@@ -1,8 +1,6 @@
 package io.github.f_e_n_y_x.nebula.ui.screens
 
 import android.content.Context
-import android.os.Build
-import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -79,7 +77,6 @@ import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 
 /** What the stream menu needs to offer a live resolution change. */
 class LiveResolutionUi(
@@ -466,16 +463,8 @@ internal fun SwitchingOverlay(state: SwitchState?, note: SwitchNote?, onNoteShow
     }
 }
 
-/** This screen's refresh rate, rounded (60, 90, 120…). */
-private fun displayRefreshHz(ctx: Context): Int {
-    val hz = if (Build.VERSION.SDK_INT >= 30) {
-        runCatching { ctx.display?.refreshRate }.getOrNull()
-    } else {
-        @Suppress("DEPRECATION")
-        (ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.refreshRate
-    }
-    return (hz ?: 60f).roundToInt().coerceIn(30, 240)
-}
+/** This screen's native (maximum) refresh rate, rounded (60, 90, 120…); see [io.github.fenyx.nebula.engine.DisplayRefresh]. */
+private fun displayRefreshHz(ctx: Context): Int = io.github.fenyx.nebula.engine.DisplayRefresh.nativeHz(ctx)
 
 /** Adds [r] to V+'s custom resolution list (the one Settings → Custom resolutions edits). */
 private fun addCustomResolution(ctx: Context, r: Resolution) {

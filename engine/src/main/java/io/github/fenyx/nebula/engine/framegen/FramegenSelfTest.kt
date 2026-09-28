@@ -62,6 +62,8 @@ data class SelfTestReport(
     val gpu: String,
     val fingerprint: String,
     val finishedAtMs: Long,
+    /** The probes' raw output lines ("caps", "dll", "benchmark"), for the copyable report. */
+    val raw: Map<String, String> = emptyMap(),
 ) {
     val summary: String
         get() = when (verdict) {
@@ -74,6 +76,22 @@ data class SelfTestReport(
 
     val firstFailure: SelfTestCheck? get() = checks.firstOrNull { !it.passed }
 
+    /**
+     * The whole report as plain text, for "Copy details" and the app log: the verdict, every
+     * requirement with its result (Vulkan feature and extension names included) and the probes'
+     * raw output lines.
+     */
+    fun fullText(): String = buildString {
+        appendLine("Nebula frame generation device check")
+        appendLine("Result: $verdict · $summary")
+        if (gpu.isNotEmpty()) appendLine("GPU: $gpu")
+        appendLine("Build: ${fingerprint.substringBefore('|')}")
+        appendLine("Engine: ${fingerprint.substringAfterLast('|')}")
+        checks.forEach { c -> appendLine("${if (c.passed) "PASS" else "FAIL"} ${c.title}: ${c.detail}") }
+        benchmark?.let { b -> appendLine("Benchmark: ${b.model} ${b.width}x${b.height} ${b.frames} frames, init ${b.initMs} ms, median %.2f ms, p95 %.2f ms, max %.2f ms".format(b.medianMs, b.p95Ms, b.maxMs)) }
+        raw.forEach { (k, v) -> appendLine("raw $k: $v") }
+    }.trimEnd()
+
     fun toJson(): String = JSONObject().apply {
         put("verdict", verdict.name)
         put("gpu", gpu)
@@ -82,6 +100,7 @@ data class SelfTestReport(
         put("checks", JSONArray().apply {
             checks.forEach { c -> put(JSONObject().put("id", c.id).put("title", c.title).put("passed", c.passed).put("detail", c.detail)) }
         })
+        if (raw.isNotEmpty()) put("raw", JSONObject().apply { raw.forEach { (k, v) -> put(k, v) } })
         benchmark?.let { b ->
             put("benchmark", JSONObject().put("model", b.model).put("width", b.width).put("height", b.height).put("frames", b.frames)
                 .put("initMs", b.initMs).put("medianMs", b.medianMs).put("p95Ms", b.p95Ms).put("maxMs", b.maxMs))
@@ -98,7 +117,8 @@ data class SelfTestReport(
                 BenchmarkResult(b.getString("model"), b.getInt("width"), b.getInt("height"), b.getInt("frames"), b.getLong("initMs"),
                     b.getDouble("medianMs"), b.getDouble("p95Ms"), b.getDouble("maxMs"))
             }
-            SelfTestReport(SelfTestVerdict.valueOf(o.getString("verdict")), checks, bench, o.optString("gpu"), o.getString("fingerprint"), o.optLong("finishedAtMs"))
+            val raw = o.optJSONObject("raw")?.let { r -> r.keys().asSequence().associateWith { k -> r.getString(k) } }.orEmpty()
+            SelfTestReport(SelfTestVerdict.valueOf(o.getString("verdict")), checks, bench, o.optString("gpu"), o.getString("fingerprint"), o.optLong("finishedAtMs"), raw)
         }.getOrNull()
 
         /** The verdict that applies now: a report for another device, DLL or engine counts as not run. */
@@ -136,6 +156,12 @@ object SelfTestEvaluator {
         crashedAt: String? = null,
     ): SelfTestReport {
         val checks = mutableListOf<SelfTestCheck>()
+        val raw = buildMap {
+            caps?.let { put("caps", it) }
+            dllProbe?.let { put("dll", it) }
+            benchmark?.let { put("benchmark", it) }
+            crashedAt?.let { put("crashed_at", it) }
+        }
         fun add(id: String, title: String, ok: Boolean, detail: String) { checks += SelfTestCheck(id, title, ok, detail) }
 
         add("android", "Android 10 or newer", env.sdk >= 29, "API ${env.sdk}")
@@ -151,18 +177,25 @@ object SelfTestEvaluator {
             } else {
                 val api = kv["api"]?.split('.')?.mapNotNull { it.toIntOrNull() }.orEmpty()
                 val vk11 = kv["vulkan"] == "1" && api.size >= 2 && (api[0] > 1 || api[1] >= 1)
-                add("vulkan", "Vulkan 1.1", vk11, if (kv["vulkan"] == "1") "Vulkan ${kv["api"]} on ${gpu.ifEmpty { "unknown GPU" }}" else (kv["reason"] ?: "no Vulkan"))
+                add(
+                    "vulkan", "Vulkan 1.1", vk11,
+                    when {
+                        kv["vulkan"] != "1" -> "no usable Vulkan: ${kv["reason"] ?: "unknown reason"}"
+                        !vk11 -> "Vulkan ${kv["api"] ?: kv["instance"] ?: "?"} on ${gpu.ifEmpty { "unknown GPU" }}; needs 1.1 (${kv["reason"] ?: "device API below 1.1"})"
+                        else -> "Vulkan ${kv["api"]} on ${gpu.ifEmpty { "unknown GPU" }}"
+                    },
+                )
                 if (vk11) {
                     val ahb = kv["ahb"] == "1" && kv["external_memory"] == "1" && kv["dedicated"] == "1"
-                    add("ahb", "Hardware-buffer import (VK_ANDROID_external_memory_android_hardware_buffer)", ahb, flags(kv, "ahb", "external_memory", "dedicated"))
-                    add("ycbcr", "YCbCr video sampling", kv["ycbcr"] == "1", flags(kv, "ycbcr"))
-                    add("robustness2", "Null descriptors (VK_EXT_robustness2)", kv["null_descriptor"] == "1", flags(kv, "robustness2", "null_descriptor"))
+                    add("ahb", "Hardware-buffer import (VK_ANDROID_external_memory_android_hardware_buffer)", ahb, missing(kv, "ahb", "external_memory", "dedicated"))
+                    add("ycbcr", "YCbCr video sampling (samplerYcbcrConversion)", kv["ycbcr"] == "1", missing(kv, "ycbcr"))
+                    add("robustness2", "Null descriptors (VK_EXT_robustness2 nullDescriptor)", kv["null_descriptor"] == "1", missing(kv, "robustness2", "null_descriptor"))
                 }
             }
         }
         val unsupported = checks.any { !it.passed }
         if (unsupported) {
-            return SelfTestReport(SelfTestVerdict.UNSUPPORTED, checks, null, gpu, fingerprint, nowMs)
+            return SelfTestReport(SelfTestVerdict.UNSUPPORTED, checks, null, gpu, fingerprint, nowMs, raw)
         }
 
         val dllOk = dllProbe?.startsWith("lossless-dll-ok") == true
@@ -171,7 +204,7 @@ object SelfTestEvaluator {
             crashedAt == "dll" -> "translating the DLL crashed the test process"
             else -> dllProbe
         })
-        if (!dllOk) return SelfTestReport(SelfTestVerdict.FAILED, checks, null, gpu, fingerprint, nowMs)
+        if (!dllOk) return SelfTestReport(SelfTestVerdict.FAILED, checks, null, gpu, fingerprint, nowMs, raw)
 
         val bench = BenchmarkResult.parse(benchmark)
         if (bench == null) {
@@ -180,7 +213,7 @@ object SelfTestEvaluator {
                 benchmark == null -> "benchmark did not run"
                 else -> benchmark.removePrefix("error=")
             })
-            return SelfTestReport(SelfTestVerdict.FAILED, checks, null, gpu, fingerprint, nowMs)
+            return SelfTestReport(SelfTestVerdict.FAILED, checks, null, gpu, fingerprint, nowMs, raw)
         }
         val share = bench.p95Ms / FRAME_BUDGET_MS
         val detail = "%.1f ms median, %.1f ms p95 per generated frame at %dx%d (budget %.1f ms)".format(bench.medianMs, bench.p95Ms, bench.width, bench.height, FRAME_BUDGET_MS)
@@ -190,8 +223,24 @@ object SelfTestEvaluator {
             share > SLOW_SHARE -> SelfTestVerdict.SLOW
             else -> SelfTestVerdict.PASSED
         }
-        return SelfTestReport(verdict, checks, bench, gpu, fingerprint, nowMs)
+        return SelfTestReport(verdict, checks, bench, gpu, fingerprint, nowMs, raw)
     }
 
     private fun flags(kv: Map<String, String>, vararg keys: String) = keys.joinToString(" ") { "$it=${kv[it] ?: "?"}" }
+
+    /** The Vulkan extension or feature each caps flag stands for. */
+    private val VULKAN_NAMES = mapOf(
+        "ahb" to "VK_ANDROID_external_memory_android_hardware_buffer",
+        "external_memory" to "VK_KHR_external_memory",
+        "dedicated" to "VK_KHR_dedicated_allocation",
+        "ycbcr" to "samplerYcbcrConversion feature (VK_KHR_sampler_ycbcr_conversion)",
+        "robustness2" to "VK_EXT_robustness2",
+        "null_descriptor" to "nullDescriptor feature of VK_EXT_robustness2",
+    )
+
+    /** "missing VK_KHR_external_memory (ahb=1 external_memory=0 dedicated=1)", or just the flags when all are there. */
+    internal fun missing(kv: Map<String, String>, vararg keys: String): String {
+        val absent = keys.filter { kv[it] != "1" }.map { VULKAN_NAMES[it] ?: it }
+        return if (absent.isEmpty()) flags(kv, *keys) else "missing ${absent.joinToString(", ")} (${flags(kv, *keys)})"
+    }
 }

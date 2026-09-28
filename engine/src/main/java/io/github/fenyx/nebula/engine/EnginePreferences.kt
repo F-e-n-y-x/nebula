@@ -17,8 +17,14 @@ class EnginePreferences internal constructor(context: Context) {
     /** The raw store, for settings the engine doesn't model yet. Keys match V+'s preference screens. */
     val sharedPreferences: SharedPreferences get() = PreferenceManager.getDefaultSharedPreferences(context)
 
-    /** A fresh read of every V+ setting. */
-    fun configuration(): PreferenceConfiguration = PreferenceConfiguration.readPreferences(context)
+    /**
+     * A fresh read of every V+ setting. Until the user picks a frame rate, it is the screen's
+     * native (maximum) refresh rate rather than V+'s fixed 60 ([DisplayRefresh]); a value the user
+     * set is never changed.
+     */
+    fun configuration(): PreferenceConfiguration = PreferenceConfiguration.readPreferences(context).also {
+        it.fps = defaultedFps(sharedPreferences.contains(PreferenceConfiguration.FPS_PREF_STRING), it.fps) { DisplayRefresh.nativeHz(context) }
+    }
 
     /** The saved settings as a ready-to-use request. */
     fun defaultRequest(): StreamRequest = configuration().toStreamRequest()
@@ -40,6 +46,9 @@ class EnginePreferences internal constructor(context: Context) {
             .commit()
     }
 }
+
+/** The stored frame rate when there is one, else [native] (first run, reinstall, reset). */
+internal inline fun defaultedFps(stored: Boolean, storedFps: Int, native: () -> Int): Int = if (stored) storedFps else native()
 
 internal val AudioLayout.wire: String
     get() = when (this) {
