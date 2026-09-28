@@ -27,3 +27,23 @@
 - arm64-v8a
 - Vulkan 1.1+ 并支持 `VK_ANDROID_external_memory_android_hardware_buffer`
 - 实测稳定：Adreno 7xx+（骁龙 8 Gen 2 及更新）
+
+## Nebula (English)
+
+- **Lossless.dll is never in git.** Private builds inject it from outside the repository:
+  `nebulaLosslessDll=/path/to/Lossless.dll` in `local.properties` (or `-PnebulaLosslessDll=`). Nebula
+  packages it as `assets/framegen/Lossless.dll` and stages it into `noBackupFilesDir` on first run.
+  `-PnebulaPublicBuild=true` (and `CI=true`) refuses a configured DLL and fails if one reaches the
+  merged assets. `.gitignore` ignores `*.dll` and `private-assets/`; `tools/check-private-assets.sh`
+  (CI) and `:nebula:checkNoProprietaryFiles` (every build) fail if git tracks one.
+- **lsfg-vk licence pin.** `src/main/cpp/lsfg-vk-android` is pinned to
+  `3e89e5439a98f55d5acb003d20039426ab24e69c` (lsfg-vk-android v1.0.0-7, 2026-05-01), which carries the
+  MIT `LICENSE.md`. lsfg-vk moved to CC BY-NC-ND 4.0 in August 2026; ND forbids derivatives, so do not
+  update this submodule past the change point.
+- Nebula additions to the native bridge: flow scale and the LSFG 3.1P performance model
+  (`configureLsfgModel`, applied at the next context bootstrap), an instant generation pause
+  (`setGenerationPaused`, used by the stream-menu toggle and thermal auto-off), a Vulkan feature
+  probe (`probeDeviceCaps`) and a synthetic LSFG benchmark (`runBenchmark`) for the self-test.
+- Multiplier: the pipeline has one generated-frame slot per real frame (`kGenerationCount = 1`), so
+  only 2× is offered. 3× would need a second LSFG output, a third present slot and presenter pacing
+  for three frames per input.
