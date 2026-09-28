@@ -65,6 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
+import io.github.f_e_n_y_x.nebula.domain.HostGating
+import androidx.compose.material.icons.outlined.Terminal
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
 import io.github.f_e_n_y_x.nebula.ui.DetailsUi
@@ -89,12 +91,23 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
     val game = ui.game ?: run { Box(Modifier.fillMaxSize().background(NebulaColors.bg)); return }
     val form = Nebula.form
     val s = Nebula.scale
-    val play: (DisplayMode) -> Unit = { m -> vm.remember(m); nav.push(Route.Stream(hostId, game.id, m)) }
+    val hostVm = viewModel(key = "host-actions-details-$hostId-$gameId") { io.github.f_e_n_y_x.nebula.ui.HostActionsViewModel(container, hostId, gameId) }
+    val wake by hostVm.wake.collectAsStateWithLifecycle()
+    val host by hostVm.host.collectAsStateWithLifecycle()
+    var showCommands by remember { mutableStateOf(false) }
+    HostActionToasts(hostVm)
+    // A sleeping PC is woken first; the game launches once it answers.
+    val play: (DisplayMode) -> Unit = { m -> vm.remember(m); hostVm.playWhenAwake { nav.push(Route.Stream(hostId, game.id, m)) } }
+    val commands by hostVm.commands.collectAsStateWithLifecycle()
+    LaunchedEffect(host?.status) { hostVm.loadCommands(force = true) }
+    val openCommands: (() -> Unit)? = if (HostGating.showCommandsEntry(host, commands)) ({ showCommands = true }) else null
     val wide = form.isLandscape
     val ctx = LocalContext.current
     val refresh = { vm.refresh(onArtCleared = { SingletonImageLoader.get(ctx).memoryCache?.clear() }) }
     val showAbout = ui.details != null && ui.options.showDetails
+    val asleep = host?.takeIf { HostGating.needsWake(it) }?.name
 
+    Box(Modifier.fillMaxSize()) {
     PullToRefreshBox(isRefreshing = ui.refreshing, onRefresh = refresh, modifier = Modifier.fillMaxSize().background(NebulaColors.bg)) {
         if (wide) {
             key(ui.artVersion) {
@@ -116,7 +129,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                             NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
-                            MoreMenu(refresh)
+                            MoreMenu(refresh, openCommands)
                         }
                         Spacer(Modifier.height(s.dp(8)))
                         Header(ui)
@@ -124,16 +137,16 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         Stats(ui)
                     }
                     Spacer(Modifier.height(s.dp(12)))
-                    PlayChoices(ui, play, showNote = false)
+                    PlayChoices(ui, play, showNote = false, asleepHost = asleep, onCommands = openCommands)
                 } else Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                         NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
-                        MoreMenu(refresh)
+                        MoreMenu(refresh, openCommands)
                     }
                     Spacer(Modifier.height(s.dp(20)))
                     Header(ui)
                     Spacer(Modifier.height(s.dp(22)))
-                    PlayChoices(ui, play)
+                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands)
                     Spacer(Modifier.height(s.dp(24)))
                     Stats(ui)
                 }
@@ -161,13 +174,13 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
-                        MoreMenu(refresh)
+                        MoreMenu(refresh, openCommands)
                     }
                     Column(Modifier.align(Alignment.BottomStart).padding(horizontal = s.dp(20))) { Header(ui) }
                 }
                 Column(Modifier.padding(horizontal = s.dp(20)).navigationBarsPadding()) {
                     Spacer(Modifier.height(s.dp(18)))
-                    PlayChoices(ui, play)
+                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands)
                     Spacer(Modifier.height(s.dp(22)))
                     Stats(ui)
                     if (showAbout) {
@@ -178,6 +191,9 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                 }
             }
         }
+    }
+    WakeOverlay(host?.name ?: "your PC", game.name, wake, onCancel = hostVm::cancelWake, onRetry = hostVm::retryWake)
+    if (showCommands) HostCommandsDialog(host?.name ?: "your PC", game.name, hostVm, onDismiss = { showCommands = false })
     }
 }
 
@@ -203,7 +219,7 @@ private fun Header(ui: DetailsUi) {
 }
 
 @Composable
-private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: Boolean = true) {
+private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: Boolean = true, asleepHost: String? = null, onCommands: (() -> Unit)? = null) {
     val s = Nebula.scale
     val ctx = LocalContext.current
     val primary = remember { FocusRequester() }
@@ -226,6 +242,13 @@ private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: 
         Column(verticalArrangement = Arrangement.spacedBy(s.dp(10))) { modes.forEach { content(it, Modifier.fillMaxWidth()) } }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(s.dp(12))) { modes.forEach { content(it, Modifier.weight(1f)) } }
+    }
+    if (asleepHost != null || onCommands != null) {
+        Spacer(Modifier.height(s.dp(10)))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            if (asleepHost != null) Pill("$asleepHost is asleep · Play wakes it", color = NebulaColors.warning)
+            if (onCommands != null) NebulaButton("Host commands", onClick = onCommands, style = ButtonStyle.Ghost, icon = Icons.Outlined.Terminal)
+        }
     }
     if (!showNote) return
     Spacer(Modifier.height(s.dp(10)))
@@ -338,7 +361,7 @@ private fun About(ui: DetailsUi, wide: Boolean = false) {
 
 /** "More" actions for D-pad and TV users, who can't pull to refresh. */
 @Composable
-private fun MoreMenu(onRefresh: () -> Unit) {
+private fun MoreMenu(onRefresh: () -> Unit, onCommands: (() -> Unit)? = null) {
     var open by remember { mutableStateOf(false) }
     Box {
         NebulaIconButton(Icons.Rounded.MoreVert, "More actions", { open = true })
@@ -348,6 +371,13 @@ private fun MoreMenu(onRefresh: () -> Unit) {
                 leadingIcon = { Icon(Icons.Outlined.Refresh, null, tint = NebulaColors.textSecondary) },
                 onClick = { open = false; onRefresh() },
             )
+            if (onCommands != null) {
+                DropdownMenuItem(
+                    text = { Text("Host commands…", style = Nebula.type.body, color = NebulaColors.text) },
+                    leadingIcon = { Icon(Icons.Outlined.Terminal, null, tint = NebulaColors.textSecondary) },
+                    onClick = { open = false; onCommands() },
+                )
+            }
         }
     }
 }

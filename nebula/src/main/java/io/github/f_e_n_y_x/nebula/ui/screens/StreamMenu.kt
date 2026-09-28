@@ -95,6 +95,8 @@ fun StreamMenu(
     zoomed: Boolean,
     actions: StreamMenuActions,
     resolution: LiveResolutionUi? = null,
+    /** Mic, clipboard, host commands and power ([StreamHostMenuSection]). */
+    hostSection: (@Composable () -> Unit)? = null,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -127,7 +129,8 @@ fun StreamMenu(
             Header(gameName, mode, stats)
             StatsBlock(stats, ui.perf == PerfDetail.FULL)
             resolution?.let { ResolutionRow(it, onOpen = { picking = true }) }
-            Controls(ui, prefs, actions, gameKey, zoomed)
+            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null)
+            hostSection?.invoke()
             Bitrate(bitrateKbps, bitrateNote, actions.onBitrate)
             Keys(actions.onShortcut)
             if (gamepads > 0) Text("$gamepads controller${if (gamepads > 1) "s" else ""} connected · Start + Select opens this menu", style = Nebula.type.label, color = NebulaColors.textMuted)
@@ -202,7 +205,7 @@ private fun Stat(label: String, value: String) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean) {
+private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean) {
     val s = Nebula.scale
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
@@ -211,7 +214,7 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
             NebulaButton("Resume", onClick = actions.onResume, icon = Icons.Rounded.PlayArrow, modifier = Modifier.focusRequester(first))
             NebulaButton("PC keyboard", onClick = actions.onPcKeyboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.Keyboard)
             NebulaButton("Device keyboard", onClick = actions.onKeyboard, style = ButtonStyle.Secondary)
-            NebulaButton("Send clipboard", onClick = actions.onClipboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.ContentPaste)
+            if (!hostSection) NebulaButton("Type clipboard", onClick = actions.onClipboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.ContentPaste)
             if (zoomed) NebulaButton("Reset zoom", onClick = actions.onResetZoom, style = ButtonStyle.Secondary)
         }
         OverlayTransparency(ui.overlayOpacity, actions.onOverlayOpacity)

@@ -56,6 +56,9 @@ class AppContainer(context: Context) {
     val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)
 
+    /** Debug QA only: the demo PC starts asleep so Play shows the wake flow. */
+    fun debugPutDemoHostToSleep() { if (isDemo) demo.putToSleep() }
+
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
     /** A stream went live: keep the process in the foreground with an ongoing notification. */

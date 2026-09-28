@@ -9,12 +9,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Microphone passthrough to the PC ("Nova Mic"); asked for at first use in the stream menu. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- One APK for phone, tablet and TV: touch is optional, leanback is supported but not required. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:name=".NebulaApplication"
@@ -46,5 +49,16 @@
             android:name=".StreamKeepAliveService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Clipboard sync: images copied on the PC are written to cache/clipboard and shared from here. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.clipboard_fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clipboard_file_paths" />
+        </provider>
     </application>
 </manifest>

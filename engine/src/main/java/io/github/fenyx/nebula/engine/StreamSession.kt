@@ -68,6 +68,15 @@ class StreamSession internal constructor(
     lateinit var input: InputBridge
         private set
 
+    /** Microphone and clipboard sync for this stream; set before [start] returns. */
+    lateinit var link: StreamHostLink
+        private set
+
+    internal var linkConfig: StreamHostLink.Config? = null
+
+    /** True once [link] exists (from the start of the stream on). */
+    val isLinkReady: Boolean get() = ::link.isInitialized
+
     @Volatile
     var isConnected: Boolean = false
         private set
@@ -102,6 +111,7 @@ class StreamSession internal constructor(
                 audioPaused = false
             }
             _backgrounded.value = false
+            if (::link.isInitialized) link.onBackground(false)
         }
     }
 
@@ -118,6 +128,7 @@ class StreamSession internal constructor(
         }
         LimeLog.info("Surface gone; keeping the session for ${background.graceMs} ms")
         _backgrounded.value = true
+        link.onBackground(true)
         if (!background.keepAudio) {
             audio.pauseProcessing()
             audioPaused = true
@@ -132,6 +143,7 @@ class StreamSession internal constructor(
         this.decoder = decoder
         this.audio = audio
         input = InputBridge(connection)
+        link = StreamHostLink(activity.applicationContext, connection, requireNotNull(linkConfig) { "linkConfig" })
         holder.addCallback(surfaceCallback)
         decoder.setRenderTarget(holder)
         connection.start(audio, decoder, connectionListener)
@@ -184,6 +196,7 @@ class StreamSession internal constructor(
             main.removeCallbacks(graceExpired)
             holder.removeCallback(surfaceCallback)
             _backgrounded.value = false
+            if (::link.isInitialized) link.stop()
         }
         decoder.prepareForStop()
         if (reason == StreamEndReason.USER_QUIT) {
@@ -213,7 +226,10 @@ class StreamSession internal constructor(
 
         override fun connectionStarted() {
             isConnected = true
-            onMain { listener.onConnected() }
+            onMain {
+                if (!ended.get()) link.onConnected()
+                listener.onConnected()
+            }
         }
 
         override fun connectionTerminated(errorCode: Int) {

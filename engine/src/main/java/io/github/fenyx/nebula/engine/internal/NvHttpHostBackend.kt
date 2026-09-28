@@ -2,6 +2,8 @@ package io.github.fenyx.nebula.engine.internal
 
 import com.limelight.LimeLog
 import com.limelight.nvstream.http.ComputerDetails
+import com.limelight.nvstream.http.HostHttpResponseException
+import io.github.fenyx.nebula.engine.HostRefusedException
 import com.limelight.nvstream.http.LimelightCryptoProvider
 import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
@@ -115,6 +117,25 @@ class NvHttpHostBackend(
 
     override fun wake(details: ComputerDetails) {
         WakeOnLanSender.sendWolPacket(details)
+    }
+
+    override fun pcSleep(details: ComputerDetails): Boolean = refusalsMapped { http(details).pcSleep() }
+
+    override fun superCmd(details: ComputerDetails, cmdId: String): Boolean =
+        refusalsMapped { http(details).sendSuperCmd(java.net.URLEncoder.encode(cmdId, "UTF-8")) }
+
+    /** 401/403 (no permission) and 503 (busy) become [HostRefusedException]; a 404 means the host lacks the route. */
+    private inline fun refusalsMapped(block: () -> Boolean): Boolean = try {
+        block()
+    } catch (e: HostHttpResponseException) {
+        when (e.getErrorCode()) {
+            401, 403 -> throw HostRefusedException(e.getErrorMessage().ifBlank { "Not allowed" }, e.getErrorCode())
+            503, 409 -> throw HostRefusedException(e.getErrorMessage().ifBlank { "The PC is busy" }, e.getErrorCode())
+            400, 404 -> throw HostRefusedException(e.getErrorMessage().ifBlank { "This PC doesn't support that" }, e.getErrorCode())
+            else -> throw e
+        }
+    } catch (e: FileNotFoundException) {
+        throw HostRefusedException("This PC doesn't support that", 404)
     }
 
     private companion object {

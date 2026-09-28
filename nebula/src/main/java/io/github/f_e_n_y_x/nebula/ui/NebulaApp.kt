@@ -114,7 +114,10 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
         val paired = hosts.filter { it.paired }
         val pick = paired.firstOrNull { it.id == last } ?: paired.firstOrNull()
         homeLibrary = pick?.let { Route.Library(it.id) }
-        start = debugStart(startOverride) ?: homeLibrary ?: Route.Onboarding
+        // Debug QA: "asleep:<screen>" starts with the demo PC asleep.
+        val spec = startOverride?.takeIf { io.github.f_e_n_y_x.nebula.BuildConfig.DEBUG && it.startsWith("asleep:") }
+            ?.also { container.debugPutDemoHostToSleep() }?.removePrefix("asleep:") ?: startOverride
+        start = debugStart(spec) ?: homeLibrary ?: Route.Onboarding
     }
     val initial = start
     if (initial == null) {

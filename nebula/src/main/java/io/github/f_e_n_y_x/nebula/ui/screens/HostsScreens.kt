@@ -66,6 +66,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
+import io.github.f_e_n_y_x.nebula.domain.HostGating
+import io.github.f_e_n_y_x.nebula.domain.WakeState
+import io.github.f_e_n_y_x.nebula.domain.model.Gate
+import io.github.f_e_n_y_x.nebula.ui.HostActionsViewModel
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
@@ -164,15 +173,29 @@ fun HostsScreen(container: AppContainer, nav: Navigator) {
             }
         }
         items(hosts, key = { it.id }) { h ->
+            val actions = viewModel(key = "host-actions-card-${h.id}") { HostActionsViewModel(container, h.id, null) }
+            val wake by actions.wake.collectAsStateWithLifecycle()
+            val busy by actions.busy.collectAsStateWithLifecycle()
+            HostActionToasts(actions)
+            var menuFor by remember { mutableStateOf<String?>(null) }
             HostCard(h,
+                wake = wake,
+                sleeping = busy == HostActionsViewModel.SLEEP,
+                onMenu = { menuFor = it },
                 onPrimary = {
                     when {
+                        wake?.finished == false -> actions.cancelWake()
+                        HostGating.showWake(h) -> actions.wakeOnly()
                         h.status == HostStatus.OFFLINE && h.paired -> vm.wake(h.id)
                         !h.paired -> nav.push(Route.Pair(h.id))
                         else -> { vm.select(h.id); nav.top(Route.Library(h.id)) }
                     }
                 },
             )
+            when (menuFor) {
+                "sleep" -> SleepConfirmDialog(h.name, streaming = false, onConfirm = { menuFor = null; actions.sleep() }, onDismiss = { menuFor = null })
+                "commands" -> HostCommandsDialog(h.name, null, actions, onDismiss = { menuFor = null })
+            }
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
             if (adding) {
@@ -185,15 +208,23 @@ fun HostsScreen(container: AppContainer, nav: Navigator) {
 }
 
 @Composable
-private fun HostCard(host: Host, onPrimary: () -> Unit) {
+private fun HostCard(host: Host, wake: WakeState?, sleeping: Boolean, onMenu: (String) -> Unit, onPrimary: () -> Unit) {
     val s = Nebula.scale
     val t = Nebula.type
     val shape = RoundedCornerShape(s.dp(16))
+    val wakeable = host.status == HostStatus.OFFLINE && host.paired
     val action = when {
-        host.status == HostStatus.OFFLINE && host.paired -> "Wake PC"
+        wake is WakeState.Waiting -> "Waking… ${wake.elapsedS} s · tap to stop"
+        wake == WakeState.Sending -> "Sending wake-up signal…"
+        wake is WakeState.TimedOut -> "Didn't wake · Try again"
+        wake is WakeState.Failed -> wake.reason
+        sleeping -> "Going to sleep…"
+        wakeable -> "Wake PC"
         !host.paired -> "Pair"
         else -> "Open library"
     }
+    val sleepGate = HostGating.sleepGate(host)
+    val hasMenu = sleepGate != Gate.UNSUPPORTED || host.features.commands != Gate.UNSUPPORTED
     Column(
         Modifier
             .fillMaxWidth()
@@ -222,15 +253,58 @@ private fun HostCard(host: Host, onPrimary: () -> Unit) {
                 Pill(kind, color = if (host.isNova) NebulaColors.accentText else NebulaColors.textSecondary,
                     background = if (host.isNova) NebulaColors.accentTint else NebulaColors.raised)
             }
+            if (hasMenu) HostMenu(host, sleepGate, onMenu)
         }
         Spacer(Modifier.height(s.dp(16)))
         Text(listOfNotNull(host.gpu, host.address).joinToString("  ·  "), style = t.mono, color = NebulaColors.textMuted)
         Spacer(Modifier.height(s.dp(16)))
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (wake != null && !wake.finished) {
+                CircularProgressIndicator(Modifier.size(s.dp(14)), color = NebulaColors.accentText, strokeWidth = 2.dp)
+                Spacer(Modifier.width(s.dp(8)))
+            }
             Text(action, style = t.bodyStrong, color = if (host.paired && host.status != HostStatus.OFFLINE) NebulaColors.accentText else NebulaColors.text)
             Spacer(Modifier.width(s.dp(6)))
-            Icon(if (host.status == HostStatus.OFFLINE && host.paired) Icons.Outlined.Bolt else Icons.AutoMirrored.Rounded.ArrowForward, null,
-                tint = NebulaColors.accentText, modifier = Modifier.size(s.dp(16)))
+            if (wake == null) {
+                Icon(if (wakeable) Icons.Outlined.Bolt else Icons.AutoMirrored.Rounded.ArrowForward, null,
+                    tint = NebulaColors.accentText, modifier = Modifier.size(s.dp(16)))
+            }
+        }
+        if (wake is WakeState.TimedOut) {
+            Spacer(Modifier.height(s.dp(8)))
+            Text("Check Wake-on-LAN in the PC's BIOS. The signal can't travel over Tailscale or mobile data.", style = t.label, color = NebulaColors.textMuted)
+        }
+    }
+}
+
+/** The host card's "⋮" menu: Sleep PC and host commands, when the host offers them. */
+@Composable
+private fun HostMenu(host: Host, sleepGate: Gate, onPick: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        NebulaIconButton(Icons.Rounded.MoreVert, "More for ${host.name}", { open = true })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = NebulaColors.raised) {
+            if (sleepGate != Gate.UNSUPPORTED) {
+                val allowed = sleepGate == Gate.AVAILABLE
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("Sleep PC", style = Nebula.type.body, color = if (allowed) NebulaColors.text else NebulaColors.textMuted)
+                            if (!allowed) Text(HostGating.PERMISSION_HINT, style = Nebula.type.label, color = NebulaColors.accentText)
+                        }
+                    },
+                    leadingIcon = { Icon(Icons.Outlined.Bedtime, null, tint = NebulaColors.textSecondary) },
+                    enabled = allowed,
+                    onClick = { open = false; onPick("sleep") },
+                )
+            }
+            if (host.features.commands != Gate.UNSUPPORTED && host.status != HostStatus.OFFLINE) {
+                DropdownMenuItem(
+                    text = { Text("Host commands…", style = Nebula.type.body, color = NebulaColors.text) },
+                    leadingIcon = { Icon(Icons.Outlined.Terminal, null, tint = NebulaColors.textSecondary) },
+                    onClick = { open = false; onPick("commands") },
+                )
+            }
         }
     }
 }

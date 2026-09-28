@@ -42,6 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -87,12 +89,23 @@ fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String) {
     val vm = viewModel { LibraryViewModel(container, hostId) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val form = Nebula.form
-    val play: (Game) -> Unit = { g -> nav.push(Route.Stream(hostId, g.id, ui.focusedMode)) }
+    val hostVm = viewModel(key = "host-actions-library-$hostId") { io.github.f_e_n_y_x.nebula.ui.HostActionsViewModel(container, hostId, null) }
+    val wake by hostVm.wake.collectAsStateWithLifecycle()
+    var waking by remember { mutableStateOf<Game?>(null) }
+    // A sleeping PC is woken first; the game launches once it answers.
+    val play: (Game) -> Unit = { g ->
+        val mode = ui.focusedMode
+        waking = g
+        hostVm.playWhenAwake { waking = null; nav.push(Route.Stream(hostId, g.id, mode)) }
+    }
     val details: (Game) -> Unit = { g -> nav.push(Route.Details(hostId, g.id)) }
-    when {
-        !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
-        !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details)
-        else -> SpotlightLibrary(ui, vm::focus, play, details)
+    Box(Modifier.fillMaxSize()) {
+        when {
+            !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
+            !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details)
+            else -> SpotlightLibrary(ui, vm::focus, play, details)
+        }
+        WakeOverlay(ui.host?.name ?: "your PC", waking?.name, wake, onCancel = { waking = null; hostVm.cancelWake() }, onRetry = hostVm::retryWake)
     }
 }
 

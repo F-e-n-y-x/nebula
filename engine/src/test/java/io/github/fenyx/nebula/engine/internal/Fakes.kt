@@ -68,6 +68,23 @@ class FakeBackend : HostBackend {
     override fun wake(details: ComputerDetails) {
         woken++
     }
+
+    var sleepRefusal: String? = null
+    var slept = 0
+    val commandsRun = mutableListOf<String>()
+
+    override fun pcSleep(details: ComputerDetails): Boolean {
+        if (!online) throw IOException("offline")
+        sleepRefusal?.let { throw io.github.fenyx.nebula.engine.HostRefusedException(it, 403) }
+        slept++
+        return true
+    }
+
+    override fun superCmd(details: ComputerDetails, cmdId: String): Boolean {
+        if (!online) throw IOException("offline")
+        commandsRun += cmdId
+        return true
+    }
 }
 
 class FakeStore : HostStore {

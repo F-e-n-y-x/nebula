@@ -9,11 +9,68 @@ enum class AddressKind { LOCAL, REMOTE, MANUAL, IPV6 }
 /** One way to reach a host. */
 data class HostAddress(val address: String, val port: Int, val kind: AddressKind)
 
-/** Capabilities a Nova host advertises on GET /nova/v1/capabilities. */
-data class NovaCapabilities(val version: String, val features: Set<String>) {
+/**
+ * Capabilities a Nova host advertises on GET /nova/v1/capabilities. [permissions] is what this
+ * client may do on the host ("power", "host_commands", ...); null when the host doesn't say, in
+ * which case actions are offered and a refusal is reported when it happens.
+ */
+data class NovaCapabilities(
+    val version: String,
+    val features: Set<String>,
+    val permissions: Set<String>? = null,
+) {
     /** True when the host implements the named /nova/v1 feature (e.g. "apps", "art", "details"). */
     fun has(feature: String): Boolean = feature in features
+
+    /** False only when the host listed this client's permissions and [permission] isn't among them. */
+    fun allows(permission: String): Boolean = permissions?.contains(permission) ?: true
 }
+
+/** Feature and permission names used in [NovaCapabilities]. */
+object NovaFeature {
+    /** GET /pcsleep suspends the host. */
+    const val PC_SLEEP = "pcsleep"
+    /** GET /nova/v1/commands lists host commands; GET /supercmd?cmdId= runs one. */
+    const val COMMANDS = "commands"
+    const val SUPER_CMD = "supercmd"
+    const val WOL = "wol"
+    const val MIC = "mic"
+    const val CLIPBOARD = "clipboard"
+    const val PERMISSION_POWER = "power"
+    const val PERMISSION_CLIPBOARD = "clipboard"
+    const val PERMISSION_COMMANDS = "host_commands"
+}
+
+/**
+ * A named command the host's owner defined (Foundation "super command"). [appNovaId] is null for
+ * host-wide commands; per-app ones come from that app's /applist `SuperCmds`.
+ */
+data class HostCommand(
+    val id: String,
+    val name: String,
+    /** Ask before running it. Hosts that don't say get a confirmation, to be safe. */
+    val confirm: Boolean = true,
+    val appNovaId: String? = null,
+    /** Optional icon name from Nova's set: terminal, refresh, power, lock, volume, mic-off, monitor, gamepad, stop, play, folder, settings. */
+    val icon: String? = null,
+    /** Nova: app commands run only while their app does. Hosts that don't say are assumed runnable. */
+    val runnable: Boolean = true,
+    /** Nova: the command is running now (starting it again is refused). */
+    val running: Boolean = false,
+)
+
+/**
+ * GET /nova/v1/commands. [allowed] is false when this device lacks the host's `host_commands`
+ * permission (the list is then empty), null when the host didn't say.
+ */
+data class HostCommandList(val allowed: Boolean?, val commands: List<HostCommand>) {
+    companion object {
+        val Empty = HostCommandList(null, emptyList())
+    }
+}
+
+/** The host answered but refused the action (missing permission, busy, disabled in config). */
+class HostRefusedException(message: String, val code: Int = 0) : java.io.IOException(message)
 
 /** A saved or discovered streaming host. */
 data class Host(
@@ -61,6 +118,8 @@ data class HostApp(
     val lastPlayed: Long?,
     val playtimeSeconds: Long?,
     val modeDefault: NovaDisplayMode?,
+    /** Commands the host attached to this app (its /applist `SuperCmds`). */
+    val commands: List<HostCommand> = emptyList(),
 ) {
     val isDesktop: Boolean get() = name.equals("Desktop", ignoreCase = true) || name.startsWith("Desktop (")
 }

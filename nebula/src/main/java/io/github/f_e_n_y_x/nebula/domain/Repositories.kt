@@ -3,7 +3,10 @@ package io.github.f_e_n_y_x.nebula.domain
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameDetails
+import io.github.f_e_n_y_x.nebula.domain.model.ClipboardSendResult
 import io.github.f_e_n_y_x.nebula.domain.model.Host
+import io.github.f_e_n_y_x.nebula.domain.model.HostCommands
+import io.github.f_e_n_y_x.nebula.domain.model.StreamLink
 import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
@@ -18,6 +21,17 @@ interface HostRepository {
     suspend fun addManual(address: String): Result<Host>
     fun pair(hostId: String): Flow<PairingState>
     suspend fun wake(hostId: String): Result<Unit>
+    /** Polls one host now; null when unknown. */
+    suspend fun refresh(hostId: String): Host? = null
+    /** Suspends the PC (Nova `/pcsleep`). Failure messages are ready to show. */
+    suspend fun sleep(hostId: String): Result<Unit> = Result.failure(UnsupportedOperationException("This PC can't be put to sleep from Nebula."))
+    /**
+     * Host commands for [gameId] (its own plus host-wide ones), or host-wide only when null.
+     * Filtered by [HostGating.visibleCommands].
+     */
+    suspend fun commands(hostId: String, gameId: String?): HostCommands = HostCommands.None
+    /** Runs a host command; failure messages are ready to show. */
+    suspend fun runCommand(hostId: String, commandId: String): Result<Unit> = Result.failure(UnsupportedOperationException("This PC has no commands."))
     /** Keep watching the network for hosts while the app is visible (onStart / onStop). */
     fun startWatching() {}
     fun stopWatching() {}
@@ -81,4 +95,12 @@ interface StreamRepository {
     val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput? get() = null
     /** True while the stream is kept alive without a surface (app in the background). */
     val backgrounded: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
+    /** Mic and clipboard state of the running stream. */
+    val link: Flow<StreamLink> get() = kotlinx.coroutines.flow.flowOf(StreamLink())
+    /** Starts or stops sending the microphone; false when it couldn't start. */
+    fun setMicLive(on: Boolean): Boolean = false
+    /** Sends this device's clipboard to the PC now (call from a user action, while focused). */
+    fun sendClipboard(): ClipboardSendResult = ClipboardSendResult.NOT_SYNCING
+    /** The stream window gained or lost input focus (Android 10+ clipboard reads need focus). */
+    fun onWindowFocus(focused: Boolean) {}
 }

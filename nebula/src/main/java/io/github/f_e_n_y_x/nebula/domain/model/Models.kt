@@ -11,7 +11,54 @@ data class Host(
     val gpu: String? = null,
     val version: String? = null,
     val runningGameId: String? = null,
+    /** Host-linked actions this host offers this device (see [io.github.f_e_n_y_x.nebula.domain.HostGating]). */
+    val features: HostFeatures = HostFeatures.None,
+    /** The host shared a MAC address, so Wake-on-LAN can reach it. */
+    val canWake: Boolean = false,
 )
+
+/** Whether a host-linked action is offered. */
+enum class Gate {
+    /** The host doesn't implement it (or has it turned off): hide the action. */
+    UNSUPPORTED,
+    /** The host has it, but not for this device: show it disabled with how to allow it. */
+    NOT_ALLOWED,
+    AVAILABLE,
+}
+
+/** What a host lets this device do beyond streaming (see [io.github.f_e_n_y_x.nebula.domain.HostGating]). */
+data class HostFeatures(
+    val sleep: Gate = Gate.UNSUPPORTED,
+    val commands: Gate = Gate.UNSUPPORTED,
+) {
+    companion object {
+        val None = HostFeatures()
+    }
+}
+
+/** A command the host's owner set up (restart Steam, mute Discord…). App-scoped ones have [appScoped]. */
+data class HostCommand(
+    val id: String,
+    val name: String,
+    val confirm: Boolean = true,
+    val appScoped: Boolean = false,
+    /** Nova's icon name (terminal, refresh, power, lock, volume, mic-off, monitor, gamepad, stop, play, folder, settings). */
+    val icon: String? = null,
+    /** App commands run only while their game does. */
+    val runnable: Boolean = true,
+    val running: Boolean = false,
+)
+
+/** A host's commands for one screen, and whether this device may run them. */
+data class HostCommands(
+    val commands: List<HostCommand>,
+    /** The host has commands but this device lacks the `host_commands` permission. */
+    val notAllowed: Boolean = false,
+) {
+    companion object {
+        val None = HostCommands(emptyList())
+    }
+}
 
 enum class HostStatus { ONLINE, STREAMING, OFFLINE, UNKNOWN }
 
@@ -117,4 +164,30 @@ data class StreamStats(
     val renderMs: Float = 0f,
     val decoder: String = "",
     val hdr: Boolean = false,
+)
+
+/** Clipboard sync for the running stream. */
+enum class ClipboardMode {
+    /** Both clipboard settings are off. */
+    OFF,
+    /** On in Settings, but this PC doesn't sync the clipboard. */
+    UNSUPPORTED,
+    /** The PC has clipboard sync off for this device. */
+    NOT_ALLOWED,
+    SYNCING,
+}
+
+enum class ClipboardSendResult { SENT, EMPTY, NOT_SYNCING }
+
+/** Mic and clipboard state of the running stream (engine [StreamHostLink] or the demo). */
+data class StreamLink(
+    /** "Enable microphone" is on in Settings. */
+    val micEnabled: Boolean = false,
+    /** Null until connected; false when the host didn't ask for a microphone. */
+    val micSupported: Boolean? = null,
+    val micLive: Boolean = false,
+    val micPaused: Boolean = false,
+    /** What "Initial microphone state" asks for at start. */
+    val micWantedAtStart: Boolean = false,
+    val clipboard: ClipboardMode = ClipboardMode.OFF,
 )

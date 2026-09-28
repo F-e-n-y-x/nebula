@@ -118,6 +118,21 @@ class ClipboardSyncManager(
         }
     }
 
+    /**
+     * Sends the current clip to the host even when it's the one sent last (an explicit "send
+     * clipboard" action). Call while the app has focus.
+     */
+    fun pushCurrentClip() {
+        if (!syncText && !syncImage) return
+        lastDispatchedFingerprint = 0L
+        pendingSelfWrites = 0
+        try {
+            handleLocalClipChanged()
+        } catch (t: Throwable) {
+            LimeLog.warning("Clipboard push failed: ${t.message}")
+        }
+    }
+
     // ---------------------------------------------------------------------
     // Outbound: Android clipboard → host
     // ---------------------------------------------------------------------
