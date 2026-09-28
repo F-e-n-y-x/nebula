@@ -4,7 +4,18 @@ import android.app.Activity
 import android.view.SurfaceHolder
 import io.github.f_e_n_y_x.nebula.data.PreferencesStore
 import io.github.f_e_n_y_x.nebula.domain.ArtworkRepository
+import io.github.f_e_n_y_x.nebula.domain.HostGating
 import io.github.f_e_n_y_x.nebula.domain.HostRepository
+import io.github.f_e_n_y_x.nebula.domain.model.ClipboardMode
+import io.github.f_e_n_y_x.nebula.domain.model.ClipboardSendResult
+import io.github.f_e_n_y_x.nebula.domain.model.Gate
+import io.github.f_e_n_y_x.nebula.domain.model.HostCommand
+import io.github.f_e_n_y_x.nebula.domain.model.HostCommands
+import io.github.f_e_n_y_x.nebula.domain.model.StreamLink
+import io.github.fenyx.nebula.engine.ClipboardSend
+import io.github.fenyx.nebula.engine.ClipboardSync
+import io.github.fenyx.nebula.engine.HostRefusedException
+import io.github.fenyx.nebula.engine.HostCommand as EngineHostCommand
 import io.github.f_e_n_y_x.nebula.domain.LibraryRepository
 import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
 import io.github.f_e_n_y_x.nebula.domain.StreamRepository
@@ -94,8 +105,45 @@ class EngineHostRepository(private val engine: NebulaEngine) : HostRepository {
     override suspend fun wake(hostId: String): Result<Unit> =
         if (engine.wake(hostId)) Result.success(Unit) else Result.failure(IllegalStateException("This PC hasn't shared a network address for Wake-on-LAN yet."))
 
+    override suspend fun refresh(hostId: String): Host? = runCatching { engine.refresh(hostId)?.toDomain() }.getOrNull()
+
+    override suspend fun sleep(hostId: String): Result<Unit> =
+        runCatching { engine.sleepHost(hostId) }.recoverCatching { throw IllegalStateException(hostActionMessage(it, sleep = true)) }
+
+    override suspend fun commands(hostId: String, gameId: String?): HostCommands = withContext(Dispatchers.IO) {
+        val host = engine.hosts.value.firstOrNull { it.id == hostId }?.toDomain() ?: return@withContext HostCommands.None
+        val listed = if (host.features.commands == Gate.AVAILABLE) runCatching { engine.hostCommands(hostId) }.getOrNull() else null
+        val global = listed?.commands.orEmpty()
+        // A game's SuperCmds are its own commands followed by the host-wide ones; the Nova list says which is which.
+        val app = gameId?.let { id -> runCatching { engine.apps(hostId).first() }.getOrNull()?.firstOrNull { it.id == id } }
+        val byId = global.associateBy { it.id }
+        val forApp = app?.commands.orEmpty().map { c -> (byId[c.id] ?: c.copy(appNovaId = app?.novaId ?: "app")).toDomain() }
+        val visible = HostGating.visibleCommands(host, global.filter { it.appNovaId == null }.map { it.toDomain() }, forApp)
+        if (listed?.allowed == false) visible.copy(notAllowed = true) else visible
+    }
+
+    override suspend fun runCommand(hostId: String, commandId: String): Result<Unit> =
+        runCatching { engine.runHostCommand(hostId, commandId) }.recoverCatching { throw IllegalStateException(hostActionMessage(it, sleep = false)) }
+
     override fun startWatching() = engine.startDiscovery()
     override fun stopWatching() = engine.stopDiscovery()
+}
+
+private fun EngineHostCommand.toDomain() = HostCommand(
+    id = id, name = name, confirm = confirm, appScoped = appNovaId != null, icon = icon, runnable = runnable, running = running,
+)
+
+/** Turns an engine failure into a sentence for a toast (phase-1 wire contract refusal codes). */
+internal fun hostActionMessage(e: Throwable, sleep: Boolean): String = when (e) {
+    is HostRefusedException -> when (e.code) {
+        401, 403 -> "This device isn't allowed to ${if (sleep) "put the PC to sleep" else "run host commands"}. ${HostGating.PERMISSION_HINT}."
+        409 -> if (sleep) "Another device is streaming from this PC, so it stays awake." else "That command is already running."
+        404 -> if (sleep) "This PC can't be put to sleep from Nebula." else "The PC doesn't have that command right now (app commands need their game running)."
+        503 -> "The PC refused: ${e.message}"
+        else -> e.message ?: "The PC refused."
+    }
+    is java.io.IOException -> "Couldn't reach the PC."
+    else -> e.message ?: "Something went wrong."
 }
 
 private fun EngineHost.toDomain() = Host(
@@ -111,6 +159,8 @@ private fun EngineHost.toDomain() = Host(
     isNova = isNova,
     version = novaCapabilities?.version?.let { "Nova $it" },
     runningGameId = runningAppId?.toString(),
+    features = HostGating.features(paired, novaCapabilities?.features, novaCapabilities?.permissions),
+    canWake = HostGating.canWake(paired, macAddress),
 )
 
 class EngineLibraryRepository(private val engine: NebulaEngine) : LibraryRepository {
@@ -232,6 +282,38 @@ class EngineStreamRepository(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     override val backgrounded: Flow<Boolean> = current.flatMapLatest { it?.backgrounded ?: kotlinx.coroutines.flow.flowOf(false) }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override val link: Flow<StreamLink> = current.flatMapLatest { session ->
+        val l = session?.takeIf { it.isLinkReady }?.link ?: return@flatMapLatest kotlinx.coroutines.flow.flowOf(StreamLink())
+        combine(l.micSupported, l.micLive, l.micPausedInBackground, l.clipboard) { supported, live, paused, clip ->
+            StreamLink(
+                micEnabled = l.micEnabledInSettings,
+                micSupported = supported,
+                micLive = live,
+                micPaused = paused,
+                micWantedAtStart = l.micWantedAtStart(),
+                clipboard = when (clip) {
+                    ClipboardSync.OFF -> ClipboardMode.OFF
+                    ClipboardSync.UNSUPPORTED -> ClipboardMode.UNSUPPORTED
+                    ClipboardSync.NOT_ALLOWED -> ClipboardMode.NOT_ALLOWED
+                    ClipboardSync.ACTIVE -> ClipboardMode.SYNCING
+                },
+            )
+        }
+    }
+
+    override fun setMicLive(on: Boolean): Boolean = session?.takeIf { it.isLinkReady }?.link?.setMicLive(on) ?: false
+
+    override fun sendClipboard(): ClipboardSendResult = when (session?.takeIf { it.isLinkReady }?.link?.sendClipboardNow()) {
+        ClipboardSend.SENT -> ClipboardSendResult.SENT
+        ClipboardSend.EMPTY -> ClipboardSendResult.EMPTY
+        else -> ClipboardSendResult.NOT_SYNCING
+    }
+
+    override fun onWindowFocus(focused: Boolean) {
+        session?.takeIf { it.isLinkReady }?.link?.onWindowFocusChanged(focused)
+    }
 
     override fun reattach(target: StreamTarget) {
         val surface = target as? SurfaceStreamTarget ?: return

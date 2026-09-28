@@ -11,7 +11,14 @@ import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameArt
 import io.github.f_e_n_y_x.nebula.domain.model.GameDetails
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
+import io.github.f_e_n_y_x.nebula.domain.model.ClipboardMode
+import io.github.f_e_n_y_x.nebula.domain.model.ClipboardSendResult
+import io.github.f_e_n_y_x.nebula.domain.model.Gate
 import io.github.f_e_n_y_x.nebula.domain.model.Host
+import io.github.f_e_n_y_x.nebula.domain.model.HostCommand
+import io.github.f_e_n_y_x.nebula.domain.model.HostCommands
+import io.github.f_e_n_y_x.nebula.domain.model.HostFeatures
+import io.github.f_e_n_y_x.nebula.domain.model.StreamLink
 import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
 import io.github.f_e_n_y_x.nebula.domain.model.LastSession
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
@@ -84,7 +91,10 @@ class DemoHost(private val context: Context) {
 
     private val hosts = MutableStateFlow(
         listOf(
-            Host(HOST_ID, "atom", "192.168.10.10", HostStatus.ONLINE, paired = true, isNova = true, gpu = "GeForce GTX 1080 Ti", version = "Nova 0.2"),
+            Host(
+                HOST_ID, "atom", "192.168.10.10", HostStatus.ONLINE, paired = true, isNova = true, gpu = "GeForce GTX 1080 Ti", version = "Nova 0.3",
+                features = HostFeatures(sleep = Gate.AVAILABLE, commands = Gate.AVAILABLE), canWake = true,
+            ),
             Host("demo-deck", "living-room", "192.168.10.24", HostStatus.OFFLINE, paired = false, isNova = false, gpu = null, version = "Sunshine"),
         ),
     )
@@ -106,11 +116,51 @@ class DemoHost(private val context: Context) {
             emit(PairingState.Paired)
         }
         override suspend fun wake(hostId: String): Result<Unit> {
-            delay(1_500)
-            hosts.update { list -> list.map { if (it.id == hostId) it.copy(status = HostStatus.ONLINE) else it } }
+            // A sleeping demo PC "boots" a few seconds after the first magic packet.
+            if (wakeAt == 0L) wakeAt = System.currentTimeMillis() + WAKE_DELAY_MS
             return Result.success(Unit)
         }
+        override suspend fun refresh(hostId: String): Host? {
+            delay(300)
+            if (wakeAt != 0L && System.currentTimeMillis() >= wakeAt) {
+                wakeAt = 0L
+                hosts.update { list -> list.map { if (it.id == hostId) it.copy(status = HostStatus.ONLINE) else it } }
+            }
+            return hosts.value.firstOrNull { it.id == hostId }
+        }
+        override suspend fun sleep(hostId: String): Result<Unit> {
+            delay(700)
+            hosts.update { list -> list.map { if (it.id == hostId) it.copy(status = HostStatus.OFFLINE) else it } }
+            return Result.success(Unit)
+        }
+        override suspend fun commands(hostId: String, gameId: String?): HostCommands {
+            delay(250)
+            val host = hosts.value.firstOrNull { it.id == hostId }
+            val app = if (gameId == "gta5") gtaCommands else emptyList()
+            return io.github.f_e_n_y_x.nebula.domain.HostGating.visibleCommands(host, globalCommands, app)
+        }
+        override suspend fun runCommand(hostId: String, commandId: String): Result<Unit> {
+            delay(600)
+            return if (commandId == "kill-game") Result.failure(IllegalStateException("That command is already running.")) else Result.success(Unit)
+        }
     }
+
+    private var wakeAt = 0L
+
+    /** Debug QA: start with atom asleep so Play shows the wake flow. */
+    fun putToSleep() {
+        hosts.update { list -> list.map { if (it.id == HOST_ID) it.copy(status = HostStatus.OFFLINE) else it } }
+    }
+
+    private val globalCommands = listOf(
+        HostCommand("restart-steam", "Restart Steam", confirm = true, icon = "refresh"),
+        HostCommand("mute-discord", "Mute Discord", confirm = false, icon = "mic-off"),
+        HostCommand("lock", "Lock screen", confirm = true, icon = "lock"),
+    )
+    private val gtaCommands = listOf(
+        HostCommand("reset-graphics", "Reset graphics settings", confirm = true, appScoped = true, icon = "settings"),
+        HostCommand("kill-game", "Force close GTA V", confirm = true, appScoped = true, icon = "stop"),
+    )
 
     val libraryRepository = object : LibraryRepository {
         override fun observeGames(hostId: String): Flow<List<Game>> =
@@ -129,10 +179,23 @@ class DemoHost(private val context: Context) {
         override suspend fun refreshGame(hostId: String, gameId: String) = delay(400)
     }
 
+    private val link = MutableStateFlow(StreamLink())
+
     val streamRepository = object : StreamRepository {
+        override val link: Flow<StreamLink> = this@DemoHost.link
+        override fun setMicLive(on: Boolean): Boolean {
+            this@DemoHost.link.update { it.copy(micLive = on) }
+            return true
+        }
+        override fun sendClipboard(): ClipboardSendResult {
+            val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+            return if (cm?.hasPrimaryClip() == true) ClipboardSendResult.SENT else ClipboardSendResult.EMPTY
+        }
         override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = flow {
             emit(StreamState.Starting)
+            this@DemoHost.link.value = StreamLink(micEnabled = true)
             delay(1_200)
+            this@DemoHost.link.value = StreamLink(micEnabled = true, micSupported = true, clipboard = ClipboardMode.SYNCING)
             val res = if (mode == DisplayMode.MIRROR) "1920×1080" else "2340×1080"
             var t = 0
             while (true) {
@@ -150,7 +213,7 @@ class DemoHost(private val context: Context) {
                 delay(1_000)
             }
         }
-        override fun stop(quitApp: Boolean) = Unit
+        override fun stop(quitApp: Boolean) { this@DemoHost.link.value = StreamLink() }
         private val log = io.github.f_e_n_y_x.nebula.input.LoggingInput()
         override val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput get() = log
         override suspend fun setBitrate(kbps: Int): Boolean {
@@ -162,5 +225,6 @@ class DemoHost(private val context: Context) {
 
     companion object {
         const val HOST_ID = "demo-atom"
+        private const val WAKE_DELAY_MS = 7_000L
     }
 }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Inbound clipboard images from the PC; only this cache folder is exposed. -->
+    <cache-path name="clipboard" path="clipboard/" />
+</paths>

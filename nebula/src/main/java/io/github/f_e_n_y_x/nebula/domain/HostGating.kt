@@ -76,5 +76,10 @@ object HostGating {
         else -> Gate.UNSUPPORTED
     }
 
+    /** A "Host commands" entry on the details page: the host lists commands, or this game has some. */
+    fun showCommandsEntry(host: Host?, known: HostCommands?): Boolean =
+        host != null && host.paired && host.status.reachable &&
+            (host.features.commands != Gate.UNSUPPORTED || known?.commands?.isNotEmpty() == true || known?.notAllowed == true)
+
     private val HostStatus.reachable get() = this == HostStatus.ONLINE || this == HostStatus.STREAMING
 }

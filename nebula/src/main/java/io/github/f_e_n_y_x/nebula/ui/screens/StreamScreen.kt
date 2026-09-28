@@ -176,6 +176,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
     }
 
+    // Mic, clipboard sync, host commands and Sleep PC (phase 1 host-linked features).
+    val hostLink = rememberStreamHostState(container, hostId, gameId, live)
+
     val input = remember { InputState() }
     input.ui = ui
     input.active = live && !menu
@@ -327,6 +330,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         if (oscShown) OnScreenControls(remote, ui.oscOpacity, ui.oscL3R3Only, ui.oscGuide)
         if (live && !menu && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (ui.perf == PerfDetail.OFF) 12 else if (ui.perf == PerfDetail.FULL) 96 else 60)
         if (live && !menu && ui.perf != PerfDetail.OFF && stats != null) PerfOverlay(stats, ui.perf == PerfDetail.FULL, ui.perfOpacity, Modifier.align(if (oscShown) Alignment.TopCenter else Alignment.TopStart))
+        StreamMicIndicator(hostLink, visible = live && !menu && !pcKeyboard, prefs = prefs)
         if (live && !menu && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
         if (live && !menu && ui.floatBall && !pcKeyboard) {
             FloatBall(
@@ -342,6 +346,17 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
 
         val backFocus = remember { FocusRequester() }
+        // Fallback for hosts without clipboard sync: type the clipboard's text as keystrokes.
+        val typeClipboard: () -> Unit = {
+            val text = ctx.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }
+                ?.getItemAt(0)?.coerceToText(ctx)?.toString()
+            if (text.isNullOrEmpty()) {
+                Toast.makeText(ctx, "The clipboard is empty", Toast.LENGTH_SHORT).show()
+            } else {
+                remoteInput?.text(text)
+                Toast.makeText(ctx, "Typed ${text.length} characters on your PC", Toast.LENGTH_SHORT).show()
+            }
+        }
         when (val st = state) {
             StreamState.Starting -> Column(
                 Modifier.fillMaxSize().background(Color(0xCC0A0A0B)),
@@ -398,20 +413,12 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                         pcKeyboard = true
                     },
                     onOverlayOpacity = { setOverlayOpacity(ctx, it) },
-                    onClipboard = {
-                        val text = ctx.getSystemService(ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }
-                            ?.getItemAt(0)?.coerceToText(ctx)?.toString()
-                        if (text.isNullOrEmpty()) {
-                            Toast.makeText(ctx, "The clipboard is empty", Toast.LENGTH_SHORT).show()
-                        } else {
-                            remoteInput?.text(text)
-                            Toast.makeText(ctx, "Sent ${text.length} characters to your PC", Toast.LENGTH_SHORT).show()
-                        }
-                    },
+                    onClipboard = typeClipboard,
                     onShortcut = { remoteInput?.press(it) },
                     onDisconnect = { end(false) },
                     onQuit = { end(!ui.quitDisconnectsOnly) },
                 ),
+                hostSection = { StreamHostMenuSection(hostLink, prefs, onTypeClipboard = typeClipboard, onSlept = { end(false) }) },
             )
         }
     }

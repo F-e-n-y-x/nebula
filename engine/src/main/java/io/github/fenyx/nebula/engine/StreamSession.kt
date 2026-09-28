@@ -74,6 +74,9 @@ class StreamSession internal constructor(
 
     internal var linkConfig: StreamHostLink.Config? = null
 
+    /** True once [link] exists (from the start of the stream on). */
+    val isLinkReady: Boolean get() = ::link.isInitialized
+
     @Volatile
     var isConnected: Boolean = false
         private set
