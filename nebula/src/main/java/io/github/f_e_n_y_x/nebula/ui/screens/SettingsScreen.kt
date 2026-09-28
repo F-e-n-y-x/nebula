@@ -105,7 +105,7 @@ private enum class SettingsSection(val title: String, val summary: String, val i
     FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, "framegen"),
     Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, null),
     Advanced("Advanced", "Backup, restore and everything else", Icons.Outlined.Tune, "advanced"),
-    About("About", "Version, licenses, credits", Icons.Outlined.Info, null),
+    About("About", "Version, updates, licenses, credits", Icons.Outlined.Info, null),
 }
 
 @Composable
@@ -201,6 +201,7 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
         }
         SettingsSection.About -> {
             AboutSection()
+            UpdateSection()
         }
         SettingsSection.Library -> LibrarySection(vm)
         SettingsSection.Input -> {
