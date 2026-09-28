@@ -341,6 +341,12 @@ class EngineStreamRepository(
     override suspend fun switchMode(mode: VideoMode): Result<Unit> =
         run?.switchTo(mode) ?: Result.failure(IllegalStateException("Nothing is streaming."))
 
+    override fun setFramegenPaused(paused: Boolean, force: Boolean): Boolean = session?.setFramegenPaused(paused, force) ?: false
+
+    override fun refreshUpscaler() {
+        session?.refreshUpscaler()
+    }
+
     override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = callbackFlow {
         val surface = target as? SurfaceStreamTarget ?: error("The engine streams into a SurfaceStreamTarget")
         send(StreamState.Starting)
@@ -395,9 +401,15 @@ class EngineStreamRepository(
                     val s = mine ?: return
                     if (!isMine()) return
                     statsJob?.cancel()
-                    statsJob = out.launch { s.stats.collect { out.trySend(StreamState.Live(it.toDomain())) } }
+                    statsJob = out.launch {
+                        combine(s.stats, s.framegen, s.upscaling) { st, fg, up -> st.toDomain().copy(post = io.github.f_e_n_y_x.nebula.framegen.postProcessStats(fg, up)) }
+                            .collect { out.trySend(StreamState.Live(it)) }
+                    }
                     pending?.complete(Result.success(Unit))
                 }
+
+                override fun onFramegenEvent(event: io.github.fenyx.nebula.engine.framegen.FramegenEvent) =
+                    io.github.f_e_n_y_x.nebula.framegen.FramegenAppSetup.onEvent(surface.activity, event)
 
                 override fun onStageFailed(stage: String, errorCode: Int) {
                     if (!isMine()) return

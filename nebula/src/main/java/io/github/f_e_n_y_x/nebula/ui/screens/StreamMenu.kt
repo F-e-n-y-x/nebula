@@ -75,6 +75,8 @@ class StreamMenuActions(
     val onShortcut: (Shortcut) -> Unit,
     val onDisconnect: () -> Unit,
     val onQuit: () -> Unit,
+    /** Frame generation quick toggle: (paused, force) → accepted. */
+    val onFramegenPause: (Boolean, Boolean) -> Boolean = { _, _ -> false },
 )
 
 /**
@@ -129,6 +131,7 @@ fun StreamMenu(
             Header(gameName, mode, stats)
             StatsBlock(stats, ui.perf == PerfDetail.FULL)
             resolution?.let { ResolutionRow(it, onOpen = { picking = true }) }
+            io.github.f_e_n_y_x.nebula.framegen.FramegenMenuCard(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause)
             Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null)
             hostSection?.invoke()
             Bitrate(bitrateKbps, bitrateNote, actions.onBitrate)
@@ -160,6 +163,7 @@ private fun Header(gameName: String, mode: DisplayMode, stats: StreamStats?) {
                 color = NebulaColors.accentText, background = NebulaColors.accentTint,
             )
             stats?.let { Pill("${it.resolution} · ${it.codec}", color = NebulaColors.textSecondary, background = NebulaColors.raised) }
+            io.github.f_e_n_y_x.nebula.framegen.FramegenPill(stats?.post)
         }
         Text(
             if (mode == DisplayMode.VIRTUAL) "Your PC made a display that matches this screen; it goes away when you leave."

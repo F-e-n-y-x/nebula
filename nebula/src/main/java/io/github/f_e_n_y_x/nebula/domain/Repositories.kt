@@ -93,6 +93,13 @@ interface StreamRepository {
     suspend fun setBitrate(kbps: Int): Boolean = false
     /** Input for the running stream, or null when nothing is connected. */
     val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput? get() = null
+    /**
+     * Stream-menu quick toggle for frame generation: pauses (decoded frames only) or resumes it.
+     * Resuming after a thermal auto-off needs [force]. False when refused or not available.
+     */
+    fun setFramegenPaused(paused: Boolean, force: Boolean = false): Boolean = false
+    /** Applies changed upscaler settings to the running stream. */
+    fun refreshUpscaler() {}
     /** True while the stream is kept alive without a surface (app in the background). */
     val backgrounded: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
     /** Mic and clipboard state of the running stream. */

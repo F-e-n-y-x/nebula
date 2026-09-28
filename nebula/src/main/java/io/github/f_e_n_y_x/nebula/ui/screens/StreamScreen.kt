@@ -430,6 +430,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     onShortcut = { remoteInput?.press(it) },
                     onDisconnect = { end(false) },
                     onQuit = { end(!ui.quitDisconnectsOnly) },
+                    onFramegenPause = { paused, force -> container.stream.setFramegenPaused(paused, force) },
                 ),
                 hostSection = { StreamHostMenuSection(hostLink, prefs, onTypeClipboard = typeClipboard, onSlept = { end(false) }) },
             )
@@ -518,6 +519,7 @@ private fun PerfOverlay(x: StreamStats, full: Boolean, opacity: Int, modifier: M
                 style = Nebula.type.mono, color = NebulaColors.textSecondary,
             )
         }
+        io.github.f_e_n_y_x.nebula.framegen.FramegenOverlayLines(x.post, x.receivedFps, full)
     }
 }
 

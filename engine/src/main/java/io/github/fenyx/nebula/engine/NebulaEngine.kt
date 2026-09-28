@@ -298,7 +298,12 @@ class NebulaEngine private constructor(context: Context) {
             requireClipboardFlag = caps != null,
             clipboardDenied = phase1 && !(caps!!.has(NovaFeature.CLIPBOARD) && caps.allows(NovaFeature.PERMISSION_CLIPBOARD)),
         )
-        session.start(connection, decoder, audio)
+        session.start(
+            connection, decoder, audio,
+            videoFps = prefs.fps,
+            hdrMode = if (hdr) prefs.hdrMode else MoonBridge.HDR_MODE_SDR,
+            hdrFullRange = hdr && com.limelight.nvstream.ColorRangePolicy.isFullRangeHdr(prefs.hdrMode, decoder.getPreferredColorRange()),
+        )
         return session
     }
 

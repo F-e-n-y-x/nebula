@@ -4,6 +4,7 @@
 #include <android/native_window.h>
 
 #include <cstdint>
+#include <string>
 
 namespace FramegenPipeline {
 
@@ -37,5 +38,13 @@ void setTuningConfig(int32_t internalWidth,
                      int32_t presentQueueMax,
                      bool allowHighInputBypass);
 void setOutputWindow(ANativeWindow* nativeWindow);
+
+// Nebula additions.
+void setLsfgModel(float flowScale, bool performanceMode);
+void setGenerationPaused(bool paused);
+/** "key=value ..." report of the Vulkan features frame generation needs. */
+std::string probeDeviceCaps();
+/** Times LSFG alone on synthetic frames; "ok ..." or "error=...". Needs no running pipeline. */
+std::string runLsfgBenchmark(int width, int height, int frames, float flowScale, bool performanceMode);
 
 } // namespace FramegenPipeline

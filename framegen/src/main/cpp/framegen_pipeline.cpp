@@ -6,6 +6,7 @@
 #include <vulkan/vulkan_core.h>
 
 #include <lsfg_3_1.hpp>
+#include <lsfg_3_1p.hpp>
 
 #include "extract/extract.hpp"
 #include "extract/trans.hpp"
@@ -22,10 +23,12 @@
 #include <cstdlib>
 #include <deque>
 #include <dlfcn.h>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -431,6 +434,7 @@ enum FramegenRuntimeMode : int32_t {
     kModeHighInputBypass = 1,
     kModeSlowCooldown = 2,
     kModeCadenceRecover = 3,
+    kModePaused = 4,
 };
 
 std::atomic<uint64_t> g_statsRealFrames{0};
@@ -450,6 +454,36 @@ std::vector<std::vector<uint8_t>> g_presentBufferPool;
 
 constexpr uint64_t kFirstAvailableDeviceUuid = 0x1463ABACULL;
 constexpr uint32_t kGenerationCount = 1; // 2x 插帧：每两帧之间生成 1 帧。
+
+// Nebula: LSFG model settings, applied on the next bootstrap. Flow scale 1.0 is V+'s tested
+// value (Adreno got slower below 1.0); the performance model is LSFG 3.1P.
+std::atomic<float> g_flowScale{1.0F};
+std::atomic<bool> g_performanceMode{false};
+// Nebula: while set, every decoded frame is presented as-is and LSFG does no work
+// (quick toggle and thermal auto-off), without leaving the capture path.
+std::atomic<bool> g_generationPaused{false};
+
+// Entry points of one LSFG model. The model is chosen at bootstrap and kept until reset, so
+// finalize() always goes to the model that was initialized.
+struct LsfgApi {
+    const char* name;
+    void (*initialize)(uint64_t, bool, float, uint64_t,
+                       const std::function<std::vector<uint8_t>(const std::string&)>&);
+    int32_t (*createContextFromAHB)(AHardwareBuffer*, AHardwareBuffer*,
+                                    const std::vector<AHardwareBuffer*>&, VkExtent2D, VkFormat);
+    void (*presentContext)(int32_t, int, const std::vector<int>&);
+    void (*deleteContext)(int32_t);
+    void (*finalize)();
+    void (*waitIdle)();
+};
+const LsfgApi kLsfgQuality{"3.1", &LSFG_3_1::initialize, &LSFG_3_1::createContextFromAHB,
+                           &LSFG_3_1::presentContext, &LSFG_3_1::deleteContext,
+                           &LSFG_3_1::finalize, &LSFG_3_1::waitIdle};
+const LsfgApi kLsfgPerformance{"3.1p", &LSFG_3_1P::initialize, &LSFG_3_1P::createContextFromAHB,
+                               &LSFG_3_1P::presentContext, &LSFG_3_1P::deleteContext,
+                               &LSFG_3_1P::finalize, &LSFG_3_1P::waitIdle};
+std::atomic<const LsfgApi*> g_lsfg{&kLsfgQuality};
+const LsfgApi& lsfg() { return *g_lsfg.load(std::memory_order_acquire); }
 constexpr int64_t kSlowFrameMs = 16;
 constexpr int64_t kSlowPresentMs = 8;
 constexpr uint32_t kCadenceRecoverySuppressFrames = 1;
@@ -1612,23 +1646,26 @@ bool ensureContextBootstrapped(AHardwareBuffer* decoderAhb, int width, int heigh
 
         setenv("DISABLE_LSFG", "1", 1); // NOLINT(concurrency-mt-unsafe)
         const bool hdrEnabled = g_hdrEnabled.load(std::memory_order_acquire);
-        constexpr float kFlowScale = 1.0F; // 实测：Adreno 上 <1.0 反而显著变慢（0.5 → waitIdle 65ms→245ms）
+        // 实测：Adreno 上 <1.0 反而显著变慢（0.5 → waitIdle 65ms→245ms）; Nebula makes it a setting.
+        const float kFlowScale = std::clamp(g_flowScale.load(std::memory_order_acquire), 0.25F, 1.0F);
+        g_lsfg.store(g_performanceMode.load(std::memory_order_acquire) ? &kLsfgPerformance : &kLsfgQuality,
+                     std::memory_order_release);
         const auto lsfgInitStart = std::chrono::steady_clock::now();
-        LSFG_3_1::initialize(
+        lsfg().initialize(
             kFirstAvailableDeviceUuid,
             hdrEnabled,
             kFlowScale,
             kGenerationCount,
             loadTranslatedShader);
         const auto lsfgInitEnd = std::chrono::steady_clock::now();
-        LOGI("stage3.2 bootstrap: LSFG_3_1::initialize isHdr=%d flowScale=%.2f generationCount=%u",
-             static_cast<int>(hdrEnabled), kFlowScale, kGenerationCount);
+        LOGI("stage3.2 bootstrap: LSFG %s initialize isHdr=%d flowScale=%.2f generationCount=%u",
+             lsfg().name, static_cast<int>(hdrEnabled), kFlowScale, kGenerationCount);
         LOGI("stage3.2 bootstrap timing: lsfgInitialize=%lldms total=%lldms",
              static_cast<long long>(elapsedMs(lsfgInitStart, lsfgInitEnd)),
              static_cast<long long>(elapsedMs(bootStart, lsfgInitEnd)));
 
         const auto createContextStart = std::chrono::steady_clock::now();
-        resources->contextId = LSFG_3_1::createContextFromAHB(
+        resources->contextId = lsfg().createContextFromAHB(
             resources->input0.get(),
             resources->input1.get(),
             outputAhbs,
@@ -1783,7 +1820,7 @@ bool ensureContextBootstrapped(AHardwareBuffer* decoderAhb, int width, int heigh
     } catch (const std::exception& e) {
         unsetenv("DISABLE_LSFG"); // NOLINT(concurrency-mt-unsafe)
         LOGE("stage3.2 bootstrap failed: %s", e.what());
-        LSFG_3_1::finalize();
+        lsfg().finalize();
         g_context.reset();
         if (g_vk != nullptr && g_vk->device != VK_NULL_HANDLE) {
             vkDeviceWaitIdle(g_vk->device);
@@ -1864,7 +1901,7 @@ void reset() {
     if (g_context != nullptr) {
         LOGI("stage3.2 reset: deleting lsfg context id=%d", g_context->contextId);
     }
-    LSFG_3_1::finalize();
+    lsfg().finalize();
     g_context.reset();
     if (g_vk != nullptr && g_vk->device != VK_NULL_HANDLE) {
         vkDeviceWaitIdle(g_vk->device);
@@ -2773,6 +2810,16 @@ bool upscaleInterpLocked(bool logThisFrame, int64_t* outWaitMs) {
 // Adaptive pacing policy. Keep this native-side because decoder timestamps and LSFG cost
 // are both observed here, not in the Java setup path.
 bool shouldBypassFramegenLocked(int64_t timestampNs, float observedInputFps, bool logThisFrame) {
+    if (g_generationPaused.load(std::memory_order_acquire)) {
+        if (timestampNs > 0) {
+            g_adaptive.lastTimestampNs = timestampNs;
+        }
+        g_statsMode.store(kModePaused, std::memory_order_release);
+        if (logThisFrame) {
+            LOGI("stage3.3d: generation paused; presenting real frames only");
+        }
+        return true;
+    }
     const int32_t targetFps = g_outputFrameRate.load(std::memory_order_acquire);
     const bool allowHighInputBypass = g_allowHighInputBypass.load(std::memory_order_acquire);
     if (targetFps < 30) {
@@ -3407,9 +3454,9 @@ bool dispatchYuvToRgbaLocked(DecoderAhbImport& decoderImport,
     try {
         std::vector<int> noOutSems;
         const auto p0 = std::chrono::steady_clock::now();
-        LSFG_3_1::presentContext(g_context->contextId, -1, noOutSems);
+        lsfg().presentContext(g_context->contextId, -1, noOutSems);
         const auto p1 = std::chrono::steady_clock::now();
-        LSFG_3_1::waitIdle();
+        lsfg().waitIdle();
         const auto p2 = std::chrono::steady_clock::now();
         lsfgPresentMs = elapsedMs(p0, p1);
         lsfgWaitIdleMs = elapsedMs(p1, p2);
@@ -3756,6 +3803,183 @@ bool probeImportDecoderAhbLegacy(AHardwareBuffer* decoderAhb, int64_t timestampN
     vkFreeMemory(g_vk->device, memory, nullptr);
     vkDestroyImage(g_vk->device, image, nullptr);
     return dispatchOk || !pipelineReady;
+}
+
+
+// ---- Nebula additions: model settings, pause, device probe and synthetic benchmark ----------
+
+void setLsfgModel(float flowScale, bool performanceMode) {
+    const float clamped = std::clamp(flowScale, 0.25F, 1.0F);
+    const float prevFlow = g_flowScale.exchange(clamped, std::memory_order_acq_rel);
+    const bool prevPerf = g_performanceMode.exchange(performanceMode, std::memory_order_acq_rel);
+    if (prevFlow != clamped || prevPerf != performanceMode) {
+        LOGI("nebula: LSFG model flowScale=%.2f performance=%d (effective on next bootstrap)",
+             static_cast<double>(clamped), static_cast<int>(performanceMode));
+    }
+}
+
+void setGenerationPaused(bool paused) {
+    const bool prev = g_generationPaused.exchange(paused, std::memory_order_acq_rel);
+    if (prev != paused) {
+        std::lock_guard<std::mutex> lock(g_contextMutex);
+        // Re-prime LSFG on fresh consecutive inputs after a pause, like after a bypass.
+        g_adaptive.interpSuppressFrames = std::max(g_adaptive.interpSuppressFrames, 1U);
+        LOGI("nebula: frame generation %s", paused ? "paused" : "resumed");
+    }
+}
+
+std::string probeDeviceCaps() {
+    std::ostringstream out;
+    if (volkInitialize() != VK_SUCCESS) {
+        return "vulkan=0 reason=no-loader";
+    }
+    uint32_t instanceVersion = VK_API_VERSION_1_0;
+    if (vkEnumerateInstanceVersion != nullptr) {
+        vkEnumerateInstanceVersion(&instanceVersion);
+    }
+    const VkApplicationInfo appInfo{
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pApplicationName = "nebula-framegen-selftest",
+        .applicationVersion = 1,
+        .pEngineName = "nebula",
+        .engineVersion = 1,
+        .apiVersion = VK_API_VERSION_1_1,
+    };
+    const VkInstanceCreateInfo instanceCi{
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pApplicationInfo = &appInfo,
+    };
+    VkInstance instance = VK_NULL_HANDLE;
+    if (VK_VERSION_MAJOR(instanceVersion) == 1 && VK_VERSION_MINOR(instanceVersion) < 1) {
+        return "vulkan=1 instance=1.0 reason=instance-below-1.1";
+    }
+    if (vkCreateInstance(&instanceCi, nullptr, &instance) != VK_SUCCESS || instance == VK_NULL_HANDLE) {
+        return "vulkan=0 reason=create-instance-failed";
+    }
+    volkLoadInstance(instance);
+    uint32_t gpuCount = 0;
+    vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
+    if (gpuCount == 0) {
+        vkDestroyInstance(instance, nullptr);
+        return "vulkan=1 gpus=0 reason=no-gpu";
+    }
+    std::vector<VkPhysicalDevice> gpus(gpuCount);
+    vkEnumeratePhysicalDevices(instance, &gpuCount, gpus.data());
+    // LSFG and the pipeline both take the first device.
+    VkPhysicalDevice gpu = gpus[0];
+    VkPhysicalDeviceProperties props{};
+    vkGetPhysicalDeviceProperties(gpu, &props);
+
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT,
+    };
+    VkPhysicalDeviceShaderFloat16Int8Features fp16{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+    };
+    VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcr{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES,
+    };
+    const bool hasRobustness2 = hasDeviceExtension(gpu, VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    const bool hasFp16Ext = hasDeviceExtension(gpu, VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME) ||
+                            props.apiVersion >= VK_API_VERSION_1_2;
+    ycbcr.pNext = hasFp16Ext ? static_cast<void*>(&fp16) : nullptr;
+    fp16.pNext = hasRobustness2 ? static_cast<void*>(&robustness2) : nullptr;
+    VkPhysicalDeviceFeatures2 features2{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &ycbcr,
+    };
+    if (!hasFp16Ext) {
+        ycbcr.pNext = hasRobustness2 ? static_cast<void*>(&robustness2) : nullptr;
+    }
+    if (vkGetPhysicalDeviceFeatures2 != nullptr) {
+        vkGetPhysicalDeviceFeatures2(gpu, &features2);
+    }
+
+    char gpuName[VK_MAX_PHYSICAL_DEVICE_NAME_SIZE + 1]{};
+    std::strncpy(gpuName, props.deviceName, VK_MAX_PHYSICAL_DEVICE_NAME_SIZE);
+    for (char& c : gpuName) {
+        if (c == ' ') c = '_';
+    }
+    out << "vulkan=1"
+        << " api=" << VK_VERSION_MAJOR(props.apiVersion) << "." << VK_VERSION_MINOR(props.apiVersion)
+        << "." << VK_VERSION_PATCH(props.apiVersion)
+        << " gpu=" << gpuName
+        << " vendor=0x" << std::hex << props.vendorID << std::dec
+        << " driver=" << props.driverVersion
+        << " ahb=" << (hasDeviceExtension(gpu, VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME) ? 1 : 0)
+        << " external_memory=" << (hasDeviceExtension(gpu, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) ? 1 : 0)
+        << " dedicated=" << (hasDeviceExtension(gpu, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) ? 1 : 0)
+        << " foreign_queue=" << (hasDeviceExtension(gpu, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME) ? 1 : 0)
+        << " ycbcr=" << (ycbcr.samplerYcbcrConversion == VK_TRUE ? 1 : 0)
+        << " robustness2=" << (hasRobustness2 ? 1 : 0)
+        << " null_descriptor=" << (hasRobustness2 && robustness2.nullDescriptor == VK_TRUE ? 1 : 0)
+        << " fp16=" << (hasFp16Ext && fp16.shaderFloat16 == VK_TRUE ? 1 : 0);
+    vkDestroyInstance(instance, nullptr);
+    return out.str();
+}
+
+std::string runLsfgBenchmark(int width, int height, int frames, float flowScale, bool performanceMode) {
+    std::lock_guard<std::mutex> lock(g_contextMutex);
+    if (g_context != nullptr ||
+        g_contextBootState.load(std::memory_order_acquire) != ContextBootState::kUninitialized) {
+        return "error=pipeline-busy";
+    }
+    const uint32_t w = static_cast<uint32_t>(std::clamp(width, 64, 1920)) & ~15U;
+    const uint32_t h = static_cast<uint32_t>(std::clamp(height, 64, 1920)) & ~15U;
+    const int count = std::clamp(frames, 4, 600);
+    const float flow = std::clamp(flowScale, 0.25F, 1.0F);
+    const LsfgApi& api = performanceMode ? kLsfgPerformance : kLsfgQuality;
+    bool initialized = false;
+    try {
+        const auto t0 = std::chrono::steady_clock::now();
+        Extract::extractShaders();
+        AhbPtr in0 = allocateOwnedColorAhb(w, h, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
+        AhbPtr in1 = allocateOwnedColorAhb(w, h, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
+        AhbPtr outAhb = allocateOwnedColorAhb(w, h, AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
+        setenv("DISABLE_LSFG", "1", 1); // NOLINT(concurrency-mt-unsafe)
+        api.initialize(kFirstAvailableDeviceUuid, false, flow, kGenerationCount, loadTranslatedShader);
+        initialized = true;
+        std::vector<AHardwareBuffer*> outs{outAhb.get()};
+        const int32_t ctx = api.createContextFromAHB(in0.get(), in1.get(), outs, VkExtent2D{w, h},
+                                                     VK_FORMAT_R8G8B8A8_UNORM);
+        unsetenv("DISABLE_LSFG"); // NOLINT(concurrency-mt-unsafe)
+        const auto t1 = std::chrono::steady_clock::now();
+        std::vector<double> ms;
+        ms.reserve(static_cast<size_t>(count));
+        const std::vector<int> noSems;
+        for (int i = 0; i < count; ++i) {
+            const auto a = std::chrono::steady_clock::now();
+            api.presentContext(ctx, -1, noSems);
+            api.waitIdle();
+            const auto b = std::chrono::steady_clock::now();
+            ms.push_back(std::chrono::duration<double, std::milli>(b - a).count());
+        }
+        api.deleteContext(ctx);
+        api.finalize();
+        initialized = false;
+        const double first = ms.front();
+        // Skip the first two frames: pipeline warm-up and the empty second input slot.
+        std::vector<double> steady(ms.begin() + std::min<size_t>(2, ms.size() - 1), ms.end());
+        std::sort(steady.begin(), steady.end());
+        const double median = steady[steady.size() / 2];
+        const double p95 = steady[std::min(steady.size() - 1, (steady.size() * 95) / 100)];
+        const double worst = steady.back();
+        char buf[256];
+        std::snprintf(buf, sizeof(buf),
+                      "ok model=%s flow=%.2f size=%ux%u frames=%d init_ms=%lld first_ms=%.2f "
+                      "median_ms=%.2f p95_ms=%.2f max_ms=%.2f",
+                      api.name, static_cast<double>(flow), w, h, count,
+                      static_cast<long long>(elapsedMs(t0, t1)), first, median, p95, worst);
+        LOGI("nebula benchmark: %s", buf);
+        return buf;
+    } catch (const std::exception& e) {
+        unsetenv("DISABLE_LSFG"); // NOLINT(concurrency-mt-unsafe)
+        if (initialized) {
+            try { api.finalize(); } catch (...) {}
+        }
+        LOGE("nebula benchmark failed: %s", e.what());
+        return std::string("error=") + e.what();
+    }
 }
 
 } // namespace FramegenPipeline

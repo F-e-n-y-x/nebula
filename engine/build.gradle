@@ -75,6 +75,8 @@ dependencies {
     coreLibraryDesugaring libs.desugar.jdk.libs
 
     api project(':moonlight-haptics-android')
+    // V+'s in-decoder frame generation (Vulkan + LSFG); arm64 and API 29+ only, gated at runtime.
+    implementation project(':framegen')
     api libs.okhttp
     api libs.kotlinx.coroutines.android
     implementation libs.bouncycastle.prov
