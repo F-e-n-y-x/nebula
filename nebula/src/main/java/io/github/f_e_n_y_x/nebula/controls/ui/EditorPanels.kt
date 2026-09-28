@@ -572,6 +572,15 @@ internal fun ProfilesPanel(
             }
         }
 
+        val legacy = remember { io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx) }
+        var outside by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(legacy, current.id)) }
+        Field("Touch outside the controls", "What a finger on the picture does while these controls are shown. Nothing keeps stray touches from clicking or moving the PC's mouse.") {
+            Segmented(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.entries.map { it.label to it }, outside) { v ->
+                outside = v
+                io.github.f_e_n_y_x.nebula.controls.OutsideTouch.write(legacy, current.id, v)
+            }
+        }
+
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             if (!current.isBuiltIn) SmallAction("Rename", null, { renaming = true })
             SmallAction("Duplicate", Icons.Rounded.ContentCopy, {

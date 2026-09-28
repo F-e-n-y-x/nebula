@@ -122,6 +122,8 @@ private class InputState {
     var viewWidth = 1f
     var ui: StreamUiPrefs? = null
     var active = false
+    /** Set while the on-screen controls are shown: what touches outside them do (null = no controls). */
+    var outside: io.github.f_e_n_y_x.nebula.controls.OutsideTouch? = null
     var zoom: (Float, Float, Float) -> Unit = { _, _, _ -> }
     var pan: (Float, Float) -> Unit = { _, _ -> }
 }
@@ -426,8 +428,12 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                         }
                     }
                     val gestures = TouchGestures(
-                        out = { remoteInput.takeIf { input.active } },
-                        config = { input.ui?.touch ?: io.github.f_e_n_y_x.nebula.input.TouchConfig() },
+                        // With the on-screen controls up, the picture only reaches the PC if the profile says so.
+                        out = { remoteInput.takeIf { input.active && input.outside != io.github.f_e_n_y_x.nebula.controls.OutsideTouch.NOTHING } },
+                        config = {
+                            val c = input.ui?.touch ?: io.github.f_e_n_y_x.nebula.input.TouchConfig()
+                            if (input.outside == io.github.f_e_n_y_x.nebula.controls.OutsideTouch.DIRECT) c.copy(mode = TouchMode.TOUCH) else c
+                        },
                         video = { input.rect },
                         viewWidth = { input.viewWidth },
                         callbacks = callbacks,
@@ -456,6 +462,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
+        input.outside = if (oscShown || zonesShown) remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(prefs, controlsProfile.id) } else null
         if (oscShown || zonesShown) {
             OnScreenControls(remote, { pad }, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown })
         }

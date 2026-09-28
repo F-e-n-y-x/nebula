@@ -32,10 +32,10 @@ class ZonesTest {
     @Test
     fun cameraStickFollowsFingerSpeedAndRecentres() {
         val cam = CameraStick(sensitivity = 1f, acceleration = 1f, invertY = false)
-        // Slow drag right: small push. 90 dp/s is a tenth of full speed.
+        // Slow drag right: small push. 90 dp/s is 18 % of full speed.
         var p = cam.move(1.44f, 0f, 16)
         repeat(10) { p = cam.move(1.44f, 0f, 16) }
-        assertTrue(p.first in 0.08f..0.12f)
+        assertTrue(p.first in 0.16f..0.20f)
         // A flick saturates; dragging up gives positive (stick-up) y.
         repeat(10) { p = cam.move(0f, -40f, 16) }
         assertTrue(p.second > 0.98f && abs(p.first) < 0.02f)
@@ -56,13 +56,13 @@ class ZonesTest {
         var p = 0f to 0f
         repeat(10) { p = inv.move(0f, -40f, 16) }
         assertTrue(p.second < -0.98f)
-        // With acceleration 2, a quarter of full speed gives a sixteenth push instead of a quarter.
+        // With acceleration 2, 45 % of full speed gives about a fifth instead of 45 %.
         val lin = CameraStick(1f, 1f, false)
         val acc = CameraStick(1f, 2f, false)
         var a = 0f; var l = 0f
         repeat(12) { l = lin.move(3.6f, 0f, 16).first; a = acc.move(3.6f, 0f, 16).first }
-        assertTrue(abs(l - 0.25f) < 0.02f)
-        assertTrue(abs(a - 0.0625f) < 0.01f)
+        assertTrue(abs(l - 0.45f) < 0.02f)
+        assertTrue(abs(a - 0.2025f) < 0.01f)
         // Higher sensitivity reaches full push sooner.
         val fast = CameraStick(4f, 1f, false)
         var f = 0f
@@ -115,5 +115,24 @@ class ZonesTest {
         mixed = false
         input.setStick(Side.LEFT, 1f, 0f)
         assertEquals(listOf(0, 0, ControlsInput.AXIS_MAX, 0, 0, 0), log.sent.last())
+    }
+
+    @Test
+    fun swipeLookFollowsTheFingerFrameByFrameAndStopsWithIt() {
+        // 60 Hz: a 1 cm (63 dp) swipe over 8 frames, then the finger stays down without moving.
+        val cam = CameraStick(sensitivity = 1f, acceleration = 1f, invertY = false)
+        val rx = mutableListOf<Int>()
+        repeat(8) { rx += (cam.move(63f / 8, 0f, 16).first * 32766).toInt() }
+        var sinceMove = 0L
+        repeat(6) { sinceMove += CameraStick.TICK_MS; rx += (cam.idle(sinceMove).first * 32766).toInt() }
+        println("swipe-look RX per frame: $rx")
+        assertTrue("turns while the finger moves: $rx", rx.take(8).all { it > 20000 })
+        assertTrue("held about a frame, then decays: $rx", rx[8] > 20000 && rx[9] < rx[8])
+        assertEquals("stopped within four frames: $rx", 0, rx[12])
+        // Press and hold without moving: nothing.
+        val still = CameraStick(1f, 1f, false)
+        var t = 0L
+        repeat(10) { t += CameraStick.TICK_MS; assertEquals(0f, still.idle(t).first) }
+        assertEquals(0f to 0f, still.move(0f, 0f, 16))
     }
 }

@@ -139,9 +139,11 @@ fun StreamMenu(
                 .border(1.dp, NebulaColors.border, panelShape)
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                 .then(if (side) Modifier.statusBarsPadding() else Modifier)
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(s.dp(22)),
+                .navigationBarsPadding(),
+        ) {
+        // The menu scrolls; Disconnect and Quit stay pinned at the bottom, always reachable.
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = s.dp(22), end = s.dp(22), top = s.dp(22), bottom = s.dp(12)),
             verticalArrangement = Arrangement.spacedBy(s.dp(18)),
         ) {
             Header(gameName, mode, stats)
@@ -160,7 +162,11 @@ fun StreamMenu(
             Bitrate(bitrateKbps, bitrateNote, actions.onBitrate)
             Keys(actions.onShortcut)
             if (gamepads > 0) Text("$gamepads controller${if (gamepads > 1) "s" else ""} connected · Start + Select opens this menu", style = Nebula.type.label, color = NebulaColors.textMuted)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(NebulaColors.border))
+        Box(Modifier.fillMaxWidth().padding(horizontal = s.dp(22), vertical = s.dp(12))) {
             Footer(actions, onQuit = { confirmQuit = true }, quitLabel = if (ui.quitDisconnectsOnly) "Quit (disconnect)" else "Quit game")
+        }
         }
     }
     if (confirmQuit) {

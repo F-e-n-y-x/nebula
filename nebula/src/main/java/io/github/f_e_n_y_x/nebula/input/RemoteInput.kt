@@ -130,18 +130,33 @@ class LoggingInput : RemoteInput {
     }
     override fun virtualKey(vk: Int, down: Boolean, modifiers: Int) = log("vk 0x${vk.toString(16)} ${if (down) "down" else "up"} mods=$modifiers")
     override fun text(text: String) = log("text \"$text\"")
-    override fun move(dx: Int, dy: Int) = log("move $dx $dy")
-    override fun position(x: Int, y: Int, refW: Int, refH: Int) = log("position $x $y of ${refW}x$refH")
-    override fun button(button: MouseButton, down: Boolean) = log("button $button ${if (down) "down" else "up"}")
+    /** Mouse and touch events that reached the PC, for device tests. */
+    val pointerEvents = java.util.concurrent.atomic.AtomicInteger()
+
+    override fun move(dx: Int, dy: Int) { pointerEvents.incrementAndGet(); log("move $dx $dy") }
+    override fun position(x: Int, y: Int, refW: Int, refH: Int) { pointerEvents.incrementAndGet(); log("position $x $y of ${refW}x$refH") }
+    override fun button(button: MouseButton, down: Boolean) { pointerEvents.incrementAndGet(); log("button $button ${if (down) "down" else "up"}") }
     override fun scroll(amount: Int) = log("scroll $amount")
     override fun scrollHorizontal(amount: Int) = log("hscroll $amount")
     override fun touch(type: Byte, pointerId: Int, x: Float, y: Float): Boolean {
+        pointerEvents.incrementAndGet()
         log("touch type=$type id=$pointerId ${"%.3f".format(x)} ${"%.3f".format(y)}"); return true
     }
-    override fun gamepad(controller: Int, activeMask: Int, buttons: Int, lt: Int, rt: Int, lx: Int, ly: Int, rx: Int, ry: Int) =
+    /** Last gamepad state sent, for device tests: controller, buttons, lt, rt, lx, ly, rx, ry. */
+    @Volatile var lastPad: IntArray? = null
+        private set
+
+    /** Every controller number announced, in order, for device tests. */
+    val arrivals: MutableList<Int> = java.util.Collections.synchronizedList(mutableListOf())
+
+    override fun gamepad(controller: Int, activeMask: Int, buttons: Int, lt: Int, rt: Int, lx: Int, ly: Int, rx: Int, ry: Int) {
+        lastPad = intArrayOf(controller, buttons, lt, rt, lx, ly, rx, ry)
         log("pad $controller mask=$activeMask buttons=0x${buttons.toString(16)} lt=$lt rt=$rt l=$lx,$ly r=$rx,$ry")
-    override fun gamepadArrived(controller: Int, activeMask: Int, type: Byte, supportedButtons: Int, capabilities: Short) =
+    }
+    override fun gamepadArrived(controller: Int, activeMask: Int, type: Byte, supportedButtons: Int, capabilities: Short) {
+        arrivals += controller
         log("pad $controller arrived mask=$activeMask")
+    }
 
     companion object {
         const val TAG = "NebulaInput"

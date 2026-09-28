@@ -77,8 +77,8 @@ enum class ElementKind(val id: String, val label: String) {
 
 /** What a [ElementKind.ZONE] does with a finger. */
 enum class ZoneType(val id: String, val label: String, val help: String) {
-    CAMERA_STICK("camera_stick", "Camera → stick", "Drag to look: finger speed becomes stick deflection, back to centre when you stop or lift."),
-    CAMERA_MOUSE("camera_mouse", "Camera → mouse", "Drag to look with relative mouse movement."),
+    CAMERA_STICK("camera_stick", "Camera → stick", "Swipe to look: the camera turns with your finger and stops when it stops. Limited to the game's full-stick turn speed."),
+    CAMERA_MOUSE("camera_mouse", "Camera → mouse", "Swipe to look with the mouse: 1:1 like a PC mouse. Recommended for games that take mouse look together with a pad, such as GTA V on PC."),
     FLOATING_STICK("floating_stick", "Floating joystick", "A stick appears where your thumb lands; drag to push it."),
 }
 
@@ -185,6 +185,7 @@ data class ControlsProfile(
         const val BUILTIN_PREFIX = "builtin:"
         const val STANDARD_ID = "builtin:standard"
         const val GTA_ID = "builtin:gta-touch-camera"
+        const val GTA_MOUSE_ID = "builtin:gta-mouse-camera"
     }
 }
 

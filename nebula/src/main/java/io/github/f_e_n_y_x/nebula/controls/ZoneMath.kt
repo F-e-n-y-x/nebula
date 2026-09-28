@@ -7,13 +7,16 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
- * Camera zone → stick: finger *speed* becomes stick deflection (like a mouse driving a stick),
- * so a slow drag turns slowly and a flick turns fast. Deflection eases back to centre when the
- * finger stops, and is zero on release.
+ * Camera zone → stick as swipe-look, the mobile-shooter feel: the finger's movement in each frame
+ * becomes right-stick deflection for that frame, so the camera turns in proportion to the swipe
+ * and stops when the finger stops (held about one frame to bridge touch samples, then gone within
+ * two or three). A slow drag turns slowly and a flick turns fast; release is zero.
  *
- * [sensitivity] scales the speed that gives full deflection ([FULL_SPEED_DP_S] at 1×);
- * [acceleration] is the response-curve exponent (1 = linear). Output y is up-positive, like a
- * stick; [invertY] flips it.
+ * [sensitivity] scales the swipe speed that gives full deflection ([FULL_SPEED_DP_S] at 1×, about
+ * a 1 cm swipe in an eighth of a second); [acceleration] is the response-curve exponent (1 =
+ * linear). Output y is up-positive, like a stick; [invertY] flips it. A stick can only turn as
+ * fast as the game's full-stick speed; for 1:1 aiming use "Camera → mouse" where the game takes
+ * mouse look alongside a pad (GTA V on PC does).
  */
 class CameraStick(
     private val sensitivity: Float,
@@ -55,11 +58,11 @@ class CameraStick(
     fun release() { x = 0f; y = 0f }
 
     companion object {
-        const val FULL_SPEED_DP_S = 900f
-        const val SMOOTHING = 0.55f
+        const val FULL_SPEED_DP_S = 500f
+        const val SMOOTHING = 0.7f
         /** A pause shorter than this (between touch samples) keeps the deflection. */
-        const val HOLD_MS = 34L
-        const val DECAY = 0.45f
+        const val HOLD_MS = 20L
+        const val DECAY = 0.25f
         /** How often the zone checks for a stopped finger. */
         const val TICK_MS = 16L
     }

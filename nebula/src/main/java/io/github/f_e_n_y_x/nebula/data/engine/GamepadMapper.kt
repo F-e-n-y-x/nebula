@@ -86,6 +86,8 @@ class GamepadMapper(
     private val pads = LinkedHashMap<Int, Pad>()
     private val traits = HashMap<Int, ControllerTraits?>()
     private val layouts = HashMap<Int, GamepadAxes>()
+    /** Idle-negative trigger axes that have reported a real value, per device. */
+    private val triggersSeen = HashMap<Int, MutableSet<Int>>()
 
     /** Bitmask of every connected player slot, as the host expects. */
     private val activeMask: Int
@@ -139,7 +141,18 @@ class GamepadMapper(
         if (!fromStickDevice) return false
         val layout = layouts.getOrPut(deviceId) { axesOf(deviceId) }
         val pad = padFor(deviceId)
-        val v = layout.read(axis, config().deadzone)
+        // xpad-style triggers rest at -1, but Android reports 0.0 for an axis that hasn't sent an
+        // event yet, which reads as a half-pressed trigger. Like moonlight-android, a trigger
+        // counts as released until it has first moved away from 0.
+        val seen = triggersSeen.getOrPut(deviceId) { HashSet() }
+        val read: (Int) -> Float = if (!layout.triggersIdleNegative) axis else { a ->
+            val v = axis(a)
+            if (a == layout.leftTrigger || a == layout.rightTrigger) {
+                if (v != 0f) seen += a
+                if (a in seen) v else -1f
+            } else v
+        }
+        val v = layout.read(read, config().deadzone)
         pad.lx = v.lx; pad.ly = v.ly; pad.rx = v.rx; pad.ry = v.ry
         // Pads with digital L2/R2 keys have no trigger axes; leave what the keys set.
         if (layout.leftTrigger >= 0) pad.lt = v.lt
@@ -204,6 +217,7 @@ class GamepadMapper(
     fun onDeviceRemoved(deviceId: Int) {
         traits.remove(deviceId)
         layouts.remove(deviceId)
+        triggersSeen.remove(deviceId)
         val pad = pads.remove(deviceId) ?: return
         // A companion node going away doesn't unplug the pad it belongs to.
         if (pad in pads.values) {
@@ -219,6 +233,7 @@ class GamepadMapper(
     fun onDeviceChanged(deviceId: Int) {
         traits.remove(deviceId)
         layouts.remove(deviceId)
+        triggersSeen.remove(deviceId)
     }
 
     // ---- ControllerLookup (rumble, lights and motion find the physical pad here) ----

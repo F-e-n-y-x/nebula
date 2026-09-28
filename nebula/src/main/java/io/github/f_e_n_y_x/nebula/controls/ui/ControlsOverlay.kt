@@ -20,7 +20,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -88,6 +89,7 @@ private fun LiveElement(e: ControlElement, look: ElementLook, latched: State<Boo
     Box(
         Modifier
             .elementBounds(e, w, h)
+            .testTag("osc:${e.id}")
             .graphicsLayer { alpha = (opacity * e.opacity).coerceIn(0.05f, 1f) }
             .pointerInput(e) { handle(e, look, input) },
     ) {
@@ -167,7 +169,7 @@ private suspend fun PointerInputScope.handle(e: ControlElement, look: ElementLoo
                     ev.changes.forEach { it.consume() }
                     val c = ev.changes.firstOrNull { it.id == id } ?: break
                     if (!c.pressed) break
-                    travelled += c.positionChange().getDistance()
+                    travelled += c.positionChangeIgnoreConsumed().getDistance()
                     apply(c.position)
                 }
             } finally {
@@ -192,7 +194,7 @@ private suspend fun PointerInputScope.handle(e: ControlElement, look: ElementLoo
                     ev.changes.forEach { it.consume() }
                     val c = ev.changes.firstOrNull { it.id == id } ?: break
                     if (!c.pressed) break
-                    val d = c.positionChange()
+                    val d = c.positionChangeIgnoreConsumed()
                     travelled += d.getDistance()
                     input.touchpadMove(e, d.x, d.y)
                 }
@@ -251,7 +253,7 @@ private suspend fun PointerInputScope.handleZone(e: ControlElement, look: Elemen
                     val c = ev.changes.firstOrNull { it.id == id } ?: break
                     if (!c.pressed) break
                     now = c.uptimeMillis
-                    val d = c.positionChange()
+                    val d = c.positionChangeIgnoreConsumed()
                     if (d.x == 0f && d.y == 0f) continue
                     val (x, y) = cam.move(d.x / density, d.y / density, c.uptimeMillis - c.previousUptimeMillis)
                     lastMove = c.uptimeMillis
@@ -267,7 +269,7 @@ private suspend fun PointerInputScope.handleZone(e: ControlElement, look: Elemen
                     ev.changes.forEach { it.consume() }
                     val c = ev.changes.firstOrNull { it.id == id } ?: break
                     if (!c.pressed) break
-                    val d = c.positionChange()
+                    val d = c.positionChangeIgnoreConsumed()
                     look.origin.value = c.position
                     val (mx, my) = mouse.move(d.x, d.y, c.uptimeMillis - c.previousUptimeMillis, density)
                     input.mouseMove(mx, my)

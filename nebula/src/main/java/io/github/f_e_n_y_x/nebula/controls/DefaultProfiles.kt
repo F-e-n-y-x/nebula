@@ -129,8 +129,18 @@ object DefaultProfiles {
         )
     }
 
+    /** The same with "Camera → mouse": 1:1 mouse look, which GTA V on PC takes alongside a pad. */
+    fun gtaMouseCamera(): ControlsProfile {
+        val base = gtaTouchCamera()
+        fun mouse(l: List<ControlElement>) = l.map { it.copy(zone = ZoneType.CAMERA_MOUSE, sensitivity = 1f, acceleration = 1.2f) }
+        return base.copy(
+            id = ControlsProfile.GTA_MOUSE_ID, name = "GTA V: controller + mouse camera (right half)",
+            landscape = mouse(base.landscape), portrait = base.portrait?.let(::mouse),
+        )
+    }
+
     /** Ready-made profiles after Standard. */
-    fun presets(): List<ControlsProfile> = listOf(gtaTouchCamera())
+    fun presets(): List<ControlsProfile> = listOf(gtaTouchCamera(), gtaMouseCamera())
 
     fun landscape(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.LANDSCAPE, o)
     fun portrait(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.PORTRAIT, o)

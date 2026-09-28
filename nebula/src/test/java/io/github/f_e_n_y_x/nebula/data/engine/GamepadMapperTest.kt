@@ -360,4 +360,19 @@ class GamepadMapperTest {
         assertEquals(listOf(0, 0), out.arrivals)
         assertTrue(mapper.hasPhonePad)
     }
+
+    @Test
+    fun `an xpad trigger that has not reported yet is released, not half pressed`() {
+        pad(1, xpad)
+        // Android reports 0.0 for Z/RZ before their first event: not 50 %.
+        assertTrue(mapper.onMotion(1, true) { a -> if (a == MotionEvent.AXIS_X) 0.5f else 0f })
+        assertEquals(0, out.last.lt)
+        assertEquals(0, out.last.rt)
+        // Once RZ has moved it is read normally, 0.0 included.
+        mapper.onMotion(1, true) { a -> if (a == MotionEvent.AXIS_RZ) 1f else if (a == MotionEvent.AXIS_Z) -1f else 0f }
+        assertEquals(255, out.last.rt)
+        mapper.onMotion(1, true) { a -> if (a == MotionEvent.AXIS_RZ) 0f else if (a == MotionEvent.AXIS_Z) -1f else 0f }
+        assertTrue("half-pressed RT now reads as half: ${out.last.rt}", out.last.rt in 120..135)
+        assertEquals(0, out.last.lt)
+    }
 }
