@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -61,6 +62,8 @@ fun Modifier.nebulaClickable(
     focusScale: Float = 1f,
     role: Role = Role.Button,
     interaction: MutableInteractionSource = remember { MutableInteractionSource() },
+    /** Long press (touch) or a held Enter / D-pad centre (keyboard, TV remote). */
+    onLongClick: (() -> Unit)? = null,
 ): Modifier {
     val focused by interaction.collectIsFocusedAsState()
     val pressed by interaction.collectIsPressedAsState()
@@ -75,7 +78,10 @@ fun Modifier.nebulaClickable(
         .scale(s)
         .then(if (focused) Modifier.border(BorderStroke(2.dp, NebulaColors.focus), shape) else Modifier)
         .clip(shape)
-        .clickable(interactionSource = interaction, indication = null, role = role, onClick = onClick)
+        .then(
+            if (onLongClick == null) Modifier.clickable(interactionSource = interaction, indication = null, role = role, onClick = onClick)
+            else Modifier.combinedClickable(interactionSource = interaction, indication = null, role = role, onLongClick = onLongClick, onClick = onClick),
+        )
 }
 
 enum class ButtonStyle { Primary, Secondary, Ghost, Danger }
@@ -118,7 +124,7 @@ fun NebulaButton(
 }
 
 @Composable
-fun NebulaIconButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun NebulaIconButton(icon: ImageVector, contentDescription: String, onClick: () -> Unit, modifier: Modifier = Modifier, tint: Color = NebulaColors.text) {
     val s = Nebula.scale
     Box(
         modifier = modifier
@@ -127,7 +133,7 @@ fun NebulaIconButton(icon: ImageVector, contentDescription: String, onClick: () 
             .background(Color(0x66111113), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = NebulaColors.text, modifier = Modifier.size(s.dp(22)))
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(s.dp(22)))
     }
 }
 

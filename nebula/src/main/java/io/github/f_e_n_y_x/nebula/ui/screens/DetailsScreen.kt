@@ -95,6 +95,8 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
     val wake by hostVm.wake.collectAsStateWithLifecycle()
     val host by hostVm.host.collectAsStateWithLifecycle()
     var showCommands by remember { mutableStateOf(false) }
+    val favourite by vm.favourite.collectAsStateWithLifecycle()
+    val star: @Composable () -> Unit = { FavouriteButton(favourite, { vm.toggleFavourite() }) }
     HostActionToasts(hostVm)
     // A sleeping PC is woken first; the game launches once it answers.
     val play: (DisplayMode) -> Unit = { m -> vm.remember(m); hostVm.playWhenAwake { nav.push(Route.Stream(hostId, game.id, m)) } }
@@ -129,6 +131,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                             NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                            star()
                             MoreMenu(refresh, openCommands)
                         }
                         Spacer(Modifier.height(s.dp(8)))
@@ -141,6 +144,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                 } else Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                         NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                        star()
                         MoreMenu(refresh, openCommands)
                     }
                     Spacer(Modifier.height(s.dp(20)))
@@ -174,7 +178,10 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
-                        MoreMenu(refresh, openCommands)
+                        Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                            star()
+                            MoreMenu(refresh, openCommands)
+                        }
                     }
                     Column(Modifier.align(Alignment.BottomStart).padding(horizontal = s.dp(20))) { Header(ui) }
                 }
