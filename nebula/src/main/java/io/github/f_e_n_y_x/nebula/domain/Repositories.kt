@@ -1,5 +1,6 @@
 package io.github.f_e_n_y_x.nebula.domain
 
+import io.github.f_e_n_y_x.nebula.domain.model.ConnectionReport
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameDetails
@@ -48,6 +49,12 @@ interface HostRepository {
     suspend fun commands(hostId: String, gameId: String?): HostCommands = HostCommands.None
     /** Runs a host command; failure messages are ready to show. */
     suspend fun runCommand(hostId: String, commandId: String): Result<Unit> = Result.failure(UnsupportedOperationException("This PC has no commands."))
+    /**
+     * Measures RTT, jitter, loss and throughput to [hostId] and suggests settings. [onProgress]
+     * gets 0..1 during the download. Fails with [io.github.f_e_n_y_x.nebula.domain.model.ConnectionTestError].
+     */
+    suspend fun testConnection(hostId: String, onProgress: (Float) -> Unit = {}): Result<ConnectionReport> =
+        Result.failure(io.github.f_e_n_y_x.nebula.domain.model.ConnectionTestError("This PC can't test the connection."))
     /** Keep watching the network for hosts while the app is visible (onStart / onStop). */
     fun startWatching() {}
     fun stopWatching() {}
@@ -119,6 +126,9 @@ interface StreamRepository {
     suspend fun setDisplayScale(percent: Int): Boolean = false
     /** Changes the bitrate mid-stream; true once the PC accepted it. */
     suspend fun setBitrate(kbps: Int): Boolean = false
+    /** RTT and jitter measured again during the stream, with a suggestion from its recent loss. */
+    suspend fun testConnection(): Result<ConnectionReport> =
+        Result.failure(io.github.f_e_n_y_x.nebula.domain.model.ConnectionTestError("Nothing is streaming."))
     /** Input for the running stream, or null when nothing is connected. */
     val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput? get() = null
     /**

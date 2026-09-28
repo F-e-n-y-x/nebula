@@ -29,6 +29,15 @@ import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
 import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
+import io.github.f_e_n_y_x.nebula.domain.model.AbrInfo
+import io.github.f_e_n_y_x.nebula.domain.model.AbrSource
+import io.github.f_e_n_y_x.nebula.domain.model.ConnectionReport
+import io.github.f_e_n_y_x.nebula.data.engine.toDomain
+import io.github.fenyx.nebula.engine.AbrMode
+import io.github.fenyx.nebula.engine.AbrSettings
+import io.github.fenyx.nebula.engine.ConnectionAdvisor
+import io.github.fenyx.nebula.engine.DisplaySpec
+import com.limelight.nvstream.http.AdaptiveBitrateService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -126,6 +135,18 @@ class DemoHost(private val context: Context) {
         override fun pairingAs() = PairingAs(PairingName.display(PairingName.APP, demoDevice), demoDevice)
         override fun setPairingDeviceName(name: String) {
             demoDevice = PairingName.clean(name).ifEmpty { "Ayush's S25 Ultra" }
+        }
+        /** A made-up but plausible Wi-Fi 6 result, with the same suggestion rules as a real test. */
+        override suspend fun testConnection(hostId: String, onProgress: (Float) -> Unit): Result<ConnectionReport> {
+            delay(400)
+            for (i in 1..10) {
+                onProgress(i / 10f)
+                delay(120)
+            }
+            val (w, h) = io.github.f_e_n_y_x.nebula.ui.screens.deviceResolution(context)
+            return Result.success(
+                ConnectionAdvisor.result(6.4, 1.1, 0.2, 182.0, null, DisplaySpec(w, h, io.github.f_e_n_y_x.nebula.ui.screens.deviceMaxFps(context)), duringStream = false).toDomain(),
+            )
         }
         override suspend fun wake(hostId: String): Result<Unit> {
             // A sleeping demo PC "boots" a few seconds after the first magic packet.
@@ -228,6 +249,15 @@ class DemoHost(private val context: Context) {
     val streamRepository = object : StreamRepository {
         private val demoMode = MutableStateFlow<VideoMode?>(null)
         private val paused = MutableStateFlow(false)
+        private val bitrateKbps = MutableStateFlow(0)
+
+        /** Adaptive bitrate as the demo PC would report it: the host steers, with the saved mode. */
+        private fun demoAbr(): AbrInfo? {
+            val a = AbrSettings.read(io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(context).prefs)
+            if (a.mode == AbrMode.OFF) return null
+            val (lo, hi) = AdaptiveBitrateService.resolveRange(a.mode.wire!!, bitrateKbps.value, a.minKbps, a.maxKbps)
+            return AbrInfo(a.mode.name.lowercase().replaceFirstChar { it.uppercase() }, AbrSource.HOST, lo, hi, "stable, probe")
+        }
 
         override val link: Flow<StreamLink> = this@DemoHost.link
         override fun setMicLive(on: Boolean): Boolean {
@@ -248,6 +278,7 @@ class DemoHost(private val context: Context) {
             demoMode.value = VideoMode(r.width.takeIf { it > 0 } ?: 2340, r.height.takeIf { it > 0 } ?: 1080, settings.fps)
             paused.value = false
             this@DemoHost.link.value = StreamLink(micEnabled = true)
+            bitrateKbps.value = settings.bitrateKbps
             delay(1_200)
             this@DemoHost.link.value = StreamLink(micEnabled = true, micSupported = true, clipboard = ClipboardMode.SYNCING)
             var t = 0
@@ -262,6 +293,7 @@ class DemoHost(private val context: Context) {
                                 hostFps = m.fps.toFloat(), onePercentLowFps = m.fps * 0.9f - (t % 4), jitterMs = 0.4f + (t % 3) * 0.3f, lossPercent = 0.1f * (t % 2),
                                 hostMs = 1.8f, networkMs = 2.1f + (t % 3) * 0.3f, decodeMs = 1.2f, renderMs = 0.5f, decoder = "c2.android.hevc.decoder",
                                 post = demoPost(t),
+                                targetBitrateKbps = bitrateKbps.value, abr = demoAbr(),
                             ),
                         ),
                     )
@@ -321,12 +353,20 @@ class DemoHost(private val context: Context) {
         override suspend fun setBitrate(kbps: Int): Boolean {
             delay(300)
             android.util.Log.i(io.github.f_e_n_y_x.nebula.input.LoggingInput.TAG, "bitrate $kbps")
+            bitrateKbps.value = kbps
             return true
         }
         override suspend fun setDisplayScale(percent: Int): Boolean {
             delay(300)
             android.util.Log.i(io.github.f_e_n_y_x.nebula.input.LoggingInput.TAG, "display scale $percent%")
             return true
+        }
+
+        override suspend fun testConnection(): Result<ConnectionReport> {
+            delay(700)
+            val (w, h) = io.github.f_e_n_y_x.nebula.ui.screens.deviceResolution(context)
+            val display = DisplaySpec(w, h, io.github.f_e_n_y_x.nebula.ui.screens.deviceMaxFps(context))
+            return Result.success(ConnectionAdvisor.result(7.1, 1.6, 0.1, null, bitrateKbps.value, display, duringStream = true).toDomain())
         }
     }
 

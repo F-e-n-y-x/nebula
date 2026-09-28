@@ -87,6 +87,7 @@ import io.github.fenyx.nebula.engine.PairingName
 import io.github.f_e_n_y_x.nebula.ui.Route
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
+import androidx.compose.material.icons.outlined.NetworkCheck
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaIconButton
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaStar
 import io.github.f_e_n_y_x.nebula.ui.components.Pill
@@ -135,10 +136,20 @@ fun HostsScreen(container: AppContainer, nav: Navigator) {
     val hosts by vm.hosts.collectAsStateWithLifecycle()
     val searching by vm.searching.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val test by vm.connectionTest.collectAsStateWithLifecycle()
     val s = Nebula.scale
     val t = Nebula.type
     val form = Nebula.form
     var adding by remember { mutableStateOf(false) }
+    test?.let { (hostId, state) ->
+        ConnectionTestDialog(
+            hostName = hosts.firstOrNull { it.id == hostId }?.name ?: "PC",
+            state = state,
+            onRetry = { vm.testConnection(hostId) },
+            onUse = vm::useSuggestion,
+            onDismiss = vm::closeConnectionTest,
+        )
+    }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(s.dp(340)),
         modifier = Modifier.fillMaxSize().background(NebulaColors.bg),
@@ -194,6 +205,7 @@ fun HostsScreen(container: AppContainer, nav: Navigator) {
                         else -> { vm.select(h.id); nav.top(Route.Library(h.id)) }
                     }
                 },
+                onTest = { vm.testConnection(h.id) }.takeIf { h.paired && h.status != HostStatus.OFFLINE },
             )
             when (menuFor) {
                 "sleep" -> SleepConfirmDialog(h.name, streaming = false, onConfirm = { menuFor = null; actions.sleep() }, onDismiss = { menuFor = null })

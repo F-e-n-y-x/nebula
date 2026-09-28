@@ -122,7 +122,9 @@ class NvHTTP(
         val bandwidthMbps: Double,
         val responseLatencyMs: Double,
         val responseJitterMs: Double,
-        val receivedBytes: Long
+        val receivedBytes: Long,
+        /** Nonce of the throughput sample; Nova reports host-side loss for it (see [getNetworkProbeResult]). */
+        val nonce: String = ""
     )
 
     class NetworkProbeException(
@@ -1087,34 +1089,56 @@ class NvHTTP(
             bandwidthMbps = receivedBytes * 8.0 / bodyDurationSeconds / 1_000_000.0,
             responseLatencyMs = averageLatency,
             responseJitterMs = averageJitter,
-            receivedBytes = receivedBytes
+            receivedBytes = receivedBytes,
+            nonce = nonce
         )
+    }
+
+    /**
+     * Nova extension: the host's view of a finished throughput sample (TCP retransmissions as
+     * `lossPct`). Returns the JSON body, or null when the host doesn't offer it (404, older hosts
+     * and Foundation) or the result isn't ready yet.
+     */
+    fun getNetworkProbeResult(nonce: String): String? = try {
+        val url = getHttpsUrl(true).newBuilder()
+            .addPathSegments("api/network/probe/result")
+            .addQueryParameter("nonce", nonce)
+            .build()
+        httpClientLongConnectTimeout.newCall(Request.Builder().url(url).get().build())
+            .execute()
+            .use { if (it.isSuccessful) it.body.string() else null }
+    } catch (e: IOException) {
+        null
+    }
+
+    /**
+     * Times [samples] small HTTPS requests to the host (the network-probe capability endpoint, which
+     * hosts answer even while streaming) and returns each round trip in milliseconds. A request
+     * the host rejects (404 on hosts without the probe) still counts: it measured a round trip.
+     * The first sample includes connection setup; callers usually drop it.
+     */
+    @Throws(IOException::class)
+    fun measureResponseLatency(samples: Int): List<Double> {
+        val client = httpClientLongConnectTimeout.newBuilder()
+            .connectionPool(ConnectionPool(1, 5, TimeUnit.SECONDS))
+            .readTimeout(5, TimeUnit.SECONDS)
+            .build()
+        val url = getHttpsUrl(true).newBuilder().addPathSegments("api/network/capabilities").build()
+        val out = ArrayList<Double>(samples)
+        repeat(samples) {
+            if (Thread.currentThread().isInterrupted) throw InterruptedException()
+            val startedAt = System.nanoTime()
+            client.newCall(Request.Builder().url(url).get().build()).execute().use { it.body.bytes() }
+            out += (System.nanoTime() - startedAt) / 1_000_000.0
+        }
+        return out
     }
 
     fun cancelNetworkProbe() {
         activeNetworkProbeCall.getAndSet(null)?.cancel()
     }
 
-    fun parseNetworkProbeCapabilities(body: String): NetworkProbeCapabilities {
-        try {
-            val root = JSONObject(body)
-            val probe = root.getJSONObject("bandwidthProbe")
-            if (root.optInt("version", 0) < 1 || probe.optInt("version", 0) < 1) {
-                throw NetworkProbeException("unsupported_version")
-            }
-            val endpoint = probe.getString("endpoint")
-            val minBytes = probe.getLong("minBytes")
-            val maxBytes = probe.getLong("maxBytes")
-            if (endpoint != "/api/network/probe" || minBytes <= 0 || maxBytes < minBytes) {
-                throw NetworkProbeException("invalid_capabilities")
-            }
-            return NetworkProbeCapabilities(endpoint, minBytes, maxBytes)
-        } catch (e: NetworkProbeException) {
-            throw e
-        } catch (e: Exception) {
-            throw NetworkProbeException("invalid_capabilities", cause = e)
-        }
-    }
+    fun parseNetworkProbeCapabilities(body: String): NetworkProbeCapabilities = parseProbeCapabilities(body)
 
     private fun parseNetworkProbeError(statusCode: Int, body: String): NetworkProbeException {
         val json = runCatching { JSONObject(body) }.getOrNull()
@@ -1248,6 +1272,29 @@ class NvHTTP(
     }
 
     companion object {
+        /** Parses and validates Foundation's `GET /api/network/capabilities` body (as the V+ probe expects it). */
+        @JvmStatic
+        fun parseProbeCapabilities(body: String): NetworkProbeCapabilities {
+            try {
+                val root = JSONObject(body)
+                val probe = root.getJSONObject("bandwidthProbe")
+                if (root.optInt("version", 0) < 1 || probe.optInt("version", 0) < 1) {
+                    throw NetworkProbeException("unsupported_version")
+                }
+                val endpoint = probe.getString("endpoint")
+                val minBytes = probe.getLong("minBytes")
+                val maxBytes = probe.getLong("maxBytes")
+                if (endpoint != "/api/network/probe" || minBytes <= 0 || maxBytes < minBytes) {
+                    throw NetworkProbeException("invalid_capabilities")
+                }
+                return NetworkProbeCapabilities(endpoint, minBytes, maxBytes)
+            } catch (e: NetworkProbeException) {
+                throw e
+            } catch (e: Exception) {
+                throw NetworkProbeException("invalid_capabilities", cause = e)
+            }
+        }
+
         const val DEFAULT_HTTPS_PORT = 47984
         const val DEFAULT_HTTP_PORT = 47989
         const val SHORT_CONNECTION_TIMEOUT = 3000

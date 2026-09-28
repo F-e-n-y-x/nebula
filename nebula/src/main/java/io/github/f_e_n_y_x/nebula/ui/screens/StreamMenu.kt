@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PowerSettingsNew
@@ -87,6 +88,8 @@ class StreamMenuActions(
     val onPortraitFollow: (Boolean) -> Unit = {},
     /** The layout set's next layout (the Layout quick toggle). */
     val onNextLayout: () -> Unit = {},
+    /** Re-measures RTT and jitter to the PC during the stream. */
+    val onTestConnection: () -> Unit = {},
 )
 
 /**
@@ -125,6 +128,7 @@ fun StreamMenu(
     portraitFollow: Boolean? = null,
     /** The layout on screen when the game's controls are a layout set, else null. */
     setLayout: String? = null,
+    connectionTest: ConnectionTestUi = ConnectionTestUi.Idle,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -204,7 +208,7 @@ fun StreamMenu(
             if (unsupported.isNotEmpty()) {
                 Text("This game asked for: ${unsupported.joinToString()}.", style = Nebula.type.label, color = NebulaColors.textMuted)
             }
-            Bitrate(bitrateKbps, bitrateNote, actions.onBitrate)
+            Bitrate(bitrateKbps, bitrateNote, stats, connectionTest, actions)
             Keys(actions.onShortcut)
             if (gamepads > 0) Text("$gamepads controller${if (gamepads > 1) "s" else ""} connected · Start + Select opens this menu", style = Nebula.type.label, color = NebulaColors.textMuted)
         }
@@ -391,16 +395,34 @@ private fun MenuSetting(title: String, control: @Composable () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Bitrate(kbps: Int, note: String?, onChange: (Int) -> Unit) {
+private fun Bitrate(kbps: Int, note: String?, stats: StreamStats?, test: ConnectionTestUi, actions: StreamMenuActions) {
     val s = Nebula.scale
-    Column(verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
+    val abr = stats?.abr
+    Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
         SectionTitle("Bitrate", Modifier.padding(bottom = 0.dp))
         SliderField(
             label = "Bitrate", value = (kbps.coerceAtLeast(1000)) / 1000f, range = 1f..150f, step = 1f, unit = "Mbps",
-            onValueChange = { onChange((it * 1000).toInt()) },
+            onValueChange = { actions.onBitrate((it * 1000).toInt()) },
         )
-        Text(note ?: "Changes apply live; tap the value to type one.", style = Nebula.type.label, color = NebulaColors.textMuted)
+        Text(
+            note ?: if (abr != null) "Changes apply live and become adaptive bitrate's new starting point." else "Changes apply live; tap the value to type one.",
+            style = Nebula.type.label, color = NebulaColors.textMuted,
+        )
+        abr?.let { Text(ConnectionText.abrDetail(it), style = Nebula.type.label, color = NebulaColors.textSecondary) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            NebulaButton(
+                if (test is ConnectionTestUi.Running) "Testing…" else "Test connection",
+                onClick = actions.onTestConnection, style = ButtonStyle.Secondary, icon = Icons.Outlined.NetworkCheck,
+            )
+            val suggestion = (test as? ConnectionTestUi.Done)?.report?.suggestion
+            if (suggestion != null && suggestion.bitrateKbps != kbps) {
+                NebulaButton("Use ${ConnectionText.formatMbps(suggestion.bitrateKbps)}", onClick = { actions.onBitrate(suggestion.bitrateKbps) }, style = ButtonStyle.Secondary)
+            }
+        }
+        ConnectionTestProgress(test)
+        if (test is ConnectionTestUi.Done) ConnectionReportCard(test.report)
     }
 }
 

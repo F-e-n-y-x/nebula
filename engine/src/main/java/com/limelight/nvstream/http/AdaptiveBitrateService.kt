@@ -48,12 +48,15 @@ class AdaptiveBitrateService(
     private var mode: String = MODE_BALANCED
     private var minBitrate: Int = 3000
     private var maxBitrate: Int = 100_000
+    private var requestedMin: Int = 0
+    private var requestedMax: Int = 0
+
+    /** Reason of the last change ("server", "loss=6.0% emergency", …), null before the first. */
+    @Volatile var lastReason: String? = null
+        private set
 
     // 本地 fallback 控制器状态
-    private var stableSeconds = 0
-    private var lossStreak = 0
-    private var lastAdjustWallClock = 0L
-    private var lastDirection = DIR_NONE
+    private var local = LocalAbrController(MODE_BALANCED, minBitrate, maxBitrate)
 
     // 服务端启用重试
     private var serverEnableRetries = 0
@@ -63,12 +66,18 @@ class AdaptiveBitrateService(
      * 启动 ABR。会在后台线程探测服务端能力。
      * @param initialBitrate 当前码率（kbps），ABR 围绕此值上下浮动
      */
-    fun start(initialBitrate: Int, mode: String) {
+    fun start(initialBitrate: Int, mode: String, minBitrateOverride: Int = 0, maxBitrateOverride: Int = 0) {
         if (enabled) return
         this.initialBitrate = initialBitrate
         this.currentBitrate = initialBitrate
         this.mode = mode
-        applyModePreset(mode)
+        val range = resolveRange(mode, initialBitrate, minBitrateOverride, maxBitrateOverride)
+        minBitrate = range.first
+        maxBitrate = range.second
+        // The server applies its own preset for bounds sent as 0; send what the user chose.
+        requestedMin = minBitrateOverride.coerceAtLeast(0)
+        requestedMax = maxBitrateOverride.coerceAtLeast(0)
+        local = LocalAbrController(mode, minBitrate, maxBitrate)
         resetState()
         enabled = true
 
@@ -101,9 +110,7 @@ class AdaptiveBitrateService(
     fun notifyManualOverride(kbps: Int) {
         if (!enabled) return
         currentBitrate = kbps
-        stableSeconds = 0
-        lossStreak = 0
-        lastAdjustWallClock = System.currentTimeMillis()
+        local.reset(System.currentTimeMillis())
         LimeLog.info("[ABR] 手动覆盖码率 -> ${kbps}kbps")
     }
 
@@ -130,43 +137,27 @@ class AdaptiveBitrateService(
         executor.shutdown()
     }
 
-    /** 用于性能面板显示当前 ABR 状态。*/
-    fun getStatusText(): String {
-        if (!enabled) return ""
-        val sub = when {
+    /** Who decides right now: "server", "connecting" (enabling on the host) or "local". */
+    val source: String
+        get() = when {
             serverSupported && serverEnableRetries == 0 -> "server"
             serverSupported && serverEnableRetries > 0 -> "connecting"
             else -> "local"
         }
-        return "ABR:$sub ${currentBitrate / 1000}M"
+
+    /** 用于性能面板显示当前 ABR 状态。*/
+    fun getStatusText(): String {
+        if (!enabled) return ""
+        return "ABR:$source ${currentBitrate / 1000}M"
     }
 
     // -----------------------------------------------------------------------
     // 内部
     // -----------------------------------------------------------------------
 
-    private fun applyModePreset(mode: String) {
-        when (mode) {
-            MODE_QUALITY -> {
-                minBitrate = maxOf(5000, (initialBitrate * 0.5).toInt())
-                maxBitrate = minOf(150_000, (initialBitrate * 1.5).toInt())
-            }
-            MODE_LOW_LATENCY -> {
-                minBitrate = 2000
-                maxBitrate = (initialBitrate * 1.2).toInt()
-            }
-            else -> {
-                minBitrate = maxOf(3000, (initialBitrate * 0.3).toInt())
-                maxBitrate = minOf(150_000, initialBitrate * 2)
-            }
-        }
-    }
-
     private fun resetState() {
-        stableSeconds = 0
-        lossStreak = 0
-        lastAdjustWallClock = 0L
-        lastDirection = DIR_NONE
+        local.reset(0L)
+        lastReason = null
         serverEnableRetries = 0
         serverRetryTickCounter = 0
     }
@@ -179,7 +170,7 @@ class AdaptiveBitrateService(
         if (serverSupported && serverEnableRetries > 0) {
             if (++serverRetryTickCounter >= SERVER_RETRY_INTERVAL_TICKS) {
                 serverRetryTickCounter = 0
-                val ok = http.setAbrMode(AbrConfig(true, minBitrate, maxBitrate, mode))
+                val ok = http.setAbrMode(AbrConfig(true, requestedMin, requestedMax, mode))
                 if (ok) {
                     LimeLog.info("[ABR] 服务端 ABR 启用成功（第 $serverEnableRetries 次）")
                     serverEnableRetries = 0
@@ -219,6 +210,7 @@ class AdaptiveBitrateService(
         return try {
             if (http.setBitrate(kbps)) {
                 currentBitrate = kbps
+                lastReason = reason
                 LimeLog.info("[ABR][$source] ${from}kbps -> ${kbps}kbps ($reason)")
                 onBitrateChanged(kbps, reason)
                 try { bitrateListener?.invoke(kbps, reason) } catch (_: Exception) {}
@@ -232,55 +224,9 @@ class AdaptiveBitrateService(
 
     private fun tickLocal(stats: AbrStats) {
         val now = System.currentTimeMillis()
-        val cooldown = if (mode == MODE_LOW_LATENCY) 1500 else 2000
-        if (now - lastAdjustWallClock < cooldown) return
-
-        var newBitrate = currentBitrate.toDouble()
-        var reason = ""
-
-        when {
-            stats.packetLoss > 5f -> {
-                newBitrate = currentBitrate * 0.7
-                reason = "loss=%.1f%% emergency".format(stats.packetLoss)
-                stableSeconds = 0
-                lossStreak++
-            }
-            stats.packetLoss > 2f -> {
-                lossStreak++
-                if (lossStreak >= 2) {
-                    newBitrate = currentBitrate * 0.9
-                    reason = "loss=%.1f%% sustained".format(stats.packetLoss)
-                    stableSeconds = 0
-                }
-            }
-            stats.packetLoss > 0.5f -> {
-                lossStreak++
-                stableSeconds = 0
-                if (lossStreak >= 4) {
-                    newBitrate = currentBitrate * 0.95
-                    reason = "loss=%.1f%% mild".format(stats.packetLoss)
-                }
-            }
-            else -> {
-                lossStreak = 0
-                stableSeconds++
-                val probeThreshold = if (mode == MODE_QUALITY) 3 else 5
-                if (stableSeconds >= probeThreshold && currentBitrate < maxBitrate) {
-                    val step = if (lastDirection == DIR_DOWN) 1.02 else 1.05
-                    newBitrate = currentBitrate * step
-                    reason = "stable ${stableSeconds}s probe"
-                    stableSeconds = 0
-                }
-            }
-        }
-
-        val target = newBitrate.toInt().coerceIn(minBitrate, maxBitrate)
-        if (target != currentBitrate) {
-            val direction = if (target > currentBitrate) DIR_UP else DIR_DOWN
-            if (applyBitrateInternal(target, reason, source = "local")) {
-                lastDirection = direction
-                lastAdjustWallClock = now
-            }
+        val step = local.tick(stats, currentBitrate, now) ?: return
+        if (applyBitrateInternal(step.bitrateKbps, step.reason, source = "local")) {
+            local.applied(step, now)
         }
     }
 
@@ -293,8 +239,95 @@ class AdaptiveBitrateService(
         private const val SERVER_RETRY_INTERVAL_TICKS = 5
         private const val MAX_SERVER_ENABLE_RETRIES = 10
 
-        private const val DIR_NONE = 0
-        private const val DIR_UP = 1
-        private const val DIR_DOWN = -1
+        /**
+         * The range ABR moves in: the mode preset (Foundation's numbers) with any bound the user set
+         * (above 0) taking its place. Never inverted.
+         */
+        @JvmStatic
+        fun resolveRange(mode: String, initialBitrate: Int, minOverride: Int, maxOverride: Int): Pair<Int, Int> {
+            val initial = initialBitrate.coerceAtLeast(500)
+            val (presetMin, presetMax) = when (mode) {
+                MODE_QUALITY -> maxOf(5000, (initial * 0.5).toInt()) to minOf(150_000, (initial * 1.5).toInt())
+                MODE_LOW_LATENCY -> 2000 to (initial * 1.2).toInt()
+                else -> maxOf(3000, (initial * 0.3).toInt()) to minOf(150_000, initial * 2)
+            }
+            val hi = (if (maxOverride > 0) maxOverride else presetMax).coerceAtLeast(500)
+            val lo = (if (minOverride > 0) minOverride else presetMin).coerceIn(500, hi)
+            return lo to hi
+        }
+    }
+}
+
+/**
+ * The client-side fallback used when the host has no ABR: steps down on packet loss (at once above
+ * 5 %, after 2 reports above 2 %, after 4 above 0.5 %) and probes up after a run of clean reports,
+ * more gently right after a drop. Pure; the caller supplies the clock.
+ */
+class LocalAbrController(private val mode: String, private val minBitrate: Int, private val maxBitrate: Int) {
+    /** A step the controller wants; call [applied] once the host accepted it. */
+    data class Step(val bitrateKbps: Int, val reason: String, internal val up: Boolean)
+
+    private var stableSeconds = 0
+    private var lossStreak = 0
+    private var lastAdjust = 0L
+    private var lastUp: Boolean? = null
+
+    /** Forget the stable and loss runs (manual change or restart); [now] counts as the last change. */
+    fun reset(now: Long) {
+        stableSeconds = 0
+        lossStreak = 0
+        lastAdjust = now
+    }
+
+    /** One report per second. Returns the step to take, or null to hold. */
+    fun tick(stats: AdaptiveBitrateService.AbrStats, current: Int, now: Long): Step? {
+        val cooldown = if (mode == AdaptiveBitrateService.MODE_LOW_LATENCY) 1500 else 2000
+        if (now - lastAdjust < cooldown) return null
+
+        var target = current.toDouble()
+        var reason = ""
+        val loss = stats.packetLoss.takeIf { it.isFinite() } ?: 0f
+        when {
+            loss > 5f -> {
+                target = current * 0.7
+                reason = "loss=%.1f%% emergency".format(loss)
+                stableSeconds = 0
+                lossStreak++
+            }
+            loss > 2f -> {
+                lossStreak++
+                if (lossStreak >= 2) {
+                    target = current * 0.9
+                    reason = "loss=%.1f%% sustained".format(loss)
+                    stableSeconds = 0
+                }
+            }
+            loss > 0.5f -> {
+                lossStreak++
+                stableSeconds = 0
+                if (lossStreak >= 4) {
+                    target = current * 0.95
+                    reason = "loss=%.1f%% mild".format(loss)
+                }
+            }
+            else -> {
+                lossStreak = 0
+                stableSeconds++
+                val probeThreshold = if (mode == AdaptiveBitrateService.MODE_QUALITY) 3 else 5
+                if (stableSeconds >= probeThreshold && current < maxBitrate) {
+                    target = current * if (lastUp == false) 1.02 else 1.05
+                    reason = "stable ${stableSeconds}s probe"
+                    stableSeconds = 0
+                }
+            }
+        }
+        val next = target.toInt().coerceIn(minBitrate, maxBitrate)
+        return if (next != current) Step(next, reason, next > current) else null
+    }
+
+    /** The host accepted [step] at [now]. */
+    fun applied(step: Step, now: Long) {
+        lastUp = step.up
+        lastAdjust = now
     }
 }

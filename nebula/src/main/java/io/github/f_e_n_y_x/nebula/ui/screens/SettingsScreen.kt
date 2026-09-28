@@ -1,5 +1,7 @@
 package io.github.f_e_n_y_x.nebula.ui.screens
 
+import io.github.fenyx.nebula.engine.AbrMode
+import io.github.fenyx.nebula.engine.AbrSettings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.alpha
@@ -494,6 +496,7 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
                 onValueChange = { v -> update { it.copy(bitrateKbps = (v * 1000).roundToInt()) } },
             )
         }
+        AdaptiveBitrateSetting(st.bitrateKbps)
         Setting("Video codec", "Auto picks HEVC when both sides support it.") {
             Segmented(listOf("Auto" to VideoCodec.AUTO, "HEVC" to VideoCodec.HEVC, "H.264" to VideoCodec.H264, "AV1" to VideoCodec.AV1), st.codec) { c -> update { it.copy(codec = c) } }
         }
@@ -511,6 +514,52 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
 }
 
 private val CUSTOM_SENTINEL = Resolution(-1, -1)
+
+/**
+ * Adaptive bitrate: mode and optional bounds, stored in V+'s keys (mode) and Nebula's (bounds) so
+ * the engine and V+ agree. Bounds of 0 mean "the mode's own range around the bitrate above".
+ */
+@Composable
+private fun AdaptiveBitrateSetting(bitrateKbps: Int) {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val prefs = remember { LegacyPrefs(ctx) }
+    var abr by remember { mutableStateOf(AbrSettings.read(prefs.prefs)) }
+    fun save(next: AbrSettings) {
+        abr = next.normalized()
+        abr.write(prefs.prefs.edit()).apply()
+    }
+    Setting("Adaptive bitrate", abrHelp(abr.mode)) {
+        Column(verticalArrangement = Arrangement.spacedBy(s.dp(12))) {
+            Segmented(
+                listOf("Off" to AbrMode.OFF, "Conservative" to AbrMode.CONSERVATIVE, "Balanced" to AbrMode.BALANCED, "Aggressive" to AbrMode.AGGRESSIVE),
+                abr.mode,
+            ) { m -> save(abr.copy(mode = m)) }
+            if (abr.mode != AbrMode.OFF) {
+                val (autoMin, autoMax) = com.limelight.nvstream.http.AdaptiveBitrateService.resolveRange(abr.mode.wire!!, bitrateKbps, 0, 0)
+                SliderField(
+                    label = "Lowest bitrate", value = abr.minKbps / 1000f, range = 0f..150f, step = 1f, unit = "Mbps",
+                    onValueChange = { v -> save(abr.copy(minKbps = (v * 1000).roundToInt())) },
+                )
+                SliderField(
+                    label = "Highest bitrate", value = abr.maxKbps / 1000f, range = 0f..150f, step = 1f, unit = "Mbps",
+                    onValueChange = { v -> save(abr.copy(maxKbps = (v * 1000).roundToInt())) },
+                )
+                Text(
+                    "0 = automatic (${autoMin / 1000}–${autoMax / 1000} Mbps for this mode at ${bitrateKbps / 1000} Mbps). Your PC's own maximum always applies.",
+                    style = Nebula.type.label, color = NebulaColors.textMuted,
+                )
+            }
+        }
+    }
+}
+
+private fun abrHelp(mode: AbrMode) = when (mode) {
+    AbrMode.OFF -> "The stream keeps the bitrate above. Turn this on for Wi-Fi or Tailscale."
+    AbrMode.CONSERVATIVE -> "Drops quickly when packets are lost and climbs back slowly: steady and low latency."
+    AbrMode.BALANCED -> "Drops on sustained loss and climbs after a few clean seconds."
+    AbrMode.AGGRESSIVE -> "Climbs quickly toward the highest bitrate: the sharpest picture on a good link."
+}
 
 @Composable
 internal fun Setting(title: String, help: String, control: @Composable () -> Unit) {

@@ -200,6 +200,10 @@ data class StreamStats(
     val hdr: Boolean = false,
     /** Frame generation and upscaling; null when the stream doesn't report them (demo, V+). */
     val post: PostProcessStats? = null,
+    /** Bitrate the PC encodes at now (start value, then menu and adaptive changes), kbps; 0 = unknown. */
+    val targetBitrateKbps: Int = 0,
+    /** Null while adaptive bitrate is off. */
+    val abr: AbrInfo? = null,
 )
 
 /** Clipboard sync for the running stream. */
@@ -227,3 +231,39 @@ data class StreamLink(
     val micWantedAtStart: Boolean = false,
     val clipboard: ClipboardMode = ClipboardMode.OFF,
 )
+
+/** Adaptive bitrate on a running stream. */
+data class AbrInfo(
+    /** "Conservative", "Balanced" or "Aggressive". */
+    val mode: String,
+    /** Who decides: the PC (Nova / Foundation), this device, or still asking the PC. */
+    val source: AbrSource,
+    val minKbps: Int,
+    val maxKbps: Int,
+    val lastReason: String? = null,
+)
+
+enum class AbrSource { HOST, LOCAL, CONNECTING }
+
+/** How good the link to the PC looks for streaming. */
+enum class LinkQuality { EXCELLENT, GOOD, FAIR, POOR }
+
+/** Settings a connection test suggests for this device. */
+data class SuggestedSettings(val mode: VideoMode, val bitrateKbps: Int, val nativeResolution: Boolean)
+
+/**
+ * A "Test connection" result. [throughputMbps] is null when measured during a stream (the PC only
+ * runs the download test between streams); [lossPercent] is null when the PC doesn't report it.
+ */
+data class ConnectionReport(
+    val rttMs: Double,
+    val jitterMs: Double,
+    val lossPercent: Double?,
+    val throughputMbps: Double?,
+    val quality: LinkQuality,
+    val suggestion: SuggestedSettings?,
+    val duringStream: Boolean,
+)
+
+/** Why a connection test didn't run, in words for the user. */
+class ConnectionTestError(message: String, val retryAfterMs: Long = 0) : Exception(message)

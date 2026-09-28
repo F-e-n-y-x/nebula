@@ -16,6 +16,7 @@ import com.limelight.nvstream.Ds5HapticsPcmFrame
 import com.limelight.nvstream.NvConnection
 import com.limelight.nvstream.NvConnectionListener
 import com.limelight.nvstream.RemoteTextContext
+import com.limelight.nvstream.http.AdaptiveBitrateService
 import com.limelight.nvstream.jni.MoonBridge
 import com.limelight.utils.BandwidthMeter
 import io.github.fenyx.nebula.engine.framegen.FramegenController
@@ -48,6 +49,8 @@ class StreamSession internal constructor(
     initialWidth: Int,
     initialHeight: Int,
     private val background: BackgroundPolicy = BackgroundPolicy(),
+    private val abrSettings: AbrSettings = AbrSettings(),
+    private val initialBitrateKbps: Int = 0,
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val bandwidth = BandwidthMeter()
@@ -125,7 +128,14 @@ class StreamSession internal constructor(
         disconnect()
     }
 
-    private val _stats = MutableStateFlow(StreamStats(width = initialWidth, height = initialHeight))
+    private val _stats = MutableStateFlow(StreamStats(width = initialWidth, height = initialHeight, targetBitrateKbps = initialBitrateKbps))
+
+    @Volatile
+    private var abrService: AdaptiveBitrateService? = null
+
+    /** Latest decoder window, for ABR feedback. */
+    @Volatile
+    private var latestPerf: PerformanceInfo? = null
 
     /** Updated about once per second from the decoder. */
     val stats: StateFlow<StreamStats> = _stats.asStateFlow()
@@ -330,10 +340,15 @@ class StreamSession internal constructor(
         connection.setDisplayScale(percent) { ok -> if (cont.isActive) cont.resume(ok) }
     }
 
-    /** Asks the host to change the video bitrate mid-stream; true once the host accepted it. */
+    /**
+     * Asks the host to change the video bitrate mid-stream; true once the host accepted it. With
+     * adaptive bitrate on, the new value becomes its starting point.
+     */
     suspend fun setBitrate(kbps: Int): Boolean = suspendCancellableCoroutine { cont ->
         connection.setBitrate(kbps, object : NvConnection.BitrateAdjustmentCallback {
             override fun onSuccess(newBitrate: Int) {
+                abrService?.notifyManualOverride(kbps)
+                _stats.update { it.copy(targetBitrateKbps = kbps, abr = abrState()) }
                 if (cont.isActive) cont.resume(true)
             }
 
@@ -365,10 +380,75 @@ class StreamSession internal constructor(
         haptics?.deviceDucked = active
     }
 
+    /**
+     * Measures RTT and jitter to the host again during the stream (the throughput download is
+     * refused while streaming) and suggests settings from them and the stream's recent loss.
+     */
+    suspend fun testConnection(display: DisplaySpec): ConnectionTestResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        if (!isConnected) throw ConnectionTestException(ConnectionTestFailure.OFFLINE)
+        val samples = try {
+            kotlinx.coroutines.runInterruptible { connection.createNvHttp().measureResponseLatency(LATENCY_SAMPLES) }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw ProbeParsing.failureOf(e)
+        }
+        val (rtt, jitter) = ConnectionAdvisor.latency(samples)
+        val now = _stats.value
+        ConnectionAdvisor.result(
+            rttMs = rtt,
+            jitterMs = jitter,
+            lossPercent = now.lossPercent.toDouble(),
+            throughputMbps = null,
+            currentKbps = now.targetBitrateKbps.takeIf { it > 0 } ?: initialBitrateKbps,
+            display = display,
+            duringStream = true,
+        )
+    }
+
+    /** Starts adaptive bitrate once connected, when it is on. */
+    private fun startAbr() {
+        val wire = abrSettings.mode.wire ?: return
+        if (abrService != null || initialBitrateKbps <= 0) return
+        val service = AdaptiveBitrateService(
+            nvHttpFactory = { connection.createNvHttp() },
+            statsProvider = {
+                latestPerf?.let { p ->
+                    AdaptiveBitrateService.AbrStats(
+                        packetLoss = p.lostFrameRate.takeIf { it.isFinite() } ?: 0f,
+                        rttMs = (p.rttInfo shr 32).toInt(),
+                        decodeFps = p.totalFps,
+                        droppedFrames = 0,
+                    )
+                }
+            },
+            onBitrateChanged = { kbps, _ ->
+                connection.applyBitrateLocally(kbps)
+                _stats.update { it.copy(targetBitrateKbps = kbps, abr = abrState()) }
+            },
+        )
+        abrService = service
+        service.start(initialBitrateKbps, wire, abrSettings.minKbps, abrSettings.maxKbps)
+        _stats.update { it.copy(abr = abrState()) }
+    }
+
+    private fun stopAbr() {
+        abrService?.stop()
+        abrService = null
+    }
+
+    private fun abrState(): AbrState? {
+        val service = abrService ?: return null
+        if (!service.enabled) return null
+        val (lo, hi) = AdaptiveBitrateService.resolveRange(abrSettings.mode.wire!!, initialBitrateKbps, abrSettings.minKbps, abrSettings.maxKbps)
+        return AbrState(abrSettings.mode, sourceOf(service.source), lo, hi, service.lastReason)
+    }
+
     /** Stops the decoder and detaches from the surface once; returns false if already ending. */
     private fun beginEnd(reason: StreamEndReason): Boolean {
         if (ended.getAndSet(true)) return false
         isConnected = false
+        stopAbr()
         main.post {
             main.removeCallbacks(graceExpired)
             holder.removeCallback(surfaceCallback)
@@ -425,6 +505,7 @@ class StreamSession internal constructor(
 
         override fun connectionStarted() {
             isConnected = true
+            startAbr()
             onMain {
                 if (!ended.get()) link.onConnected()
                 listener.onConnected()
@@ -509,7 +590,8 @@ class StreamSession internal constructor(
             framegenController.onPerformanceInfo(performanceInfo)
             upscaler.onWindow()
             val mbps = bandwidth.update(MoonBridge.getRtpVideoBytesReceived(), System.nanoTime())
-            _stats.update { performanceInfo.toStreamStats(mbps, it) }
+            latestPerf = performanceInfo
+            _stats.update { performanceInfo.toStreamStats(mbps, it).copy(abr = abrState()) }
         }
 
         override fun onPerfUpdateWG(performanceInfo: PerformanceInfo) = Unit
@@ -520,6 +602,9 @@ class StreamSession internal constructor(
     /** The decoder is built before [start] and reports stats through this. */
     internal val perfListener: PerfOverlayListener get() = connectionListener
 }
+
+/** Round trips timed by [StreamSession.testConnection]; the first (connection setup) is dropped. */
+private const val LATENCY_SAMPLES = 6
 
 /**
  * What happens when the stream's surface goes away. [graceMs] = 0 disconnects at once; otherwise
@@ -553,4 +638,6 @@ internal fun PerformanceInfo.toStreamStats(measuredMbps: Double?, previous: Stre
     width = if (initialWidth > 0) initialWidth else previous.width,
     height = if (initialHeight > 0) initialHeight else previous.height,
     hdr = hdrFormat.isHdr,
+    targetBitrateKbps = previous.targetBitrateKbps,
+    abr = previous.abr,
 )

@@ -29,6 +29,7 @@ import io.github.f_e_n_y_x.nebula.domain.PreferencesRepository
 import io.github.f_e_n_y_x.nebula.domain.ResolvePlayModeUseCase
 import io.github.f_e_n_y_x.nebula.domain.StreamRepository
 import io.github.f_e_n_y_x.nebula.ui.screens.deviceResolution
+import io.github.f_e_n_y_x.nebula.ui.screens.deviceMaxFps
 import io.github.fenyx.nebula.engine.NebulaEngine
 
 /**
@@ -47,6 +48,7 @@ class AppContainer(context: Context) {
 
     private val local = PreferencesStore(context)
     private val screen = { deviceResolution(context) }
+    private val display = { deviceResolution(context).let { (w, h) -> Triple(w, h, deviceMaxFps(context)) } }
 
     /** This device's panel size in landscape: what "match this device" streams at. */
     fun deviceResolution(): Pair<Int, Int> = screen()
@@ -56,12 +58,12 @@ class AppContainer(context: Context) {
         if (app.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT) Orientation.PORTRAIT else Orientation.LANDSCAPE
 
     val prefs: PreferencesRepository = engine?.let { EnginePreferencesRepository(it, local, screen) } ?: local
-    val hosts: HostRepository = engine?.let { EngineHostRepository(it) } ?: demo.hostRepository
+    val hosts: HostRepository = engine?.let { EngineHostRepository(it, display) } ?: demo.hostRepository
     val library: LibraryRepository = engine?.let { EngineLibraryRepository(it) } ?: demo.libraryRepository
     /** The last few streams' summaries (Settings → Diagnostics). */
     val sessionHistory = io.github.f_e_n_y_x.nebula.diagnostics.SessionHistory(context)
     val stream: StreamRepository = io.github.f_e_n_y_x.nebula.diagnostics.RecordingStreamRepository(
-        engine?.let { EngineStreamRepository(it, screen, context) } ?: demo.streamRepository, sessionHistory::add,
+        engine?.let { EngineStreamRepository(it, screen, context, display) } ?: demo.streamRepository, sessionHistory::add,
     )
     val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)

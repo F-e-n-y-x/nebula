@@ -39,6 +39,15 @@ fun screenResolution(context: Context): Pair<Int, Int> {
     }
 }
 
+/** Highest refresh rate this device's screen offers, in Hz (60 when unknown). */
+fun deviceMaxFps(context: Context): Int {
+    val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    @Suppress("DEPRECATION")
+    val display = wm.defaultDisplay ?: return 60
+    val best = display.supportedModes?.maxOfOrNull { it.refreshRate } ?: display.refreshRate
+    return best.toInt().takeIf { it > 0 } ?: 60
+}
+
 fun modeLabel(context: Context, mode: DisplayMode, s: StreamSettings): String = when (mode) {
     DisplayMode.VIRTUAL -> {
         val (w, h) = if (s.resolution.width > 0) s.resolution.width to s.resolution.height else deviceResolution(context)

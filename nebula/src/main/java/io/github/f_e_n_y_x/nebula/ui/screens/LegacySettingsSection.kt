@@ -1,5 +1,6 @@
 package io.github.f_e_n_y_x.nebula.ui.screens
 
+import io.github.fenyx.nebula.engine.AbrSettings
 import android.content.Context
 import android.net.Uri
 import android.widget.Toast
@@ -77,6 +78,8 @@ internal val nativeKeys = setOf(
     "seekbar_perf_overlay_bg_opacity",
     // Motion and rumble sections
     "checkbox_gamepad_motion_sensors", "checkbox_gamepad_motion_fallback", "list_game_rumble_mode", "seekbar_vibrate_fallback_strength",
+    // Adaptive bitrate has its own control next to Bitrate (AdaptiveBitrateSetting).
+    AbrSettings.ENABLED_KEY, AbrSettings.MODE_KEY,
 )
 
 /** How the stream picture fills the screen. Stored as [SCALE_MODE_KEY] in V+'s preferences. */

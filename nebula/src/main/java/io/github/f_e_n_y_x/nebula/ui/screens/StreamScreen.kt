@@ -145,6 +145,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     val game by vm.game.collectAsStateWithLifecycle()
     val bitrate by vm.bitrateKbps.collectAsStateWithLifecycle()
     val bitrateNote by vm.bitrateNote.collectAsStateWithLifecycle()
+    val connectionTest by vm.connectionTest.collectAsStateWithLifecycle()
     val switchState by vm.switchState.collectAsStateWithLifecycle()
     val switchNote by vm.switchNote.collectAsStateWithLifecycle()
     val gameVideoMode by vm.gameVideoMode.collectAsStateWithLifecycle()
@@ -595,7 +596,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 stats = stats,
                 ui = ui,
                 prefs = prefs,
-                bitrateKbps = bitrate,
+                bitrateKbps = stats?.targetBitrateKbps?.takeIf { it > 0 } ?: bitrate,
                 bitrateNote = bitrateNote,
                 gamepads = pad.count,
                 gameKey = gameKey,
@@ -648,7 +649,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     onNextLayout = {
                         controlsActive.set?.target(controlsProfile.id, io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next)?.let { activeLayoutId = it }
                     },
+                    onTestConnection = vm::testConnection,
                 ),
+                connectionTest = connectionTest,
                 hostSection = { StreamHostMenuSection(hostLink, prefs, onTypeClipboard = typeClipboard, onSlept = { end(false) }) },
             )
         }

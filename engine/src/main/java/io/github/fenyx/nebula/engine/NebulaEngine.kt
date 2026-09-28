@@ -34,6 +34,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import com.limelight.nvstream.http.NvHTTP
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -176,6 +181,43 @@ class NebulaEngine private constructor(context: Context) {
     /** One of [AppDetails.screenshots], disk-cached. */
     suspend fun loadScreenshot(hostId: String, path: String): ByteArray? = repository.loadScreenshot(hostId, path)
 
+    // ---- Connection test ----
+
+    /**
+     * Measures the link to [hostId] before streaming: RTT and jitter from a few small requests, a
+     * short download (up to 4 MB) for throughput and, on Nova, packet loss from the host's TCP
+     * retransmissions; then suggests settings for [display]. [onProgress] gets 0..1 during the
+     * download. Throws [ConnectionTestException]; cancelling the coroutine aborts the download.
+     * Hosts refuse it while any device streams ([ConnectionTestFailure.STREAM_ACTIVE]).
+     */
+    suspend fun testConnection(hostId: String, display: DisplaySpec, onProgress: (Float) -> Unit = {}): ConnectionTestResult =
+        withContext(Dispatchers.IO) {
+            val host = repository.details(hostId) ?: throw ConnectionTestException(ConnectionTestFailure.FAILED)
+            val address = host.activeAddress ?: throw ConnectionTestException(ConnectionTestFailure.OFFLINE)
+            val cert = host.serverCert ?: throw ConnectionTestException(ConnectionTestFailure.NOT_PAIRED)
+            val http = NvHTTP(address, host.httpsPort, identity.uniqueId, repository.pairName(hostId), cert, crypto)
+            val cancel = coroutineContext[Job]?.invokeOnCompletion { if (it != null) http.cancelNetworkProbe() }
+            try {
+                runInterruptible {
+                    val m = http.runNetworkProbe { received, total -> if (total > 0) onProgress(received.toFloat() / total) }
+                    // The host records the result once its last write completes, just after we read it.
+                    var loss: Double? = null
+                    for (attempt in 0 until PROBE_RESULT_ATTEMPTS) {
+                        loss = ProbeParsing.lossPercent(http.getNetworkProbeResult(m.nonce))
+                        if (loss != null) break
+                        Thread.sleep(PROBE_RESULT_RETRY_MS)
+                    }
+                    ConnectionAdvisor.result(m.responseLatencyMs, m.responseJitterMs, loss, m.bandwidthMbps, null, display, duringStream = false)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw ProbeParsing.failureOf(e)
+            } finally {
+                cancel?.dispose()
+            }
+        }
+
     // ---- Streaming ----
 
     /**
@@ -202,7 +244,8 @@ class NebulaEngine private constructor(context: Context) {
         val prefs = PreferenceConfiguration.readPreferences(activity).also { request.applyTo(it) }
         // V+'s "Swap stream width and height" (portrait streams from a landscape request).
         if (prefs.reverseResolution) prefs.width = prefs.height.also { prefs.height = prefs.width }
-        val session = StreamSession(activity, surface, listener, prefs.width, prefs.height, backgroundPolicy(activity))
+        val abr = request.abr ?: AbrSettings.read(preferences.sharedPreferences)
+        val session = StreamSession(activity, surface, listener, prefs.width, prefs.height, backgroundPolicy(activity), abr, prefs.bitrate)
 
         val hdrSupport = HdrCapabilityHelper.getHdrTypeSupport(activity)
         var hdr = prefs.enableHdr && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && when (prefs.hdrMode) {
@@ -406,6 +449,8 @@ class NebulaEngine private constructor(context: Context) {
 
     companion object {
         private const val DISCOVERY_INTERVAL_MS = 1500
+        private const val PROBE_RESULT_ATTEMPTS = 3
+        private const val PROBE_RESULT_RETRY_MS = 150L
         private const val DEFAULT_PACKET_SIZE = 1392
         /** Seconds a backgrounded stream stays connected (SharedPreferences Int). */
         const val BACKGROUND_GRACE_KEY = "nebula_background_grace_s"

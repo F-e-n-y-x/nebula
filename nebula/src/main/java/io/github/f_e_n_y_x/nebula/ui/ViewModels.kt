@@ -24,6 +24,9 @@ import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
+import io.github.f_e_n_y_x.nebula.domain.model.SuggestedSettings
+import io.github.f_e_n_y_x.nebula.ui.screens.ConnectionTestUi
+import io.github.f_e_n_y_x.nebula.ui.screens.ConnectionText
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -71,6 +74,48 @@ class HostsViewModel(private val c: AppContainer) : ViewModel() {
 
     fun select(hostId: String) = viewModelScope.launch { c.prefs.setLastHost(hostId) }
     fun clearMessage() { _message.value = null }
+
+    /** The host whose connection test dialog is open, and where that test is. */
+    private val _test = MutableStateFlow<Pair<String, ConnectionTestUi>?>(null)
+    val connectionTest = _test.asStateFlow()
+    private var testJob: Job? = null
+
+    /** Opens the test dialog for [hostId] and runs the test. */
+    fun testConnection(hostId: String) {
+        testJob?.cancel()
+        _test.value = hostId to ConnectionTestUi.Running(null)
+        testJob = viewModelScope.launch {
+            val result = c.hosts.testConnection(hostId) { p -> _test.value = hostId to ConnectionTestUi.Running(p) }
+            _test.value = hostId to result.fold({ ConnectionTestUi.Done(it) }, { ConnectionTestUi.Failed(it.message ?: "The connection test failed.") })
+        }
+    }
+
+    /** Closes the dialog; a running test is cancelled (the download stops). */
+    fun closeConnectionTest() {
+        testJob?.cancel()
+        testJob = null
+        _test.value = null
+    }
+
+    /** Makes a suggestion the stream settings and closes the dialog. */
+    fun useSuggestion(s: SuggestedSettings) = viewModelScope.launch {
+        val (dw, dh) = c.deviceResolution()
+        c.prefs.updateStreamSettings { applySuggestion(it, s, dw to dh) }
+        _message.value = "Stream settings: ${ConnectionText.suggestion(s)}"
+        closeConnectionTest()
+    }
+
+    companion object {
+        /** Stream settings with a suggestion applied; the device's own size stays "match this device". */
+        fun applySuggestion(settings: StreamSettings, s: SuggestedSettings, device: Pair<Int, Int>): StreamSettings {
+            val native = s.nativeResolution || (s.mode.width == device.first && s.mode.height == device.second)
+            return settings.copy(
+                resolution = if (native) io.github.f_e_n_y_x.nebula.domain.model.Resolution.Native else s.mode.resolution,
+                fps = s.mode.fps,
+                bitrateKbps = s.bitrateKbps,
+            )
+        }
+    }
 }
 
 class PairViewModel(private val c: AppContainer, val hostId: String) : ViewModel() {
@@ -445,6 +490,18 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
         if (savedScaleApplied) return
         savedScaleApplied = true
         if (percent != _displayScale.value) setDisplayScale(percent)
+    }
+
+    private val _connectionTest = MutableStateFlow<ConnectionTestUi>(ConnectionTestUi.Idle)
+    /** The stream menu's "Test connection" (latency only while streaming). */
+    val connectionTest = _connectionTest.asStateFlow()
+
+    fun testConnection() {
+        if (_connectionTest.value is ConnectionTestUi.Running) return
+        _connectionTest.value = ConnectionTestUi.Running(null)
+        viewModelScope.launch {
+            _connectionTest.value = c.stream.testConnection().fold({ ConnectionTestUi.Done(it) }, { ConnectionTestUi.Failed(it.message ?: "The connection test failed.") })
+        }
     }
 
     fun setBitrate(kbps: Int) = viewModelScope.launch {

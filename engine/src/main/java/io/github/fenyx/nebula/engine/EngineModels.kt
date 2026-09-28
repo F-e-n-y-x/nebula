@@ -204,6 +204,8 @@ data class StreamRequest(
      * running on the host any more.
      */
     val resumeOnly: Boolean = false,
+    /** Adaptive bitrate for this stream; null uses the saved setting ([AbrSettings.read]). */
+    val abr: AbrSettings? = null,
 ) {
     /** The orientation this request streams in; sent to Nova as `nova_orientation`. */
     val orientation: StreamOrientation get() = StreamOrientation.of(width, height)
@@ -249,6 +251,10 @@ data class StreamStats(
     val width: Int = 0,
     val height: Int = 0,
     val hdr: Boolean = false,
+    /** Bitrate the host encodes at (the start value, then live and ABR changes), kbps; 0 before connecting. */
+    val targetBitrateKbps: Int = 0,
+    /** Null while adaptive bitrate is off. */
+    val abr: AbrState? = null,
 )
 
 /** Controller motion sensor kinds, as the host names them. */

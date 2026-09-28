@@ -36,7 +36,20 @@ import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
 import io.github.f_e_n_y_x.nebula.domain.model.VideoCodec
 import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
+import io.github.f_e_n_y_x.nebula.domain.model.AbrInfo
+import io.github.f_e_n_y_x.nebula.domain.model.AbrSource
+import io.github.f_e_n_y_x.nebula.domain.model.ConnectionReport
+import io.github.f_e_n_y_x.nebula.domain.model.ConnectionTestError
+import io.github.f_e_n_y_x.nebula.domain.model.LinkQuality
+import io.github.f_e_n_y_x.nebula.domain.model.SuggestedSettings
+import io.github.fenyx.nebula.engine.AbrMode
+import io.github.fenyx.nebula.engine.AbrState
 import io.github.fenyx.nebula.engine.ArtKind
+import io.github.fenyx.nebula.engine.ConnectionQuality
+import io.github.fenyx.nebula.engine.ConnectionTestException
+import io.github.fenyx.nebula.engine.ConnectionTestFailure
+import io.github.fenyx.nebula.engine.ConnectionTestResult
+import io.github.fenyx.nebula.engine.DisplaySpec
 import io.github.fenyx.nebula.engine.CodecPreference
 import io.github.fenyx.nebula.engine.HostApp
 import io.github.fenyx.nebula.engine.HostState
@@ -77,7 +90,12 @@ import io.github.fenyx.nebula.engine.StreamStats as EngineStats
 /** The video target the stream screen hands to [EngineStreamRepository]. */
 class SurfaceStreamTarget(val activity: Activity, val holder: SurfaceHolder) : StreamTarget
 
-class EngineHostRepository(private val engine: NebulaEngine) : HostRepository {
+/** This device's screen for connection-test suggestions: width, height and highest refresh rate. */
+typealias DeviceDisplay = () -> Triple<Int, Int, Int>
+
+private fun DeviceDisplay.spec() = invoke().let { (w, h, fps) -> DisplaySpec(w, h, fps) }
+
+class EngineHostRepository(private val engine: NebulaEngine, private val display: DeviceDisplay = { Triple(1920, 1080, 60) }) : HostRepository {
     override fun observeHosts(): Flow<List<Host>> = engine.hosts.map { list -> list.map { it.toDomain() } }
 
     override suspend fun discover() {
@@ -158,6 +176,8 @@ class EngineHostRepository(private val engine: NebulaEngine) : HostRepository {
     override fun pairingAs(): PairingAs = engine.pairingIdentity().let { PairingAs(it.displayName, it.deviceName) }
 
     override fun setPairingDeviceName(name: String) = engine.setPairingDeviceName(name)
+    override suspend fun testConnection(hostId: String, onProgress: (Float) -> Unit): Result<ConnectionReport> =
+        runConnectionTest { engine.testConnection(hostId, display.spec(), onProgress) }
 
     override fun startWatching() = engine.startDiscovery()
     override fun stopWatching() = engine.stopDiscovery()
@@ -315,6 +335,7 @@ class EngineStreamRepository(
     private val engine: NebulaEngine,
     private val deviceResolution: () -> Pair<Int, Int>,
     context: android.content.Context,
+    private val display: DeviceDisplay = { deviceResolution().let { (w, h) -> Triple(w, h, 60) } },
 ) : StreamRepository {
     private val app = context.applicationContext
     private val legacy = io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(app)
@@ -394,6 +415,10 @@ class EngineStreamRepository(
     }
 
     override suspend fun setDisplayScale(percent: Int): Boolean = session?.setDisplayScale(percent) ?: false
+    override suspend fun testConnection(): Result<ConnectionReport> {
+        val s = session?.takeIf { it.isConnected } ?: return Result.failure(ConnectionTestError("Nothing is streaming."))
+        return runConnectionTest { s.testConnection(display.spec()) }
+    }
 
     override suspend fun switchMode(mode: VideoMode): Result<Unit> =
         run?.switchTo(mode) ?: Result.failure(IllegalStateException("Nothing is streaming."))
@@ -665,6 +690,57 @@ private fun io.github.f_e_n_y_x.nebula.settings.HapticsSettings.toEngine() = io.
     scene = io.github.fenyx.nebula.engine.AudioHapticsScene.fromWire(scene),
 )
 
+/** Runs an engine connection test and turns its failures into messages for the user. */
+private suspend fun runConnectionTest(block: suspend () -> ConnectionTestResult): Result<ConnectionReport> = try {
+    Result.success(block().toDomain())
+} catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+} catch (e: ConnectionTestException) {
+    Result.failure(ConnectionTestError(e.failure.message(e.retryAfterMs), e.retryAfterMs))
+} catch (e: Exception) {
+    Result.failure(ConnectionTestError(e.message ?: "The connection test failed."))
+}
+
+internal fun ConnectionTestFailure.message(retryAfterMs: Long): String = when (this) {
+    ConnectionTestFailure.STREAM_ACTIVE -> "The PC is streaming. The full test runs between streams; use Test connection in the stream menu for a quick check."
+    ConnectionTestFailure.RATE_LIMITED -> "Tested a moment ago. Try again in ${((retryAfterMs + 999) / 1000).coerceAtLeast(1)} s."
+    ConnectionTestFailure.UNSUPPORTED -> "This PC can't test the connection. Nova and Sunshine Foundation hosts can."
+    ConnectionTestFailure.NOT_PAIRED -> "Pair with this PC first."
+    ConnectionTestFailure.OFFLINE -> "Couldn't reach the PC."
+    ConnectionTestFailure.FAILED -> "The connection test failed. Try again."
+}
+
+internal fun ConnectionTestResult.toDomain() = ConnectionReport(
+    rttMs = rttMs,
+    jitterMs = jitterMs,
+    lossPercent = lossPercent,
+    throughputMbps = throughputMbps,
+    quality = when (quality) {
+        ConnectionQuality.EXCELLENT -> LinkQuality.EXCELLENT
+        ConnectionQuality.GOOD -> LinkQuality.GOOD
+        ConnectionQuality.FAIR -> LinkQuality.FAIR
+        ConnectionQuality.POOR -> LinkQuality.POOR
+    },
+    suggestion = suggestion?.let { SuggestedSettings(VideoMode(it.width, it.height, it.fps), it.bitrateKbps, it.nativeResolution) },
+    duringStream = duringStream,
+)
+
+internal fun AbrState.toDomain() = AbrInfo(
+    mode = when (mode) {
+        AbrMode.CONSERVATIVE -> "Conservative"
+        AbrMode.AGGRESSIVE -> "Aggressive"
+        else -> "Balanced"
+    },
+    source = when (source) {
+        io.github.fenyx.nebula.engine.AbrSource.HOST -> AbrSource.HOST
+        io.github.fenyx.nebula.engine.AbrSource.CONNECTING -> AbrSource.CONNECTING
+        io.github.fenyx.nebula.engine.AbrSource.LOCAL -> AbrSource.LOCAL
+    },
+    minKbps = minKbps,
+    maxKbps = maxKbps,
+    lastReason = lastReason,
+)
+
 private fun EngineStats.toDomain(): StreamStats {
     val d = decoder?.lowercase().orEmpty()
     val codec = when {
@@ -692,5 +768,7 @@ private fun EngineStats.toDomain(): StreamStats {
         renderMs = latency.renderMs,
         decoder = decoder.orEmpty(),
         hdr = hdr,
+        targetBitrateKbps = targetBitrateKbps,
+        abr = abr?.toDomain(),
     )
 }
