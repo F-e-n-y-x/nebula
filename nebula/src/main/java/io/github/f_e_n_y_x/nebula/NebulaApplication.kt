@@ -61,6 +61,8 @@ class AppContainer(context: Context) {
     val stream: StreamRepository = engine?.let { EngineStreamRepository(it, screen, context) } ?: demo.streamRepository
     val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
     val resolvePlayMode = ResolvePlayModeUseCase(prefs)
+    /** Pinned games, per host, stored on this device only. */
+    val favourites: io.github.f_e_n_y_x.nebula.domain.FavouritesRepository = io.github.f_e_n_y_x.nebula.data.FavouritesStore(context)
 
     /** Debug QA only: the demo PC starts asleep so Play shows the wake flow. */
     fun debugPutDemoHostToSleep() { if (isDemo) demo.putToSleep() }

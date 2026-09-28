@@ -102,8 +102,8 @@ fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String) {
     Box(Modifier.fillMaxSize()) {
         when {
             !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
-            !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details)
-            else -> SpotlightLibrary(ui, vm::focus, play, details)
+            !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite)
+            else -> SpotlightLibrary(ui, vm::focus, play, details, vm::toggleFavourite)
         }
         WakeOverlay(ui.host?.name ?: "your PC", waking?.name, wake, onCancel = { waking = null; hostVm.cancelWake() }, onRetry = hostVm::retryWake)
     }
@@ -122,7 +122,7 @@ private fun HostChip(host: Host?) {
 
 /** Console-style home: the focused game fills the screen; a poster row at the bottom drives focus. */
 @Composable
-private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit) {
+private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit, onToggleFavourite: (Game) -> Unit) {
     val s = Nebula.scale
     val t = Nebula.type
     val ctx = LocalContext.current
@@ -182,6 +182,7 @@ private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Ga
                         onClick = { onPlay(focused) }, modifier = Modifier.focusRequester(playRequester),
                     )
                     NebulaButton(text = "Details", icon = Icons.Outlined.Info, style = ButtonStyle.Secondary, onClick = { onDetails(focused) })
+                    FavouriteButton(focused.id in ui.favouriteIds, { onToggleFavourite(focused) })
                 }
             }
             Spacer(Modifier.height(s.dp(if (compactHeight) 14 else 28)))
@@ -192,11 +193,15 @@ private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Ga
                 contentPadding = PaddingValues(vertical = s.dp(8), horizontal = s.dp(4)),
                 verticalAlignment = Alignment.Top,
             ) {
+                // Favourites lead the row (ui.games starts with them), each with a star.
                 items(ui.games, key = { it.id }) { g ->
                     PosterTile(
                         game = g, selected = g.id == focused.id, height = tileH,
                         onFocus = { onFocus(g) },
                         onClick = { if (g.id == focused.id) onDetails(g) else onFocus(g) },
+                        favourite = g.id in ui.favouriteIds,
+                        onToggleFavourite = { onToggleFavourite(g) },
+                        onDetails = { onDetails(g) },
                     )
                 }
             }
@@ -220,16 +225,20 @@ private fun GameTitle(game: Game, maxHeight: androidx.compose.ui.unit.Dp, small:
 }
 
 @Composable
-private fun PosterTile(game: Game, selected: Boolean, height: androidx.compose.ui.unit.Dp, onFocus: () -> Unit, onClick: () -> Unit) {
+private fun PosterTile(
+    game: Game, selected: Boolean, height: androidx.compose.ui.unit.Dp, onFocus: () -> Unit, onClick: () -> Unit,
+    favourite: Boolean, onToggleFavourite: () -> Unit, onDetails: () -> Unit,
+) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(12))
+    var menu by remember { mutableStateOf(false) }
     Column(Modifier.width(height * (2f / 3f))) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(height)
                 .onFocusChanged { if (it.isFocused) onFocus() }
-                .nebulaClickable(shape, onClick, focusScale = 1.06f)
+                .nebulaClickable(shape, onClick, focusScale = 1.06f, onLongClick = { menu = true })
                 .then(if (selected) Modifier.border(2.dp, NebulaColors.accentText, shape) else Modifier.border(1.dp, NebulaColors.border, shape)),
         ) {
             ArtImage(url = game.art.poster, seed = game.name, contentDescription = game.name, modifier = Modifier.fillMaxSize())
@@ -248,6 +257,8 @@ private fun PosterTile(game: Game, selected: Boolean, height: androidx.compose.u
             if (game.running) {
                 Pill("Running", color = NebulaColors.success, background = Color(0xE610231A), modifier = Modifier.align(Alignment.TopStart).padding(s.dp(6)))
             }
+            if (favourite) FavouriteBadge(Modifier.align(Alignment.TopEnd))
+            GameCardMenu(menu, favourite, { menu = false }, onToggleFavourite, onDetails)
         }
         if (selected) {
             Spacer(Modifier.height(s.dp(8)))
@@ -258,7 +269,7 @@ private fun PosterTile(game: Game, selected: Boolean, height: androidx.compose.u
 
 /** Phone held upright: a hero card for the focused game, then the whole library as posters. */
 @Composable
-private fun PortraitLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit) {
+private fun PortraitLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit, onToggleFavourite: (Game) -> Unit) {
     val s = Nebula.scale
     val t = Nebula.type
     val ctx = LocalContext.current
@@ -309,29 +320,53 @@ private fun PortraitLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Gam
                             onClick = { onPlay(focused) }, modifier = Modifier.weight(1f),
                         )
                         NebulaButton(text = "Details", style = ButtonStyle.Secondary, onClick = { onDetails(focused) })
+                        FavouriteButton(focused.id in ui.favouriteIds, { onToggleFavourite(focused) })
                     }
                 }
             }
         }
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            SectionTitle("Library · ${ui.games.size} on ${ui.host?.name ?: "host"}", Modifier.padding(top = s.dp(12)))
+        val tile: @Composable (Game) -> Unit = { g ->
+            GridTile(g, g.id == focused.id, g.id in ui.favouriteIds,
+                onClick = { if (g.id == focused.id) onDetails(g) else onFocus(g) },
+                onToggleFavourite = { onToggleFavourite(g) }, onDetails = { onDetails(g) })
         }
-        items(ui.games, key = { it.id }) { g ->
-            val shape = RoundedCornerShape(s.dp(10))
-            Column {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(2f / 3f)
-                        .nebulaClickable(shape, { if (g.id == focused.id) onDetails(g) else onFocus(g) }, focusScale = 1.04f)
-                        .then(if (g.id == focused.id) Modifier.border(2.dp, NebulaColors.accentText, shape) else Modifier.border(1.dp, NebulaColors.border, shape)),
-                ) {
-                    ArtImage(g.art.poster, g.name, g.name, Modifier.fillMaxSize(), fallbackIcon = if (g.kind == GameKind.DESKTOP) Icons.Outlined.DesktopWindows else null)
-                }
-                Spacer(Modifier.height(s.dp(6)))
-                Text(g.name, style = t.label, color = NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // Pinned games get their own section on top, in pin order; the library below skips them.
+        if (ui.favourites.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                SectionTitle("Favourites · ${ui.favourites.size}", Modifier.padding(top = s.dp(12)))
             }
+            items(ui.favourites, key = { "fav-" + it.id }) { tile(it) }
         }
+        val rest = if (ui.favourites.isEmpty()) ui.games else ui.games.filter { it.id !in ui.favouriteIds }
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            SectionTitle(
+                if (ui.favourites.isEmpty()) "Library · ${ui.games.size} on ${ui.host?.name ?: "host"}" else "All games · ${rest.size}",
+                Modifier.padding(top = s.dp(12)),
+            )
+        }
+        items(rest, key = { it.id }) { tile(it) }
+    }
+}
+
+@Composable
+private fun GridTile(g: Game, selected: Boolean, favourite: Boolean, onClick: () -> Unit, onToggleFavourite: () -> Unit, onDetails: () -> Unit) {
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(10))
+    var menu by remember { mutableStateOf(false) }
+    Column {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .nebulaClickable(shape, onClick, focusScale = 1.04f, onLongClick = { menu = true })
+                .then(if (selected) Modifier.border(2.dp, NebulaColors.accentText, shape) else Modifier.border(1.dp, NebulaColors.border, shape)),
+        ) {
+            ArtImage(g.art.poster, g.name, g.name, Modifier.fillMaxSize(), fallbackIcon = if (g.kind == GameKind.DESKTOP) Icons.Outlined.DesktopWindows else null)
+            if (favourite) FavouriteBadge(Modifier.align(Alignment.TopEnd))
+            GameCardMenu(menu, favourite, { menu = false }, onToggleFavourite, onDetails)
+        }
+        Spacer(Modifier.height(s.dp(6)))
+        Text(g.name, style = Nebula.type.label, color = NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

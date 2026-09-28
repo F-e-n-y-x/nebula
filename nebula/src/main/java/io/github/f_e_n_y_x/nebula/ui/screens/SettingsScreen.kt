@@ -619,6 +619,7 @@ private fun AboutSection() {
             style = Nebula.type.body, color = NebulaColors.textSecondary,
         )
         Text("Geist and Geist Mono fonts: SIL Open Font License.", style = Nebula.type.label, color = NebulaColors.textMuted)
+        SourceCodeLinks(Modifier.padding(top = s.dp(12)))
         SectionTitle("Privacy", Modifier.padding(top = s.dp(12)))
         Text("No account, no analytics, no tracking. Nebula only talks to the hosts you pair.", style = Nebula.type.body, color = NebulaColors.textSecondary)
     }

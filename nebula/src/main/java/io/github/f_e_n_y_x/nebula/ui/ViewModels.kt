@@ -12,6 +12,7 @@ import io.github.f_e_n_y_x.nebula.domain.PortraitStreaming
 import io.github.f_e_n_y_x.nebula.domain.RotationFollower
 import io.github.f_e_n_y_x.nebula.domain.orientation
 import io.github.f_e_n_y_x.nebula.domain.SortLibrary
+import io.github.f_e_n_y_x.nebula.domain.PinnedLibrary
 import io.github.f_e_n_y_x.nebula.domain.SwitchOutcome
 import io.github.f_e_n_y_x.nebula.domain.SwitchState
 import io.github.f_e_n_y_x.nebula.domain.model.VideoMode
@@ -113,6 +114,9 @@ data class LibraryUi(
     val settings: StreamSettings = StreamSettings(),
     val loading: Boolean = true,
     val options: LibraryOptions = LibraryOptions(),
+    /** Pinned games in pin order; [games] starts with these. */
+    val favourites: List<Game> = emptyList(),
+    val favouriteIds: Set<String> = emptySet(),
 )
 
 /** Data saver on a metered network: no hero art (the smaller poster/header stands in). */
@@ -123,10 +127,12 @@ class LibraryViewModel(private val c: AppContainer, val hostId: String) : ViewMo
     private val focusedId = MutableStateFlow<String?>(null)
 
     private val options = c.prefs.libraryOptions
-    private val games = combine(c.library.observeGames(hostId), options) { list, o ->
+    // Favourites first, in pin order; the rest keep the library order.
+    private val shelf = combine(c.library.observeGames(hostId), options, c.favourites.observe(hostId)) { list, o, pins ->
         val save = o.dataSaver && c.isMetered()
-        SortLibrary(list).map { it.forNetwork(save) }
+        PinnedLibrary.of(SortLibrary(list).map { it.forNetwork(save) }, pins)
     }
+    private val games = shelf.map { it.all }
     private val host = c.hosts.observeHosts().map { l -> l.firstOrNull { it.id == hostId } }
 
     private val focusedGame = combine(games, focusedId) { list, id -> list.firstOrNull { it.id == id } ?: list.firstOrNull() }
@@ -134,11 +140,13 @@ class LibraryViewModel(private val c: AppContainer, val hostId: String) : ViewMo
     private val mode = focusedGame.flatMapLatest { g -> if (g == null) flowOf(DisplayMode.VIRTUAL) else c.resolvePlayMode(g) }
 
     val ui: StateFlow<LibraryUi> =
-        combine(combine(host, games, focusedGame, ::Triple), mode, c.prefs.streamSettings, options) { (h, g, f), m, s, o ->
-            LibraryUi(h, g, f, m, s, loading = false, options = o)
+        combine(combine(host, shelf, focusedGame, ::Triple), mode, c.prefs.streamSettings, options) { (h, p, f), m, s, o ->
+            LibraryUi(h, p.all, f, m, s, loading = false, options = o, favourites = p.favourites, favouriteIds = p.favouriteIds)
         }.stateIn(this, LibraryUi())
 
     fun focus(game: Game) { focusedId.value = game.id }
+
+    fun toggleFavourite(game: Game) = viewModelScope.launch { c.favourites.toggle(hostId, game.id) }
 }
 
 data class DetailsUi(
@@ -183,6 +191,11 @@ class DetailsViewModel(private val c: AppContainer, val hostId: String, val game
     }
 
     fun remember(mode: DisplayMode) = viewModelScope.launch { c.prefs.setMode(hostId, gameId, mode) }
+
+    /** Pinned to the top of the library. */
+    val favourite: StateFlow<Boolean> = c.favourites.observe(hostId).map { gameId in it }.stateIn(this, false)
+
+    fun toggleFavourite() = viewModelScope.launch { c.favourites.toggle(hostId, gameId) }
 
     /** Re-fetches this game's details and artwork from the host. */
     fun refresh(onArtCleared: () -> Unit = {}) {
