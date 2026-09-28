@@ -72,11 +72,25 @@ class PairViewModel(private val c: AppContainer, val hostId: String) : ViewModel
     private val _state = MutableStateFlow<PairingState>(PairingState.Connecting)
     val state = _state.asStateFlow()
     private var job: Job? = null
+    private val _pairingAs = MutableStateFlow(c.hosts.pairingAs())
+    /** The name this device pairs under; editable on the pairing screen. */
+    val pairingAs = _pairingAs.asStateFlow()
+    private val _renamedLate = MutableStateFlow(false)
+    /** True when the name changed after the host already had the request (it keeps the old one). */
+    val renamedLate = _renamedLate.asStateFlow()
 
     init { start() }
 
+    fun renameDevice(name: String) {
+        c.hosts.setPairingDeviceName(name)
+        val next = c.hosts.pairingAs()
+        if (next != _pairingAs.value && _state.value is PairingState.ShowPin) _renamedLate.value = true
+        _pairingAs.value = next
+    }
+
     fun start() {
         job?.cancel()
+        _renamedLate.value = false
         job = viewModelScope.launch {
             c.hosts.pair(hostId).collect {
                 _state.value = it

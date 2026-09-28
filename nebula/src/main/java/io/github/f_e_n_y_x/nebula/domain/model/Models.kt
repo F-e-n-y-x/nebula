@@ -138,6 +138,12 @@ data class LibraryOptions(
     val cacheLimitMb: Int = 512,
 )
 
+/**
+ * The name this device pairs under. [displayName] is what the host pre-fills ("Nebula from
+ * Ayush's S25 Ultra"); [deviceName] is the editable device part.
+ */
+data class PairingAs(val displayName: String, val deviceName: String)
+
 sealed interface PairingState {
     data object Connecting : PairingState
     /** Enter [pin] on the host (Nova web UI → Pair a device). */

@@ -54,7 +54,12 @@ class NebulaEngine private constructor(context: Context) {
     val artCache = ArtCacheControl(art)
 
     private val repository = HostRepository(
-        backend = NvHttpHostBackend(uniqueId = { identity.uniqueId }, clientName = ::clientName, crypto = crypto),
+        backend = NvHttpHostBackend(
+            uniqueId = { identity.uniqueId },
+            clientName = ::clientName,
+            crypto = crypto,
+            pairingIdentity = ::pairingIdentity,
+        ),
         store = DatabaseHostStore(appContext),
         art = art,
         scope = scope,
@@ -335,6 +340,50 @@ class NebulaEngine private constructor(context: Context) {
     private fun clientName(): String =
         Settings.Global.getString(appContext.contentResolver, "device_name") ?: Build.MODEL ?: "Nebula"
 
+    // ---- Pairing name ----
+
+    private val pairingPrefs get() = appContext.getSharedPreferences(appContext.packageName + "_preferences", Context.MODE_PRIVATE)
+
+    /**
+     * How this device introduces itself when pairing: "Nebula from Ayush's S25 Ultra". The device
+     * part is the user's own choice when they set one, else Android's device name when it names an
+     * owner, else the marketing model (Nova then adds its user as the owner).
+     */
+    fun pairingIdentity(): PairingIdentity {
+        val custom = PairingName.clean(pairingPrefs.getString(PAIRING_DEVICE_NAME_KEY, null))
+        val device = custom.ifEmpty {
+            PairingName.deviceName(
+                Settings.Global.getString(appContext.contentResolver, Settings.Global.DEVICE_NAME),
+                Build.MODEL,
+                Build.MANUFACTURER,
+            )
+        }
+        return PairingIdentity(deviceName = device, version = appVersion(), form = formFactor())
+    }
+
+    /** Sets the device part of the pairing name; null or blank goes back to the automatic one. */
+    fun setPairingDeviceName(name: String?) {
+        val clean = PairingName.clean(name)
+        pairingPrefs.edit().apply {
+            if (clean.isEmpty()) remove(PAIRING_DEVICE_NAME_KEY) else putString(PAIRING_DEVICE_NAME_KEY, clean)
+        }.apply()
+    }
+
+    private fun appVersion(): String = runCatching {
+        appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName
+    }.getOrNull().orEmpty()
+
+    private fun formFactor(): FormFactor {
+        val pm = appContext.packageManager
+        val ui = appContext.getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        return when {
+            pm.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK) ||
+                ui?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION -> FormFactor.TV
+            appContext.resources.configuration.smallestScreenWidthDp >= 600 -> FormFactor.TABLET
+            else -> FormFactor.PHONE
+        }
+    }
+
     /**
      * Readies hardware decoding (GL renderer probe, decoder whitelists). startStream does this
      * itself; call it early, off the main thread, to avoid the one-time cost at stream start.
@@ -351,6 +400,8 @@ class NebulaEngine private constructor(context: Context) {
         /** Seconds a backgrounded stream stays connected (SharedPreferences Int). */
         const val BACKGROUND_GRACE_KEY = "nebula_background_grace_s"
         const val DEFAULT_BACKGROUND_GRACE_S = 60
+        /** The user's own device part of the pairing name (SharedPreferences String). */
+        const val PAIRING_DEVICE_NAME_KEY = "nebula_pairing_device_name"
 
         @Volatile
         private var instance: NebulaEngine? = null

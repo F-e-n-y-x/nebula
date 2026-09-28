@@ -21,6 +21,8 @@ import io.github.f_e_n_y_x.nebula.domain.model.HostFeatures
 import io.github.f_e_n_y_x.nebula.domain.model.StreamLink
 import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
 import io.github.f_e_n_y_x.nebula.domain.model.LastSession
+import io.github.f_e_n_y_x.nebula.domain.model.PairingAs
+import io.github.fenyx.nebula.engine.PairingName
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
@@ -118,6 +120,11 @@ class DemoHost(private val context: Context) {
             delay(6_000)
             hosts.update { list -> list.map { if (it.id == hostId) it.copy(paired = true, status = HostStatus.ONLINE) else it } }
             emit(PairingState.Paired)
+        }
+        private var demoDevice = "Ayush's S25 Ultra"
+        override fun pairingAs() = PairingAs(PairingName.display(PairingName.APP, demoDevice), demoDevice)
+        override fun setPairingDeviceName(name: String) {
+            demoDevice = PairingName.clean(name).ifEmpty { "Ayush's S25 Ultra" }
         }
         override suspend fun wake(hostId: String): Result<Unit> {
             // A sleeping demo PC "boots" a few seconds after the first magic packet.

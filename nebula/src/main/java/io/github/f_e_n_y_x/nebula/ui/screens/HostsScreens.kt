@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,10 +78,12 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
+import io.github.f_e_n_y_x.nebula.domain.model.PairingAs
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.ui.HostsViewModel
 import io.github.f_e_n_y_x.nebula.ui.Navigator
 import io.github.f_e_n_y_x.nebula.ui.PairViewModel
+import io.github.fenyx.nebula.engine.PairingName
 import io.github.f_e_n_y_x.nebula.ui.Route
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
@@ -339,6 +342,8 @@ fun PairScreen(container: AppContainer, nav: Navigator, hostId: String) {
     val vm = viewModel { PairViewModel(container, hostId) }
     val state by vm.state.collectAsStateWithLifecycle()
     val host by vm.host.collectAsStateWithLifecycle()
+    val pairingAs by vm.pairingAs.collectAsStateWithLifecycle()
+    val renamedLate by vm.renamedLate.collectAsStateWithLifecycle()
     val s = Nebula.scale
     val t = Nebula.type
     val name = host?.name ?: "your PC"
@@ -356,6 +361,8 @@ fun PairScreen(container: AppContainer, nav: Navigator, hostId: String) {
                 }
                 is PairingState.ShowPin -> {
                     Text("Pair with $name", style = t.title, color = NebulaColors.text, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(s.dp(12)))
+                    PairingAsRow(pairingAs, renamedLate, vm::renameDevice)
                     Spacer(Modifier.height(s.dp(24)))
                     Row(horizontalArrangement = Arrangement.spacedBy(s.dp(12))) {
                         st.pin.forEach { d ->
@@ -369,7 +376,7 @@ fun PairScreen(container: AppContainer, nav: Navigator, hostId: String) {
                     Spacer(Modifier.height(s.dp(28)))
                     Steps(listOf(
                         "On your PC, open Nova's web UI and go to Pair a device.",
-                        "Enter this PIN and give this device a name.",
+                        "Enter this PIN. Nova fills in this device's name for you.",
                         "Keep this screen open. It moves on by itself.",
                     ))
                     Spacer(Modifier.height(s.dp(20)))
@@ -395,6 +402,8 @@ fun PairScreen(container: AppContainer, nav: Navigator, hostId: String) {
                     Text("Couldn't pair with $name", style = t.title, color = NebulaColors.text, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(s.dp(10)))
                     Text(st.reason, style = t.body, color = NebulaColors.textSecondary, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(s.dp(16)))
+                    PairingAsRow(pairingAs, renamedLate = false, onRename = vm::renameDevice)
                     Spacer(Modifier.height(s.dp(24)))
                     Row(horizontalArrangement = Arrangement.spacedBy(s.dp(10))) {
                         NebulaButton("Try again", onClick = { vm.start() })
@@ -403,6 +412,57 @@ fun PairScreen(container: AppContainer, nav: Navigator, hostId: String) {
                 }
             }
         }
+    }
+}
+
+/**
+ * "Pairing as: Nebula from Ayush's S25 Ultra · Edit". Editing changes the device part; a request
+ * the host already has keeps its name, so [renamedLate] says where to change it.
+ */
+@Composable
+private fun PairingAsRow(pairingAs: PairingAs, renamedLate: Boolean, onRename: (String) -> Unit) {
+    val s = Nebula.scale
+    val t = Nebula.type
+    var editing by remember { mutableStateOf(false) }
+    if (!editing) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            Text("Pairing as", style = t.secondary, color = NebulaColors.textSecondary)
+            Text(pairingAs.displayName, style = t.bodyStrong, color = NebulaColors.text, modifier = Modifier.weight(1f, fill = false))
+            NebulaButton("Edit", onClick = { editing = true }, style = ButtonStyle.Ghost)
+        }
+        if (renamedLate) {
+            Text(
+                "Saved for next time. Nova already has this request, so change the name there before you enter the PIN.",
+                style = t.secondary, color = NebulaColors.textSecondary, textAlign = TextAlign.Center,
+            )
+        }
+        return
+    }
+    var text by remember { mutableStateOf(pairingAs.deviceName) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val shape = RoundedCornerShape(s.dp(12))
+    val save = { onRename(text); editing = false }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            Text("Nebula from", style = t.secondary, color = NebulaColors.textSecondary)
+            BasicTextField(
+                value = text, onValueChange = { text = it.take(PairingName.MAX_DEVICE_CHARS * 2) }, singleLine = true,
+                textStyle = t.body.copy(color = NebulaColors.text), cursorBrush = SolidColor(NebulaColors.accentText),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+                modifier = Modifier.weight(1f).widthIn(max = s.dp(320)).focusRequester(focus).onFocusChanged { focused = it.isFocused }
+                    .background(NebulaColors.surface, shape)
+                    .border(if (focused) 2.dp else 1.dp, if (focused) NebulaColors.accentText else NebulaColors.controlBorder, shape)
+                    .padding(s.dp(12)),
+                decorationBox = { inner -> if (text.isEmpty()) Text("This device (automatic)", style = t.body, color = NebulaColors.textMuted); inner() },
+            )
+            NebulaButton("Save", onClick = save)
+            NebulaIconButton(Icons.Rounded.Close, "Cancel", { editing = false })
+        }
+        Spacer(Modifier.height(s.dp(6)))
+        Text("Leave it empty to use this device's own name.", style = t.secondary, color = NebulaColors.textMuted)
     }
 }
 

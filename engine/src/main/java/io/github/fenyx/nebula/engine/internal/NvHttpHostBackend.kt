@@ -9,6 +9,7 @@ import com.limelight.nvstream.http.NvApp
 import com.limelight.nvstream.http.NvHTTP
 import com.limelight.nvstream.http.PairingManager
 import com.limelight.nvstream.wol.WakeOnLanSender
+import io.github.fenyx.nebula.engine.PairingIdentity
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.concurrent.Callable
@@ -21,6 +22,8 @@ class NvHttpHostBackend(
     private val uniqueId: () -> String,
     private val clientName: () -> String,
     private val crypto: LimelightCryptoProvider,
+    /** Who is pairing (sent as devicename/clientapp/clientver/clientform); null sends the stock name. */
+    private val pairingIdentity: () -> PairingIdentity? = { null },
 ) : HostBackend {
 
     private val pollExecutor = Executors.newCachedThreadPool { r ->
@@ -85,7 +88,7 @@ class NvHttpHostBackend(
         http(details).getPairState() == PairingManager.PairState.PAIRED
 
     override fun pair(details: ComputerDetails, pin: String): PairOutcome {
-        val http = http(details)
+        val http = http(details).also { it.pairingIdentity = pairingIdentity() }
         val result = http.pairingManager.pair(http.getServerInfo(true), pin)
         return PairOutcome(result.state, result.pairName, http.pairingManager.pairedCert)
     }

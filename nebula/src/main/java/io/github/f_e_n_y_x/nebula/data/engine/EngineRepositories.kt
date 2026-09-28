@@ -28,6 +28,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.GameKind
 import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
 import io.github.f_e_n_y_x.nebula.domain.model.LastSession
+import io.github.f_e_n_y_x.nebula.domain.model.PairingAs
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.Resolution
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
@@ -131,6 +132,10 @@ class EngineHostRepository(private val engine: NebulaEngine) : HostRepository {
 
     override suspend fun runCommand(hostId: String, commandId: String): Result<Unit> =
         runCatching { engine.runHostCommand(hostId, commandId) }.recoverCatching { throw IllegalStateException(hostActionMessage(it, sleep = false)) }
+
+    override fun pairingAs(): PairingAs = engine.pairingIdentity().let { PairingAs(it.displayName, it.deviceName) }
+
+    override fun setPairingDeviceName(name: String) = engine.setPairingDeviceName(name)
 
     override fun startWatching() = engine.startDiscovery()
     override fun stopWatching() = engine.stopDiscovery()

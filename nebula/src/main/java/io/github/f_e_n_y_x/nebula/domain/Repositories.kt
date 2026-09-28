@@ -8,6 +8,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.domain.model.HostCommands
 import io.github.f_e_n_y_x.nebula.domain.model.StreamLink
 import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
+import io.github.f_e_n_y_x.nebula.domain.model.PairingAs
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
@@ -20,6 +21,10 @@ interface HostRepository {
     suspend fun discover()
     suspend fun addManual(address: String): Result<Host>
     fun pair(hostId: String): Flow<PairingState>
+    /** The name this device pairs under. */
+    fun pairingAs(): PairingAs = PairingAs("Nebula", "")
+    /** Sets the device part of the pairing name; blank goes back to the automatic name. */
+    fun setPairingDeviceName(name: String) {}
     suspend fun wake(hostId: String): Result<Unit>
     /** Polls one host now; null when unknown. */
     suspend fun refresh(hostId: String): Host? = null

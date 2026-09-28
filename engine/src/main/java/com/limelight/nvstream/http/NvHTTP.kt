@@ -86,6 +86,12 @@ class NvHTTP(
     var lastPairStateTrusted = false
         private set
 
+    /**
+     * Who is pairing, sent with the /pair requests (Nebula). Null keeps the stock
+     * `devicename=roth` that Moonlight and V+ send.
+     */
+    var pairingIdentity: io.github.fenyx.nebula.engine.PairingIdentity? = null
+
     data class TimeoutConfig(
         val connectTimeoutMs: Int,
         val readTimeoutMs: Int,
@@ -437,7 +443,13 @@ class NvHTTP(
         }
     }
 
-    private fun getCompleteUrl(baseUrl: HttpUrl, path: String, query: String?, displayName: String? = null): HttpUrl {
+    private fun getCompleteUrl(
+        baseUrl: HttpUrl,
+        path: String,
+        query: String?,
+        displayName: String? = null,
+        extraParams: List<Pair<String, String>> = emptyList(),
+    ): HttpUrl {
         return baseUrl.newBuilder()
             .addPathSegment(path)
             .query(query)
@@ -445,6 +457,7 @@ class NvHTTP(
                 displayName?.takeIf { it.isNotEmpty() }?.let {
                     addQueryParameter("display_name", it)
                 }
+                extraParams.forEach { (name, value) -> addQueryParameter(name, value) }
             }
             .addQueryParameter("uniqueid", uniqueId)
             .addQueryParameter("clientname", clientName)
@@ -458,8 +471,15 @@ class NvHTTP(
     }
 
     @Throws(IOException::class, InterruptedException::class)
-    private fun openHttpConnection(client: OkHttpClient, baseUrl: HttpUrl, path: String, query: String?, displayName: String? = null): ResponseBody {
-        val completeUrl = getCompleteUrl(baseUrl, path, query, displayName)
+    private fun openHttpConnection(
+        client: OkHttpClient,
+        baseUrl: HttpUrl,
+        path: String,
+        query: String?,
+        displayName: String? = null,
+        extraParams: List<Pair<String, String>> = emptyList(),
+    ): ResponseBody {
+        val completeUrl = getCompleteUrl(baseUrl, path, query, displayName, extraParams)
         val request = Request.Builder().url(completeUrl).get().build()
         val response = try {
             client.newCall(request).execute()
@@ -493,9 +513,16 @@ class NvHTTP(
     }
 
     @Throws(IOException::class, InterruptedException::class)
-    private fun openHttpConnectionToString(client: OkHttpClient, baseUrl: HttpUrl, path: String, query: String?, displayName: String? = null): String {
+    private fun openHttpConnectionToString(
+        client: OkHttpClient,
+        baseUrl: HttpUrl,
+        path: String,
+        query: String?,
+        displayName: String? = null,
+        extraParams: List<Pair<String, String>> = emptyList(),
+    ): String {
         try {
-            val resp = openHttpConnection(client, baseUrl, path, query, displayName)
+            val resp = openHttpConnection(client, baseUrl, path, query, displayName, extraParams)
             val respString = resp.string()
             resp.close()
 
@@ -683,7 +710,7 @@ class NvHTTP(
     fun executePairingCommand(additionalArguments: String, enableReadTimeout: Boolean): String {
         return openHttpConnectionToString(
             if (enableReadTimeout) httpClientLongConnectTimeout else httpClientLongConnectNoReadTimeout,
-            baseUrlHttp, "pair", "devicename=roth&updateState=1&$additionalArguments"
+            baseUrlHttp, "pair", pairingQuery(additionalArguments), extraParams = pairingParams()
         )
     }
 
@@ -691,9 +718,15 @@ class NvHTTP(
     fun executePairingChallenge(): String {
         return openHttpConnectionToString(
             httpClientLongConnectTimeout, getHttpsUrl(true),
-            "pair", "devicename=roth&updateState=1&phrase=pairchallenge"
+            "pair", pairingQuery("phrase=pairchallenge"), extraParams = pairingParams()
         )
     }
+
+    /** The /pair query: stock `devicename=roth` unless [pairingIdentity] supplies the name. */
+    private fun pairingQuery(arguments: String): String =
+        if (pairingIdentity == null) "devicename=roth&updateState=1&$arguments" else "updateState=1&$arguments"
+
+    private fun pairingParams(): List<Pair<String, String>> = pairingIdentity?.queryParameters().orEmpty()
 
     @Throws(IOException::class, InterruptedException::class)
     fun unpair() {
