@@ -225,6 +225,9 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
     val switchNote: StateFlow<SwitchNote?> = _switchNote.asStateFlow()
     /** The size and frame rate saved for this game ("Use for this game from now on"), if any. */
     val gameVideoMode: StateFlow<VideoMode?> = c.prefs.videoModeFor(hostId, gameId).stateIn(this, null)
+    private val _startMode = MutableStateFlow<VideoMode?>(null)
+    /** The mode the stream started at; the stream's orientation follows it, not live switches. */
+    val startMode: StateFlow<VideoMode?> = _startMode.asStateFlow()
     /** Settings' default resolution and frame rate, for the picker's "current" hints. */
     val settings: StateFlow<StreamSettings> = c.prefs.streamSettings.stateIn(this, StreamSettings())
 
@@ -246,6 +249,7 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
             c.prefs.setMode(hostId, gameId, mode)
             val base = c.prefs.streamSettings.first()
             val initial = startingMode(base, c.prefs.videoModeFor(hostId, gameId).first(), c.deviceResolution())
+            _startMode.value = initial
             val settings = base.copy(resolution = initial.resolution, fps = initial.fps)
             _bitrateKbps.value = settings.bitrateKbps
             val sw = LiveResolutionSwitcher(initial, reconnect = { c.stream.switchMode(it) }, clock = SystemClock::elapsedRealtime)
@@ -303,6 +307,25 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
             remember -> c.prefs.setVideoMode(hostId, gameId, target)
             gameVideoMode.value != null -> c.prefs.setVideoMode(hostId, gameId, null)
         }
+    }
+
+    private val _displayScale = MutableStateFlow(100)
+    /** The host's desktop UI scale for this stream, in percent (100 until changed). */
+    val displayScale: StateFlow<Int> = _displayScale.asStateFlow()
+    private var savedScaleApplied = false
+
+    /** Asks the host to scale its desktop UI; a note says how it went. */
+    fun setDisplayScale(percent: Int) = viewModelScope.launch {
+        val ok = c.stream.setDisplayScale(percent)
+        if (ok) _displayScale.value = percent
+        _switchNote.value = if (ok) SwitchNote("Desktop scaling $percent%", ok = true) else SwitchNote("The PC didn't change its scaling.", ok = false)
+    }
+
+    /** Once per stream: re-applies the scaling saved for this game. */
+    fun applySavedDisplayScale(percent: Int) {
+        if (savedScaleApplied) return
+        savedScaleApplied = true
+        if (percent != _displayScale.value) setDisplayScale(percent)
     }
 
     fun setBitrate(kbps: Int) = viewModelScope.launch {

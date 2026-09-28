@@ -259,6 +259,11 @@ class StreamSession internal constructor(
         }, "nebula-stop").start()
     }
 
+    /** Asks the host to scale its desktop UI (text, icons) to [percent]; true once it accepted. */
+    suspend fun setDisplayScale(percent: Int): Boolean = suspendCancellableCoroutine { cont ->
+        connection.setDisplayScale(percent) { ok -> if (cont.isActive) cont.resume(ok) }
+    }
+
     /** Asks the host to change the video bitrate mid-stream; true once the host accepted it. */
     suspend fun setBitrate(kbps: Int): Boolean = suspendCancellableCoroutine { cont ->
         connection.setBitrate(kbps, object : NvConnection.BitrateAdjustmentCallback {

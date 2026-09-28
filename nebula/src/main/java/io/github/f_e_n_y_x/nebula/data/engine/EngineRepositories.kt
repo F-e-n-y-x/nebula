@@ -355,6 +355,8 @@ class EngineStreamRepository(
         return ok
     }
 
+    override suspend fun setDisplayScale(percent: Int): Boolean = session?.setDisplayScale(percent) ?: false
+
     override suspend fun switchMode(mode: VideoMode): Result<Unit> =
         run?.switchTo(mode) ?: Result.failure(IllegalStateException("Nothing is streaming."))
 
