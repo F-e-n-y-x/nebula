@@ -361,7 +361,7 @@ private fun EditableElement(
     Box(
         Modifier
             .elementBounds(e, areaW, areaH)
-            .pointerInput(e.id, gridOn) {
+            .pointerInput(e.id, gridOn, areaW, areaH) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     down.consume()

@@ -81,7 +81,7 @@ class ProfileJsonTest {
         assertEquals(custom.landscape, o.profile.landscape)
         expectFormatError { ProfileImport.parse("""{"hello":"world"}""", CrownImport.Basis(1, 1, 1f), "x", 0) }
         expectFormatError { ProfileImport.parse(ProfileJson.exportProfile(custom.copy(landscape = emptyList(), portrait = null)), CrownImport.Basis(1, 1, 1f), "x", 0) }
-        assertEquals("souls-2-.nebula-controls.json".replace("-2-", ""), ProfileImport.fileName(custom).replace("-2-", ""))
+        assertEquals("souls.nebula-controls.json", ProfileImport.fileName(custom))
         assertEquals("controls.nebula-controls.json", ProfileImport.fileName(custom.copy(name = "!!!")))
     }
 
