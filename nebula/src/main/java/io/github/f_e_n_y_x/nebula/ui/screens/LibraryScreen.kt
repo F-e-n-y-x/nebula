@@ -63,7 +63,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
@@ -88,44 +91,68 @@ import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
+/**
+ * What every home layout (Spotlight, Shelf, TV) does with a game, built once by [LibraryScreen] so
+ * they all behave the same: Play wakes a sleeping PC first, the Now playing card resumes on the
+ * display the game runs on, and favourites are the same pins everywhere.
+ */
+class HomeActions(
+    /** Plays [Game]; a null mode means "whatever Play would use" (remembered choice, host default…). */
+    val play: (Game, DisplayMode?) -> Unit,
+    val details: (Game) -> Unit,
+    val hosts: () -> Unit,
+    /** The Now playing card for this PC ([Modifier], compact); draws nothing when no game runs. */
+    val nowPlaying: @Composable (Modifier, Boolean) -> Unit,
+)
+
 @Composable
 fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String, layout: HomeLayout = HomeLayout.SPOTLIGHT_WIDE) {
-    // Tablet list-detail: the library is the list beside a game's details.
     val pane = LocalLibraryPane.current
-    if (pane.isListPane) return LibraryListPane(container, nav, hostId, pane.selectedGameId)
-    when (layout) {
-        HomeLayout.TV_SPOTLIGHT -> return TvHomeScreen(container, nav, hostId)
-        HomeLayout.SHELF_WIDE, HomeLayout.SHELF_PORTRAIT -> return ShelfHome(container, nav, hostId, wide = layout == HomeLayout.SHELF_WIDE)
-        HomeLayout.SPOTLIGHT_WIDE, HomeLayout.SPOTLIGHT_PORTRAIT -> Unit
-    }
-    val vm = viewModel { LibraryViewModel(container, hostId) }
-    val ui by vm.ui.collectAsStateWithLifecycle()
-    val form = Nebula.form
     val hostVm = viewModel(key = "host-actions-library-$hostId") { io.github.f_e_n_y_x.nebula.ui.HostActionsViewModel(container, hostId, null) }
     val wake by hostVm.wake.collectAsStateWithLifecycle()
-    var waking by remember { mutableStateOf<Game?>(null) }
+    val host by hostVm.host.collectAsStateWithLifecycle()
+    var waking by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     // A sleeping PC is woken first; the game launches once it answers.
-    val play: (Game) -> Unit = { g ->
-        val mode = ui.focusedMode
-        waking = g
-        hostVm.playWhenAwake { waking = null; nav.push(Route.Stream(hostId, g.id, mode)) }
+    val start: (String, String, DisplayMode) -> Unit = { gameId, name, mode ->
+        waking = name
+        hostVm.playWhenAwake { waking = null; nav.push(Route.Stream(hostId, gameId, mode)) }
     }
-    val details: (Game) -> Unit = { g -> nav.push(Route.Details(hostId, g.id)) }
-    // "Now playing": a game left running on this PC (after Disconnect, or started elsewhere).
-    val games = remember(vm) { vm.ui.map { it.games } }
-    val nowPlaying: @Composable (Modifier, Boolean) -> Unit = { mod, compact ->
-        NowPlayingSection(
-            container, hostId, games, compact = compact, modifier = mod,
-            onResume = { np, mode -> hostVm.playWhenAwake { nav.push(Route.Stream(hostId, np.gameId, mode)) } },
-        )
-    }
+    val games = remember(container, hostId) { container.library.observeGames(hostId) }
+    val actions = HomeActions(
+        play = { g, m -> if (m != null) start(g.id, g.name, m) else scope.launch { start(g.id, g.name, container.resolvePlayMode(g).first()) } },
+        details = { g -> nav.showDetails(hostId, g.id) },
+        hosts = { nav.top(Route.Hosts) },
+        // "Now playing": a game left running on this PC (after Disconnect, or started elsewhere).
+        nowPlaying = { mod, compact ->
+            NowPlayingSection(container, hostId, games, compact = compact, modifier = mod, onResume = { np, mode -> start(np.gameId, np.gameName, mode) })
+        },
+    )
     Box(Modifier.fillMaxSize()) {
         when {
-            !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
-            layout == HomeLayout.SPOTLIGHT_PORTRAIT -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
-            else -> SpotlightLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
+            // Tablet list-detail: the library is the list beside a game's details.
+            pane.isListPane -> LibraryListPane(container, nav, hostId, pane.selectedGameId, actions)
+            else -> when (layout) {
+            HomeLayout.TV_SPOTLIGHT -> TvHomeScreen(container, nav, hostId, actions)
+            HomeLayout.SHELF_WIDE, HomeLayout.SHELF_PORTRAIT -> ShelfHome(container, nav, hostId, wide = layout == HomeLayout.SHELF_WIDE, actions)
+            HomeLayout.SPOTLIGHT_WIDE, HomeLayout.SPOTLIGHT_PORTRAIT -> SpotlightHome(container, nav, hostId, portrait = layout == HomeLayout.SPOTLIGHT_PORTRAIT, actions)
+            }
         }
-        WakeOverlay(ui.host?.name ?: "your PC", waking?.name, wake, onCancel = { waking = null; hostVm.cancelWake() }, onRetry = hostVm::retryWake)
+        WakeOverlay(host?.name ?: "your PC", waking, wake, onCancel = { waking = null; hostVm.cancelWake() }, onRetry = hostVm::retryWake)
+    }
+}
+
+@Composable
+private fun SpotlightHome(container: AppContainer, nav: Navigator, hostId: String, portrait: Boolean, a: HomeActions) {
+    val vm = viewModel { LibraryViewModel(container, hostId) }
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    // Spotlight's Play uses the mode already shown on its button.
+    val play: (Game) -> Unit = { g -> a.play(g, if (g.id == ui.focused?.id) ui.focusedMode else null) }
+    val details: (Game) -> Unit = { g -> nav.push(Route.Details(hostId, g.id)) }
+    when {
+        !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
+        portrait -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite, a.nowPlaying)
+        else -> SpotlightLibrary(ui, vm::focus, play, details, vm::toggleFavourite, a.nowPlaying)
     }
 }
 

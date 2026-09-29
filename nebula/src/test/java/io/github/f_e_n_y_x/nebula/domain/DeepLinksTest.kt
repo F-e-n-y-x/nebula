@@ -69,9 +69,10 @@ class DeepLinksTest {
     }
 
     @Test fun buildRoundTrips() {
-        val link = DeepLinks.build("uuid atom/1", "Grand Theft Auto V", DisplayMode.MIRROR)
+        // Spaces and '+' survive; a '/' inside an id is rejected on purpose (see rejectsControlCharsSlashesAndOversize).
+        val link = DeepLinks.build("uuid atom+1", "Grand Theft Auto V", DisplayMode.MIRROR)
         assertFalse(link.contains(' '))
-        assertEquals(PlayLink("uuid atom/1".replace("/", "/"), "Grand Theft Auto V", DisplayMode.MIRROR).gameRef, DeepLinks.parse(link)?.gameRef)
+        assertEquals(PlayLink("uuid atom+1", "Grand Theft Auto V", DisplayMode.MIRROR), DeepLinks.parse(link))
         val simple = DeepLinks.build("uuid-atom", "1234", DisplayMode.VIRTUAL)
         assertEquals("nebula://play/uuid-atom/1234?display=virtual", simple)
         assertEquals(PlayLink("uuid-atom", "1234", DisplayMode.VIRTUAL), DeepLinks.parse(simple))

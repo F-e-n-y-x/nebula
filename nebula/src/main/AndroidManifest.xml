@@ -84,13 +84,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="nebula" android:host="layout" />
             </intent-filter>
-            <!-- Quick connect: nebula://play/<host>/<app>?display=virtual|mirror. Validated in the app:
-                 only a game on an already paired host ever starts (DeepLinks.resolve). -->
+            <!-- Quick connect: nebula://play/<host>/<app>?display=virtual|mirror and nebula://resume[/<host>].
+                 Validated in the app: only a game on an already paired host ever starts (PlayLinkHandler). -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="nebula" android:host="play" />
+                <data android:scheme="nebula" android:host="resume" />
             </intent-filter>
         </activity>
 

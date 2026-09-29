@@ -76,6 +76,11 @@ import io.github.f_e_n_y_x.nebula.ui.components.NebulaStar
 import io.github.f_e_n_y_x.nebula.ui.components.StatusDot
 import io.github.f_e_n_y_x.nebula.ui.components.label
 import io.github.f_e_n_y_x.nebula.ui.screens.EmptyLibrary
+import io.github.f_e_n_y_x.nebula.ui.screens.FavouriteBadge
+import io.github.f_e_n_y_x.nebula.ui.screens.GameCardMenu
+import io.github.f_e_n_y_x.nebula.ui.screens.HomeActions
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import io.github.f_e_n_y_x.nebula.ui.screens.HeroFocus
 import io.github.f_e_n_y_x.nebula.ui.screens.continueSubtitle
 import io.github.f_e_n_y_x.nebula.ui.screens.gameKeys
@@ -106,6 +111,7 @@ private sealed interface TvRow {
 
 private fun HomeUi.rows(): List<TvRow> = buildList {
     if (continueItems.isNotEmpty()) add(TvRow.Continue(continueItems))
+    if (favourites.isNotEmpty()) add(TvRow.Games("favourites", "Favourites", favourites))
     if (recentlyPlayed.isNotEmpty()) add(TvRow.Games("recent", "Recently played", recentlyPlayed))
     add(TvRow.Games("all", "All games", allGames))
     add(TvRow.Hosts(hosts))
@@ -128,13 +134,12 @@ private fun TvRow.firstKey(): String? = when (this) {
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun TvHomeScreen(container: AppContainer, nav: Navigator, hostId: String) {
+fun TvHomeScreen(container: AppContainer, nav: Navigator, hostId: String, home: HomeActions) {
     val vm = viewModel(key = "home-$hostId") { HomeViewModel(container, hostId) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     if (!ui.loading && ui.games.isEmpty()) return EmptyLibrary(ui.host, nav)
-    val play: (Game, DisplayMode?) -> Unit = { g, m ->
-        if (m != null) nav.push(Route.Stream(hostId, g.id, m)) else vm.play(g) { mode -> nav.push(Route.Stream(hostId, g.id, mode)) }
-    }
+    // Play wakes a sleeping PC first (the wake overlay is drawn by LibraryScreen).
+    val play: (Game, DisplayMode?) -> Unit = { g, m -> home.play(g, m ?: ui.focusedMode.takeIf { g.id == ui.focused?.id }) }
     val details: (Game) -> Unit = { g -> nav.push(Route.Details(hostId, g.id)) }
     val openHost: (Host) -> Unit = { h ->
         when {
@@ -166,8 +171,8 @@ fun TvHomeScreen(container: AppContainer, nav: Navigator, hostId: String) {
 
             Column(Modifier.fillMaxSize().padding(top = 24.dp, bottom = 14.dp)) {
                 TvHeader(ui.host, onHosts = { nav.top(Route.Hosts) }, onSettings = { nav.top(Route.Settings()) })
-                ui.focused?.let { TvHero(ui, it, onPlay = { play(it, null) }, onDetails = { details(it) }) }
-                TvRows(ui, Modifier.weight(1f), vm::focus, play, details, openHost, addHost = { nav.top(Route.Hosts) })
+                ui.focused?.let { TvHero(ui, it, onPlay = { play(it, null) }, onDetails = { details(it) }, onToggleFavourite = { vm.toggleFavourite(it) }) }
+                TvRows(ui, Modifier.weight(1f), vm::focus, play, details, vm::toggleFavourite, openHost, addHost = { nav.top(Route.Hosts) }, nowPlaying = home.nowPlaying)
                 Row(Modifier.padding(horizontal = 48.dp).padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
                     TvKeyHint("A", "Play")
                     TvKeyHint("Y", "Details")
@@ -208,7 +213,7 @@ private fun TvHeader(host: Host?, onHosts: () -> Unit, onSettings: () -> Unit) {
 }
 
 @Composable
-private fun TvHero(ui: HomeUi, g: Game, onPlay: () -> Unit, onDetails: () -> Unit) {
+private fun TvHero(ui: HomeUi, g: Game, onPlay: () -> Unit, onDetails: () -> Unit, onToggleFavourite: () -> Unit) {
     val context = LocalContext.current
     val cont = ui.continueItems.firstOrNull { it.game.id == g.id }
     val kicker = when {
@@ -238,6 +243,11 @@ private fun TvHero(ui: HomeUi, g: Game, onPlay: () -> Unit, onDetails: () -> Uni
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             TvActionButton("Play", onPlay, subtitle = modeLabel(context, ui.focusedMode, ui.settings), icon = Icons.Rounded.PlayArrow, primary = true)
             TvActionButton("Details", onDetails, icon = Icons.Outlined.Info, modifier = Modifier.heightIn(min = 56.dp))
+            val fav = g.id in ui.favouriteIds
+            TvActionButton(
+                if (fav) "Favourite" else "Add to favourites", onToggleFavourite,
+                icon = if (fav) Icons.Rounded.Star else Icons.Rounded.StarBorder, modifier = Modifier.heightIn(min = 56.dp),
+            )
         }
     }
 }
@@ -250,8 +260,10 @@ private fun TvRows(
     onFocusGame: (Game) -> Unit,
     play: (Game, DisplayMode?) -> Unit,
     details: (Game) -> Unit,
+    toggleFavourite: (Game) -> Unit,
     openHost: (Host) -> Unit,
     addHost: () -> Unit,
+    nowPlaying: @Composable (Modifier, Boolean) -> Unit,
 ) {
     val rows = ui.rows()
     // "row/item" of the last focused card; restored when the user comes back to the home.
@@ -271,6 +283,8 @@ private fun TvRows(
             verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(bottom = 24.dp),
         ) {
+            // A game running on the PC: Resume / Quit above the rows (Down from Play reaches it).
+            item(key = "now-playing") { nowPlaying(Modifier.padding(horizontal = 48.dp, vertical = 6.dp).widthIn(max = 640.dp), true) }
             items(rows, key = { it.key }) { row ->
                 Column {
                     Text(row.title, style = TvType.label.copy(fontSize = 13.sp), color = NebulaColors.textSecondary, modifier = Modifier.padding(horizontal = 48.dp))
@@ -292,12 +306,17 @@ private fun TvRows(
                                 }
                                 is TvRow.Games -> items(row.games, key = { it.id }) { g ->
                                     val k = "${row.key}/${g.id}"
-                                    PosterTvCard(
-                                        g,
-                                        Modifier.trackFocus(k, target, restore) { focusKey = k; onFocusGame(g) }
-                                            .gameKeys(onDetails = { details(g) }, onPlay = { play(g, null) }),
-                                        onClick = { play(g, null) }, onLongClick = { details(g) },
-                                    )
+                                    var menu by remember { mutableStateOf(false) }
+                                    val fav = g.id in ui.favouriteIds
+                                    Box {
+                                        PosterTvCard(
+                                            g, fav,
+                                            Modifier.trackFocus(k, target, restore) { focusKey = k; onFocusGame(g) }
+                                                .gameKeys(onDetails = { details(g) }, onPlay = { play(g, null) }, onMenu = { menu = true }),
+                                            onClick = { play(g, null) }, onLongClick = { menu = true },
+                                        )
+                                        GameCardMenu(menu, fav, { menu = false }, { toggleFavourite(g) }, { details(g) })
+                                    }
                                 }
                                 is TvRow.Hosts -> {
                                     items(row.hosts, key = { it.id }) { h ->
@@ -357,7 +376,7 @@ private fun ContinueTvCard(item: ContinueItem, modifier: Modifier, onClick: () -
 }
 
 @Composable
-private fun PosterTvCard(g: Game, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun PosterTvCard(g: Game, favourite: Boolean, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
     Card(
         onClick = onClick, onLongClick = onLongClick,
         modifier = modifier.width(PosterW).height(PosterH),
@@ -377,6 +396,7 @@ private fun PosterTvCard(g: Game, modifier: Modifier, onClick: () -> Unit, onLon
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp).background(Color(0xE610231A), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
+            if (favourite) FavouriteBadge(Modifier.align(Alignment.TopEnd))
         }
     }
 }

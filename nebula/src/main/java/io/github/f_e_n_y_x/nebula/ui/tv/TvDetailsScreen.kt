@@ -67,6 +67,18 @@ import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
 import io.github.f_e_n_y_x.nebula.ui.DetailsUi
 import io.github.f_e_n_y_x.nebula.ui.DetailsViewModel
+import io.github.f_e_n_y_x.nebula.ui.HostActionsViewModel
+import io.github.f_e_n_y_x.nebula.domain.HostGating
+import io.github.f_e_n_y_x.nebula.ui.screens.HostActionToasts
+import io.github.f_e_n_y_x.nebula.ui.screens.HostCommandsDialog
+import io.github.f_e_n_y_x.nebula.ui.screens.NowPlayingSection
+import io.github.f_e_n_y_x.nebula.ui.screens.WakeOverlay
+import io.github.f_e_n_y_x.nebula.ui.screens.favouriteLabel
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import kotlinx.coroutines.flow.map
 import io.github.f_e_n_y_x.nebula.ui.Navigator
 import io.github.f_e_n_y_x.nebula.ui.Route
 import io.github.f_e_n_y_x.nebula.ui.components.ArtImage
@@ -88,7 +100,18 @@ fun TvDetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gam
     val vm = viewModel { DetailsViewModel(container, hostId, gameId) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val game = ui.game ?: run { Box(Modifier.fillMaxSize().background(NebulaColors.bg)); return }
-    val play: (DisplayMode) -> Unit = { m -> vm.remember(m); nav.push(Route.Stream(hostId, game.id, m)) }
+    val context = LocalContext.current
+    val hostVm = viewModel(key = "host-actions-details-$hostId-$gameId") { HostActionsViewModel(container, hostId, gameId) }
+    val wake by hostVm.wake.collectAsStateWithLifecycle()
+    val host by hostVm.host.collectAsStateWithLifecycle()
+    val commands by hostVm.commands.collectAsStateWithLifecycle()
+    val favourite by vm.favourite.collectAsStateWithLifecycle()
+    var showCommands by remember { mutableStateOf(false) }
+    HostActionToasts(hostVm)
+    LaunchedEffect(host?.status) { hostVm.loadCommands(force = true) }
+    // A sleeping PC is woken first; the game launches once it answers.
+    val play: (DisplayMode) -> Unit = { m -> vm.remember(m); hostVm.playWhenAwake { nav.push(Route.Stream(hostId, game.id, m)) } }
+    val games = remember(vm) { vm.ui.map { listOfNotNull(it.game) } }
     var viewing by remember { mutableStateOf<Int?>(null) }
     val shots = ui.details?.screenshots.orEmpty().takeIf { ui.options.showDetails }.orEmpty()
 
@@ -104,7 +127,23 @@ fun TvDetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gam
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 48.dp, vertical = 32.dp)) {
                 Header(ui)
                 Spacer(Modifier.height(22.dp))
+                // This game running on the PC: Resume / Quit above the play choices.
+                NowPlayingSection(
+                    container, hostId, games, onlyGameId = gameId, compact = true, modifier = Modifier.padding(bottom = 16.dp).widthIn(max = 640.dp),
+                    onResume = { _, m -> hostVm.playWhenAwake { nav.push(Route.Stream(hostId, gameId, m)) } },
+                )
                 PlayButtons(ui, play)
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TvActionButton(
+                        favouriteLabel(favourite), { vm.toggleFavourite() },
+                        icon = if (favourite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                    )
+                    if (HostGating.showCommandsEntry(host, commands)) {
+                        TvActionButton("Host commands", { showCommands = true }, icon = Icons.Outlined.Terminal)
+                    }
+                    TvActionButton(if (ui.refreshing) "Refreshing…" else "Refresh", { vm.refresh(onArtCleared = { coil3.SingletonImageLoader.get(context).memoryCache?.clear() }) }, icon = Icons.Outlined.Refresh)
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Check, null, tint = NebulaColors.success, modifier = Modifier.size(16.dp))
@@ -153,6 +192,8 @@ fun TvDetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gam
             }
         }
         viewing?.let { start -> ScreenshotViewer(shots, start) { viewing = null } }
+        WakeOverlay(host?.name ?: "your PC", game.name, wake, onCancel = hostVm::cancelWake, onRetry = hostVm::retryWake)
+        if (showCommands) HostCommandsDialog(host?.name ?: "your PC", game.name, hostVm, onDismiss = { showCommands = false })
     }
 }
 

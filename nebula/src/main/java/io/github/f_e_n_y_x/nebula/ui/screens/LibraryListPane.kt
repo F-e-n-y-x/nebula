@@ -25,6 +25,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,7 +61,7 @@ import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
  * the keyboard shortcut on the details page.
  */
 @Composable
-fun LibraryListPane(container: AppContainer, nav: Navigator, hostId: String, selectedGameId: String?) {
+fun LibraryListPane(container: AppContainer, nav: Navigator, hostId: String, selectedGameId: String?, home: HomeActions) {
     val vm = viewModel(key = "home-$hostId") { HomeViewModel(container, hostId) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val s = Nebula.scale
@@ -89,9 +92,11 @@ fun LibraryListPane(container: AppContainer, nav: Navigator, hostId: String, sel
         }
         items(ui.games, key = { it.id }) { g ->
             ListPoster(
-                g, selected = g.id == selectedGameId,
+                g, selected = g.id == selectedGameId, favourite = g.id in ui.favouriteIds,
                 onOpen = { nav.showDetails(hostId, g.id) },
-                onPlay = { vm.play(g) { m -> nav.push(Route.Stream(hostId, g.id, m)) } },
+                // Wakes a sleeping PC first, like Play everywhere else.
+                onPlay = { home.play(g, null) },
+                onToggleFavourite = { vm.toggleFavourite(g) },
             )
         }
         item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.navigationBarsPadding()) }
@@ -99,9 +104,10 @@ fun LibraryListPane(container: AppContainer, nav: Navigator, hostId: String, sel
 }
 
 @Composable
-private fun ListPoster(g: Game, selected: Boolean, onOpen: () -> Unit, onPlay: () -> Unit) {
+private fun ListPoster(g: Game, selected: Boolean, favourite: Boolean, onOpen: () -> Unit, onPlay: () -> Unit, onToggleFavourite: () -> Unit) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
+    var menu by remember { mutableStateOf(false) }
     Column(Modifier.semantics { this.selected = selected }) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
@@ -109,11 +115,13 @@ private fun ListPoster(g: Game, selected: Boolean, onOpen: () -> Unit, onPlay: (
                     // Keyboard: Enter plays straight away, Space (or a tap) shows the details.
                     if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyUp) onPlay(); true } else false
                 }
-                .gameKeys(onDetails = onOpen, onPlay = onPlay)
-                .nebulaClickable(shape, onOpen, focusScale = 1.04f)
+                .gameKeys(onDetails = onOpen, onPlay = onPlay, onMenu = { menu = true })
+                .nebulaClickable(shape, onOpen, focusScale = 1.04f, onLongClick = { menu = true })
                 .border(if (selected) 2.dp else 1.dp, if (selected) NebulaColors.accentText else Color.White.copy(alpha = 0.1f), shape),
         ) {
             ArtImage(g.art.poster, g.name, g.name, Modifier.fillMaxSize(), fallbackIcon = if (g.kind == GameKind.DESKTOP) Icons.Outlined.DesktopWindows else null)
+            if (favourite) FavouriteBadge(Modifier.align(Alignment.TopEnd))
+            GameCardMenu(menu, favourite, { menu = false }, onToggleFavourite, onOpen)
         }
         Spacer(Modifier.height(s.dp(6)))
         Text(

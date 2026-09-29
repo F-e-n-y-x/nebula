@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
         intent ?: return
         if (intent.action != Intent.ACTION_VIEW) return
         val data = intent.data ?: return
-        if (!data.scheme.equals("nebula", ignoreCase = true) || data.host != "play") return
+        if (!data.scheme.equals("nebula", ignoreCase = true) || data.host !in QUICK_LINK_HOSTS) return
         playLinks.trySend(data.toString())
     }
 
@@ -112,3 +112,6 @@ class MainActivity : ComponentActivity() {
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =
         streamInput?.onMotion(event) == true || super.dispatchGenericMotionEvent(event)
 }
+
+/** Link hosts [MainActivity] passes to the play-link handler; `nebula://layout` goes to LayoutInbox. */
+private val QUICK_LINK_HOSTS = setOf("play", "resume")

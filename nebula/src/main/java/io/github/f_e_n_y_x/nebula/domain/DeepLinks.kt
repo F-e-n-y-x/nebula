@@ -14,6 +14,13 @@ import java.net.URLEncoder
 data class PlayLink(val hostRef: String, val gameRef: String, val mode: DisplayMode?)
 
 /**
+ * `nebula://resume[/<host>]`: the quick-connect "resume" action (tile, widget, launcher shortcut).
+ * Resumes the game running on the PC, else starts the last game played there; [hostRef] null means
+ * the PC of the last game played.
+ */
+data class ResumeLink(val hostRef: String?)
+
+/**
  * The quick-connect deep link. Anything on the device can send it (the activity is exported), so it
  * is parsed strictly and only ever resolves to a game on a host that is already paired: a link can
  * never start pairing, add a host, or reach a host by address.
@@ -21,6 +28,7 @@ data class PlayLink(val hostRef: String, val gameRef: String, val mode: DisplayM
 object DeepLinks {
     const val SCHEME = "nebula"
     const val ACTION_HOST = "play"
+    const val RESUME_HOST = "resume"
     private const val MAX_LINK = 512
     private const val MAX_SEGMENT = 128
 
@@ -41,6 +49,25 @@ object DeepLinks {
     fun build(hostId: String, gameId: String, mode: DisplayMode?): String {
         val q = mode?.let { "?display=" + if (it == DisplayMode.MIRROR) "mirror" else "virtual" } ?: ""
         return "$SCHEME://$ACTION_HOST/${encode(hostId)}/${encode(gameId)}$q"
+    }
+
+    /** The resume link; [hostId] null lets Nebula pick the PC of the last game played. */
+    fun buildResume(hostId: String? = null): String =
+        "$SCHEME://$RESUME_HOST" + (hostId?.let { "/" + encode(it) } ?: "")
+
+    /** Returns null for anything that isn't exactly a well-formed resume link (no query, at most one segment). */
+    fun parseResume(raw: String?): ResumeLink? {
+        if (raw.isNullOrBlank() || raw.length > MAX_LINK) return null
+        val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return null
+        if (!SCHEME.equals(uri.scheme, ignoreCase = true)) return null
+        if (uri.rawUserInfo != null || uri.port != -1 || uri.rawQuery != null || uri.rawFragment != null) return null
+        if (!RESUME_HOST.equals(uri.rawAuthority, ignoreCase = true)) return null
+        val segments = (uri.rawPath ?: "").split('/').filter { it.isNotEmpty() }
+        return when (segments.size) {
+            0 -> ResumeLink(null)
+            1 -> decodeSegment(segments[0])?.let { ResumeLink(it) }
+            else -> null
+        }
     }
 
     /** Returns null for anything that isn't exactly a well-formed play link. */
@@ -71,11 +98,14 @@ object DeepLinks {
     }
 
     /** Matches the link's host against the known hosts: an exact id, else a unique paired name. Only a paired host passes. */
-    fun resolveHost(link: PlayLink, hosts: List<Host>): HostMatch {
-        hosts.firstOrNull { it.id == link.hostRef }?.let {
+    fun resolveHost(link: PlayLink, hosts: List<Host>): HostMatch = resolveHostRef(link.hostRef, hosts)
+
+    /** [resolveHost] for a bare host id or name. */
+    fun resolveHostRef(hostRef: String, hosts: List<Host>): HostMatch {
+        hosts.firstOrNull { it.id == hostRef }?.let {
             return if (it.paired) HostMatch.Paired(it) else HostMatch.Rejected(Rejection.HOST_NOT_PAIRED)
         }
-        val named = hosts.filter { it.name.equals(link.hostRef, ignoreCase = true) }
+        val named = hosts.filter { it.name.equals(hostRef, ignoreCase = true) }
         val paired = named.filter { it.paired }
         return when {
             paired.size == 1 -> HostMatch.Paired(paired[0])

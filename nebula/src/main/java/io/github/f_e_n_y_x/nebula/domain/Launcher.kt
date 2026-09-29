@@ -135,3 +135,36 @@ object RecentGames {
     fun allGames(games: List<Game>): List<Game> =
         games.sortedWith(compareBy<Game> { it.kind != GameKind.GAME }.thenBy { it.name.lowercase() })
 }
+
+/**
+ * What quick connect's "resume" does (tile, widget, launcher shortcut): on the PC of the last game
+ * played, resume the game that runs there now, else start the last game played there again.
+ */
+object QuickResume {
+    sealed interface Target {
+        /** Start (or reconnect to) [gameId]; [mode] null means "whatever Play would use". */
+        data class Play(val gameId: String, val mode: DisplayMode?, val running: Boolean) : Target
+
+        /** Nothing to resume on that PC: open its library. */
+        data object Library : Target
+    }
+
+    /**
+     * The PC to resume on, paired only: the newest recent game's PC, else the last library shown
+     * ([lastHostId]), else any paired PC. Null when nothing is paired.
+     */
+    fun host(recents: List<RecentPlay>, hosts: List<Host>, lastHostId: String?): Host? {
+        val paired = hosts.filter { it.paired }
+        val byId = paired.associateBy { it.id }
+        return recents.sortedByDescending { it.playedAtMs }.firstNotNullOfOrNull { byId[it.hostId] }
+            ?: lastHostId?.let { byId[it] }
+            ?: paired.firstOrNull()
+    }
+
+    /** [running] is what the PC runs now (null when nothing, or it couldn't say). */
+    fun target(hostId: String, running: NowPlaying?, recents: List<RecentPlay>): Target {
+        if (running != null && running.hostId == hostId) return Target.Play(running.gameId, running.display, running = true)
+        val last = recents.filter { it.hostId == hostId }.maxByOrNull { it.playedAtMs } ?: return Target.Library
+        return Target.Play(last.gameId, last.mode, running = false)
+    }
+}

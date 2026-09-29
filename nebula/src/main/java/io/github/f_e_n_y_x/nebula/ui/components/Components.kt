@@ -11,6 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +54,8 @@ import kotlin.math.absoluteValue
 
 /**
  * Click + visible focus for every interactive surface: a 2 dp light ring when focused (D-pad, gamepad,
- * keyboard) and a small press dip. [focusScale] lets tiles grow when focused (TV/console feel).
+ * keyboard), a fainter ring under a mouse pointer, and a small press dip. [focusScale] lets tiles
+ * grow when focused (TV/console feel); hovering grows them halfway.
  */
 @Composable
 fun Modifier.nebulaClickable(
@@ -67,16 +69,25 @@ fun Modifier.nebulaClickable(
 ): Modifier {
     val focused by interaction.collectIsFocusedAsState()
     val pressed by interaction.collectIsPressedAsState()
+    // clickable reports hover itself (mouse, trackpad, stylus); touch never hovers.
+    val hovered by interaction.collectIsHoveredAsState()
     val reduced = Nebula.reducedMotion
     val target = when {
         pressed -> 0.97f
         focused -> focusScale
+        hovered -> 1f + (focusScale - 1f) / 2f
         else -> 1f
     }
     val s by animateFloatAsState(target, if (reduced) tween(0) else tween(160), label = "focusScale")
     return this
         .scale(s)
-        .then(if (focused) Modifier.border(BorderStroke(2.dp, NebulaColors.focus), shape) else Modifier)
+        .then(
+            when {
+                focused -> Modifier.border(BorderStroke(2.dp, NebulaColors.focus), shape)
+                hovered -> Modifier.border(BorderStroke(1.dp, NebulaColors.focus.copy(alpha = 0.55f)), shape)
+                else -> Modifier
+            },
+        )
         .clip(shape)
         .then(
             if (onLongClick == null) Modifier.clickable(interactionSource = interaction, indication = null, role = role, onClick = onClick)

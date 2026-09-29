@@ -94,7 +94,17 @@ class QuickConnect(
 
     private suspend fun publishShortcuts(list: List<RecentPlay>) {
         val max = ShortcutManagerCompat.getMaxShortcutCountPerActivity(app).coerceAtMost(MAX_SHORTCUTS)
-        val shortcuts = list.take(max).mapIndexed { i, r ->
+        // First: "Resume", which reconnects to whatever runs on the PC (or the last game) and wakes it.
+        val resume = list.firstOrNull()?.let { last ->
+            ShortcutInfoCompat.Builder(app, RESUME_SHORTCUT_ID)
+                .setShortLabel("Resume")
+                .setLongLabel("Resume on ${last.hostName}".take(44))
+                .setIcon(IconCompat.createWithResource(app, R.mipmap.ic_launcher_nebula))
+                .setIntent(resumeIntent(app))
+                .setRank(0)
+                .build()
+        }
+        val games = list.take(max - (if (resume != null) 1 else 0)).mapIndexed { i, r ->
             val icon = Posters.load(app, r.poster, 288, 432)?.let { IconCompat.createWithAdaptiveBitmap(adaptiveIcon(it)) }
                 ?: IconCompat.createWithResource(app, R.mipmap.ic_launcher_nebula)
             ShortcutInfoCompat.Builder(app, shortcutId(r.hostId, r.gameId))
@@ -102,10 +112,10 @@ class QuickConnect(
                 .setLongLabel("${r.gameName} on ${r.hostName}".take(44))
                 .setIcon(icon)
                 .setIntent(launchIntent(app, r))
-                .setRank(i)
+                .setRank(i + 1)
                 .build()
         }
-        ShortcutManagerCompat.setDynamicShortcuts(app, shortcuts)
+        ShortcutManagerCompat.setDynamicShortcuts(app, listOfNotNull(resume) + games)
     }
 
     companion object {
@@ -114,6 +124,15 @@ class QuickConnect(
         const val MAX_SHORTCUTS = 4
 
         fun shortcutId(hostId: String, gameId: String) = "play:$hostId/$gameId"
+        const val RESUME_SHORTCUT_ID = "resume"
+
+        /**
+         * The "resume" action (tile, widget, launcher shortcut): on the PC of the last game played,
+         * wake it if asleep, then resume the game running there or start the last one again.
+         */
+        fun resumeIntent(context: Context): Intent =
+            Intent(Intent.ACTION_VIEW, Uri.parse(DeepLinks.buildResume()), context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         /** An explicit intent to MainActivity carrying the play link (the same link frontends can send). */
         fun launchIntent(context: Context, r: RecentPlay): Intent =

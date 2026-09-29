@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.ContinueItem
 import io.github.f_e_n_y_x.nebula.domain.HomeStyle
+import io.github.f_e_n_y_x.nebula.domain.PinnedLibrary
 import io.github.f_e_n_y_x.nebula.domain.RecentGames
 import io.github.f_e_n_y_x.nebula.domain.SortLibrary
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
@@ -13,6 +14,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.Host
 import io.github.f_e_n_y_x.nebula.domain.model.LibraryOptions
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -27,8 +30,11 @@ import kotlinx.coroutines.launch
 data class HomeUi(
     val host: Host? = null,
     val hosts: List<Host> = emptyList(),
-    /** Library order (running, recent games, then desktops). */
+    /** Library order (favourites first in pin order, then running, recent games, desktops). */
     val games: List<Game> = emptyList(),
+    /** Pinned games, in pin order (the Favourites row / shelf). */
+    val favourites: List<Game> = emptyList(),
+    val favouriteIds: Set<String> = emptySet(),
     /** Stable A–Z order for "All games". */
     val allGames: List<Game> = emptyList(),
     val continueItems: List<ContinueItem> = emptyList(),
@@ -45,10 +51,15 @@ class HomeViewModel(private val c: AppContainer, val hostId: String) : ViewModel
     private val focusedId = MutableStateFlow<String?>(null)
     private val options = c.prefs.libraryOptions
 
-    private val games = combine(c.library.observeGames(hostId), options) { list, o ->
+    // Same order as the Spotlight library: favourites first, in pin order.
+    private val shelf = combine(c.library.observeGames(hostId), options, c.favourites.observe(hostId)) { list, o, pins ->
         val saveData = o.dataSaver && c.isMetered()
-        SortLibrary(list).map { if (saveData) it.copy(art = it.art.copy(hero = null)) else it }
+        PinnedLibrary.of(SortLibrary(list).map { it.forNetwork(saveData) }, pins)
     }
+    private val games = shelf.map { it.all }
+
+    /** The game list for the Now playing card (names and art of what runs on the PC). */
+    val gameList: Flow<List<Game>> = games
     private val hosts = c.hosts.observeHosts()
 
     private val rows = combine(games, c.launcher.recents) { list, recents ->
@@ -63,21 +74,23 @@ class HomeViewModel(private val c: AppContainer, val hostId: String) : ViewModel
     private val mode = focused.flatMapLatest { g -> if (g == null) flowOf(DisplayMode.VIRTUAL) else c.resolvePlayMode(g) }
 
     val ui: StateFlow<HomeUi> = combine(
-        combine(hosts, rows, ::Pair),
+        combine(hosts, rows, shelf, ::Triple),
         combine(focused, mode, ::Pair),
         c.prefs.streamSettings,
         options,
-    ) { (h, r), (f, m), s, o ->
+    ) { (h, r, p), (f, m), s, o ->
         val (list, cont, recent) = r
         HomeUi(
             host = h.firstOrNull { it.id == hostId },
             hosts = h.sortedWith(compareByDescending<Host> { it.id == hostId }.thenByDescending { it.paired }.thenBy { it.name.lowercase() }),
-            games = list, allGames = RecentGames.allGames(list), continueItems = cont, recentlyPlayed = recent,
+            games = list, favourites = p.favourites, favouriteIds = p.favouriteIds, allGames = RecentGames.allGames(list), continueItems = cont, recentlyPlayed = recent,
             focused = f, focusedMode = m, settings = s, options = o, loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUi())
 
     fun focus(game: Game) { focusedId.value = game.id }
+
+    fun toggleFavourite(game: Game) = viewModelScope.launch { c.favourites.toggle(hostId, game.id) }
 
     /** The mode "Play" uses for [game] right now (remembered choice, host default, then settings). */
     fun play(game: Game, onReady: (DisplayMode) -> Unit) {

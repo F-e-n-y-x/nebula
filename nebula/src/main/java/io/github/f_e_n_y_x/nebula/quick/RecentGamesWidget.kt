@@ -90,7 +90,17 @@ private fun WidgetContent(items: List<RecentPlay>, posters: List<Bitmap?>) {
             Text("Nebula", style = TextStyle(color = ColorProvider(Text1), fontSize = 13.sp, fontWeight = FontWeight.Medium))
             Spacer(GlanceModifier.defaultWeight())
             items.firstOrNull()?.let {
-                Text("on ${it.hostName}", style = TextStyle(color = ColorProvider(Text2), fontSize = 12.sp), maxLines = 1)
+                // Resume: whatever runs on that PC now (waking it first), else the last game.
+                Row(
+                    GlanceModifier.background(Surface).cornerRadius(12.dp).padding(horizontal = 10.dp, vertical = 4.dp)
+                        .semantics { contentDescription = "Resume on ${it.hostName}" }
+                        .clickable(actionStartActivity(QuickConnect.resumeIntent(context))),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Image(ImageProvider(R.drawable.ic_widget_play), contentDescription = null, modifier = GlanceModifier.size(14.dp))
+                    Spacer(GlanceModifier.width(4.dp))
+                    Text("Resume · ${it.hostName}", style = TextStyle(color = ColorProvider(Text1), fontSize = 12.sp), maxLines = 1)
+                }
             }
         }
         Spacer(GlanceModifier.height(10.dp))

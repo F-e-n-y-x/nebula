@@ -120,7 +120,7 @@ data class LibraryUi(
 )
 
 /** Data saver on a metered network: no hero art (the smaller poster/header stands in). */
-private fun Game.forNetwork(saveData: Boolean) = if (saveData) copy(art = art.copy(hero = null)) else this
+internal fun Game.forNetwork(saveData: Boolean) = if (saveData) copy(art = art.copy(hero = null)) else this
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LibraryViewModel(private val c: AppContainer, val hostId: String) : ViewModel() {

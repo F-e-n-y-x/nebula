@@ -72,6 +72,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.VideoCodec
 import io.github.f_e_n_y_x.nebula.ui.HomeUi
 import io.github.f_e_n_y_x.nebula.ui.HomeViewModel
 import io.github.f_e_n_y_x.nebula.ui.LocalRailInset
+import androidx.compose.foundation.layout.widthIn
 import io.github.f_e_n_y_x.nebula.ui.Navigator
 import io.github.f_e_n_y_x.nebula.ui.Route
 import io.github.f_e_n_y_x.nebula.ui.components.ArtImage
@@ -91,15 +92,11 @@ import java.util.Calendar
  * filters. Upright: host card with the two desktops, one big continue card, then a poster grid.
  */
 @Composable
-fun ShelfHome(container: AppContainer, nav: Navigator, hostId: String, wide: Boolean) {
+fun ShelfHome(container: AppContainer, nav: Navigator, hostId: String, wide: Boolean, home: HomeActions) {
     val vm = viewModel(key = "home-$hostId") { HomeViewModel(container, hostId) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     if (!ui.loading && ui.games.isEmpty()) return EmptyLibrary(ui.host, nav)
-    val actions = ShelfActions(
-        play = { g, mode -> if (mode != null) nav.push(Route.Stream(hostId, g.id, mode)) else vm.play(g) { m -> nav.push(Route.Stream(hostId, g.id, m)) } },
-        details = { g -> nav.showDetails(hostId, g.id) },
-        hosts = { nav.top(Route.Hosts) },
-    )
+    val actions = ShelfActions(home.play, home.details, home.hosts, vm::toggleFavourite, home.nowPlaying)
     if (wide) ShelfWide(ui, actions) else ShelfPortrait(ui, actions)
 }
 
@@ -108,12 +105,15 @@ internal class ShelfActions(
     val play: (Game, DisplayMode?) -> Unit,
     val details: (Game) -> Unit,
     val hosts: () -> Unit,
+    val toggleFavourite: (Game) -> Unit,
+    val nowPlaying: @Composable (Modifier, Boolean) -> Unit,
 )
 
-private enum class Filter(val label: String) { ALL("All"), GAMES("Games"), DESKTOPS("Desktops") }
+private enum class Filter(val label: String) { ALL("All"), FAVOURITES("Favourites"), GAMES("Games"), DESKTOPS("Desktops") }
 
-private fun List<Game>.filtered(f: Filter) = when (f) {
+private fun List<Game>.filtered(f: Filter, favourites: Set<String> = emptySet()) = when (f) {
     Filter.ALL -> this
+    Filter.FAVOURITES -> filter { it.id in favourites }
     Filter.GAMES -> filter { it.kind == GameKind.GAME }
     Filter.DESKTOPS -> filter { it.kind != GameKind.GAME }
 }
@@ -139,6 +139,8 @@ private fun ShelfWide(ui: HomeUi, a: ShelfActions) {
                 Text(greeting(), style = t.heading, color = NebulaColors.text, modifier = Modifier.weight(1f))
                 HostButton(ui.host, ui.settings, a.hosts)
             }
+            // A game running on the PC: Resume / Quit, the first thing D-pad down reaches.
+            a.nowPlaying(Modifier.padding(end = s.dp(20)).widthIn(max = s.dp(640)), contH < 140.dp)
             if (ui.continueItems.isNotEmpty()) {
                 ShelfLabel("Continue playing")
                 LazyRow(
@@ -155,11 +157,11 @@ private fun ShelfWide(ui: HomeUi, a: ShelfActions) {
             Row(Modifier.padding(end = s.dp(20), top = s.dp(4)), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                 ShelfLabel("Library", Modifier.weight(1f))
                 Filter.entries.forEach { f ->
-                    val n = ui.games.filtered(f).size
+                    val n = ui.games.filtered(f, ui.favouriteIds).size
                     if (f == Filter.ALL || n > 0) FilterChip("${f.label} $n", f == filter) { filter = f }
                 }
             }
-            val shown = ui.games.filtered(filter)
+            val shown = ui.games.filtered(filter, ui.favouriteIds).ifEmpty { ui.games }
             LazyRow(
                 Modifier.fillMaxWidth().focusRestorer(),
                 horizontalArrangement = Arrangement.spacedBy(s.dp(10)),
@@ -167,7 +169,7 @@ private fun ShelfWide(ui: HomeUi, a: ShelfActions) {
             ) {
                 items(shown, key = { it.id }) { g ->
                     val m = if (ui.continueItems.isEmpty() && g == shown.first()) Modifier.focusRequester(first) else Modifier
-                    ShelfPoster(g, Modifier.height(posterH).aspectRatio(2f / 3f).then(m), a)
+                    ShelfPoster(g, g.id in ui.favouriteIds, Modifier.height(posterH).aspectRatio(2f / 3f).then(m), a)
                 }
             }
         }
@@ -201,6 +203,7 @@ private fun ShelfPortrait(ui: HomeUi, a: ShelfActions) {
             }
         }
         item(span = { GridItemSpan(maxLineSpan) }) { HostCard(ui, a, Modifier.padding(bottom = s.dp(4))) }
+        item(span = { GridItemSpan(maxLineSpan) }) { a.nowPlaying(Modifier.fillMaxWidth(), compact) }
         if (hero != null) {
             item(span = { GridItemSpan(maxLineSpan) }) { ShelfLabel("Continue playing", Modifier.padding(top = s.dp(4))) }
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -213,7 +216,7 @@ private fun ShelfPortrait(ui: HomeUi, a: ShelfActions) {
                 Text("All ${ui.games.size}", style = t.label, color = NebulaColors.textSecondary)
             }
         }
-        items(posters, key = { it.id }) { g -> ShelfPoster(g, Modifier.fillMaxWidth().aspectRatio(2f / 3f), a) }
+        items(posters, key = { it.id }) { g -> ShelfPoster(g, g.id in ui.favouriteIds, Modifier.fillMaxWidth().aspectRatio(2f / 3f), a) }
     }
 }
 
@@ -335,13 +338,14 @@ internal fun continueSubtitle(item: ContinueItem): String {
 }
 
 @Composable
-private fun ShelfPoster(g: Game, modifier: Modifier, a: ShelfActions) {
+private fun ShelfPoster(g: Game, favourite: Boolean, modifier: Modifier, a: ShelfActions) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
+    var menu by remember { mutableStateOf(false) }
     Box(
         modifier
-            .gameKeys(onDetails = { a.details(g) }, onPlay = { a.play(g, null) })
-            .nebulaClickable(shape, { a.details(g) }, focusScale = 1.06f)
+            .gameKeys(onDetails = { a.details(g) }, onPlay = { a.play(g, null) }, onMenu = { menu = true })
+            .nebulaClickable(shape, { a.details(g) }, focusScale = 1.06f, onLongClick = { menu = true })
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape),
     ) {
         ArtImage(g.art.poster, g.name, g.name, Modifier.fillMaxSize(), fallbackIcon = if (g.kind == GameKind.DESKTOP) Icons.Outlined.DesktopWindows else null)
@@ -351,6 +355,8 @@ private fun ShelfPoster(g: Game, modifier: Modifier, a: ShelfActions) {
                 modifier = Modifier.align(Alignment.BottomStart).padding(s.dp(8)),
             )
         }
+        if (favourite) FavouriteBadge(Modifier.align(Alignment.TopEnd))
+        GameCardMenu(menu, favourite, { menu = false }, { a.toggleFavourite(g) }, { a.details(g) })
     }
 }
 
@@ -368,11 +374,15 @@ private fun FilterChip(text: String, on: Boolean, onClick: () -> Unit) {
     ) { Text(text, style = Nebula.type.label, color = if (on) NebulaColors.text else NebulaColors.textSecondary, maxLines = 1) }
 }
 
-/** Controller shortcuts on a game tile: Y (or Menu) opens details, X (or media Play) plays. */
-internal fun Modifier.gameKeys(onDetails: () -> Unit, onPlay: () -> Unit): Modifier = onPreviewKeyEvent { e ->
+/**
+ * Controller shortcuts on a game tile: Y opens details, X (or media Play) plays, and Menu opens the
+ * card menu (favourite, details) when there is one, else details.
+ */
+internal fun Modifier.gameKeys(onDetails: () -> Unit, onPlay: () -> Unit, onMenu: (() -> Unit)? = null): Modifier = onPreviewKeyEvent { e ->
     if (e.type != KeyEventType.KeyUp) return@onPreviewKeyEvent e.key == Key.ButtonY || e.key == Key.ButtonX || e.key == Key.Menu || e.key == Key.MediaPlay
     when (e.key) {
-        Key.ButtonY, Key.Menu -> { onDetails(); true }
+        Key.ButtonY -> { onDetails(); true }
+        Key.Menu -> { (onMenu ?: onDetails)(); true }
         Key.ButtonX, Key.MediaPlay -> { onPlay(); true }
         else -> false
     }

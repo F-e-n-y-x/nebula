@@ -12,6 +12,7 @@ import android.service.quicksettings.TileService
 import io.github.f_e_n_y_x.nebula.R
 import io.github.f_e_n_y_x.nebula.container
 import io.github.f_e_n_y_x.nebula.domain.RecentPlay
+import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,8 +32,11 @@ class ResumeTileService : TileService() {
         super.onStartListening()
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate).also { scope = it }
         s.launch {
-            last = runCatching { applicationContext.container.quick.items.first().firstOrNull() }.getOrNull()
-            render(last)
+            val c = applicationContext.container
+            last = runCatching { c.quick.items.first().firstOrNull() }.getOrNull()
+            val asleep = last?.let { r -> runCatching { c.hosts.observeHosts().first().firstOrNull { it.id == r.hostId } }.getOrNull() }
+                ?.let { it.status == HostStatus.OFFLINE && it.canWake } == true
+            render(last, asleep)
         }
     }
 
@@ -44,7 +48,8 @@ class ResumeTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
-        val target = last?.let { QuickConnect.launchIntent(this, it) } ?: QuickConnect.openAppIntent(this)
+        // Resume wakes a sleeping PC, then reconnects to what runs there (or the last game played).
+        val target = if (last != null) QuickConnect.resumeIntent(this) else QuickConnect.openAppIntent(this)
         if (isLocked) unlockAndRun { open(target) } else open(target)
     }
 
@@ -59,7 +64,7 @@ class ResumeTileService : TileService() {
         }
     }
 
-    private fun render(r: RecentPlay?) {
+    private fun render(r: RecentPlay?, asleep: Boolean) {
         val tile = qsTile ?: return
         tile.icon = Icon.createWithResource(this, R.drawable.ic_nebula_star)
         if (r == null) {
@@ -70,8 +75,8 @@ class ResumeTileService : TileService() {
         } else {
             tile.label = r.gameName
             tile.state = Tile.STATE_ACTIVE
-            if (Build.VERSION.SDK_INT >= 29) tile.subtitle = "Resume on ${r.hostName}"
-            tile.contentDescription = "Resume ${r.gameName} on ${r.hostName}"
+            if (Build.VERSION.SDK_INT >= 29) tile.subtitle = if (asleep) "Wake ${r.hostName} and resume" else "Resume on ${r.hostName}"
+            tile.contentDescription = (if (asleep) "Wake ${r.hostName} and resume " else "Resume ") + "${r.gameName} on ${r.hostName}"
         }
         tile.updateTile()
     }
