@@ -24,6 +24,19 @@ data class Host(
     fun advertises(feature: String): Boolean = novaFeatures?.contains(feature) == true
 }
 
+/**
+ * What a host says it is running (Nova /nova/v1/running, or serverinfo `currentgame` on other hosts,
+ * where only [gameId] is known and [sinceEpochS] is null).
+ */
+data class RunningGame(
+    /** The library id ([Game.id]) when known. */
+    val gameId: String?,
+    val name: String? = null,
+    val sinceEpochS: Long? = null,
+    val display: DisplayMode? = null,
+    val connectedClients: Int? = null,
+)
+
 /** Whether a host-linked action is offered. */
 enum class Gate {
     /** The host doesn't implement it (or has it turned off): hide the action. */

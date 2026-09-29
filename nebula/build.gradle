@@ -105,6 +105,9 @@ dependencies {
     implementation libs.nebula.lifecycle.viewmodel.navigation3
     implementation libs.nebula.datastore.preferences
     implementation libs.nebula.coil.compose
+    // "Game running on your PC" notification: refreshed every 15 min while you are away.
+    implementation libs.nebula.work.runtime
+    implementation libs.nebula.lifecycle.process
     implementation libs.kotlinx.coroutines.android
     // Layout sharing: QR codes (encode and decode) and the CameraX scanner for them.
     implementation "com.google.zxing:core:3.5.4"

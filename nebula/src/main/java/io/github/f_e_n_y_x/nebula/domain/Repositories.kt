@@ -31,6 +31,17 @@ interface HostRepository {
     /** Suspends the PC (Nova `/pcsleep`). Failure messages are ready to show. */
     suspend fun sleep(hostId: String): Result<Unit> = Result.failure(UnsupportedOperationException("This PC can't be put to sleep from Nebula."))
     /**
+     * What [hostId] runs right now; success(null) when nothing. Fails (message ready to show) when
+     * the host can't be reached. The default reads the polled `currentgame`.
+     */
+    suspend fun running(hostId: String): Result<io.github.f_e_n_y_x.nebula.domain.model.RunningGame?> {
+        val h = refresh(hostId) ?: return Result.failure(IllegalStateException("This PC is no longer in the list."))
+        if (h.status == io.github.f_e_n_y_x.nebula.domain.model.HostStatus.OFFLINE) return Result.failure(IllegalStateException("Couldn't reach ${h.name}."))
+        return Result.success(h.runningGameId?.let { io.github.f_e_n_y_x.nebula.domain.model.RunningGame(it) })
+    }
+    /** Quits the game running on the PC (`/cancel`). Failure messages are ready to show. */
+    suspend fun quitApp(hostId: String): Result<Unit> = Result.failure(UnsupportedOperationException("This PC can't close games from Nebula."))
+    /**
      * Host commands for [gameId] (its own plus host-wide ones), or host-wide only when null.
      * Filtered by [HostGating.visibleCommands].
      */

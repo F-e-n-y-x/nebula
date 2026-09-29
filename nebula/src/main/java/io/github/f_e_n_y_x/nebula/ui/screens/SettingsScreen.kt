@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Mouse
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
@@ -104,6 +105,7 @@ private enum class SettingsSection(val title: String, val summary: String, val i
     Overlay("Stats & stream menu", "Performance overlay, in-stream menu", Icons.Outlined.QueryStats, "interface"),
     Network("Host & network", "Packet size, host audio, Wake-on-LAN, VPN", Icons.Outlined.NetworkCheck, "host"),
     FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, "framegen"),
+    Notifications("Notifications", "Games left running on your PC", Icons.Outlined.Notifications, null),
     Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, null),
     Advanced("Advanced", "Backup, restore and everything else", Icons.Outlined.Tune, "advanced"),
     Diagnostics("Diagnostics", "Capability report, controller test, stick calibration, logs", Icons.Outlined.MonitorHeart, null),
@@ -206,6 +208,7 @@ private fun SectionBody(sec: SettingsSection, settings: StreamSettings, vm: Sett
             UpdateSection()
         }
         SettingsSection.Library -> LibrarySection(vm)
+        SettingsSection.Notifications -> NotificationsSection()
         SettingsSection.Diagnostics -> io.github.f_e_n_y_x.nebula.diagnostics.ui.DiagnosticsHub()
         SettingsSection.Input -> {
             VirtualMouseSection()

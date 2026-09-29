@@ -76,10 +76,24 @@ class AppContainer(context: Context) {
     /** Debug QA only: the demo host forgets its pairings so first-run setup can be replayed. */
     fun demoFirstRun() { if (isDemo) demo.forgetPairings() }
 
-    /** A stream went live: keep the process in the foreground with an ongoing notification. */
-    fun onStreamLive(title: String) = StreamKeepAliveService.start(app, title)
+    @Volatile private var streaming = false
 
-    fun onStreamEnded() = StreamKeepAliveService.stop(app)
+    /** Games left running on paired PCs: the home card and the "running on your PC" notification. */
+    val nowPlaying = io.github.f_e_n_y_x.nebula.nowplaying.NowPlayingCenter(app, hosts, library, streamActive = { streaming })
+
+    /** A stream went live: keep the process in the foreground with an ongoing notification. */
+    fun onStreamLive(title: String) {
+        streaming = true
+        StreamKeepAliveService.start(app, title)
+    }
+
+    fun onStreamEnded() {
+        StreamKeepAliveService.stop(app)
+        if (!streaming) return
+        streaming = false
+        // Left the app with the game still running (grace period over, Disconnect from the shade).
+        nowPlaying.onStreamEnded()
+    }
 
     /** True on mobile data and other metered links, where data saver applies. */
     fun isMetered(): Boolean = connectivity?.isActiveNetworkMetered == true
@@ -103,6 +117,11 @@ class NebulaApplication : Application(), SingletonImageLoader.Factory {
         if (io.github.f_e_n_y_x.nebula.framegen.FramegenAppSetup.isSelfTestProcess()) return
         container = AppContainer(this)
         io.github.f_e_n_y_x.nebula.framegen.FramegenAppSetup.onAppStart(this)
+        // Foreground / background for the whole app (not per activity, so rotation doesn't count).
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            override fun onStart(owner: androidx.lifecycle.LifecycleOwner) = container.nowPlaying.onAppForeground()
+            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) = container.nowPlaying.onAppBackground()
+        })
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

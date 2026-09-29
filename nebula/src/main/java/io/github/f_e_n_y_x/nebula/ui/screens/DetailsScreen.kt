@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.map
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.HostGating
 import androidx.compose.material.icons.outlined.Terminal
@@ -108,6 +109,14 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
     val refresh = { vm.refresh(onArtCleared = { SingletonImageLoader.get(ctx).memoryCache?.clear() }) }
     val showAbout = ui.details != null && ui.options.showDetails
     val asleep = host?.takeIf { HostGating.needsWake(it) }?.name
+    // This game running on the PC: Resume / Quit above the play choices.
+    val games = remember(vm) { vm.ui.map { listOfNotNull(it.game) } }
+    val nowPlaying: @Composable () -> Unit = {
+        NowPlayingSection(
+            container, hostId, games, onlyGameId = gameId, modifier = Modifier.padding(bottom = s.dp(16)),
+            onResume = { _, m -> hostVm.playWhenAwake { nav.push(Route.Stream(hostId, gameId, m)) } },
+        )
+    }
 
     Box(Modifier.fillMaxSize()) {
     PullToRefreshBox(isRefreshing = ui.refreshing, onRefresh = refresh, modifier = Modifier.fillMaxSize().background(NebulaColors.bg)) {
@@ -140,7 +149,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         Stats(ui)
                     }
                     Spacer(Modifier.height(s.dp(12)))
-                    PlayChoices(ui, play, showNote = false, asleepHost = asleep, onCommands = openCommands)
+                    PlayChoices(ui, play, showNote = false, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
                 } else Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                         NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
@@ -150,7 +159,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     Spacer(Modifier.height(s.dp(20)))
                     Header(ui)
                     Spacer(Modifier.height(s.dp(22)))
-                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands)
+                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
                     Spacer(Modifier.height(s.dp(24)))
                     Stats(ui)
                 }
@@ -187,7 +196,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                 }
                 Column(Modifier.padding(horizontal = s.dp(20)).navigationBarsPadding()) {
                     Spacer(Modifier.height(s.dp(18)))
-                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands)
+                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
                     Spacer(Modifier.height(s.dp(22)))
                     Stats(ui)
                     if (showAbout) {
@@ -226,13 +235,17 @@ private fun Header(ui: DetailsUi) {
 }
 
 @Composable
-private fun PlayChoices(ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: Boolean = true, asleepHost: String? = null, onCommands: (() -> Unit)? = null) {
+private fun PlayChoices(
+    ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: Boolean = true, asleepHost: String? = null, onCommands: (() -> Unit)? = null,
+    nowPlaying: @Composable () -> Unit = {},
+) {
     val s = Nebula.scale
     val ctx = LocalContext.current
     val primary = remember { FocusRequester() }
     LaunchedEffect(ui.game?.id) { runCatching { primary.requestFocus() } }
     val modes = if (ui.mode == DisplayMode.VIRTUAL) listOf(DisplayMode.VIRTUAL, DisplayMode.MIRROR) else listOf(DisplayMode.MIRROR, DisplayMode.VIRTUAL)
     val compact = Nebula.form.isCompact && !Nebula.form.isLandscape
+    nowPlaying()
     SectionTitle("Play on")
     val content: @Composable (DisplayMode, Modifier) -> Unit = { m, mod ->
         PlayCard(

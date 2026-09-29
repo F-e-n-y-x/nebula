@@ -118,6 +118,27 @@ class EngineHostRepository(private val engine: NebulaEngine) : HostRepository {
     override suspend fun sleep(hostId: String): Result<Unit> =
         runCatching { engine.sleepHost(hostId) }.recoverCatching { throw IllegalStateException(hostActionMessage(it, sleep = true)) }
 
+    override suspend fun running(hostId: String): Result<io.github.f_e_n_y_x.nebula.domain.model.RunningGame?> =
+        runCatching {
+            engine.running(hostId)?.let { r ->
+                io.github.f_e_n_y_x.nebula.domain.model.RunningGame(
+                    gameId = r.appId, name = r.name, sinceEpochS = r.sinceEpochS,
+                    display = when (r.display) {
+                        NovaDisplayMode.VIRTUAL -> DisplayMode.VIRTUAL
+                        NovaDisplayMode.MIRROR -> DisplayMode.MIRROR
+                        null -> null
+                    },
+                    connectedClients = r.connectedClients,
+                )
+            }
+        }.recoverCatching { throw IllegalStateException(if (it is java.io.IOException) "Couldn't reach the PC." else it.message ?: "Couldn't ask the PC.") }
+
+    override suspend fun quitApp(hostId: String): Result<Unit> =
+        runCatching { engine.quitApp(hostId) }.recoverCatching { throw io.github.f_e_n_y_x.nebula.domain.QuitFailure(
+                quitMessage(it),
+                unreachable = it is java.io.IOException && it !is HostRefusedException && it !is com.limelight.nvstream.http.HostHttpResponseException,
+            ) }
+
     override suspend fun commands(hostId: String, gameId: String?): HostCommands = withContext(Dispatchers.IO) {
         val host = engine.hosts.value.firstOrNull { it.id == hostId }?.toDomain() ?: return@withContext HostCommands.None
         val listed = if (host.features.commands == Gate.AVAILABLE) runCatching { engine.hostCommands(hostId) }.getOrNull() else null
@@ -155,6 +176,16 @@ internal fun hostActionMessage(e: Throwable, sleep: Boolean): String = when (e) 
         else -> e.message ?: "The PC refused."
     }
     is java.io.IOException -> "Couldn't reach the PC."
+    else -> e.message ?: "Something went wrong."
+}
+
+internal fun quitMessage(e: Throwable): String = when (e) {
+    is HostRefusedException -> when (e.code) {
+        401, 403 -> "This device isn't allowed to close games on the PC."
+        599 -> "The PC tried, but the game is still running."
+        else -> e.message ?: "The PC refused."
+    }
+    is java.io.IOException -> "Couldn't reach the PC. It may be asleep or off."
     else -> e.message ?: "Something went wrong."
 }
 

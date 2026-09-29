@@ -63,6 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.flow.map
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
@@ -99,11 +100,19 @@ fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String) {
         hostVm.playWhenAwake { waking = null; nav.push(Route.Stream(hostId, g.id, mode)) }
     }
     val details: (Game) -> Unit = { g -> nav.push(Route.Details(hostId, g.id)) }
+    // "Now playing": a game left running on this PC (after Disconnect, or started elsewhere).
+    val games = remember(vm) { vm.ui.map { it.games } }
+    val nowPlaying: @Composable (Modifier, Boolean) -> Unit = { mod, compact ->
+        NowPlayingSection(
+            container, hostId, games, compact = compact, modifier = mod,
+            onResume = { np, mode -> hostVm.playWhenAwake { nav.push(Route.Stream(hostId, np.gameId, mode)) } },
+        )
+    }
     Box(Modifier.fillMaxSize()) {
         when {
             !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
-            !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite)
-            else -> SpotlightLibrary(ui, vm::focus, play, details, vm::toggleFavourite)
+            !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
+            else -> SpotlightLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
         }
         WakeOverlay(ui.host?.name ?: "your PC", waking?.name, wake, onCancel = { waking = null; hostVm.cancelWake() }, onRetry = hostVm::retryWake)
     }
@@ -122,7 +131,10 @@ private fun HostChip(host: Host?) {
 
 /** Console-style home: the focused game fills the screen; a poster row at the bottom drives focus. */
 @Composable
-private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit, onToggleFavourite: (Game) -> Unit) {
+private fun SpotlightLibrary(
+    ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit, onToggleFavourite: (Game) -> Unit,
+    nowPlaying: @Composable (Modifier, Boolean) -> Unit,
+) {
     val s = Nebula.scale
     val t = Nebula.type
     val ctx = LocalContext.current
@@ -155,8 +167,10 @@ private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Ga
                 .navigationBarsPadding()
                 .padding(start = LocalRailInset.current + s.dp(40), end = s.dp(32), top = s.dp(if (compactHeight) 12 else 24), bottom = s.dp(if (compactHeight) 10 else 24)),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.Top) {
+                // The card sits top-left, above the hero text; D-pad up from Play reaches it.
+                Box(Modifier.weight(1f)) { nowPlaying(Modifier.widthIn(max = s.dp(560)), compactHeight) }
+                Spacer(Modifier.width(s.dp(16)))
                 HostChip(ui.host)
             }
             Spacer(Modifier.weight(1f))
@@ -167,8 +181,11 @@ private fun SpotlightLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Ga
                     focused.kind == GameKind.DESKTOP -> "DESKTOP"
                     else -> "IN YOUR LIBRARY"
                 }
-                Text(eyebrow, style = t.eyebrow, color = NebulaColors.accentText)
-                Spacer(Modifier.height(s.dp(10)))
+                // Short screens: the Now playing strip already says it runs; the line would crowd it.
+                if (!(compactHeight && focused.running)) {
+                    Text(eyebrow, style = t.eyebrow, color = NebulaColors.accentText)
+                    Spacer(Modifier.height(s.dp(10)))
+                }
                 GameTitle(focused, maxHeight = s.dp(if (compactHeight) 64 else 96), small = compactHeight)
                 val meta = listOfNotNull(focused.metaLine().ifBlank { null }, playtime(focused.playtimeS)?.takeIf { ui.options.showPlaytime }).joinToString("  ·  ")
                 if (meta.isNotBlank()) {
@@ -269,7 +286,10 @@ private fun PosterTile(
 
 /** Phone held upright: a hero card for the focused game, then the whole library as posters. */
 @Composable
-private fun PortraitLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit, onToggleFavourite: (Game) -> Unit) {
+private fun PortraitLibrary(
+    ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Game) -> Unit, onDetails: (Game) -> Unit, onToggleFavourite: (Game) -> Unit,
+    nowPlaying: @Composable (Modifier, Boolean) -> Unit,
+) {
     val s = Nebula.scale
     val t = Nebula.type
     val ctx = LocalContext.current
@@ -302,6 +322,8 @@ private fun PortraitLibrary(ui: LibraryUi, onFocus: (Game) -> Unit, onPlay: (Gam
                         Spacer(Modifier.weight(1f))
                         HostChip(ui.host)
                     }
+                    Spacer(Modifier.height(s.dp(10)))
+                    nowPlaying(Modifier.padding(start = start).fillMaxWidth(), false)
                 }
                 Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = start, end = side, bottom = s.dp(4))) {
                     val eyebrow = focused.lastPlayedEpochS?.takeIf { ui.options.showPlaytime }?.let { "LAST PLAYED · ${relativeAgo(it)!!.uppercase()}" } ?: "IN YOUR LIBRARY"

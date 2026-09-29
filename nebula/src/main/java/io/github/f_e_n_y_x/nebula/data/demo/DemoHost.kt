@@ -24,6 +24,7 @@ import io.github.f_e_n_y_x.nebula.domain.model.LastSession
 import io.github.f_e_n_y_x.nebula.domain.model.PairingAs
 import io.github.fenyx.nebula.engine.PairingName
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
+import io.github.f_e_n_y_x.nebula.domain.model.RunningGame
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
 import io.github.f_e_n_y_x.nebula.domain.model.StreamStats
@@ -150,6 +151,20 @@ class DemoHost(private val context: Context) {
             val app = if (gameId == "gta5") gtaCommands else emptyList()
             return io.github.f_e_n_y_x.nebula.domain.HostGating.visibleCommands(host, globalCommands, app)
         }
+        override suspend fun running(hostId: String): Result<RunningGame?> {
+            delay(250)
+            val h = hosts.value.firstOrNull { it.id == hostId } ?: return Result.failure(IllegalStateException("This PC is no longer in the list."))
+            if (h.status == HostStatus.OFFLINE) return Result.failure(IllegalStateException("Couldn't reach ${h.name}."))
+            return Result.success(if (hostId == HOST_ID) running.value else null)
+        }
+        override suspend fun quitApp(hostId: String): Result<Unit> {
+            delay(700)
+            if (hosts.value.firstOrNull { it.id == hostId }?.status == HostStatus.OFFLINE) {
+                return Result.failure(io.github.f_e_n_y_x.nebula.domain.QuitFailure("Couldn't reach the PC. It may be asleep or off.", unreachable = true))
+            }
+            if (hostId == HOST_ID) running.value = null
+            return Result.success(Unit)
+        }
         override suspend fun runCommand(hostId: String, commandId: String): Result<Unit> {
             delay(600)
             return if (commandId == "kill-game") Result.failure(IllegalStateException("That command is already running.")) else Result.success(Unit)
@@ -157,6 +172,17 @@ class DemoHost(private val context: Context) {
     }
 
     private var wakeAt = 0L
+
+    /**
+     * What the demo PC runs: GTA V on a virtual display since 1 h 20 m ago, like a Nova host with
+     * /nova/v1/running. Streams set it; Quit and Stop clear it.
+     */
+    private val running = MutableStateFlow<RunningGame?>(
+        RunningGame("gta5", "Grand Theft Auto V", sinceEpochS = now - 80 * 60, display = DisplayMode.VIRTUAL, connectedClients = 0),
+    )
+
+    /** Debug QA: nothing running on the demo PC. */
+    fun stopRunning() { running.value = null }
 
     /** Debug QA: start with atom asleep so Play shows the wake flow. */
     fun putToSleep() {
@@ -175,7 +201,9 @@ class DemoHost(private val context: Context) {
 
     val libraryRepository = object : LibraryRepository {
         override fun observeGames(hostId: String): Flow<List<Game>> =
-            hosts.map { if (hostId == HOST_ID) entries.map { it.game } else emptyList() }
+            kotlinx.coroutines.flow.combine(hosts, running) { _, r ->
+                if (hostId == HOST_ID) entries.map { it.game.copy(running = it.game.id == r?.gameId) } else emptyList()
+            }
         override suspend fun details(hostId: String, gameId: String): GameDetails? = entries.firstOrNull { it.game.id == gameId }?.details
     }
 
@@ -212,6 +240,10 @@ class DemoHost(private val context: Context) {
         }
         override fun start(game: Game, mode: DisplayMode, settings: StreamSettings, target: StreamTarget): Flow<StreamState> = flow {
             emit(StreamState.Starting)
+            // Launching another game replaces the running one; resuming keeps its start time.
+            if (running.value?.gameId != game.id) {
+                running.value = RunningGame(game.id, game.name, System.currentTimeMillis() / 1000, mode, 1)
+            }
             val r = settings.resolution
             demoMode.value = VideoMode(r.width.takeIf { it > 0 } ?: 2340, r.height.takeIf { it > 0 } ?: 1080, settings.fps)
             paused.value = false
@@ -254,7 +286,10 @@ class DemoHost(private val context: Context) {
             return Result.success(Unit)
         }
 
-        override fun stop(quitApp: Boolean) { this@DemoHost.link.value = StreamLink() }
+        override fun stop(quitApp: Boolean) {
+            this@DemoHost.link.value = StreamLink()
+            if (quitApp) running.value = null
+        }
 
         /** Demo only: frame generation as it would look at 60→120 when on in Settings. */
         @Volatile private var fgPaused = false

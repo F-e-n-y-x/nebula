@@ -106,6 +106,12 @@
             android:exported="false"
             android:grantUriPermissions="true" />
 
+        <!-- "Game running on your PC" notification actions (Stop, Don't notify, swipe-away). Not
+             exported: reached only through Nebula's own immutable PendingIntents. -->
+        <receiver
+            android:name=".nowplaying.RunningGameActionReceiver"
+            android:exported="false" />
+
         <!-- Settings → Diagnostics: the exported zip is shared from cache/diagnostics only. -->
         <provider
             android:name="androidx.core.content.FileProvider"

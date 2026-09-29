@@ -1,5 +1,6 @@
 package io.github.f_e_n_y_x.nebula
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -27,6 +28,8 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         val container = container
+        // Not again when the activity is recreated with the same intent.
+        if (savedInstanceState == null) handleResume(intent)
         val start = intent?.getStringExtra("start")
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
         setContent {
@@ -34,11 +37,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // singleTask: a layout link while Nebula runs arrives here; same checks as onCreate.
         setIntent(intent)
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
+        handleResume(intent)
+    }
+
+    /**
+     * Resume from the "game running on your PC" notification. This activity is exported (it's the
+     * launcher), so the intent is only honoured with the private token our PendingIntent carries.
+     */
+    private fun handleResume(intent: Intent?) {
+        if (intent?.action != io.github.f_e_n_y_x.nebula.nowplaying.RunningGameNotifications.ACTION_RESUME) return
+        val n = io.github.f_e_n_y_x.nebula.nowplaying.RunningGameNotifications
+        val target = container.nowPlaying.resumeTarget(
+            intent.getStringExtra(n.EXTRA_HOST), intent.getStringExtra(n.EXTRA_GAME),
+            intent.getStringExtra(n.EXTRA_MODE), intent.getStringExtra(n.EXTRA_TOKEN),
+        )
+        if (target == null) {
+            android.util.Log.w("Nebula", "Ignored a resume intent without a valid token")
+            return
+        }
+        container.nowPlaying.requestResume(target)
     }
 
     override fun onStart() {

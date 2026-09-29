@@ -39,6 +39,7 @@ nebula-datastore = "1.2.1"
 nebula-coil = "3.3.0"
 nebula-core = "1.18.0"
 nebula-tv-material = "1.0.1"
+nebula-work = "2.11.2"
 
 [libraries]
 nebula-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "nebula-compose-bom" }
@@ -50,6 +51,8 @@ nebula-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runt
 nebula-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "nebula-activity" }
 nebula-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "nebula-datastore" }
 nebula-coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "nebula-coil" }
+nebula-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "nebula-work" }
+nebula-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "nebula-lifecycle" }
 nebula-core-ktx = { module = "androidx.core:core-ktx", version.ref = "nebula-core" }
 nebula-tv-material = { module = "androidx.tv:tv-material", version.ref = "nebula-tv-material" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }

@@ -385,13 +385,17 @@ private fun Keys(onShortcut: (Shortcut) -> Unit) {
 @Composable
 private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: String) {
     val s = Nebula.scale
-    Spacer(Modifier.height(s.dp(2)))
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-        NebulaButton("Disconnect", onClick = actions.onDisconnect, style = ButtonStyle.Secondary, icon = Icons.Rounded.Close)
-        NebulaButton(quitLabel, onClick = onQuit, style = ButtonStyle.Danger, icon = Icons.Rounded.PowerSettingsNew)
+    // A Column: the caller's Box would otherwise stack the note on top of the buttons.
+    Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            NebulaButton("Disconnect", sublabel = "Game keeps running", onClick = actions.onDisconnect, style = ButtonStyle.Secondary, icon = Icons.Rounded.Close)
+            NebulaButton(
+                quitLabel, sublabel = if (quitLabel == "Quit game") "Closes it on the PC" else "Game keeps running",
+                onClick = onQuit, style = ButtonStyle.Danger, icon = Icons.Rounded.PowerSettingsNew,
+            )
+        }
+        Text("Disconnect leaves the game running on your PC: resume it from Home. Back or B closes this menu.", style = Nebula.type.label, color = NebulaColors.textMuted)
     }
-    Text("Disconnect leaves the game running so you can resume. Back or B closes this menu.", style = Nebula.type.label, color = NebulaColors.textMuted)
-    Spacer(Modifier.size(s.dp(4)))
 }
 
 /**

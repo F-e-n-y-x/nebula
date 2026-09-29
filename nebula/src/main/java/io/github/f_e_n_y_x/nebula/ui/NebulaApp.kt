@@ -155,6 +155,21 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
     val nav = remember { Navigator(stack) { paired.value } }
     (stack.lastOrNull { it is Route.Library } as? Route.Library)?.let { nav.lastLibrary = it }
 
+    // Resume from the "game running on your PC" notification: the library, then the stream on top.
+    val resume by container.nowPlaying.pendingResume.collectAsState()
+    LaunchedEffect(resume) {
+        val t = resume ?: return@LaunchedEffect
+        container.nowPlaying.consumeResume()
+        if (t.hostId !in paired.value) return@LaunchedEffect
+        val current = stack.lastOrNull()
+        if (current is Route.Stream && current.hostId == t.hostId && current.gameId == t.gameId) return@LaunchedEffect
+        val mode = t.mode ?: kotlinx.coroutines.withTimeoutOrNull(5_000) {
+            container.library.observeGames(t.hostId).first().firstOrNull { it.id == t.gameId }?.let { container.resolvePlayMode(it).first() }
+        } ?: container.prefs.streamSettings.first().defaultMode
+        nav.top(Route.Library(t.hostId))
+        nav.push(Route.Stream(t.hostId, t.gameId, mode))
+    }
+
     val route = stack.last()
     val section = when (route) {
         is Route.Library -> Section.Library
