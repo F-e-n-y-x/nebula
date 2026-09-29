@@ -201,4 +201,21 @@ class QuickTogglesTest {
         // The detailed "touch outside" control re-reads on every change instead of keeping its own copy.
         assertFalse(menu.contains("var outside by remember(controlsProfileId)"))
     }
+
+    @Test
+    fun `the layout tile steps a layout set and is off by default`() {
+        assertFalse(QuickToggle.LAYOUT in QuickToggles.DEFAULT)
+        val none = QuickTileState.layout(null)
+        assertFalse(none.enabled)
+        assertNotNull(none.reason)
+        val on = QuickTileState.layout("Vehicle")
+        assertTrue(on.enabled)
+        assertEquals("Vehicle", on.value)
+        assertEquals(QuickTileState.Kind.ACTION, on.kind)
+        assertEquals("Vehicle", on.spoken)
+        // It goes where a "next" switch element goes: the stream screen's set, the session's layout.
+        val screen = File(src, "ui/screens/StreamScreen.kt").readText()
+        assertTrue(screen.contains("onNextLayout = {"))
+        assertTrue(screen.contains("target(controlsProfile.id, io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next)"))
+    }
 }

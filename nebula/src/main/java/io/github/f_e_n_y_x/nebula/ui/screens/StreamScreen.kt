@@ -620,6 +620,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 hostState = hostLink,
                 // A TV doesn't turn; everything else can follow the device rotation.
                 portraitFollow = portraitFollow.takeUnless { Nebula.form.isTv },
+                setLayout = controlsProfile.name.takeIf { ui.osc && controlsActive.set != null },
                 actions = StreamMenuActions(
                     onResume = { menu = false },
                     onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },
@@ -644,6 +645,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     onQuit = { end(!ui.quitDisconnectsOnly) },
                     onFramegenPause = { paused, force -> container.stream.setFramegenPaused(paused, force) },
                     onPortraitFollow = { vm.setPortraitStreaming(if (it) PortraitStreaming.FOLLOW_ROTATION else PortraitStreaming.OFF) },
+                    onNextLayout = {
+                        controlsActive.set?.target(controlsProfile.id, io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next)?.let { activeLayoutId = it }
+                    },
                 ),
                 hostSection = { StreamHostMenuSection(hostLink, prefs, onTypeClipboard = typeClipboard, onSlept = { end(false) }) },
             )

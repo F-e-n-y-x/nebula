@@ -85,6 +85,8 @@ class StreamMenuActions(
     val onEditControls: () -> Unit = {},
     /** Portrait streaming "Follow rotation" on or off, for the running stream and after. */
     val onPortraitFollow: (Boolean) -> Unit = {},
+    /** The layout set's next layout (the Layout quick toggle). */
+    val onNextLayout: () -> Unit = {},
 )
 
 /**
@@ -121,6 +123,8 @@ fun StreamMenu(
     hostState: StreamHostState? = null,
     /** Portrait streaming "Follow rotation", or null where the stream can't follow (TV). */
     portraitFollow: Boolean? = null,
+    /** The layout on screen when the game's controls are a layout set, else null. */
+    setLayout: String? = null,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -185,6 +189,7 @@ fun StreamMenu(
                 portraitFollow = portraitFollow, onPortraitFollow = actions.onPortraitFollow,
                 onKeyboard = if (ui.keyboardKind == KeyboardKind.PHONE) actions.onKeyboard else actions.onPcKeyboard,
                 firstFocus = firstQuick,
+                setLayout = setLayout, onNextLayout = actions.onNextLayout,
             )
             Header(mode, stats)
             StatsBlock(stats, full = true)

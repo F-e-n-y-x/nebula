@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Mouse
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.Vibration
@@ -101,6 +102,10 @@ fun QuickToggleStrip(
     onPortraitFollow: (Boolean) -> Unit,
     onKeyboard: () -> Unit,
     firstFocus: FocusRequester?,
+    /** The layout on screen when the game's controls are a layout set (and shown), else null. */
+    setLayout: String? = null,
+    /** Goes to the set's next layout, as a switch element set to "next" does. */
+    onNextLayout: () -> Unit = {},
 ) {
     val s = Nebula.scale
     val shown = remember(tick) { QuickToggles.read(prefs.prefs.all) }
@@ -143,6 +148,7 @@ fun QuickToggleStrip(
         QuickToggle.PORTRAIT -> QuickTileState.portrait(portraitFollow)
         QuickToggle.HAPTICS -> QuickTileState.switch(ui.haptics.enabled)
         QuickToggle.MOUSE_BAR -> QuickTileState.switch(ui.mouseBar)
+        QuickToggle.LAYOUT -> QuickTileState.layout(setLayout)
     }
 
     fun tap(t: QuickToggle, st: QuickTileState) {
@@ -185,6 +191,7 @@ fun QuickToggleStrip(
             QuickToggle.PORTRAIT -> portraitFollow?.let { onPortraitFollow(!it) }
             QuickToggle.HAPTICS -> HapticsSettings.write(prefs, ui.haptics.copy(enabled = !ui.haptics.enabled))
             QuickToggle.MOUSE_BAR -> prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, !ui.mouseBar)
+            QuickToggle.LAYOUT -> onNextLayout()
         }
     }
 
@@ -235,6 +242,7 @@ private fun icon(t: QuickToggle, st: QuickTileState): ImageVector = when (t) {
     QuickToggle.PORTRAIT -> Icons.Outlined.ScreenRotation
     QuickToggle.HAPTICS -> Icons.Outlined.Vibration
     QuickToggle.MOUSE_BAR -> Icons.Outlined.Mouse
+    QuickToggle.LAYOUT -> Icons.Outlined.SwapHoriz
 }
 
 @Composable

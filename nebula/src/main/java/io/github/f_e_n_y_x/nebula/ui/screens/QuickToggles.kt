@@ -22,7 +22,8 @@ enum class QuickToggle(val id: String, val label: String) {
     KEYBOARD("keyboard", "Keyboard"),
     PORTRAIT("portrait", "Rotation"),
     HAPTICS("haptics", "Haptics"),
-    MOUSE_BAR("mouse_bar", "Mouse bar");
+    MOUSE_BAR("mouse_bar", "Mouse bar"),
+    LAYOUT("layout", "Layout");
 
     /** What the long name reads as in the editor and to TalkBack. */
     val longLabel: String get() = when (this) {
@@ -37,6 +38,7 @@ enum class QuickToggle(val id: String, val label: String) {
         PORTRAIT -> "Follow device rotation (portrait streaming)"
         HAPTICS -> "Audio haptics"
         MOUSE_BAR -> "Mouse buttons bar"
+        LAYOUT -> "Next layout of the layout set"
     }
 
     companion object {
@@ -186,6 +188,11 @@ data class QuickTileState(
         fun portrait(follow: Boolean?): QuickTileState =
             if (follow == null) QuickTileState(false, "Not here", enabled = false, reason = "Following the device rotation isn't available on this device.")
             else QuickTileState(follow, if (follow) "Follow" else "Fixed")
+
+        /** [current]: the layout on screen when the game's controls are a layout set, else null. */
+        fun layout(current: String?): QuickTileState =
+            if (current == null) QuickTileState(false, "No set", enabled = false, reason = "This game's controls aren't a layout set. Pick one under Controls below.", kind = Kind.ACTION)
+            else QuickTileState(false, current, kind = Kind.ACTION)
 
         private fun upscalerShort(m: UpscalerMode) = when (m) {
             UpscalerMode.OFF -> "Off"
