@@ -108,6 +108,10 @@ dependencies {
     // "Game running on your PC" notification: refreshed every 15 min while you are away.
     implementation libs.nebula.work.runtime
     implementation libs.nebula.lifecycle.process
+    // Launcher: Compose for TV home, home-screen widget, TV Watch Next.
+    implementation libs.nebula.tv.material
+    implementation libs.nebula.glance.appwidget
+    implementation libs.tvprovider
     implementation libs.kotlinx.coroutines.android
     // Layout sharing: QR codes (encode and decode) and the CameraX scanner for them.
     implementation "com.google.zxing:core:3.5.4"

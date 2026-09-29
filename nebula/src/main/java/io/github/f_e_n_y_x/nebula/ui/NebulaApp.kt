@@ -63,7 +63,12 @@ import io.github.f_e_n_y_x.nebula.ui.screens.StreamScreen
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
+import io.github.f_e_n_y_x.nebula.domain.HomeLayout
+import io.github.f_e_n_y_x.nebula.domain.HomeStyle
+import io.github.f_e_n_y_x.nebula.domain.ResolveHomeLayout
+import io.github.f_e_n_y_x.nebula.ui.tv.TvDetailsScreen
 
 sealed interface Route {
     data object Onboarding : Route
@@ -90,6 +95,18 @@ class Navigator(
 ) {
     val current: Route get() = stack.last()
     fun push(r: Route) { stack.add(r) }
+
+    /** Opens a game's details; from the tablet list pane it swaps the game shown instead of stacking pages. */
+    fun showDetails(hostId: String, gameId: String) {
+        val r = Route.Details(hostId, gameId)
+        if (stack.last() is Route.Details) stack[stack.lastIndex] = r else stack.add(r)
+    }
+
+    /** Replaces the whole stack (a validated play link builds Library → Details → Stream). */
+    fun reset(routes: List<Route>) {
+        stack.clear()
+        stack.addAll(routes)
+    }
 
     /**
      * Pops one screen. At the root of Hosts or Settings it returns to the home section (the
@@ -130,8 +147,9 @@ private enum class Section(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun NebulaApp(container: AppContainer, startOverride: String? = null) {
+fun NebulaApp(container: AppContainer, startOverride: String? = null, playLinks: Channel<String>? = null) {
     var start by remember { mutableStateOf<Route?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var startPaired by remember { mutableStateOf(emptyList<String>()) }
     // Paired PCs, the last used first. Live: pairing during first-run setup must update the tabs.
     val livePaired by remember(container) {
@@ -143,7 +161,7 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
         // Debug QA: "asleep:<screen>" starts with the demo PC asleep.
         val spec = startOverride?.takeIf { io.github.f_e_n_y_x.nebula.BuildConfig.DEBUG && it.startsWith("asleep:") }
             ?.also { container.debugPutDemoHostToSleep() }?.removePrefix("asleep:") ?: startOverride
-        start = debugStart(spec) ?: startPaired.firstOrNull()?.let { Route.Library(it) } ?: Route.Onboarding
+        start = debugStart(debugLauncherSetup(context, container, spec, playLinks)) ?: startPaired.firstOrNull()?.let { Route.Library(it) } ?: Route.Onboarding
     }
     val initial = start
     if (initial == null) {
@@ -171,14 +189,26 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
     }
 
     val route = stack.last()
-    val section = when (route) {
+    val form = Nebula.form
+    val homeStyle by container.launcher.homeStyle.collectAsState(initial = HomeStyle.AUTO)
+    val homeLayout = ResolveHomeLayout(homeStyle, form.isTv, form.isLandscape)
+    val split = LibraryListDetailSceneStrategy.shouldSplit(form)
+    // Library | Details side by side (tablet): the rail stays, with Library selected.
+    val twoPane = split && route is Route.Details && stack.getOrNull(stack.lastIndex - 1) is Route.Library
+    val section = if (twoPane) Section.Library else when (route) {
         is Route.Library -> Section.Library
         Route.Hosts -> Section.Hosts
         is Route.Settings -> Section.Settings
         else -> null
     }
-    val form = Nebula.form
-    val showChrome = section != null
+    // The TV Spotlight home has its own header (Hosts, Settings), like the NebA TV design.
+    val showChrome = section != null && !(route is Route.Library && homeLayout == HomeLayout.TV_SPOTLIGHT)
+
+    // Every stream opened, from the app or a play link, becomes the newest recent game.
+    LaunchedEffect(route) {
+        if (route is Route.Stream) container.quick.onStreamOpened(route.hostId, route.gameId, route.mode)
+    }
+    PlayLinkHandler(container, nav, playLinks)
 
     // Back at a section root goes home; NavDisplay handles the pops above that. Registered first,
     // so screen-level handlers (stream overlay, settings drill-down) take priority.
@@ -189,12 +219,15 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
             backStack = stack,
             onBack = { nav.back() },
             entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator()),
+            sceneStrategies = listOf(remember(split) { LibraryListDetailSceneStrategy(split) }),
             entryProvider = entryProvider {
                 entry<Route.Onboarding> { OnboardingScreen(container, nav) }
                 entry<Route.Hosts> { HostsScreen(container, nav) }
                 entry<Route.Pair> { PairScreen(container, nav, it.hostId) }
-                entry<Route.Library> { LibraryScreen(container, nav, it.hostId) }
-                entry<Route.Details> { DetailsScreen(container, nav, it.hostId, it.gameId) }
+                entry<Route.Library>(metadata = { LibraryPanes.list() }) { LibraryScreen(container, nav, it.hostId, homeLayout) }
+                entry<Route.Details>(metadata = { LibraryPanes.detail(it.gameId) }) {
+                    if (form.isTv) TvDetailsScreen(container, nav, it.hostId, it.gameId) else DetailsScreen(container, nav, it.hostId, it.gameId)
+                }
                 entry<Route.Stream> { StreamScreen(container, nav, it.hostId, it.gameId, it.mode) }
                 entry<Route.Settings> { SettingsScreen(container, nav, it.section) }
                 entry<Route.ControlsEditor> { ControlsEditorScreen(container, nav, it.hostId, it.gameId) }
@@ -212,7 +245,8 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
 
     // One layout tree for every route so NavDisplay keeps its state when the chrome changes.
     val rail = showChrome && form.useRail
-    val overlayRail = rail && section == Section.Library // the library hero runs full-bleed under the rail
+    // Spotlight's hero runs full-bleed under the rail; Shelf and the tablet list pane sit beside a solid rail.
+    val overlayRail = rail && section == Section.Library && route is Route.Library && !homeLayout.isShelf
     val railWidth = Nebula.scale.dp(RAIL_WIDTH)
     Box(Modifier.fillMaxSize().background(NebulaColors.bg)) {
         Column(Modifier.fillMaxSize()) {

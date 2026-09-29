@@ -71,6 +71,11 @@ class AppContainer(context: Context) {
     /** Debug QA only: the demo PC starts asleep so Play shows the wake flow. */
     fun debugPutDemoHostToSleep() { if (isDemo) demo.putToSleep() }
 
+    /** Home style and the local recent-games list behind Continue rows and quick connect. */
+    val launcher: io.github.f_e_n_y_x.nebula.domain.LauncherRepository = io.github.f_e_n_y_x.nebula.data.LauncherStore(context)
+    /** Shortcuts, widget, Quick Settings tile and TV Watch Next, kept in step with [launcher]. */
+    val quick = io.github.f_e_n_y_x.nebula.quick.QuickConnect(context, launcher, hosts, library)
+
     private val connectivity = context.getSystemService(ConnectivityManager::class.java)
 
     /** Debug QA only: the demo host forgets its pairings so first-run setup can be replayed. */
@@ -104,6 +109,7 @@ class AppContainer(context: Context) {
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             prefs.libraryOptions.map { it.cacheLimitMb }.distinctUntilChanged().collect { artwork.setLimit(it * 1024L * 1024L) }
         }
+        quick.start(CoroutineScope(SupervisorJob() + Dispatchers.Default))
     }
 }
 

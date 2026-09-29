@@ -43,6 +43,14 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
+    <!-- Watch Next: find the TV launcher so it can be granted read access to poster files. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <application
         android:name=".NebulaApplication"
         android:allowBackup="false"
@@ -76,7 +84,48 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="nebula" android:host="layout" />
             </intent-filter>
+            <!-- Quick connect: nebula://play/<host>/<app>?display=virtual|mirror. Validated in the app:
+                 only a game on an already paired host ever starts (DeepLinks.resolve). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nebula" android:host="play" />
+            </intent-filter>
         </activity>
+
+        <!-- Quick Settings tile: resume the last game. Only the system can bind it. -->
+        <service
+            android:name=".quick.ResumeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_nebula_star"
+            android:label="@string/tile_resume_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true" />
+        </service>
+
+        <!-- Home-screen widget with the last three games (Glance). -->
+        <receiver
+            android:name=".quick.RecentGamesWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_recent_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/recent_games_widget_info" />
+        </receiver>
+
+        <!-- Watch Next posters for the TV launcher: private, read grants per URI only. -->
+        <provider
+            android:name=".quick.PosterFileProvider"
+            android:authorities="${applicationId}.posters"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/poster_paths" />
+        </provider>
 
         <service
             android:name=".StreamKeepAliveService"

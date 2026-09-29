@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import io.github.f_e_n_y_x.nebula.ui.NebulaApp
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaTheme
+import kotlinx.coroutines.channels.Channel
 
 /** Receives raw key and motion events while a stream has input focus (controls hidden). */
 interface StreamInputSink {
@@ -20,6 +21,12 @@ interface StreamInputSink {
 class MainActivity : ComponentActivity() {
     /** Set by the stream screen; null everywhere else so D-pad focus drives the UI. */
     var streamInput: StreamInputSink? = null
+
+    /**
+     * Play links (nebula://play/…) from shortcuts, the widget, the tile, Watch Next or other apps.
+     * Only the link itself is taken from the intent; the UI validates it against the paired hosts.
+     */
+    private val playLinks = Channel<String>(Channel.CONFLATED)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
@@ -32,8 +39,10 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleResume(intent)
         val start = intent?.getStringExtra("start")
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
+        // A recreated activity already handled its launch link.
+        if (savedInstanceState == null) takePlayLink(intent)
         setContent {
-            NebulaTheme { NebulaApp(container, start) }
+            NebulaTheme { NebulaApp(container, start, playLinks) }
         }
     }
 
@@ -43,6 +52,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
         handleResume(intent)
+        takePlayLink(intent)
     }
 
     /**
@@ -61,6 +71,14 @@ class MainActivity : ComponentActivity() {
             return
         }
         container.nowPlaying.requestResume(target)
+    }
+
+    private fun takePlayLink(intent: Intent?) {
+        intent ?: return
+        if (intent.action != Intent.ACTION_VIEW) return
+        val data = intent.data ?: return
+        if (!data.scheme.equals("nebula", ignoreCase = true) || data.host != "play") return
+        playLinks.trySend(data.toString())
     }
 
     override fun onStart() {

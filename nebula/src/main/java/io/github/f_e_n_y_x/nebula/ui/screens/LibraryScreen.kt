@@ -68,6 +68,9 @@ import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
 import io.github.f_e_n_y_x.nebula.domain.model.Host
+import io.github.f_e_n_y_x.nebula.domain.HomeLayout
+import io.github.f_e_n_y_x.nebula.ui.LocalLibraryPane
+import io.github.f_e_n_y_x.nebula.ui.tv.TvHomeScreen
 import io.github.f_e_n_y_x.nebula.ui.LibraryUi
 import io.github.f_e_n_y_x.nebula.ui.LibraryViewModel
 import io.github.f_e_n_y_x.nebula.ui.Navigator
@@ -86,7 +89,15 @@ import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
 @Composable
-fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String) {
+fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String, layout: HomeLayout = HomeLayout.SPOTLIGHT_WIDE) {
+    // Tablet list-detail: the library is the list beside a game's details.
+    val pane = LocalLibraryPane.current
+    if (pane.isListPane) return LibraryListPane(container, nav, hostId, pane.selectedGameId)
+    when (layout) {
+        HomeLayout.TV_SPOTLIGHT -> return TvHomeScreen(container, nav, hostId)
+        HomeLayout.SHELF_WIDE, HomeLayout.SHELF_PORTRAIT -> return ShelfHome(container, nav, hostId, wide = layout == HomeLayout.SHELF_WIDE)
+        HomeLayout.SPOTLIGHT_WIDE, HomeLayout.SPOTLIGHT_PORTRAIT -> Unit
+    }
     val vm = viewModel { LibraryViewModel(container, hostId) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val form = Nebula.form
@@ -111,7 +122,7 @@ fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String) {
     Box(Modifier.fillMaxSize()) {
         when {
             !ui.loading && ui.games.isEmpty() -> EmptyLibrary(ui.host, nav)
-            !form.isLandscape && !form.isTv -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
+            layout == HomeLayout.SPOTLIGHT_PORTRAIT -> PortraitLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
             else -> SpotlightLibrary(ui, vm::focus, play, details, vm::toggleFavourite, nowPlaying)
         }
         WakeOverlay(ui.host?.name ?: "your PC", waking?.name, wake, onCancel = { waking = null; hostVm.cancelWake() }, onRetry = hostVm::retryWake)
@@ -119,7 +130,7 @@ fun LibraryScreen(container: AppContainer, nav: Navigator, hostId: String) {
 }
 
 @Composable
-private fun HostChip(host: Host?) {
+internal fun HostChip(host: Host?) {
     host ?: return
     Pill(
         text = "${host.name} · ${host.status.label()}",
@@ -227,7 +238,7 @@ private fun SpotlightLibrary(
 }
 
 @Composable
-private fun GameTitle(game: Game, maxHeight: androidx.compose.ui.unit.Dp, small: Boolean = false) {
+internal fun GameTitle(game: Game, maxHeight: androidx.compose.ui.unit.Dp, small: Boolean = false) {
     val t = Nebula.type
     if (game.art.logo != null) {
         Box(Modifier.heightIn(max = maxHeight).widthIn(max = maxHeight * 6f)) {
@@ -393,7 +404,7 @@ private fun GridTile(g: Game, selected: Boolean, favourite: Boolean, onClick: ()
 }
 
 @Composable
-private fun EmptyLibrary(host: Host?, nav: Navigator) {
+internal fun EmptyLibrary(host: Host?, nav: Navigator) {
     val s = Nebula.scale
     Column(
         Modifier.fillMaxSize().background(NebulaColors.bg).statusBarsPadding().padding(s.dp(32)),
@@ -412,7 +423,7 @@ private fun EmptyLibrary(host: Host?, nav: Navigator) {
 }
 
 /** Crop focus for hero art: a little right of centre and above the middle, where faces usually are. */
-private val HeroFocus = BiasAlignment(0.35f, -0.35f)
+internal val HeroFocus = BiasAlignment(0.35f, -0.35f)
 
 /** Lets a grid item draw past the grid's side padding (full-bleed headers). */
 private fun Modifier.bleed(start: Dp, end: Dp) = layout { measurable, constraints ->

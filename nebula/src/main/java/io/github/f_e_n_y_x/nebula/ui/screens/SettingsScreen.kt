@@ -106,7 +106,7 @@ private enum class SettingsSection(val title: String, val summary: String, val i
     Network("Host & network", "Packet size, host audio, Wake-on-LAN, VPN", Icons.Outlined.NetworkCheck, "host"),
     FrameGen("Frame generation", "Lossless Scaling engine, upscaling", Icons.Outlined.AutoAwesome, "framegen"),
     Notifications("Notifications", "Games left running on your PC", Icons.Outlined.Notifications, null),
-    Library("Library & artwork", "Details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, null),
+    Library("Library & artwork", "Home style, details, playtime, image quality, art cache", Icons.Outlined.PhotoLibrary, null),
     Advanced("Advanced", "Backup, restore and everything else", Icons.Outlined.Tune, "advanced"),
     Diagnostics("Diagnostics", "Capability report, controller test, stick calibration, logs", Icons.Outlined.MonitorHeart, null),
     About("About", "Version, updates, licenses, credits", Icons.Outlined.Info, null),
@@ -545,6 +545,7 @@ private fun LibrarySection(vm: SettingsViewModel) {
     val host by vm.host.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     Column(Modifier.widthIn(max = s.dp(680)), verticalArrangement = Arrangement.spacedBy(s.dp(26))) {
+        HomeStyleSetting()
         Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             ToggleRow("Show game details", "Description, genres and screenshots on each game's page.", o.showDetails) { v -> vm.updateOptions { it.copy(showDetails = v) } }
             ToggleRow("Show playtime", "Hours played and last played, from Nova.", o.showPlaytime) { v -> vm.updateOptions { it.copy(showPlaytime = v) } }

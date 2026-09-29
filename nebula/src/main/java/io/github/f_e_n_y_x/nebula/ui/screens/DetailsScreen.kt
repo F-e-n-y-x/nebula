@@ -71,6 +71,7 @@ import androidx.compose.material.icons.outlined.Terminal
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
 import io.github.f_e_n_y_x.nebula.ui.DetailsUi
+import io.github.f_e_n_y_x.nebula.ui.LocalBackButtonVisibility
 import io.github.f_e_n_y_x.nebula.ui.DetailsViewModel
 import io.github.f_e_n_y_x.nebula.ui.Navigator
 import io.github.f_e_n_y_x.nebula.ui.Route
@@ -139,7 +140,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                 if (short) Column(Modifier.weight(1.2f).fillMaxHeight()) {
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
-                            NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                            if (LocalBackButtonVisibility.current) NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                             star()
                             MoreMenu(refresh, openCommands)
                         }
@@ -152,7 +153,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                     PlayChoices(ui, play, showNote = false, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
                 } else Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
-                        NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                        if (LocalBackButtonVisibility.current) NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                         star()
                         MoreMenu(refresh, openCommands)
                     }
@@ -186,7 +187,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         Modifier.fillMaxWidth().statusBarsPadding().padding(s.dp(16)),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
+                        if (LocalBackButtonVisibility.current) NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                         Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                             star()
                             MoreMenu(refresh, openCommands)

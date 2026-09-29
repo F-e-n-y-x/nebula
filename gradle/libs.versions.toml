@@ -38,8 +38,9 @@ nebula-activity = "1.12.4"
 nebula-datastore = "1.2.1"
 nebula-coil = "3.3.0"
 nebula-core = "1.18.0"
-nebula-tv-material = "1.0.1"
+nebula-tv-material = "1.1.0"
 nebula-work = "2.11.2"
+nebula-glance = "1.2.0"
 
 [libraries]
 nebula-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "nebula-compose-bom" }
@@ -55,6 +56,7 @@ nebula-work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref =
 nebula-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "nebula-lifecycle" }
 nebula-core-ktx = { module = "androidx.core:core-ktx", version.ref = "nebula-core" }
 nebula-tv-material = { module = "androidx.tv:tv-material", version.ref = "nebula-tv-material" }
+nebula-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "nebula-glance" }
 desugar-jdk-libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }

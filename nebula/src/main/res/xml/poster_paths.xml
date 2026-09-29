@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Posters of recently played games, shared read-only with the TV launcher for Watch Next. -->
+<paths>
+    <files-path name="posters" path="quick/posters/" />
+</paths>
