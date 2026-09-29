@@ -84,8 +84,8 @@ enum class ZoneType(val id: String, val label: String, val help: String) {
 
 /**
  * Hold: pressed while the finger is down. Toggle: first tap latches, second tap releases.
- * Mixed (PUBG's "mixed" scope mode): a quick tap latches like Toggle, a long press is held only
- * while the finger stays down.
+ * Mixed (the "tap or hold" aim common in mobile shooters): a quick tap latches like Toggle, a long
+ * press is held only while the finger stays down.
  */
 enum class PressMode(val id: String, val label: String) { HOLD("hold", "Hold"), TOGGLE("toggle", "Toggle"), MIXED("mixed", "Tap or hold") }
 
@@ -208,8 +208,8 @@ data class ControlElement(
         /** GTA V's stick deadzone is about 20 %. */
         const val DEFAULT_ANTI_DEADZONE = 0.22f
         /**
-         * Fire-and-look: travel before the finger also looks. Tiny, so aiming starts at once
-         * (PUBG); the travel up to it is not lost, it is applied when looking starts.
+         * Fire-and-look: travel before the finger also looks. Tiny, so aiming starts at once (as
+         * mobile shooters do); the travel up to it is not lost, it is applied when looking starts.
          */
         const val LOOK_THROUGH_DP = 3f
         const val DEFAULT_SPRINT_AT = 1.25f
@@ -260,9 +260,23 @@ data class ControlsProfile(
         const val GTA_ID = "builtin:gta-touch-camera"
         const val GTA_MOUSE_ID = "builtin:gta-mouse-camera"
         const val GTA_TOUCH_ID = "builtin:gta-touch-only"
-        const val SHOOTER_PAD_ID = "builtin:shooter-pubg-pad"
-        const val SHOOTER_KBM_ID = "builtin:shooter-pubg-kbm"
-        const val GTA_PUBG_ID = "builtin:gta-pubg"
+        const val TOUCH_SHOOTER_PAD_ID = "builtin:touch-shooter-pad"
+        const val TOUCH_SHOOTER_KBM_ID = "builtin:touch-shooter-kbm"
+        const val GTA_TOUCH_CONTROLS_ID = "builtin:gta-touch-controls"
+
+        /**
+         * Built-in ids from 0.3.0-dev15 and earlier, and what they became. Saved defaults,
+         * per-game assignments and per-profile settings that name an old id are moved over when
+         * they're read ([ProfileJson.decodeStore], [ProfilePrefsMigration]).
+         */
+        val RENAMED_IDS: Map<String, String> = mapOf(
+            "builtin:shooter-pubg-pad" to TOUCH_SHOOTER_PAD_ID,
+            "builtin:shooter-pubg-kbm" to TOUCH_SHOOTER_KBM_ID,
+            "builtin:gta-pubg" to GTA_TOUCH_CONTROLS_ID,
+        )
+
+        /** [id], or what it was renamed to. */
+        fun currentId(id: String): String = RENAMED_IDS[id] ?: id
     }
 }
 

@@ -17,7 +17,7 @@ import java.util.Base64
 import java.util.zip.Deflater
 
 class LayoutFileTest {
-    private val presets = listOf(DefaultProfiles.gtaPubg(), DefaultProfiles.shooterPad(), DefaultProfiles.shooterKbm(), DefaultProfiles.gtaTouchOnly(), DefaultProfiles.standard())
+    private val presets = listOf(DefaultProfiles.gtaTouchControls(), DefaultProfiles.touchShooterPad(), DefaultProfiles.touchShooterKbm(), DefaultProfiles.gtaTouchGamepad(), DefaultProfiles.standard())
 
     private fun rejects(text: String, contains: String) {
         try {
@@ -28,7 +28,7 @@ class LayoutFileTest {
         }
     }
 
-    private fun good(): JSONObject = JSONObject(LayoutFile.encode(DefaultProfiles.shooterPad()))
+    private fun good(): JSONObject = JSONObject(LayoutFile.encode(DefaultProfiles.touchShooterPad()))
     private fun JSONObject.el(i: Int = 1): JSONObject = getJSONArray("landscape").getJSONObject(i)
 
     // ---------------------------------------------------------------- round trips
@@ -48,13 +48,13 @@ class LayoutFileTest {
 
     @Test
     fun `metadata round trips`() {
-        val meta = LayoutFile.parse(LayoutFile.encode(DefaultProfiles.gtaPubg())).meta
-        assertEquals("GTA V: PUBG-style", meta.name)
+        val meta = LayoutFile.parse(LayoutFile.encode(DefaultProfiles.gtaTouchControls())).meta
+        assertEquals("GTA V · touch controls", meta.name)
         assertEquals(GameRef("Grand Theft Auto V", 271590), meta.game)
         assertEquals(LayoutTarget.XINPUT, meta.target)
         assertEquals(DeviceClass.PHONE, meta.device)
         assertEquals(2.17f, meta.aspect!!, 0.001f)
-        assertTrue("gta" in meta.tags)
+        assertEquals(listOf("action-adventure", "third-person", "shooter", "controller", "touch-only"), meta.tags)
     }
 
     @Test
@@ -64,19 +64,19 @@ class LayoutFileTest {
             assertTrue(code.startsWith(LayoutFile.CODE_PREFIX))
             assertEquals(p.landscape, LayoutFile.parse(code).profile.landscape)
         }
-        assertTrue("the PUBG preset fits one QR code", LayoutFile.fitsQr(LayoutFile.shareCode(DefaultProfiles.shooterPad())))
+        assertTrue("the touch-shooter preset fits one QR code", LayoutFile.fitsQr(LayoutFile.shareCode(DefaultProfiles.touchShooterPad())))
     }
 
     @Test
     fun `files are compact`() {
-        val text = LayoutFile.encode(DefaultProfiles.shooterPad(), pretty = false)
+        val text = LayoutFile.encode(DefaultProfiles.touchShooterPad(), pretty = false)
         assertFalse("defaults are left out", text.contains("\"keepWithController\":false"))
         assertTrue(text.length < 6000)
     }
 
     @Test
     fun `the store keeps the new fields`() {
-        val p = DefaultProfiles.gtaPubg().copy(id = "p-1")
+        val p = DefaultProfiles.gtaTouchControls().copy(id = "p-1")
         val back = ProfileJson.decodeStore(ProfileJson.encodeStore(ProfileJson.StoreData(listOf(p)))).profiles.single()
         assertEquals(p, back)
     }
@@ -141,12 +141,12 @@ class LayoutFileTest {
 
     @Test fun `import entry point takes layouts, share codes and old profiles`() {
         val fallback = CrownImport.Basis(2400, 1080, 2.75f)
-        val fromFile = ProfileImport.parse(LayoutFile.encode(DefaultProfiles.shooterPad()), fallback, "p-1", 0)
+        val fromFile = ProfileImport.parse(LayoutFile.encode(DefaultProfiles.touchShooterPad()), fallback, "p-1", 0)
         assertEquals(ProfileImport.Source.LAYOUT, fromFile.source)
         assertEquals(LayoutTarget.XINPUT, fromFile.meta?.target)
-        val fromCode = ProfileImport.parse(LayoutFile.shareCode(DefaultProfiles.shooterKbm()), fallback, "p-2", 0)
+        val fromCode = ProfileImport.parse(LayoutFile.shareCode(DefaultProfiles.touchShooterKbm()), fallback, "p-2", 0)
         assertEquals(ProfileImport.Source.LAYOUT, fromCode.source)
-        val old = ProfileImport.parse(ProfileJson.exportProfile(DefaultProfiles.gtaTouchOnly()), fallback, "p-3", 0)
+        val old = ProfileImport.parse(ProfileJson.exportProfile(DefaultProfiles.gtaTouchGamepad()), fallback, "p-3", 0)
         assertEquals(ProfileImport.Source.NEBULA, old.source)
     }
 
@@ -155,17 +155,35 @@ class LayoutFileTest {
     private fun index(vararg entries: JSONObject) = JSONObject().put("format", LayoutIndex.FORMAT).put("version", 1).put("updated", "2026-09-29")
         .put("layouts", JSONArray().apply { entries.forEach { put(it) } }).toString()
 
-    private fun entry(id: String, game: String?, path: String = "layouts/generic/$id.json") = JSONObject()
+    private fun entry(id: String, game: String?, path: String = "layouts/genre-shooter/$id.json", tags: List<String> = emptyList()) = JSONObject()
         .put("id", id).put("name", "Layout $id").put("author", "me").put("target", "xinput").put("device", "phone")
         .apply { if (game != null) put("game", JSONObject().put("name", game)) }
+        .apply { if (tags.isNotEmpty()) put("tags", JSONArray(tags)) }
         .put("path", path).put("size", 1200).put("sha256", "a".repeat(64)).put("controls", 2)
         .put("preview", JSONArray().put(JSONArray(listOf("zone", 0.2, 0.6, 0.4, 0.7))).put(JSONArray(listOf("button", 0.8, 0.5, 80, 80))))
 
-    @Test fun `index parses, groups by game and searches`() {
-        val idx = LayoutIndex.parse(index(entry("a", "GTA V"), entry("b", null), entry("c", "Apex Legends"), entry("d", "GTA V")))
-        assertEquals(4, idx.entries.size)
-        assertEquals(listOf("Any game", "Apex Legends", "GTA V"), idx.byGame().map { it.first })
-        assertEquals(2, idx.byGame("gta").single().second.size)
+    @Test fun `index parses, groups by genre and game, filters and searches`() {
+        val idx = LayoutIndex.parse(
+            index(
+                entry("a", "GTA V", "layouts/gta-v/a.json", listOf("action-adventure", "third-person", "shooter")),
+                entry("b", null, "layouts/genre-shooter/b.json", listOf("shooter", "controller")),
+                entry("c", "Apex Legends", "layouts/apex-legends/c.json", listOf("shooter", "first-person")),
+                entry("d", "GTA V", "layouts/gta-v/d.json", listOf("action-adventure")),
+                entry("e", null, "layouts/genre-racing/e.json", listOf("controller")),
+            ),
+        )
+        assertEquals(5, idx.entries.size)
+        assertEquals(listOf("shooter", "racing", "action-adventure"), idx.genres())
+        // Templates first (by genre), then games by name.
+        assertEquals(listOf("Shooter templates", "Racing templates", "Apex Legends", "GTA V"), idx.browse().map { it.title })
+        assertEquals("For any shooter", idx.browse().first().subtitle)
+        assertEquals("Shooter · Action-adventure", idx.browse().last().subtitle)
+        assertEquals(listOf("Shooter templates", "Apex Legends", "GTA V"), idx.browse(genre = "shooter").map { it.title })
+        assertEquals(listOf("a"), idx.browse(genre = "shooter").last().entries.map { it.id })
+        assertEquals(listOf("Racing templates"), idx.browse(genre = "racing").map { it.title })
+        assertEquals(2, idx.browse("gta").single().entries.size)
+        assertEquals(listOf("Racing templates"), idx.browse("racing").map { it.title })
+        assertTrue(idx.browse("gta", genre = "racing").isEmpty())
         assertEquals(2, idx.entries.first().preview.size)
         assertEquals(ElementKind.ZONE, idx.entries.first().preview.first().kind)
         assertEquals("https://example.com/lib/layouts/gta-v/x.json", LayoutIndex.resolve("https://example.com/lib/index.json", "layouts/gta-v/x.json"))
@@ -198,6 +216,24 @@ class LayoutFileTest {
             val bytes = file.readBytes()
             assertEquals(e.path, e.sha256, LayoutIndex.sha256(bytes))
             LayoutFile.parse(String(bytes))
+        }
+        assertTrue("shooter" in idx.genres())
+        assertEquals("Shooter templates", idx.browse().first().title)
+        assertTrue(idx.browse().any { it.title == "Grand Theft Auto V" })
+    }
+
+    @Test fun `shared layouts go where the library keeps them`() {
+        assertEquals("layouts/genre-shooter/touch-shooter-controller.json", LibraryPaths.pathFor(DefaultProfiles.touchShooterPad().meta!!))
+        assertEquals("layouts/genre-shooter/touch-shooter-keyboard-mouse.json", LibraryPaths.pathFor(DefaultProfiles.touchShooterKbm().meta!!))
+        assertEquals("layouts/gta-v/touch-controls.json", LibraryPaths.pathFor(DefaultProfiles.gtaTouchControls().meta!!))
+        assertEquals("layouts/elden-ring/controller-touch-camera.json", LibraryPaths.pathFor(LayoutMeta("Elden Ring · controller + touch camera", game = GameRef("Elden Ring"))))
+        assertEquals("layouts/forza-horizon-5/my-wheel.json", LibraryPaths.pathFor(LayoutMeta("My wheel", game = GameRef("Forza Horizon 5"))))
+        assertEquals("layouts/genre-racing/tilt-steering.json", LibraryPaths.pathFor(LayoutMeta("Tilt steering", tags = listOf("gyro", "racing"))))
+        assertEquals("layouts/genre-other/my-layout.json", LibraryPaths.pathFor(LayoutMeta("My layout")))
+        // Every path passes the index's own check.
+        for (m in listOf(DefaultProfiles.touchShooterPad().meta!!, LayoutMeta("x".repeat(40), game = GameRef("y".repeat(60))))) {
+            val one = index(entry("p", null, LibraryPaths.pathFor(m)))
+            assertEquals(LibraryPaths.pathFor(m), 1, LayoutIndex.parse(one).entries.size)
         }
     }
 
@@ -257,12 +293,12 @@ class LayoutFileTest {
         try { f.fetch(server.url("/big").toString(), 1000); fail() } catch (e: ControlsFormatException) { assertTrue(e.message!!.contains("larger")) }
         server.enqueue(MockResponse.Builder().code(302).addHeader("Location", "http://example.com/evil.json").build())
         try { f.fetch(server.url("/r").toString(), 1000); fail() } catch (e: ControlsFormatException) { assertTrue(e.message!!.contains("https")) }
-        val layout = LayoutFile.encode(DefaultProfiles.shooterPad())
+        val layout = LayoutFile.encode(DefaultProfiles.touchShooterPad())
         server.enqueue(MockResponse.Builder().code(200).body(layout).build())
         val e = LibraryEntry("x", LayoutMeta("x"), "layouts/generic/x.json", layout.length, "0".repeat(64), 1, emptyList())
         try { f.layout(server.url("/index.json").toString(), e, "p", 0); fail() } catch (ex: ControlsFormatException) { assertTrue(ex.message!!.contains("checksum")) }
         server.enqueue(MockResponse.Builder().code(200).body(layout).build())
         val ok = f.layout(server.url("/index.json").toString(), e.copy(sha256 = LayoutIndex.sha256(layout.toByteArray())), "p", 0)
-        assertEquals(DefaultProfiles.shooterPad().landscape, ok.profile.landscape)
+        assertEquals(DefaultProfiles.touchShooterPad().landscape, ok.profile.landscape)
     }
 }

@@ -33,6 +33,7 @@ class ControlsStore private constructor(context: Context) {
     private val writes = Channel<StoreData>(Channel.CONFLATED)
 
     init {
+        ProfilePrefsMigration.apply(prefs.prefs)
         scope.launch { for (d in writes) write(d) }
     }
 

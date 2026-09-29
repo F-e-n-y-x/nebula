@@ -358,7 +358,7 @@ fun ControlsEditor(
         )
     }
     if (tutorial) {
-        ShooterTutorialOverlay(editor.elements.takeIf { l -> l.any { it.role == io.github.f_e_n_y_x.nebula.controls.ElementRole.FIRE } } ?: DefaultProfiles.shooterPad().landscape) {
+        ShooterTutorialOverlay(editor.elements.takeIf { l -> l.any { it.role == io.github.f_e_n_y_x.nebula.controls.ElementRole.FIRE } } ?: DefaultProfiles.touchShooterPad().landscape) {
             tutorial = false
             ShooterTutorial.markSeen(io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx))
         }

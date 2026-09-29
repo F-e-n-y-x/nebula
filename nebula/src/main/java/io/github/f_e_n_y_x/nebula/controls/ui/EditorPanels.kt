@@ -405,7 +405,7 @@ private fun DirectionFields(e: ControlElement, onEdit: (String?, (ControlElement
     }
 }
 
-/** Auto-sprint and run lock for a move stick (PUBG / CoD Mobile). */
+/** Auto-sprint and run lock for a move stick, as in mobile shooters. */
 @Composable
 private fun MoveFields(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
     Field("Auto-sprint", "Held while you push the stick forward past its ring: L3 on a gamepad, Shift on a keyboard. None turns it off.") {
@@ -444,7 +444,7 @@ private fun RoleField(e: ControlElement, onEdit: (String?, (ControlElement) -> C
 private fun PressModeField(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
     Field("Behaviour", when (e.mode) {
         PressMode.TOGGLE -> "Tap once to hold it down, tap again to let go."
-        PressMode.MIXED -> "A quick tap keeps it held until the next tap; a long press holds it only while your finger stays (PUBG's mixed aim)."
+        PressMode.MIXED -> "A quick tap keeps it held until the next tap; a long press holds it only while your finger stays (the usual aim button in mobile shooters)."
         PressMode.HOLD -> "Held while your finger is on it."
     }) {
         Segmented(PressMode.entries.map { it.label to it }, e.mode) { m -> onEdit(null) { it.copy(mode = m) } }
@@ -512,11 +512,11 @@ private fun BindingPicker(title: String, current: Binding, allowNone: Boolean, o
 }
 
 @Composable
-private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
+internal fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
     Box(
-        Modifier.heightIn(min = s.dp(40)).widthIn(min = s.dp(44)).nebulaClickable(shape, onClick, role = Role.RadioButton)
+        modifier.heightIn(min = s.dp(40)).widthIn(min = s.dp(44)).nebulaClickable(shape, onClick, role = Role.RadioButton)
             .background(if (selected) NebulaColors.accent else NebulaColors.surface, shape)
             .border(1.dp, if (selected) NebulaColors.accentText else NebulaColors.controlBorder, shape)
             .padding(horizontal = s.dp(12), vertical = s.dp(9)),

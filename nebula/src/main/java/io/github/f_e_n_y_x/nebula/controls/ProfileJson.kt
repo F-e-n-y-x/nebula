@@ -57,8 +57,9 @@ object ProfileJson {
         if (root.optString("kind") != STORE_KIND) throw ControlsFormatException("Not a Nebula controls store")
         checkVersion(root)
         val profiles = root.optJSONArray("profiles")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(::profileFromJsonOrNull) } }.orEmpty()
-        val games = root.optJSONObject("games")?.let { g -> g.keys().asSequence().associateWith { g.optString(it) }.filterValues { it.isNotBlank() } }.orEmpty()
-        return StoreData(profiles, root.optString("activeProfileId", ControlsProfile.STANDARD_ID), games)
+        // Built-in ids that were renamed are moved over, so defaults and per-game choices keep working.
+        val games = root.optJSONObject("games")?.let { g -> g.keys().asSequence().associateWith { ControlsProfile.currentId(g.optString(it)) }.filterValues { it.isNotBlank() } }.orEmpty()
+        return StoreData(profiles, ControlsProfile.currentId(root.optString("activeProfileId", ControlsProfile.STANDARD_ID)), games)
     }
 
     // ---- pieces ----

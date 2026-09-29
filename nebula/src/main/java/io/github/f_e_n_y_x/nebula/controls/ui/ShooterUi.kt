@@ -41,15 +41,25 @@ import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
-/** A layout style the editor can start from; [preset] null is a style that isn't ready yet. */
+/**
+ * A layout style the editor can start from; [preset] null is a style that isn't ready yet. Genre
+ * templates come first, then layouts made for one game, named like the layout library
+ * ("<game or genre> · <what's different>").
+ */
 internal data class ControlStyle(val key: String, val title: String, val help: String, val preset: (() -> ControlsProfile)?)
 
 internal fun controlStyles(standard: StandardOptions) = listOf(
     ControlStyle("standard", "Standard", "The gamepad: sticks, face buttons, bumpers and triggers.") { DefaultProfiles.standard(standard) },
-    ControlStyle("shooter-pad", "Shooter · controller", "PUBG Mobile's layout for XInput shooters: left and right fire, drag-to-aim, auto-sprint and run lock, ADS tap or hold.") { DefaultProfiles.shooterPad() },
-    ControlStyle("shooter-kbm", "Shooter · keyboard + mouse", "The same for PC mouse-and-keyboard shooters: WASD stick, mouse look, LMB / RMB, Space, C, Z, R, F, Q / E peek, Alt free look.") { DefaultProfiles.shooterKbm() },
-    ControlStyle("gta", "GTA V · PUBG-style", "The shooter layout with GTA V's controller map and mouse look.") { DefaultProfiles.gtaPubg() },
-    ControlStyle("racing", "Racing", "Steering, throttle and brake. Coming later.", null),
+    ControlStyle(
+        "touch-shooter-pad", "Touch shooter · controller",
+        "For any shooter played with a controller: fire on both sides (drag the right one to aim), sprint past the ring, run lock, aim with a tap or a hold, lean.",
+    ) { DefaultProfiles.touchShooterPad() },
+    ControlStyle(
+        "touch-shooter-kbm", "Touch shooter · keyboard & mouse",
+        "The same for games played with keyboard and mouse: WASD stick, mouse look, left and right mouse buttons, Space, C, Z, R, F, Q / E lean, Alt free look.",
+    ) { DefaultProfiles.touchShooterKbm() },
+    ControlStyle("gta-touch-controls", "GTA V · touch controls", "The touch-shooter layout on GTA V's own controller map, with mouse look.") { DefaultProfiles.gtaTouchControls() },
+    ControlStyle("racing", "Racing (later)", "Steering, throttle and brake. Coming later.", null),
 )
 
 /**
@@ -124,7 +134,7 @@ fun ShooterTutorialOverlay(layout: List<ControlElement>, onDone: () -> Unit) {
         "Right fire shoots at once: drag it to aim while you shoot.".takeIf { has(ElementRole.FIRE) { it.lookThrough } },
         "Aim: tap to stay aimed, or hold.".takeIf { has(ElementRole.ADS) },
         "Eye: hold and drag to look around.".takeIf { has(ElementRole.FREE_LOOK) },
-        "Claw grip: index fingers reach peek, map and the top buttons.".takeIf { has(ElementRole.PEEK_LEFT) },
+        "Claw grip: index fingers reach lean (peek), map and the top buttons.".takeIf { has(ElementRole.PEEK_LEFT) },
     )
     Box(Modifier.fillMaxSize().background(Color(0xCC000000)).nebulaClickable(RoundedCornerShape(0.dp), {}).testTag("shooter-tutorial")) {
         Column(Modifier.align(Alignment.Center).systemBarsPadding().padding(s.dp(16)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(s.dp(14))) {

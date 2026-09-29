@@ -159,7 +159,7 @@ class TouchRouter(
         last[id] = x to y
         lastT[id] = t
         val owner = claim(x, y, t)
-        // Touching a run-locked stick again stops the run (PUBG); the finger then steers as usual.
+        // Touching a run-locked stick again stops the run; the finger then steers as usual.
         when (owner) {
             is Stick -> unlock(owner.e.id)
             is FloatStick -> unlock(owner.e.id)

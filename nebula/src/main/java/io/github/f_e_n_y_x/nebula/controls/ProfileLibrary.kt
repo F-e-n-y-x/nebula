@@ -15,16 +15,16 @@ class ProfileLibrary(
     private val builtIn: ControlsProfile,
     private val newId: () -> String,
     private val now: () -> Long,
-    /** Read-only ready-made profiles (the GTA V touch-camera preset). */
+    /** Read-only ready-made profiles: genre templates and game layouts ([DefaultProfiles.presets]). */
     private val presets: List<ControlsProfile> = DefaultProfiles.presets(),
 ) {
     /** Built-ins first, then the user's profiles by name. */
     val all: List<ControlsProfile> get() = listOf(builtIn) + presets + data.profiles.sortedBy { it.name.lowercase() }
 
-    fun find(id: String?): ControlsProfile? = when (id) {
+    fun find(id: String?): ControlsProfile? = when (val cur = id?.let(ControlsProfile::currentId)) {
         null -> null
         builtIn.id -> builtIn
-        else -> presets.firstOrNull { it.id == id } ?: data.profiles.firstOrNull { it.id == id }
+        else -> presets.firstOrNull { it.id == cur } ?: data.profiles.firstOrNull { it.id == cur }
     }
 
     /** The profile for [gameKey]: its own assignment, else the default, else Standard. */

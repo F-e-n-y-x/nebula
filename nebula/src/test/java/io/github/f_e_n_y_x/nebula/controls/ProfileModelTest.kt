@@ -108,7 +108,13 @@ class ProfileModelTest {
         assertEquals(a.id, l6.assignedTo("h:gt"))
         // The built-in can't be deleted.
         assertSame(l6, l6.delete(ControlsProfile.STANDARD_ID))
-        assertEquals(listOf("Standard gamepad", "GTA V: PUBG-style", "Shooter: PUBG-style (controller)", "Shooter: PUBG-style (keyboard+mouse)", "GTA V: touch only", "GTA V: controller + touch camera (right half)", "GTA V: controller + mouse camera (right half)", "Racing wheel", "Racing wheel copy 2"), l6.all.map { it.name })
+        assertEquals(
+            listOf(
+                "Standard gamepad", "Touch shooter · controller", "Touch shooter · keyboard & mouse", "GTA V · touch controls", "GTA V · touch gamepad",
+                "GTA V · controller + touch camera", "GTA V · controller + mouse camera", "Racing wheel", "Racing wheel copy 2",
+            ),
+            l6.all.map { it.name },
+        )
     }
 
     @Test
@@ -131,6 +137,41 @@ class ProfileModelTest {
         assertEquals("Standard gamepad 2", a.name)
         val (_, b) = l1.add(ControlsProfile("x", "   ", emptyList()))
         assertEquals("Imported controls", b.name)
+        // A library layout with a built-in's name is added beside it, not over it.
+        val (_, c) = l1.add(DefaultProfiles.touchShooterPad().copy(origin = "library"))
+        assertEquals("Touch shooter · controller 2", c.name)
+        assertFalse(c.isBuiltIn)
+    }
+
+    @Test
+    fun renamedBuiltInIdsKeepWorking() {
+        // 0.3.0-dev15 saved these ids for the default and per-game choices.
+        val old = StoreData(activeProfileId = "builtin:shooter-pubg-kbm", games = mapOf("h:gta" to "builtin:gta-pubg", "h:cod" to "builtin:shooter-pubg-pad", "h:x" to "p-7"))
+        val back = ProfileJson.decodeStore(ProfileJson.encodeStore(old))
+        assertEquals(ControlsProfile.TOUCH_SHOOTER_KBM_ID, back.activeProfileId)
+        assertEquals(mapOf("h:gta" to ControlsProfile.GTA_TOUCH_CONTROLS_ID, "h:cod" to ControlsProfile.TOUCH_SHOOTER_PAD_ID, "h:x" to "p-7"), back.games)
+        val l = lib(back)
+        assertEquals("GTA V · touch controls", l.resolve("h:gta").name)
+        assertEquals("Touch shooter · keyboard & mouse", l.resolve("h:other").name)
+        // An old id that reaches the library some other way still resolves.
+        assertEquals(ControlsProfile.TOUCH_SHOOTER_PAD_ID, lib().find("builtin:shooter-pubg-pad")?.id)
+        assertTrue(DefaultProfiles.presets().none { "pubg" in it.id || "pubg" in it.name.lowercase() || it.meta?.tags.orEmpty().any { t -> "pubg" in t } })
+    }
+
+    @Test
+    fun perProfileSettingsMoveToRenamedIds() {
+        val keys = setOf("nebula_osc_outside_touch:builtin:gta-pubg", "nebula_osc_look_output:builtin:shooter-pubg-pad", "nebula_osc_look_output:p-1", "other")
+        assertEquals(
+            mapOf(
+                "nebula_osc_outside_touch:builtin:gta-pubg" to "nebula_osc_outside_touch:" + ControlsProfile.GTA_TOUCH_CONTROLS_ID,
+                "nebula_osc_look_output:builtin:shooter-pubg-pad" to "nebula_osc_look_output:" + ControlsProfile.TOUCH_SHOOTER_PAD_ID,
+            ),
+            ProfilePrefsMigration.moves(keys),
+        )
+        // The defaults follow the new ids.
+        assertEquals(OutsideTouch.LOOK, OutsideTouch.default(ControlsProfile.GTA_TOUCH_CONTROLS_ID))
+        assertEquals(LookOutput.MOUSE, LookOutput.default(ControlsProfile.TOUCH_SHOOTER_KBM_ID))
+        assertEquals(LookOutput.STICK, LookOutput.default(ControlsProfile.TOUCH_SHOOTER_PAD_ID))
     }
 
     @Test

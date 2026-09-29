@@ -36,7 +36,7 @@ enum class MotionHold(val id: String, val label: String) {
     RIGHT_TRIGGER("r2", "While R2 / RT is held"),
     EITHER_TRIGGER("either", "While either trigger is held"),
     TOGGLE("toggle", "Toggle with a button"),
-    /** PUBG's "scope on": either trigger, or an on-screen fire / aim button (also KB+M layouts). */
+    /** Gyro only while scoped or shooting: either trigger, or an on-screen fire / aim button (also KB+M layouts). */
     AIMING("aiming", "While aiming or firing");
 
     /**

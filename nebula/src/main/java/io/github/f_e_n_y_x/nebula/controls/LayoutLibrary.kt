@@ -21,7 +21,7 @@ import java.security.MessageDigest
 data class LibraryEntry(
     val id: String,
     val meta: LayoutMeta,
-    /** The layout file, relative to the index. */
+    /** The layout file, relative to the index: `layouts/<game>/…` or `layouts/genre-<genre>/…`. */
     val path: String,
     val size: Int,
     val sha256: String?,
@@ -30,19 +30,97 @@ data class LibraryEntry(
     val preview: List<PreviewBox>,
 ) {
     val gameName: String get() = meta.game?.name ?: "Any game"
+
+    /** A genre template (no game), as opposed to a layout made for one game. */
+    val isTemplate: Boolean get() = meta.game == null
+
+    /** The genre a `layouts/genre-<genre>/` folder names, if the file is in one. */
+    val folderGenre: String? get() = path.split('/').getOrNull(1)?.takeIf { it.startsWith(LayoutGenres.FOLDER_PREFIX) }?.removePrefix(LayoutGenres.FOLDER_PREFIX)?.ifBlank { null }
+
+    /** Its genres: the folder's, then the genre tags, in the tags' order. */
+    val genres: List<String> get() = (listOfNotNull(folderGenre) + meta.tags.filter { it in LayoutGenres.ALL }).distinct()
 }
 
 data class PreviewBox(val kind: ElementKind, val x: Float, val y: Float, val w: Float, val h: Float, val round: Boolean = true)
 
+/** A heading in Browse layouts: one genre's templates, or one game's layouts. */
+data class LibrarySection(val title: String, val subtitle: String, val template: Boolean, val entries: List<LibraryEntry>)
+
 data class LibraryIndex(val entries: List<LibraryEntry>, val skipped: Int, val updated: String?) {
-    /** Games in order, "Any game" (generic layouts) first. */
-    fun byGame(query: String = ""): List<Pair<String, List<LibraryEntry>>> {
+    /** The genres that have layouts, in [LayoutGenres.ALL] order, then any others by name. */
+    fun genres(): List<String> = entries.flatMap { it.genres }.distinct().sortedWith(LayoutGenres.ORDER)
+
+    /**
+     * Entries matching [query] (name, game, author, description, tags or genre) and [genre]
+     * (null for all): genre templates first, one section per genre, then one section per game.
+     */
+    fun browse(query: String = "", genre: String? = null): List<LibrarySection> {
         val q = query.trim().lowercase()
-        val hits = if (q.isEmpty()) entries else entries.filter { e ->
-            listOf(e.meta.name, e.meta.author, e.gameName, e.meta.description, e.meta.target.label, e.meta.tags.joinToString(" "))
-                .any { q in it.lowercase() }
+        val hits = entries.filter { e ->
+            (genre == null || genre in e.genres) && (
+                q.isEmpty() || listOf(e.meta.name, e.meta.author, e.gameName, e.meta.description, e.meta.target.label, e.meta.tags.joinToString(" "), e.genres.joinToString(" ") { LayoutGenres.label(it) })
+                    .any { q in it.lowercase() }
+                )
         }
-        return hits.groupBy { it.gameName }.toList().sortedWith(compareBy({ it.first != "Any game" }, { it.first.lowercase() }))
+        val (templates, games) = hits.partition { it.isTemplate }
+        val templateSections = templates.groupBy { (genre?.takeIf { g -> g in it.genres } ?: it.genres.firstOrNull()) ?: "" }.toList()
+            .sortedWith(compareBy(LayoutGenres.ORDER) { it.first })
+            .map { (g, list) ->
+                if (g.isEmpty()) LibrarySection("Templates", "For any game", true, list)
+                else LibrarySection("${LayoutGenres.label(g)} templates", "For any ${LayoutGenres.noun(g)}", true, list)
+            }
+        val gameSections = games.groupBy { it.gameName }.toList().sortedBy { it.first.lowercase() }.map { (game, list) ->
+            LibrarySection(game, list.flatMap { it.genres }.distinct().sortedWith(LayoutGenres.ORDER).joinToString(" · ") { LayoutGenres.label(it) }, false, list)
+        }
+        return templateSections + gameSections
+    }
+}
+
+/**
+ * The layout library's genre conventions (the nebula-layouts README): genre tags, and genre
+ * templates kept in `layouts/genre-<genre>/`. A genre outside [ALL] is allowed; it sorts last.
+ */
+object LayoutGenres {
+    const val FOLDER_PREFIX = "genre-"
+    val ALL = listOf("shooter", "racing", "action-adventure", "platformer", "fighting", "sports", "rpg", "strategy", "desktop")
+    val ORDER: Comparator<String> = compareBy<String>({ ALL.indexOf(it).let { i -> if (i < 0) Int.MAX_VALUE else i } }, { it })
+
+    fun label(genre: String): String = when (genre) {
+        "rpg" -> "RPG"
+        "" -> "Other"
+        else -> genre.replaceFirstChar { it.uppercase() }
+    }
+
+    /** "For any <noun>": a game of that genre. */
+    fun noun(genre: String): String = when (genre) {
+        "shooter", "platformer" -> genre
+        "racing", "fighting", "sports", "strategy", "action-adventure" -> "${genre.replace('-', ' ')} game"
+        "rpg" -> "RPG"
+        "desktop" -> "desktop app"
+        else -> "${genre.replace('-', ' ')} game"
+    }
+}
+
+/** Where a shared layout goes in the library, following its folder and file naming. */
+object LibraryPaths {
+    /** Short folder names for games whose full name makes a long slug. */
+    private val GAME_FOLDERS = mapOf(271590 to "gta-v")
+
+    /**
+     * `layouts/<game>/<name>.json` for a game layout (the "<Game> · " name prefix dropped:
+     * "GTA V · touch controls" → `layouts/gta-v/touch-controls.json`), or
+     * `layouts/genre-<genre>/<name>.json` for a template, by its first genre tag.
+     */
+    fun pathFor(meta: LayoutMeta): String {
+        val game = meta.game
+        val (prefix, rest) = meta.name.split(" · ", limit = 2).let { if (it.size == 2) it[0] to it[1] else null to meta.name }
+        val folder = if (game != null) {
+            game.steamAppId?.let(GAME_FOLDERS::get) ?: prefix?.let(LayoutFile::slug)?.ifBlank { null } ?: LayoutFile.slug(game.name)
+        } else {
+            LayoutGenres.FOLDER_PREFIX + (meta.tags.firstOrNull { it in LayoutGenres.ALL } ?: "other")
+        }
+        val file = LayoutFile.slug(if (game != null && prefix != null) rest else meta.name)
+        return "layouts/${folder.ifBlank { "other" }.take(48).trim('-')}/${file.ifBlank { "layout" }}.json"
     }
 }
 

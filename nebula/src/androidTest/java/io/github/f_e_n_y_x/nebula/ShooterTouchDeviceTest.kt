@@ -32,7 +32,7 @@ import org.junit.runner.RunWith
 import java.io.File
 
 /**
- * PUBG-style controls on the demo stream (mock host, no PC): real multi-finger touches injected
+ * Touch-shooter controls on the demo stream (mock host, no PC): real multi-finger touches injected
  * through the window like fingers (the ZoneTouchDeviceTest harness), reading what the pad
  * mapper and mouse send to the demo PC. Screenshots go to the app's files/shots for the QA script.
  */
@@ -134,7 +134,7 @@ class ShooterTouchDeviceTest {
     // ---------------------------------------------------------------- touch
 
     @Test fun leftFireShootsWhileTheRightThumbLooks() {
-        launch(ControlsProfile.GTA_PUBG_ID)
+        launch(ControlsProfile.GTA_TOUCH_CONTROLS_ID)
         val fire = bounds("osc:fire")
         val eye = bounds("osc:eye")
         // Right thumb on a free spot between the eye and the fire button: looks.
@@ -154,7 +154,7 @@ class ShooterTouchDeviceTest {
     }
 
     @Test fun theRightFireButtonAimsWhenDragged() {
-        launch(ControlsProfile.GTA_PUBG_ID)
+        launch(ControlsProfile.GTA_TOUCH_CONTROLS_ID)
         val fire = bounds("osc:fire")
         val before = demo.pointerEvents.get()
         fingerDown(0, fire.center)
@@ -170,7 +170,7 @@ class ShooterTouchDeviceTest {
     }
 
     @Test fun pushingPastTheRingSprints() {
-        launch(ControlsProfile.GTA_PUBG_ID)
+        launch(ControlsProfile.GTA_TOUCH_CONTROLS_ID)
         val move = bounds("osc:move")
         val start = Offset(move.left + move.width * 0.45f, move.bottom - move.height * 0.25f)
         val ring = 64 * density
@@ -188,7 +188,7 @@ class ShooterTouchDeviceTest {
     }
 
     @Test fun dragUpLocksTheRun() {
-        launch(ControlsProfile.GTA_PUBG_ID)
+        launch(ControlsProfile.GTA_TOUCH_CONTROLS_ID)
         val move = bounds("osc:move")
         val start = Offset(move.left + move.width * 0.45f, move.bottom - move.height * 0.15f)
         val ring = 64 * density
@@ -214,10 +214,15 @@ class ShooterTouchDeviceTest {
         compose.onNodeWithContentDescription("Profiles").performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("browse-layouts").performScrollTo().performClick()
-        compose.waitUntil(20_000) { runCatching { compose.onNodeWithTag("library:generic/pubg-style-controller").fetchSemanticsNode() }.isSuccess }
+        compose.waitUntil(20_000) { runCatching { compose.onNodeWithTag("library:genre-shooter/touch-shooter-controller").fetchSemanticsNode() }.isSuccess }
         SystemClock.sleep(500)
         shot("library-browse")
-        compose.onNodeWithTag("library:generic/pubg-style-controller").performClick()
+        // The genre filter narrows it to one genre's templates and games.
+        compose.onNodeWithTag("genre:shooter").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("library-section:Shooter templates").assertExists()
+        shot("library-genre-shooter")
+        compose.onNodeWithTag("library:genre-shooter/touch-shooter-controller").performClick()
         compose.waitUntil(20_000) { runCatching { compose.onNodeWithTag("layout-preview").fetchSemanticsNode() }.isSuccess }
         shot("library-preview")
         compose.onNodeWithTag("layout-add").performClick()
@@ -226,13 +231,13 @@ class ShooterTouchDeviceTest {
         val added = ControlsStore.get(ctx).data.value.profiles.filter { it.origin == "library" }
         // The built-in preset has that name already, so the copy is numbered.
         assertEquals(1, added.size)
-        assertTrue(added.single().name, added.single().name.startsWith("Shooter: PUBG-style (controller)"))
+        assertTrue(added.single().name, added.single().name.startsWith("Touch shooter · controller"))
         assertTrue(added.single().landscape.any { it.id == "fire" && it.lookThrough })
         shot("library-added")
     }
 
     @Test fun layoutLinkOpensAPreview() {
-        val url = libraryUrl.substringBeforeLast('/') + "/layouts/gta-v/pubg-style.json"
+        val url = libraryUrl.substringBeforeLast('/') + "/layouts/gta-v/touch-controls.json"
         prefs.edit().putBoolean(ShooterTutorial.SEEN_KEY, true).commit()
         val view = Intent(Intent.ACTION_VIEW, Uri.parse("nebula://layout?url=" + Uri.encode(url))).setClass(ctx, MainActivity::class.java)
         scenario = ActivityScenario.launch(view)
@@ -240,7 +245,7 @@ class ShooterTouchDeviceTest {
         shot("deep-link-preview")
         compose.onNodeWithTag("layout-add").performClick()
         compose.waitForIdle(); SystemClock.sleep(400)
-        assertTrue(ControlsStore.get(ctx).data.value.profiles.any { it.origin == "library" && it.name.startsWith("GTA V: PUBG-style") })
+        assertTrue(ControlsStore.get(ctx).data.value.profiles.any { it.origin == "library" && it.name.startsWith("GTA V · touch controls") })
     }
 
     @Test fun editorStyleTutorialShareAndQr() {
@@ -248,7 +253,7 @@ class ShooterTouchDeviceTest {
         compose.onNodeWithContentDescription("Style: start from a layout").performClick()
         compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("style-picker").fetchSemanticsNode() }.isSuccess }
         shot("style-picker")
-        compose.onNodeWithTag("style:shooter-pad").performScrollTo().performClick()
+        compose.onNodeWithTag("style:touch-shooter-pad").performScrollTo().performClick()
         compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("shooter-tutorial").fetchSemanticsNode() }.isSuccess }
         shot("tutorial")
         compose.onNodeWithTag("tutorial-done").performClick()

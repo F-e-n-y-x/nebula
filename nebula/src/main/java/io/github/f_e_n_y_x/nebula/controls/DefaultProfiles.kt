@@ -112,7 +112,7 @@ object DefaultProfiles {
     }
 
     /**
-     * "GTA V: controller + touch camera (right half)": a controller in hand moves, drives and
+     * "GTA V · controller + touch camera": a controller in hand moves, drives and
      * shoots; a thumb on the right half of the screen aims (right stick). Nothing else on screen,
      * and the zone stays when the controller hides the other controls.
      */
@@ -122,7 +122,7 @@ object DefaultProfiles {
         )
         return ControlsProfile(
             id = ControlsProfile.GTA_ID,
-            name = "GTA V: controller + touch camera (right half)",
+            name = "GTA V · controller + touch camera",
             landscape = listOf(zone),
             portrait = listOf(zone.copy(y = 0.3f, height = 0.6f)),
             origin = "builtin",
@@ -134,17 +134,17 @@ object DefaultProfiles {
         val base = gtaTouchCamera()
         fun mouse(l: List<ControlElement>) = l.map { it.copy(zone = ZoneType.CAMERA_MOUSE, sensitivity = 1f, acceleration = 1.2f) }
         return base.copy(
-            id = ControlsProfile.GTA_MOUSE_ID, name = "GTA V: controller + mouse camera (right half)",
+            id = ControlsProfile.GTA_MOUSE_ID, name = "GTA V · controller + mouse camera",
             landscape = mouse(base.landscape), portrait = base.portrait?.let(::mouse),
         )
     }
 
     /**
-     * "GTA V: touch only": no controller needed. A floating move stick on the left half, the
+     * "GTA V · touch gamepad": no controller needed. A floating move stick on the left half, the
      * Standard buttons, RT and LT that fire at once and look when dragged, and the rest of the
      * right side looks (mouse look by default, [LookOutput]; outside touches never click).
      */
-    fun gtaTouchOnly(o: StandardOptions = StandardOptions()): ControlsProfile {
+    fun gtaTouchGamepad(o: StandardOptions = StandardOptions()): ControlsProfile {
         fun shooter(l: List<ControlElement>, portrait: Boolean): List<ControlElement> {
             val kept = l.filterNot { it.id == "ls" || it.id == "rs" || it.id == "l3" || it.id == "r3" }
                 .map { if (it.id == "rt" || it.id == "lt") it.copy(lookThrough = true) else it }
@@ -159,26 +159,26 @@ object DefaultProfiles {
         }
         return ControlsProfile(
             id = ControlsProfile.GTA_TOUCH_ID,
-            name = "GTA V: touch only",
+            name = "GTA V · touch gamepad",
             landscape = shooter(landscape(o), portrait = false),
             portrait = shooter(portrait(o), portrait = true),
             origin = "builtin",
         )
     }
 
-    /** Suggested profile for a game, by name: GTA V gets the PUBG-style touch preset. */
+    /** Suggested profile for a game, by name: GTA V gets its touch-controls layout. */
     fun suggestedFor(gameName: String?): String? {
         val n = gameName?.lowercase() ?: return null
-        return if ("grand theft auto" in n || Regex("""\bgta\b""").containsMatchIn(n)) ControlsProfile.GTA_PUBG_ID else null
+        return if ("grand theft auto" in n || Regex("""\bgta\b""").containsMatchIn(n)) ControlsProfile.GTA_TOUCH_CONTROLS_ID else null
     }
 
-    /** Ready-made profiles after Standard: the PUBG-style shooters first. */
-    fun presets(): List<ControlsProfile> = listOf(gtaPubg(), shooterPad(), shooterKbm(), gtaTouchOnly(), gtaTouchCamera(), gtaMouseCamera())
+    /** Ready-made profiles after Standard: genre templates first, then layouts made for one game. */
+    fun presets(): List<ControlsProfile> = listOf(touchShooterPad(), touchShooterKbm(), gtaTouchControls(), gtaTouchGamepad(), gtaTouchCamera(), gtaMouseCamera())
 
-    // ---------------------------------------------------------------- PUBG-style shooters
+    // ---------------------------------------------------------------- touch shooters
 
     /**
-     * What each action of the PUBG-style layout sends. [None][Binding.None] leaves the button out,
+     * What each action of the touch-shooter layout ([shooter]) sends. [None][Binding.None] leaves the button out,
      * except [eye], which stays as a camera-only drag button (see [shooter]).
      */
     data class ShooterBinds(
@@ -200,7 +200,7 @@ object DefaultProfiles {
         val peekLeft: Binding = Binding.None,
         val peekRight: Binding = Binding.None,
         val peekMode: PressMode = PressMode.TOGGLE,
-        /** Free look while held (Alt in PUBG on PC); None = the eye only moves the camera. */
+        /** Free look while held (Alt in many PC shooters); None = the eye only moves the camera. */
         val eye: Binding = Binding.None,
         val melee: Binding = Binding.None,
         val meleeLabel: String = "Melee",
@@ -214,14 +214,15 @@ object DefaultProfiles {
     )
 
     /**
-     * The PUBG Mobile / CoD Mobile default arrangement, laid out for thumbs and a claw grip:
+     * The two-thumb arrangement most mobile shooters share, laid out for thumbs and a claw grip:
      *
      * - left: a floating move stick over the lower left; push past the ring to sprint, drag up to
      *   the lock to keep running; a left fire button above it fires while the right thumb aims;
      * - right: everything that isn't a button looks (the Look background, [LookOutput]); the big
      *   fire button fires at once and aims when dragged; ADS, jump, crouch, prone and reload
-     *   around it in PUBG's places; swap, use and the eye (free look) inside thumb reach;
-     * - top edge, for index fingers (claw): peek left / right, map, menu, melee.
+     *   around it where mobile players expect them; swap, use and the eye (free look) inside
+     *   thumb reach;
+     * - top edge, for index fingers (claw): lean (peek) left / right, map, menu, melee.
      *
      * Works with two thumbs (left: move + left fire; right: look + drag-fire) or three/four
      * fingers. Positions are shares of the screen; sizes in dp (the style picker scales them).
@@ -268,7 +269,7 @@ object DefaultProfiles {
 
     private val WASD = listOf(0x57, 0x53, 0x41, 0x44).map { Binding.Key(it) }
 
-    /** Generic XInput shooter (CoD / PUBG console defaults): RT fire, LT aim, A jump, B crouch (hold for prone), X reload, Y swap, L3 sprint, R3 melee. */
+    /** The usual console shooter map: RT fire, LT aim, A jump, B crouch (hold for prone), X reload, Y swap, L3 sprint, R3 melee, LB / RB lean. */
     val PAD_BINDS = ShooterBinds(
         fire = Binding.Trigger(Side.RIGHT), ads = Binding.Trigger(Side.LEFT), sprint = Binding.Pad(PadFlags.LS_CLK),
         jump = Binding.Pad(PadFlags.A), crouch = Binding.Pad(PadFlags.B), proneHold = true,
@@ -277,7 +278,7 @@ object DefaultProfiles {
         melee = Binding.Pad(PadFlags.RS_CLK), map = Binding.Pad(PadFlags.BACK), menu = Binding.Pad(PadFlags.START),
     )
 
-    /** PUBG on PC defaults: LMB fire, RMB aim, Shift sprint, Space jump, C crouch, Z prone, R reload, F use, Q / E peek, Alt free look. */
+    /** The usual PC shooter keys: LMB fire, RMB aim, Shift sprint, Space jump, C crouch, Z prone, R reload, F use, Q / E lean, Alt free look, Tab, M map. */
     val KBM_BINDS = ShooterBinds(
         fire = Binding.Mouse(MouseKey.LEFT), ads = Binding.Mouse(MouseKey.RIGHT), sprint = Binding.Key(0xA0),
         jump = Binding.Key(0x20), crouch = Binding.Key(0x43), prone = Binding.Key(0x5A),
@@ -302,38 +303,44 @@ object DefaultProfiles {
         extras = listOf("Cover" to Binding.Pad(PadFlags.RB), "Phone" to Binding.Pad(PadFlags.UP), "Next" to Binding.Pad(PadFlags.RIGHT)),
     )
 
-    private val SHOOTER_TAGS = listOf("shooter", "pubg-style", "touch-only")
-
-    fun shooterPad(): ControlsProfile = ControlsProfile(
-        id = ControlsProfile.SHOOTER_PAD_ID, name = "Shooter: PUBG-style (controller)", landscape = shooter(PAD_BINDS), origin = "builtin",
+    /**
+     * Library-style names and tags ("<game or genre> · <what's different>", see the nebula-layouts
+     * README): they describe the controls, never another game, and match the library's copies.
+     */
+    fun touchShooterPad(): ControlsProfile = ControlsProfile(
+        id = ControlsProfile.TOUCH_SHOOTER_PAD_ID, name = "Touch shooter · controller", landscape = shooter(PAD_BINDS), origin = "builtin",
         outside = OutsideTouch.LOOK, look = LookOutput.STICK,
         meta = LayoutMeta(
-            "Shooter: PUBG-style (controller)", author = "Nebula", target = LayoutTarget.XINPUT, device = DeviceClass.PHONE, aspect = 2.17f,
-            description = "PUBG Mobile's layout for any XInput shooter: RT fire (left and right, drag the right one to aim), LT aim (tap or hold), " +
-                "push the stick past the ring to sprint (L3), drag up to lock the run. A jump, B crouch (hold for prone), X reload / use, Y swap, LB / RB peek, R3 melee.",
-            tags = SHOOTER_TAGS,
+            "Touch shooter · controller", author = "Nebula", target = LayoutTarget.XINPUT, device = DeviceClass.PHONE, aspect = 2.17f,
+            description = "Two-thumb shooter layout for any game that uses a controller. Floating move stick (push past the ring to sprint, " +
+                "drag up to lock the run), swipe anywhere on the right to look, fire on both sides (the right one aims while you drag it), " +
+                "aim, jump, crouch (hold for prone), reload, swap, melee and lean.",
+            tags = listOf("shooter", "first-person", "third-person", "controller", "touch-only"),
         ),
     )
 
-    fun shooterKbm(): ControlsProfile = ControlsProfile(
-        id = ControlsProfile.SHOOTER_KBM_ID, name = "Shooter: PUBG-style (keyboard+mouse)", landscape = shooter(KBM_BINDS), origin = "builtin",
+    fun touchShooterKbm(): ControlsProfile = ControlsProfile(
+        id = ControlsProfile.TOUCH_SHOOTER_KBM_ID, name = "Touch shooter · keyboard & mouse", landscape = shooter(KBM_BINDS), origin = "builtin",
         outside = OutsideTouch.LOOK, look = LookOutput.MOUSE,
         meta = LayoutMeta(
-            "Shooter: PUBG-style (keyboard+mouse)", author = "Nebula", target = LayoutTarget.KBM, device = DeviceClass.PHONE, aspect = 2.17f,
-            description = "PUBG on PC from a phone: the stick is WASD (Shift past the ring, drag up to lock the run), swipe to look with the mouse, " +
-                "LMB fire (drag the right one to aim), RMB aim, Space, C, Z, R, F, Q / E peek, hold the eye for Alt free look, Tab bag, M map.",
-            tags = SHOOTER_TAGS,
+            "Touch shooter · keyboard & mouse", author = "Nebula", target = LayoutTarget.KBM, device = DeviceClass.PHONE, aspect = 2.17f,
+            description = "Two-thumb shooter layout for games played with keyboard and mouse. The stick is WASD (Shift past the ring, " +
+                "drag up to lock the run), swipe to look with the mouse, left and right mouse buttons on both sides, " +
+                "Space, C, Z, R, F, Q/E lean, Alt free look, Tab, M and Esc.",
+            tags = listOf("shooter", "first-person", "third-person", "keyboard-mouse", "touch-only"),
         ),
     )
 
-    fun gtaPubg(): ControlsProfile = ControlsProfile(
-        id = ControlsProfile.GTA_PUBG_ID, name = "GTA V: PUBG-style", landscape = shooter(GTA_BINDS), origin = "builtin",
+    /** The touch-shooter arrangement on GTA V's own controller map, with mouse look. */
+    fun gtaTouchControls(): ControlsProfile = ControlsProfile(
+        id = ControlsProfile.GTA_TOUCH_CONTROLS_ID, name = "GTA V · touch controls", landscape = shooter(GTA_BINDS), origin = "builtin",
         outside = OutsideTouch.LOOK, look = LookOutput.MOUSE,
         meta = LayoutMeta(
-            "GTA V: PUBG-style", author = "Nebula", game = GameRef("Grand Theft Auto V", 271590), target = LayoutTarget.XINPUT, device = DeviceClass.PHONE, aspect = 2.17f,
-            description = "Touch-only GTA V with GTA's controller map: RT shoot (left fire while you look, drag the right one to aim), LT aim, " +
-                "sprint (A) past the ring or locked, X jump, B reload, L3 stealth, Y car, LB weapon wheel, RB cover, R3 look behind. Swipe the right side to look (mouse look).",
-            tags = listOf("gta", "shooter", "pubg-style", "touch-only"),
+            "GTA V · touch controls", author = "Nebula", game = GameRef("Grand Theft Auto V", 271590), target = LayoutTarget.XINPUT, device = DeviceClass.PHONE, aspect = 2.17f,
+            description = "Touch-only GTA V on GTA's own controller map: RT shoot (a second fire button on the left, and the right one aims while dragged), " +
+                "LT aim, sprint past the ring or locked, X jump, B reload, L3 stealth, Y enter vehicle, LB weapon wheel, RB cover, R3 look behind. " +
+                "Swipe the right side to look.",
+            tags = listOf("action-adventure", "third-person", "shooter", "controller", "touch-only"),
         ),
     )
 

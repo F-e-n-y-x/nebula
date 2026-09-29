@@ -58,7 +58,7 @@ class ShooterControlsTest {
 
     @Test
     fun `left fire shoots while the right thumb looks`() = runTest {
-        val p = DefaultProfiles.gtaPubg()
+        val p = DefaultProfiles.gtaTouchControls()
         val r = rig(p)
         // Right thumb: a free spot on the right looks (mouse look in the GTA preset).
         r.router.down(1, 560f, 200f, 0)
@@ -78,7 +78,7 @@ class ShooterControlsTest {
 
     @Test
     fun `the right fire button aims as soon as it is dragged, without losing the first movement`() = runTest {
-        val p = DefaultProfiles.gtaPubg()
+        val p = DefaultProfiles.gtaTouchControls()
         val r = rig(p)
         val (fx, fy) = at(p, "fire")
         r.router.down(3, fx, fy, 0)
@@ -115,7 +115,7 @@ class ShooterControlsTest {
 
     @Test
     fun `pushing the move stick forward past the ring holds sprint, and only forward`() = runTest {
-        val p = DefaultProfiles.shooterPad()
+        val p = DefaultProfiles.touchShooterPad()
         val r = rig(p)
         val x = 170f; val y = 270f
         r.router.down(0, x, y, 0)
@@ -137,7 +137,7 @@ class ShooterControlsTest {
 
     @Test
     fun `dragging up to the lock and letting go keeps running until the stick is touched again`() = runTest {
-        val p = DefaultProfiles.shooterPad()
+        val p = DefaultProfiles.touchShooterPad()
         val r = rig(p)
         val x = 170f; val y = 300f
         r.router.down(0, x, y, 0)
@@ -160,7 +160,7 @@ class ShooterControlsTest {
 
     @Test
     fun `letting go below the lock mark doesn't lock`() = runTest {
-        val p = DefaultProfiles.shooterPad()
+        val p = DefaultProfiles.touchShooterPad()
         val r = rig(p)
         r.router.down(0, 170f, 300f, 0)
         r.router.move(listOf(Finger(0, 170f, 300f - moveR * 1.6f)), 16)
@@ -173,7 +173,7 @@ class ShooterControlsTest {
 
     @Test
     fun `cancel ends a run lock`() = runTest {
-        val p = DefaultProfiles.shooterPad()
+        val p = DefaultProfiles.touchShooterPad()
         val r = rig(p)
         r.router.down(0, 170f, 300f, 0)
         r.router.move(listOf(Finger(0, 170f, 300f - moveR * 2.3f)), 16)
@@ -188,7 +188,7 @@ class ShooterControlsTest {
 
     @Test
     fun `the keyboard preset's stick is WASD with Shift past the ring`() = runTest {
-        val p = DefaultProfiles.shooterKbm()
+        val p = DefaultProfiles.touchShooterKbm()
         val r = rig(p)
         r.router.down(0, 170f, 270f, 0)
         r.router.move(listOf(Finger(0, 170f, 270f - moveR * 0.8f)), 16)
@@ -203,7 +203,7 @@ class ShooterControlsTest {
 
     @Test
     fun `mixed ADS latches on a tap and holds on a long press`() = runTest {
-        val p = DefaultProfiles.shooterPad()
+        val p = DefaultProfiles.touchShooterPad()
         val r = rig(p)
         val (ax, ay) = at(p, "ads")
         r.router.down(0, ax, ay, 0); r.router.up(0, 80)
@@ -234,7 +234,7 @@ class ShooterControlsTest {
 
     @Test
     fun `fire and ADS count as aiming for the gyro`() = runTest {
-        val p = DefaultProfiles.shooterKbm()
+        val p = DefaultProfiles.touchShooterKbm()
         OnScreenAim.active = false
         val r = rig(p)
         assertFalse(OnScreenAim.active)
@@ -254,7 +254,7 @@ class ShooterControlsTest {
 
     @Test
     fun `the eye button looks while holding free look`() = runTest {
-        val p = DefaultProfiles.shooterKbm()
+        val p = DefaultProfiles.touchShooterKbm()
         val r = rig(p)
         val (ex, ey) = at(p, "eye")
         r.router.down(0, ex, ey, 0)
@@ -269,7 +269,7 @@ class ShooterControlsTest {
 
     @Test
     fun `GTA V preset uses GTA's controller map`() {
-        val l = DefaultProfiles.gtaPubg().landscape.associateBy { it.id }
+        val l = DefaultProfiles.gtaTouchControls().landscape.associateBy { it.id }
         assertEquals(Binding.Trigger(Side.RIGHT), l.getValue("fire").binding)
         assertEquals(Binding.Trigger(Side.RIGHT), l.getValue("fire-left").binding)
         assertEquals(Binding.Trigger(Side.LEFT), l.getValue("ads").binding)
@@ -280,30 +280,30 @@ class ShooterControlsTest {
         assertEquals(Binding.Pad(PadFlags.Y), l.getValue("use").binding)
         assertEquals(Binding.Pad(PadFlags.LB), l.getValue("swap").binding)
         assertTrue(l.values.any { it.binding == Binding.Pad(PadFlags.RB) && it.label == "Cover" })
-        assertEquals(LookOutput.MOUSE, DefaultProfiles.gtaPubg().look)
+        assertEquals(LookOutput.MOUSE, DefaultProfiles.gtaTouchControls().look)
     }
 
     @Test
     fun `controller and keyboard presets`() {
-        val pad = DefaultProfiles.shooterPad().landscape.associateBy { it.id }
+        val pad = DefaultProfiles.touchShooterPad().landscape.associateBy { it.id }
         assertEquals(Binding.Pad(PadFlags.A), pad.getValue("jump").binding)
         assertEquals(Binding.Pad(PadFlags.B), pad.getValue("crouch").binding)
         assertEquals(ElementKind.MACRO, pad.getValue("prone").kind)
         assertEquals(Binding.Pad(PadFlags.LS_CLK), pad.getValue("move").sprint)
-        val kbm = DefaultProfiles.shooterKbm().landscape.associateBy { it.id }
+        val kbm = DefaultProfiles.touchShooterKbm().landscape.associateBy { it.id }
         assertEquals(Binding.Mouse(MouseKey.LEFT), kbm.getValue("fire").binding)
         assertEquals(Binding.Mouse(MouseKey.RIGHT), kbm.getValue("ads").binding)
         assertEquals(StickOutput.KEYS, kbm.getValue("move").stick)
         assertEquals(listOf(0x20, 0x43, 0x5A, 0x52, 0x46), listOf("jump", "crouch", "prone", "reload", "use").map { (kbm.getValue(it).binding as Binding.Key).vk })
         assertEquals(Binding.Key(0xA0), kbm.getValue("move").sprint)
         assertEquals(PressMode.TOGGLE, kbm.getValue("peek-left").mode)
-        assertEquals(LayoutTarget.KBM, LayoutTarget.detect(DefaultProfiles.shooterKbm().landscape))
-        assertEquals(LayoutTarget.XINPUT, LayoutTarget.detect(DefaultProfiles.shooterPad().landscape))
+        assertEquals(LayoutTarget.KBM, LayoutTarget.detect(DefaultProfiles.touchShooterKbm().landscape))
+        assertEquals(LayoutTarget.XINPUT, LayoutTarget.detect(DefaultProfiles.touchShooterPad().landscape))
     }
 
     @Test
     fun `every shooter preset plays with two thumbs and leaves the right side to look`() {
-        for (p in listOf(DefaultProfiles.gtaPubg(), DefaultProfiles.shooterPad(), DefaultProfiles.shooterKbm())) {
+        for (p in listOf(DefaultProfiles.gtaTouchControls(), DefaultProfiles.touchShooterPad(), DefaultProfiles.touchShooterKbm())) {
             val l = p.landscape
             assertEquals(p.name, OutsideTouch.LOOK, p.outside)
             assertTrue(p.name, p.isShooter())
@@ -332,16 +332,16 @@ class ShooterControlsTest {
     }
 
     @Test
-    fun `presets are listed and GTA is suggested the PUBG-style one`() {
+    fun `presets are listed and GTA V is suggested its touch controls`() {
         val ids = DefaultProfiles.presets().map { it.id }
-        assertTrue(ids.containsAll(listOf(ControlsProfile.GTA_PUBG_ID, ControlsProfile.SHOOTER_PAD_ID, ControlsProfile.SHOOTER_KBM_ID)))
-        assertEquals(ControlsProfile.GTA_PUBG_ID, DefaultProfiles.suggestedFor("Grand Theft Auto V"))
-        assertNotNull(DefaultProfiles.gtaPubg().meta?.game?.steamAppId)
+        assertTrue(ids.containsAll(listOf(ControlsProfile.GTA_TOUCH_CONTROLS_ID, ControlsProfile.TOUCH_SHOOTER_PAD_ID, ControlsProfile.TOUCH_SHOOTER_KBM_ID)))
+        assertEquals(ControlsProfile.GTA_TOUCH_CONTROLS_ID, DefaultProfiles.suggestedFor("Grand Theft Auto V"))
+        assertNotNull(DefaultProfiles.gtaTouchControls().meta?.game?.steamAppId)
     }
 
     @Test
     fun `fit scales buttons for a tablet and keeps them on screen`() {
-        val l = DefaultProfiles.shooterPad().landscape
+        val l = DefaultProfiles.touchShooterPad().landscape
         val tablet = LayoutFit.fit(l, 1180f, 780f)
         val fire = tablet.first { it.id == "fire" }
         assertEquals(80f * LayoutFit.MAX_SCALE, fire.width, 0.01f)
