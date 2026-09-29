@@ -168,6 +168,19 @@ class StreamInputView(
             }
         }
 
+    /**
+     * Hide Android's own mouse pointer over the stream. On while Nebula draws the PC's cursor
+     * itself (local cursor), so an uncaptured mouse doesn't show two pointers.
+     */
+    var hideSystemPointer = false
+
+    override fun onResolvePointerIcon(event: MotionEvent, pointerIndex: Int): android.view.PointerIcon? =
+        if (hideSystemPointer && event.isMouse()) {
+            android.view.PointerIcon.getSystemIcon(context, android.view.PointerIcon.TYPE_NULL)
+        } else {
+            super.onResolvePointerIcon(event, pointerIndex)
+        }
+
     init {
         isFocusable = true
         isFocusableInTouchMode = true

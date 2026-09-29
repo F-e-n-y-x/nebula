@@ -377,6 +377,18 @@ class DemoHost(private val context: Context) {
                 upscalerLabel = up.mode.label, upscaleMs = 1.1f, upscaleOut = "1920×1080 → 2340×1080",
             )
         }
+
+        // The demo PC "supports" the local cursor and sends a plain arrow.
+        private val demoCursor = MutableStateFlow(io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor())
+        override val cursor: Flow<io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor> get() = demoCursor
+        override fun setLocalCursor(enabled: Boolean) {
+            demoCursor.value = if (enabled) {
+                io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor(io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode.LOCAL, visible = true, image = demoArrowCursor())
+            } else {
+                io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor()
+            }
+        }
+
         private val log = io.github.f_e_n_y_x.nebula.input.LoggingInput()
         override val remoteInput: io.github.f_e_n_y_x.nebula.input.RemoteInput get() = log
         override suspend fun setBitrate(kbps: Int): Boolean {

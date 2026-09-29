@@ -310,8 +310,7 @@ private fun VirtualMouseSection() {
         ToggleRow("Natural scrolling", "Content follows your fingers, like a phone. Off scrolls like a mouse wheel.", natural) { natural = it; prefs.put(StreamUiPrefs.NATURAL_SCROLL_KEY, it) }
         ToggleRow("Pinch to zoom", "Zoom and pan the picture on this device; nothing is sent to the PC.", pinch) { pinch = it; prefs.put(StreamUiPrefs.PINCH_ZOOM_KEY, it) }
         ToggleRow("Mouse buttons bar", "Left, middle, right, scroll strip, drag lock and keyboard on screen.", bar) { bar = it; prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, it) }
-        ToggleRow("Pointer dot", "Draws a dot on this device where the pointer should be, for instant feedback.", cursor) { cursor = it; prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
-        ComingRow("Host cursor sync", "Coming in 0.4", "Showing the PC's real cursor shape here and hiding it in the video needs Nova's cursor channel.")
+        ToggleRow("Local cursor", localCursorNote(cursor, io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode.OFF).takeIf { !cursor } ?: "Draws the PC's cursor on this device, so it moves with no stream delay. Nova leaves it out of the video; other PCs keep it there.", cursor) { cursor = it; prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
         ToggleRow("Capture a connected mouse", "Games get raw relative movement and the local pointer hides. Off keeps a free pointer.", capture) { capture = it; prefs.put(StreamUiPrefs.MOUSE_CAPTURE_KEY, it) }
     }
 }

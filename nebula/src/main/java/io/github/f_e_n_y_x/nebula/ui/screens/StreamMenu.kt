@@ -131,6 +131,7 @@ fun StreamMenu(
     /** The layout on screen when the game's controls are a layout set, else null. */
     setLayout: String? = null,
     connectionTest: ConnectionTestUi = ConnectionTestUi.Idle,
+    cursorMode: io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode = io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode.OFF,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -205,7 +206,7 @@ fun StreamMenu(
                 RotateRow(it, onRotated = actions.onResume)
             }
             io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
-            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId, controlsProfile, tick, focusResume = !quickShown)
+            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId, controlsProfile, tick, focusResume = !quickShown, cursorMode = cursorMode)
             hostSection?.invoke()
             FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)
             if (unsupported.isNotEmpty()) {
@@ -293,6 +294,7 @@ private fun Controls(
     ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean,
     controlsProfileId: String? = null, controlsProfile: io.github.f_e_n_y_x.nebula.controls.ControlsProfile? = null,
     tick: Any? = null, focusResume: Boolean = true,
+    cursorMode: io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode = io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode.OFF,
 ) {
     val s = Nebula.scale
     val first = remember { FocusRequester() }
@@ -331,8 +333,8 @@ private fun Controls(
         }
         ToggleRow("Mouse buttons bar", "Left, middle, right, scroll strip, drag lock and keyboard on screen.", ui.mouseBar) { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, it) }
         ToggleRow(
-            "Pointer dot",
-            "Draws a dot on this device where the pointer should be, for instant feedback. Syncing the PC's real cursor (and hiding it in the video) is coming in 0.4.",
+            "Local cursor",
+            localCursorNote(ui.localCursor, cursorMode),
             ui.localCursor,
         ) { prefs.put(StreamUiPrefs.LOCAL_CURSOR_KEY, it) }
         MenuSetting("Picture") {

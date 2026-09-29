@@ -267,3 +267,37 @@ data class ConnectionReport(
 
 /** Why a connection test didn't run, in words for the user. */
 class ConnectionTestError(message: String, val retryAfterMs: Long = 0) : Exception(message)
+
+/** Where the local cursor stands: who draws the PC's cursor. */
+enum class RemoteCursorMode {
+    /** Not asked for: the PC draws the cursor into the video. */
+    OFF,
+
+    /** Asked for; waiting for the PC's first cursor shape. */
+    WAITING,
+
+    /** This device draws the PC's cursor; the video has none. */
+    LOCAL,
+
+    /** The PC can't send its cursor (not Nova, or an older Nova); the video keeps it. */
+    UNSUPPORTED,
+
+    /** The PC didn't answer; the video keeps the cursor. */
+    FAILED,
+}
+
+/**
+ * A cursor shape from the PC, already at the stream's resolution: straight-alpha `0xAARRGGBB`
+ * pixels, row by row. The hotspot is the pixel that sits on the pointer position.
+ */
+class RemoteCursorImage(val id: Int, val width: Int, val height: Int, val hotspotX: Int, val hotspotY: Int, val argb: IntArray)
+
+/** The local cursor: draw [image] at the pointer while [mode] is LOCAL and [visible]. */
+data class RemoteCursor(
+    val mode: RemoteCursorMode = RemoteCursorMode.OFF,
+    val visible: Boolean = false,
+    val image: RemoteCursorImage? = null,
+) {
+    /** The video has no cursor, so this device draws it (or nothing while the PC hides it). */
+    val drawnLocally: Boolean get() = mode == RemoteCursorMode.LOCAL
+}

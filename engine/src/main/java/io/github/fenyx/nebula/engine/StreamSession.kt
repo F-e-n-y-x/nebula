@@ -145,6 +145,88 @@ class StreamSession internal constructor(
     /** Updated about once per second from the decoder. */
     val stats: StateFlow<StreamStats> = _stats.asStateFlow()
 
+    private val cursorTracker = HostCursorTracker()
+    private val _cursor = MutableStateFlow(HostCursorState())
+
+    /**
+     * The local cursor: what to draw over the video while [setLocalCursor] is on. Status
+     * [LocalCursorStatus.UNSUPPORTED] or [LocalCursorStatus.FAILED] means the host keeps drawing
+     * the cursor into the video.
+     */
+    val cursor: StateFlow<HostCursorState> = _cursor.asStateFlow()
+
+    /** Local mode was requested from the host and not turned off since. */
+    @Volatile
+    private var cursorLocal = false
+
+    /** The host never answered a local-cursor request: back to the in-video cursor (as V+ does). */
+    private val cursorTimeout = Runnable {
+        if (!cursorLocal || _cursor.value.status != LocalCursorStatus.WAITING) return@Runnable
+        LimeLog.warning("Local cursor: no cursor update within $CURSOR_TIMEOUT_MS ms; the host keeps the cursor in the video")
+        cursorLocal = false
+        MoonBridge.setCursorMode(MoonBridge.LI_CURSOR_MODE_VIDEO)
+        publishCursor(HostCursorState(LocalCursorStatus.FAILED))
+    }
+
+    /** True once connected when the host offers the local cursor (`LI_FF_CURSOR_SHAPE`). */
+    val hostHasLocalCursor: Boolean
+        get() = isConnected && MoonBridge.getHostFeatureFlags() and MoonBridge.LI_FF_CURSOR_SHAPE != 0
+
+    /**
+     * Draw the cursor on this device ([enabled]) or let the host draw it into the video. With
+     * local mode the host leaves the cursor out of the video and sends its shapes, which arrive in
+     * [cursor]; the app draws them at its own pointer position, so the pointer moves with no stream
+     * latency. Hosts without the feature keep the in-video cursor ([LocalCursorStatus.UNSUPPORTED]).
+     * Main thread; call again after [StreamListener.onConnected] (it does nothing before).
+     */
+    fun setLocalCursor(enabled: Boolean) {
+        if (ended.get()) return
+        if (!enabled) {
+            main.removeCallbacks(cursorTimeout)
+            if (cursorLocal) {
+                cursorLocal = false
+                MoonBridge.setCursorMode(MoonBridge.LI_CURSOR_MODE_VIDEO)
+            }
+            publishCursor(HostCursorState(LocalCursorStatus.OFF))
+            return
+        }
+        if (cursorLocal || !isConnected) return
+        if (!hostHasLocalCursor) {
+            LimeLog.info("Local cursor: this host doesn't offer it; the cursor stays in the video")
+            publishCursor(HostCursorState(LocalCursorStatus.UNSUPPORTED))
+            return
+        }
+        // The host forgets what it sent us when local mode starts, so start clean too.
+        cursorTracker.reset()
+        when (val result = MoonBridge.setCursorMode(MoonBridge.LI_CURSOR_MODE_LOCAL)) {
+            MoonBridge.LI_CURSOR_MODE_OK -> {
+                cursorLocal = true
+                publishCursor(HostCursorState(LocalCursorStatus.WAITING))
+                main.postDelayed(cursorTimeout, CURSOR_TIMEOUT_MS)
+                LimeLog.info("Local cursor: requested")
+            }
+            MoonBridge.LI_CURSOR_MODE_ERR_UNSUPPORTED -> publishCursor(HostCursorState(LocalCursorStatus.UNSUPPORTED))
+            else -> {
+                LimeLog.warning("Local cursor: request failed ($result)")
+                publishCursor(HostCursorState(LocalCursorStatus.FAILED))
+            }
+        }
+    }
+
+    /** Main thread. */
+    private fun publishCursor(state: HostCursorState) {
+        if (_cursor.value == state) return
+        _cursor.value = state
+        listener.onHostCursor(state)
+    }
+
+    /** A decoded host update, on the main thread. */
+    private fun cursorUpdated(state: HostCursorState) {
+        if (!cursorLocal || ended.get()) return
+        main.removeCallbacks(cursorTimeout)
+        publishCursor(state)
+    }
+
     /** Sends keyboard, mouse, touch and gamepad input to the host. */
     lateinit var input: InputBridge
         private set
@@ -469,8 +551,11 @@ class StreamSession internal constructor(
         if (ended.getAndSet(true)) return false
         isConnected = false
         stopAbr()
+        cursorLocal = false
         main.post {
             main.removeCallbacks(graceExpired)
+            main.removeCallbacks(cursorTimeout)
+            _cursor.value = HostCursorState()
             holder.removeCallback(surfaceCallback)
             _backgrounded.value = false
             if (::link.isInitialized) link.stop()
@@ -602,7 +687,12 @@ class StreamSession internal constructor(
             hotspotX: Int,
             hotspotY: Int,
             bgraPixels: ByteArray?,
-        ) = unsupported(HostFeature.LOCAL_CURSOR)
+        ) {
+            // Decoded here on the control thread; cursorUpdated() publishes it on the main thread to [cursor] and listener.onHostCursor.
+            if (!cursorLocal) return
+            val state = cursorTracker.onUpdate(flags, shapeId, width, height, hotspotX, hotspotY, bgraPixels)
+            if (state != null) onMain { cursorUpdated(state) } else LimeLog.warning("Local cursor: ignored a malformed shape $shapeId (${width}x$height)")
+        }
 
         override fun onRemoteTextContext(context: RemoteTextContext) = unsupported(HostFeature.REMOTE_TEXT_CONTEXT)
 
@@ -625,6 +715,9 @@ class StreamSession internal constructor(
 
 /** Round trips timed by [StreamSession.testConnection]; the first (connection setup) is dropped. */
 private const val LATENCY_SAMPLES = 6
+
+/** V+ waits this long for the host's first cursor update before going back to the in-video cursor. */
+internal const val CURSOR_TIMEOUT_MS = 1500L
 
 /**
  * What happens when the stream's surface goes away. [graceMs] = 0 disconnects at once; otherwise

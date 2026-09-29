@@ -264,6 +264,13 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     LaunchedEffect(ended) { if (ended) editingControls = false }
     val overlaysOn = live && !menu && !editingControls
 
+    // Local cursor: the PC leaves its cursor out of the video and this device draws it, so it
+    // moves with no stream latency. PCs without it keep the cursor in the video.
+    val remoteCursor by container.stream.cursor.collectAsStateWithLifecycle(io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor())
+    LaunchedEffect(live, ui.localCursor) { container.stream.setLocalCursor(live && ui.localCursor) }
+    DisposableEffect(Unit) { onDispose { container.stream.setLocalCursor(false) } }
+    val cursorLocal = live && ui.localCursor && remoteCursor.drawnLocally
+
     val input = remember { InputState() }
     input.ui = ui
     input.active = overlaysOn
@@ -363,6 +370,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     var panX by remember { mutableFloatStateOf(0f) }
     var panY by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(capture, inputView) { inputView?.wantCapture = capture }
+    LaunchedEffect(cursorLocal, inputView) { inputView?.hideSystemPointer = cursorLocal }
+    // Keep the PC's pointer under the cursor drawn here while it shows.
+    LaunchedEffect(cursorLocal, remoteCursor.visible, remoteInput) { remoteInput?.pinPointer = cursorLocal && remoteCursor.visible }
     // The input layer gives up focus while the menu or the PC keyboard needs the D-pad.
     LaunchedEffect(overlaysOn, pcKeyboard, inputView) { inputView?.inputEnabled = overlaysOn && !pcKeyboard }
 
@@ -470,9 +480,16 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             )
         }
 
-        // Local cursor: optional in Settings, always on in demo mode so gestures can be checked without a PC.
+        // Local cursor. The PC's own shape while it leaves the cursor out of the video (hidden while
+        // a game hides it); otherwise a pointer dot over the in-video cursor for instant feedback
+        // (optional in Settings, always on in demo mode so gestures can be checked without a PC).
         val relative = ui.touch.mode == TouchMode.TRACKPAD || ui.touch.mode == TouchMode.SPLIT || ui.touch.mode == TouchMode.POINTER
-        remoteInput?.takeIf { (container.isDemo || ui.localCursor) && relative }?.let { tracker ->
+        val shape = remoteCursor.image
+        if (cursorLocal && remoteInput != null) {
+            if (remoteCursor.visible && shape != null && overlaysOn) {
+                LocalCursorOverlay(shape, remoteInput.cursor, rect, vw, vh, Modifier.fillMaxSize())
+            }
+        } else remoteInput?.takeIf { (container.isDemo || ui.localCursor) && relative }?.let { tracker ->
             val cur by tracker.cursor.collectAsState()
             if (live) {
                 Box(
@@ -603,6 +620,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 gamepads = pad.count,
                 gameKey = gameKey,
                 zoomed = zoom > 1.001f,
+                cursorMode = remoteCursor.mode,
                 resolution = LiveResolutionUi(
                     current = (switchState as? SwitchState.Streaming)?.mode?.takeIf { live },
                     state = switchState,

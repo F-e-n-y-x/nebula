@@ -315,7 +315,6 @@ enum class MotionType(internal val wire: Byte) {
  */
 enum class HostFeature(val title: String, val plannedFor: String, val why: String) {
     ADAPTIVE_TRIGGERS("Adaptive triggers", "0.4", "Android has no public API for DualSense trigger effects; they need the USB driver path."),
-    LOCAL_CURSOR("Host cursor sync", "0.4", "Drawing the PC's own cursor shape on this device isn't built yet."),
     DS5_HAPTICS("DualSense haptics", "0.4", "Host-authored DualSense haptics need the USB driver path."),
     REMOTE_TEXT_CONTEXT("Keyboard on text focus", "0.4", "Opening the keyboard when a PC text field is focused isn't built yet."),
 }
@@ -352,6 +351,8 @@ interface StreamListener {
     fun onResolutionChanged(width: Int, height: Int) {}
     /** Frame generation turned itself off, or can't run for this stream. */
     fun onFramegenEvent(event: io.github.fenyx.nebula.engine.framegen.FramegenEvent) {}
+    /** The local cursor changed (see [StreamSession.setLocalCursor]); also in [StreamSession.cursor]. */
+    fun onHostCursor(state: HostCursorState) {}
 }
 
 /** The on-disk artwork cache (posters, heroes, logos, screenshots), shared by every host. */

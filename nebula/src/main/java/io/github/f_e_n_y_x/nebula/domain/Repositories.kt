@@ -180,4 +180,13 @@ interface StreamRepository {
 
     /** Host features the running stream asked for that Nebula doesn't do yet, by title. */
     val unsupportedFeatures: Flow<List<String>> get() = kotlinx.coroutines.flow.flowOf(emptyList())
+
+    /** The PC's cursor for drawing on this device while [setLocalCursor] is on. */
+    val cursor: Flow<io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor> get() = kotlinx.coroutines.flow.flowOf(io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor())
+    /**
+     * Draw the PC's cursor on this device, so it moves with no stream latency: the PC leaves it out
+     * of the video when it can ([cursor] then says LOCAL), otherwise the video keeps it. Kept across
+     * reconnects of the same stream.
+     */
+    fun setLocalCursor(enabled: Boolean) {}
 }

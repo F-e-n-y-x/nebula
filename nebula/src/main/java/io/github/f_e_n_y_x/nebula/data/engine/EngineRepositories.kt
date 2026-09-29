@@ -30,6 +30,9 @@ import io.github.f_e_n_y_x.nebula.domain.model.HostStatus
 import io.github.f_e_n_y_x.nebula.domain.model.LastSession
 import io.github.f_e_n_y_x.nebula.domain.model.PairingAs
 import io.github.f_e_n_y_x.nebula.domain.model.PairingState
+import io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor
+import io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorImage
+import io.github.f_e_n_y_x.nebula.domain.model.RemoteCursorMode
 import io.github.f_e_n_y_x.nebula.domain.model.Resolution
 import io.github.f_e_n_y_x.nebula.domain.model.StreamSettings
 import io.github.f_e_n_y_x.nebula.domain.model.StreamState
@@ -51,6 +54,8 @@ import io.github.fenyx.nebula.engine.ConnectionTestFailure
 import io.github.fenyx.nebula.engine.ConnectionTestResult
 import io.github.fenyx.nebula.engine.DisplaySpec
 import io.github.fenyx.nebula.engine.CodecPreference
+import io.github.fenyx.nebula.engine.HostCursorState
+import io.github.fenyx.nebula.engine.LocalCursorStatus
 import io.github.fenyx.nebula.engine.HostApp
 import io.github.fenyx.nebula.engine.HostState
 import io.github.fenyx.nebula.engine.InputBridge
@@ -415,6 +420,19 @@ class EngineStreamRepository(
         session?.takeIf { it.isLinkReady }?.link?.onWindowFocusChanged(focused)
     }
 
+    /** The local cursor setting; applied to every connection of the stream. Main thread. */
+    private var localCursor = false
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override val cursor: Flow<RemoteCursor> = current.flatMapLatest { s ->
+        s?.cursor?.map { it.toDomain() } ?: kotlinx.coroutines.flow.flowOf(RemoteCursor())
+    }
+
+    override fun setLocalCursor(enabled: Boolean) {
+        localCursor = enabled
+        session?.setLocalCursor(enabled)
+    }
+
     override fun reattach(target: StreamTarget) {
         val surface = target as? SurfaceStreamTarget ?: return
         // A live resolution switch waiting for its fresh surface takes it; otherwise the running
@@ -594,6 +612,8 @@ class EngineStreamRepository(
                             .collect { out.trySend(StreamState.Live(it)) }
                     }
                     s.audioHapticsGamepad = feedback
+                    // Each connection starts with the cursor in the video; ask again (also after a live resolution change).
+                    if (localCursor) s.setLocalCursor(true)
                     pending?.complete(Result.success(Unit))
                 }
 
@@ -700,6 +720,18 @@ class EngineStreamRepository(
         const val SURFACE_TIMEOUT_MS = 2_000L
     }
 }
+
+internal fun HostCursorState.toDomain(): RemoteCursor = RemoteCursor(
+    mode = when (status) {
+        LocalCursorStatus.OFF -> RemoteCursorMode.OFF
+        LocalCursorStatus.WAITING -> RemoteCursorMode.WAITING
+        LocalCursorStatus.ACTIVE -> RemoteCursorMode.LOCAL
+        LocalCursorStatus.UNSUPPORTED -> RemoteCursorMode.UNSUPPORTED
+        LocalCursorStatus.FAILED -> RemoteCursorMode.FAILED
+    },
+    visible = visible,
+    image = shape?.let { RemoteCursorImage(it.id, it.width, it.height, it.hotspotX, it.hotspotY, it.argb) },
+)
 
 private fun StreamEndReason.message(errorCode: Int): String? = when (this) {
     StreamEndReason.USER_QUIT -> null

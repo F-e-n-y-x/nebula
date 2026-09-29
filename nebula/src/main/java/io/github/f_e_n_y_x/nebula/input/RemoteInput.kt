@@ -7,6 +7,7 @@ import io.github.fenyx.nebula.engine.MouseButton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.math.roundToInt
 
 /** Everything the stream screen can send to the PC. Implemented by the engine and by demo mode. */
 interface RemoteInput {
@@ -178,10 +179,32 @@ class TrackingInput(private val delegate: RemoteInput) : RemoteInput by delegate
     @Volatile var frameWidth = 1920
     @Volatile var frameHeight = 1080
 
+    /**
+     * While true (Nebula draws the PC's cursor itself and it is visible), relative moves go to the
+     * PC as absolute positions, so the PC's pointer stays exactly under the cursor drawn here: no
+     * drift from the PC's pointer acceleration, and clicks land where the user sees the cursor.
+     * Turning it on moves the PC's pointer to the estimate once. Off (a game hides the pointer, or
+     * the video draws it), moves stay relative, which games that capture the mouse need.
+     */
+    @Volatile
+    var pinPointer = false
+        set(value) {
+            if (value == field) return
+            field = value
+            if (value) sendPosition()
+        }
+
     override fun move(dx: Int, dy: Int) {
         val (x, y) = _cursor.value
         _cursor.value = (x + dx / frameWidth.toFloat()).coerceIn(0f, 1f) to (y + dy / frameHeight.toFloat()).coerceIn(0f, 1f)
-        delegate.move(dx, dy)
+        if (pinPointer) sendPosition() else delegate.move(dx, dy)
+    }
+
+    private fun sendPosition() {
+        val (x, y) = _cursor.value
+        val w = frameWidth.coerceAtLeast(1)
+        val h = frameHeight.coerceAtLeast(1)
+        delegate.position((x * (w - 1)).roundToInt(), (y * (h - 1)).roundToInt(), w, h)
     }
 
     override fun position(x: Int, y: Int, refW: Int, refH: Int) {
