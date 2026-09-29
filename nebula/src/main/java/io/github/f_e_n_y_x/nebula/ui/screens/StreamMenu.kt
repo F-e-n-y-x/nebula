@@ -112,6 +112,8 @@ fun StreamMenu(
     phoneHasGyro: Boolean = true,
     /** The on-screen controls' profile while they're on, for the "touch outside controls" toggle. */
     controlsProfileId: String? = null,
+    /** The profile itself, so a layout file's own "outside touches" choice shows. */
+    controlsProfile: io.github.f_e_n_y_x.nebula.controls.ControlsProfile? = null,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -156,7 +158,7 @@ fun StreamMenu(
                 RotateRow(it, onRotated = actions.onResume)
             }
             io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
-            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId)
+            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId, controlsProfile)
             hostSection?.invoke()
             FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)
             if (unsupported.isNotEmpty()) {
@@ -241,7 +243,7 @@ private fun Stat(label: String, value: String) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean, controlsProfileId: String? = null) {
+private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean, controlsProfileId: String? = null, controlsProfile: io.github.f_e_n_y_x.nebula.controls.ControlsProfile? = null) {
     val s = Nebula.scale
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
@@ -255,7 +257,7 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
         }
         OverlayTransparency(ui.overlayOpacity, actions.onOverlayOpacity)
         if (controlsProfileId != null) {
-            var outside by remember(controlsProfileId) { mutableStateOf(OutsideTouch.read(prefs, controlsProfileId)) }
+            var outside by remember(controlsProfileId) { mutableStateOf(controlsProfile?.let { OutsideTouch.read(prefs, it) } ?: OutsideTouch.read(prefs, controlsProfileId)) }
             MenuSetting("Touch outside controls · remembered for these controls") {
                 Segmented(listOf("Mouse" to OutsideTouch.TRACKPAD, "Look" to OutsideTouch.LOOK, "Off" to OutsideTouch.OFF), outside) { v ->
                     outside = v

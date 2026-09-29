@@ -82,8 +82,42 @@ enum class ZoneType(val id: String, val label: String, val help: String) {
     FLOATING_STICK("floating_stick", "Floating joystick", "A stick appears where your thumb lands; drag to push it."),
 }
 
-/** Hold: pressed while the finger is down. Toggle: first tap latches, second tap releases. */
-enum class PressMode(val id: String, val label: String) { HOLD("hold", "Hold"), TOGGLE("toggle", "Toggle") }
+/**
+ * Hold: pressed while the finger is down. Toggle: first tap latches, second tap releases.
+ * Mixed (PUBG's "mixed" scope mode): a quick tap latches like Toggle, a long press is held only
+ * while the finger stays down.
+ */
+enum class PressMode(val id: String, val label: String) { HOLD("hold", "Hold"), TOGGLE("toggle", "Toggle"), MIXED("mixed", "Tap or hold") }
+
+/**
+ * What an element is for in a shooter layout. Nothing is sent differently because of it, except
+ * [FIRE] and [ADS], which count as "aiming" for the gyro's "While aiming or firing" option; it
+ * also drives the first-run tutorial and lets tools (and the library) describe a layout.
+ */
+enum class ElementRole(val id: String, val label: String) {
+    NONE("none", "None"),
+    FIRE("fire", "Fire"),
+    ADS("ads", "Aim down sights"),
+    MOVE("move", "Move"),
+    SPRINT("sprint", "Sprint"),
+    JUMP("jump", "Jump"),
+    CROUCH("crouch", "Crouch"),
+    PRONE("prone", "Prone"),
+    RELOAD("reload", "Reload"),
+    SWITCH("switch", "Switch weapon"),
+    INTERACT("interact", "Interact"),
+    PEEK_LEFT("peek_left", "Peek left"),
+    PEEK_RIGHT("peek_right", "Peek right"),
+    FREE_LOOK("free_look", "Free look"),
+    MENU("menu", "Menu / map"),
+    ;
+
+    val aims: Boolean get() = this == FIRE || this == ADS
+
+    companion object {
+        fun of(id: String?): ElementRole? = entries.firstOrNull { it.id == id }
+    }
+}
 
 enum class ElementShape(val id: String, val label: String) { ROUND("round", "Round"), PILL("pill", "Pill"), SQUARE("square", "Square") }
 
@@ -137,6 +171,21 @@ data class ControlElement(
     val lookThrough: Boolean = false,
     /** Camera → stick: smallest push once the finger moves (0–0.45), to clear the game's stick deadzone. */
     val antiDeadzone: Float = DEFAULT_ANTI_DEADZONE,
+    /**
+     * Move stick (a stick element or a floating-stick zone): held while the thumb is pushed
+     * forward past the ring ([sprintAt] × the radius), like auto-sprint in mobile shooters.
+     * [Binding.None] turns it off. L3 on a pad, Shift on a keyboard.
+     */
+    val sprint: Binding = Binding.None,
+    /** Where auto-sprint starts, as a multiple of the stick radius (1 = the ring itself). */
+    val sprintAt: Float = DEFAULT_SPRINT_AT,
+    /**
+     * Move stick: drag up past the lock mark ([RUN_LOCK_AT] × the radius) and let go to keep
+     * running forward (and sprinting, with [sprint]); touch the stick again to stop.
+     */
+    val runLock: Boolean = false,
+    /** What the element is for (fire, aim, jump…); see [ElementRole]. */
+    val role: ElementRole = ElementRole.NONE,
 ) {
 
     /** Zones are sized as a share of the controls area; everything else in dp. */
@@ -150,6 +199,7 @@ data class ControlElement(
         height = if (areaSized) height.coerceIn(MIN_ZONE, 1f) else height.coerceIn(MIN_SIZE_DP, MAX_SIZE_DP),
         acceleration = acceleration.coerceIn(0.5f, 2.5f),
         opacity = opacity.coerceIn(MIN_OPACITY, 1f),
+        sprintAt = sprintAt.coerceIn(1f, 2f),
         x = x.coerceIn(0f, 1f),
         y = y.coerceIn(0f, 1f),
     )
@@ -157,7 +207,16 @@ data class ControlElement(
     companion object {
         /** GTA V's stick deadzone is about 20 %. */
         const val DEFAULT_ANTI_DEADZONE = 0.22f
-        const val LOOK_THROUGH_DP = 12f
+        /**
+         * Fire-and-look: travel before the finger also looks. Tiny, so aiming starts at once
+         * (PUBG); the travel up to it is not lost, it is applied when looking starts.
+         */
+        const val LOOK_THROUGH_DP = 3f
+        const val DEFAULT_SPRINT_AT = 1.25f
+        /** Run lock mark, as a multiple of the stick radius above its centre. */
+        const val RUN_LOCK_AT = 2.1f
+        /** Auto-sprint only counts a push within this angle of straight up (degrees). */
+        const val SPRINT_CONE_DEG = 50f
         const val MIN_SIZE_DP = 28f
         const val MAX_SIZE_DP = 360f
         const val MIN_OPACITY = 0.1f
@@ -179,8 +238,14 @@ data class ControlsProfile(
     val portrait: List<ControlElement>? = null,
     val createdAtMs: Long = 0,
     val updatedAtMs: Long = 0,
-    /** Where it came from: null (made here), "crown" (V+ import) or "builtin". */
+    /** Where it came from: null (made here), "crown" (V+ import), "builtin" or "library". */
     val origin: String? = null,
+    /** What touches outside the controls do; null follows the user's choice / the default. */
+    val outside: OutsideTouch? = null,
+    /** How look fingers turn the camera; null follows the user's choice / the default. */
+    val look: LookOutput? = null,
+    /** Sharing metadata (author, game, target…) kept from a layout file, for re-sharing. */
+    val meta: LayoutMeta? = null,
 ) {
     val isBuiltIn: Boolean get() = id.startsWith(BUILTIN_PREFIX)
 
@@ -195,6 +260,9 @@ data class ControlsProfile(
         const val GTA_ID = "builtin:gta-touch-camera"
         const val GTA_MOUSE_ID = "builtin:gta-mouse-camera"
         const val GTA_TOUCH_ID = "builtin:gta-touch-only"
+        const val SHOOTER_PAD_ID = "builtin:shooter-pubg-pad"
+        const val SHOOTER_KBM_ID = "builtin:shooter-pubg-kbm"
+        const val GTA_PUBG_ID = "builtin:gta-pubg"
     }
 }
 
@@ -262,6 +330,9 @@ fun Binding.describe(): String = when (this) {
     is Binding.Mouse -> button.label
     is Binding.Wheel -> if (up) "Wheel up" else "Wheel down"
 }
+
+/** A shooter layout: something fires and a finger can aim with it (tutorial, style picker). */
+fun ControlsProfile.isShooter(): Boolean = (landscape + portrait.orEmpty()).any { it.role == ElementRole.FIRE }
 
 /** True when some zone keeps working with a physical controller attached. */
 fun ControlsProfile.hasControllerZones(): Boolean = (landscape + portrait.orEmpty()).any { it.kind == ElementKind.ZONE && it.keepWithController }

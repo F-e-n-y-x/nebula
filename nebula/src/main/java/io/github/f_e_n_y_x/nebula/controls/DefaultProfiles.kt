@@ -166,14 +166,175 @@ object DefaultProfiles {
         )
     }
 
-    /** Suggested profile for a game, by name: GTA V gets the touch-only preset. */
+    /** Suggested profile for a game, by name: GTA V gets the PUBG-style touch preset. */
     fun suggestedFor(gameName: String?): String? {
         val n = gameName?.lowercase() ?: return null
-        return if ("grand theft auto" in n || Regex("""\bgta\b""").containsMatchIn(n)) ControlsProfile.GTA_TOUCH_ID else null
+        return if ("grand theft auto" in n || Regex("""\bgta\b""").containsMatchIn(n)) ControlsProfile.GTA_PUBG_ID else null
     }
 
-    /** Ready-made profiles after Standard. */
-    fun presets(): List<ControlsProfile> = listOf(gtaTouchOnly(), gtaTouchCamera(), gtaMouseCamera())
+    /** Ready-made profiles after Standard: the PUBG-style shooters first. */
+    fun presets(): List<ControlsProfile> = listOf(gtaPubg(), shooterPad(), shooterKbm(), gtaTouchOnly(), gtaTouchCamera(), gtaMouseCamera())
+
+    // ---------------------------------------------------------------- PUBG-style shooters
+
+    /**
+     * What each action of the PUBG-style layout sends. [None][Binding.None] leaves the button out,
+     * except [eye], which stays as a camera-only drag button (see [shooter]).
+     */
+    data class ShooterBinds(
+        val fire: Binding,
+        val ads: Binding,
+        val adsMode: PressMode = PressMode.MIXED,
+        val sprint: Binding,
+        val jump: Binding,
+        val crouch: Binding,
+        val crouchMode: PressMode = PressMode.HOLD,
+        /** Prone: a key, or null with [proneHold] set to hold [crouch] long (console "hold B"). */
+        val prone: Binding = Binding.None,
+        val proneHold: Boolean = false,
+        val reload: Binding,
+        val switchWeapon: Binding,
+        val switchLabel: String = "Swap",
+        val interact: Binding,
+        val interactLabel: String = "Use",
+        val peekLeft: Binding = Binding.None,
+        val peekRight: Binding = Binding.None,
+        val peekMode: PressMode = PressMode.TOGGLE,
+        /** Free look while held (Alt in PUBG on PC); None = the eye only moves the camera. */
+        val eye: Binding = Binding.None,
+        val melee: Binding = Binding.None,
+        val meleeLabel: String = "Melee",
+        val map: Binding,
+        val mapLabel: String = "Map",
+        val menu: Binding,
+        /** Extra small buttons along the top edge (label to binding), e.g. GTA's phone and cover. */
+        val extras: List<Pair<String, Binding>> = emptyList(),
+        /** The move stick sends direction keys (WASD) instead of the left stick. */
+        val keysMove: Boolean = false,
+    )
+
+    /**
+     * The PUBG Mobile / CoD Mobile default arrangement, laid out for thumbs and a claw grip:
+     *
+     * - left: a floating move stick over the lower left; push past the ring to sprint, drag up to
+     *   the lock to keep running; a left fire button above it fires while the right thumb aims;
+     * - right: everything that isn't a button looks (the Look background, [LookOutput]); the big
+     *   fire button fires at once and aims when dragged; ADS, jump, crouch, prone and reload
+     *   around it in PUBG's places; swap, use and the eye (free look) inside thumb reach;
+     * - top edge, for index fingers (claw): peek left / right, map, menu, melee.
+     *
+     * Works with two thumbs (left: move + left fire; right: look + drag-fire) or three/four
+     * fingers. Positions are shares of the screen; sizes in dp (the style picker scales them).
+     */
+    fun shooter(b: ShooterBinds): List<ControlElement> {
+        val out = mutableListOf<ControlElement>()
+        fun btn(id: String, label: String, bind: Binding, x: Float, y: Float, size: Float, role: ElementRole, mode: PressMode = PressMode.HOLD, shape: ElementShape = ElementShape.ROUND, w: Float = size, look: Boolean = false, kind: ElementKind = ElementKind.BUTTON) {
+            out += ControlElement(id, kind, x, y, w, size, label = label, mode = mode, shape = shape, bindings = listOf(bind), role = role, lookThrough = look)
+        }
+        out += ControlElement(
+            "move", ElementKind.ZONE, 0.22f, 0.62f, 0.44f, 0.76f, label = "Move", opacity = 0.25f, shape = ElementShape.SQUARE,
+            zone = ZoneType.FLOATING_STICK, stick = if (b.keysMove) StickOutput.KEYS else StickOutput.LEFT,
+            bindings = if (b.keysMove) WASD else emptyList(), deadzone = 0.1f, sprint = b.sprint, runLock = true, role = ElementRole.MOVE,
+        )
+        val fireKind = if (b.fire is Binding.Trigger) ElementKind.TRIGGER else ElementKind.BUTTON
+        btn("fire-left", "FIRE", b.fire, 0.075f, 0.33f, 64f, ElementRole.FIRE, kind = fireKind)
+        btn("fire", "FIRE", b.fire, 0.80f, 0.55f, 80f, ElementRole.FIRE, look = true, kind = fireKind)
+        btn("ads", "ADS", b.ads, 0.925f, 0.33f, 58f, ElementRole.ADS, mode = b.adsMode, kind = if (b.ads is Binding.Trigger) ElementKind.TRIGGER else ElementKind.BUTTON)
+        btn("jump", "Jump", b.jump, 0.94f, 0.58f, 54f, ElementRole.JUMP)
+        btn("crouch", "Crouch", b.crouch, 0.905f, 0.83f, 54f, ElementRole.CROUCH, mode = b.crouchMode)
+        when {
+            b.prone != Binding.None -> btn("prone", "Prone", b.prone, 0.795f, 0.9f, 48f, ElementRole.PRONE)
+            b.proneHold -> out += ControlElement(
+                "prone", ElementKind.MACRO, 0.795f, 0.9f, 48f, 48f, label = "Prone", role = ElementRole.PRONE,
+                steps = listOf(MacroStep(b.crouch, holdMs = 800, gapMs = 40)),
+            )
+        }
+        btn("reload", "Reload", b.reload, 0.69f, 0.88f, 50f, ElementRole.RELOAD)
+        btn("swap", b.switchLabel, b.switchWeapon, 0.585f, 0.88f, 48f, ElementRole.SWITCH)
+        btn("use", b.interactLabel, b.interact, 0.62f, 0.66f, 48f, ElementRole.INTERACT)
+        // The eye: hold and drag to look around. With a free-look key the game keeps the aim still.
+        btn("eye", "Eye", b.eye, 0.69f, 0.3f, 50f, ElementRole.FREE_LOOK, look = true)
+        if (b.peekLeft != Binding.None) btn("peek-left", "◀ Peek", b.peekLeft, 0.26f, 0.1f, 40f, ElementRole.PEEK_LEFT, mode = b.peekMode, shape = ElementShape.PILL, w = 72f)
+        if (b.peekRight != Binding.None) btn("peek-right", "Peek ▶", b.peekRight, 0.74f, 0.1f, 40f, ElementRole.PEEK_RIGHT, mode = b.peekMode, shape = ElementShape.PILL, w = 72f)
+        if (b.melee != Binding.None) btn("melee", b.meleeLabel, b.melee, 0.925f, 0.1f, 44f, ElementRole.NONE)
+        btn("map", b.mapLabel, b.map, 0.43f, 0.07f, 34f, ElementRole.MENU, shape = ElementShape.PILL, w = 60f)
+        btn("menu", "Menu", b.menu, 0.57f, 0.07f, 34f, ElementRole.MENU, shape = ElementShape.PILL, w = 60f)
+        b.extras.forEachIndexed { i, (label, bind) ->
+            btn("extra-$i", label, bind, 0.075f + i * 0.085f, 0.1f, 40f, ElementRole.NONE, shape = ElementShape.PILL, w = 58f)
+        }
+        return out
+    }
+
+    private val WASD = listOf(0x57, 0x53, 0x41, 0x44).map { Binding.Key(it) }
+
+    /** Generic XInput shooter (CoD / PUBG console defaults): RT fire, LT aim, A jump, B crouch (hold for prone), X reload, Y swap, L3 sprint, R3 melee. */
+    val PAD_BINDS = ShooterBinds(
+        fire = Binding.Trigger(Side.RIGHT), ads = Binding.Trigger(Side.LEFT), sprint = Binding.Pad(PadFlags.LS_CLK),
+        jump = Binding.Pad(PadFlags.A), crouch = Binding.Pad(PadFlags.B), proneHold = true,
+        reload = Binding.Pad(PadFlags.X), switchWeapon = Binding.Pad(PadFlags.Y), interact = Binding.Pad(PadFlags.X),
+        peekLeft = Binding.Pad(PadFlags.LB), peekRight = Binding.Pad(PadFlags.RB), peekMode = PressMode.HOLD,
+        melee = Binding.Pad(PadFlags.RS_CLK), map = Binding.Pad(PadFlags.BACK), menu = Binding.Pad(PadFlags.START),
+    )
+
+    /** PUBG on PC defaults: LMB fire, RMB aim, Shift sprint, Space jump, C crouch, Z prone, R reload, F use, Q / E peek, Alt free look. */
+    val KBM_BINDS = ShooterBinds(
+        fire = Binding.Mouse(MouseKey.LEFT), ads = Binding.Mouse(MouseKey.RIGHT), sprint = Binding.Key(0xA0),
+        jump = Binding.Key(0x20), crouch = Binding.Key(0x43), prone = Binding.Key(0x5A),
+        reload = Binding.Key(0x52), switchWeapon = Binding.Wheel(up = false), interact = Binding.Key(0x46), interactLabel = "F",
+        peekLeft = Binding.Key(0x51), peekRight = Binding.Key(0x45), peekMode = PressMode.TOGGLE,
+        eye = Binding.Key(0xA4), melee = Binding.Key(0x09), meleeLabel = "Bag",
+        map = Binding.Key(0x4D), menu = Binding.Key(0x1B), keysMove = true,
+    )
+
+    /**
+     * GTA V's default controller map (on foot): RT shoot, LT aim, A sprint, X jump, B reload,
+     * Y enter vehicle, LB weapon wheel, RB cover, L3 stealth (crouch), R3 look behind,
+     * D-pad up phone, D-pad right next weapon, Back camera, Start pause. No prone or peek.
+     */
+    val GTA_BINDS = ShooterBinds(
+        fire = Binding.Trigger(Side.RIGHT), ads = Binding.Trigger(Side.LEFT), adsMode = PressMode.MIXED, sprint = Binding.Pad(PadFlags.A),
+        jump = Binding.Pad(PadFlags.X), crouch = Binding.Pad(PadFlags.LS_CLK), crouchMode = PressMode.HOLD,
+        reload = Binding.Pad(PadFlags.B), switchWeapon = Binding.Pad(PadFlags.LB), switchLabel = "Wheel",
+        interact = Binding.Pad(PadFlags.Y), interactLabel = "Car",
+        melee = Binding.Pad(PadFlags.RS_CLK), meleeLabel = "Behind",
+        map = Binding.Pad(PadFlags.BACK), mapLabel = "Cam", menu = Binding.Pad(PadFlags.START),
+        extras = listOf("Cover" to Binding.Pad(PadFlags.RB), "Phone" to Binding.Pad(PadFlags.UP), "Next" to Binding.Pad(PadFlags.RIGHT)),
+    )
+
+    private val SHOOTER_TAGS = listOf("shooter", "pubg-style", "touch-only")
+
+    fun shooterPad(): ControlsProfile = ControlsProfile(
+        id = ControlsProfile.SHOOTER_PAD_ID, name = "Shooter: PUBG-style (controller)", landscape = shooter(PAD_BINDS), origin = "builtin",
+        outside = OutsideTouch.LOOK, look = LookOutput.STICK,
+        meta = LayoutMeta(
+            "Shooter: PUBG-style (controller)", author = "Nebula", target = LayoutTarget.XINPUT, device = DeviceClass.PHONE, aspect = 2.17f,
+            description = "PUBG Mobile's layout for any XInput shooter: RT fire (left and right, drag the right one to aim), LT aim (tap or hold), " +
+                "push the stick past the ring to sprint (L3), drag up to lock the run. A jump, B crouch (hold for prone), X reload / use, Y swap, LB / RB peek, R3 melee.",
+            tags = SHOOTER_TAGS,
+        ),
+    )
+
+    fun shooterKbm(): ControlsProfile = ControlsProfile(
+        id = ControlsProfile.SHOOTER_KBM_ID, name = "Shooter: PUBG-style (keyboard+mouse)", landscape = shooter(KBM_BINDS), origin = "builtin",
+        outside = OutsideTouch.LOOK, look = LookOutput.MOUSE,
+        meta = LayoutMeta(
+            "Shooter: PUBG-style (keyboard+mouse)", author = "Nebula", target = LayoutTarget.KBM, device = DeviceClass.PHONE, aspect = 2.17f,
+            description = "PUBG on PC from a phone: the stick is WASD (Shift past the ring, drag up to lock the run), swipe to look with the mouse, " +
+                "LMB fire (drag the right one to aim), RMB aim, Space, C, Z, R, F, Q / E peek, hold the eye for Alt free look, Tab bag, M map.",
+            tags = SHOOTER_TAGS,
+        ),
+    )
+
+    fun gtaPubg(): ControlsProfile = ControlsProfile(
+        id = ControlsProfile.GTA_PUBG_ID, name = "GTA V: PUBG-style", landscape = shooter(GTA_BINDS), origin = "builtin",
+        outside = OutsideTouch.LOOK, look = LookOutput.MOUSE,
+        meta = LayoutMeta(
+            "GTA V: PUBG-style", author = "Nebula", game = GameRef("Grand Theft Auto V", 271590), target = LayoutTarget.XINPUT, device = DeviceClass.PHONE, aspect = 2.17f,
+            description = "Touch-only GTA V with GTA's controller map: RT shoot (left fire while you look, drag the right one to aim), LT aim, " +
+                "sprint (A) past the ring or locked, X jump, B reload, L3 stealth, Y car, LB weapon wheel, RB cover, R3 look behind. Swipe the right side to look (mouse look).",
+            tags = listOf("gta", "shooter", "pubg-style", "touch-only"),
+        ),
+    )
 
     fun landscape(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.LANDSCAPE, o)
     fun portrait(o: StandardOptions = StandardOptions()) = build(LayoutOrientation.PORTRAIT, o)

@@ -69,26 +69,62 @@ class ControlsInput(
             ElementKind.MACRO -> playMacro(e)
             ElementKind.BUTTON, ElementKind.TRIGGER, ElementKind.COMBO -> {
                 val binds = e.bindings.filter { it != Binding.None }
-                if (e.mode == PressMode.TOGGLE) {
-                    if (e.id in _latched.value) {
+                when (e.mode) {
+                    PressMode.TOGGLE, PressMode.MIXED -> if (e.id in _latched.value) {
+                        // A latched toggle (or a tapped Mixed button) lets go on the next press.
                         _latched.value -= e.id
                         hold(e.id, emptyList())
+                        if (e.mode == PressMode.MIXED) unlatchedBy += e.id
                     } else {
-                        _latched.value += e.id
+                        if (e.mode == PressMode.TOGGLE) _latched.value += e.id
                         hold(e.id, binds)
                     }
-                } else {
-                    hold(e.id, binds)
+                    PressMode.HOLD -> hold(e.id, binds)
                 }
             }
             else -> Unit
         }
+        trackAim(e)
     }
 
-    fun elementUp(e: ControlElement) {
-        if (e.mode == PressMode.TOGGLE && e.kind != ElementKind.MACRO) return
-        if (e.kind == ElementKind.BUTTON || e.kind == ElementKind.TRIGGER || e.kind == ElementKind.COMBO) hold(e.id, emptyList())
+    /**
+     * A finger let go of [e] after [heldMs]. Hold releases; Toggle stays latched; Mixed latches
+     * after a quick tap (under [MIXED_TAP_MS]) and releases after a long press.
+     */
+    fun elementUp(e: ControlElement, heldMs: Long = Long.MAX_VALUE) {
+        if (e.kind != ElementKind.BUTTON && e.kind != ElementKind.TRIGGER && e.kind != ElementKind.COMBO) return
+        when (e.mode) {
+            PressMode.TOGGLE -> Unit
+            PressMode.MIXED -> when {
+                unlatchedBy.remove(e.id) -> Unit // this press only let go of the latch
+                heldMs < MIXED_TAP_MS -> _latched.value += e.id
+                else -> hold(e.id, emptyList())
+            }
+            PressMode.HOLD -> hold(e.id, emptyList())
+        }
+        trackAim(e)
     }
+
+    /** Presses of Mixed buttons that only released their latch (they must not latch again on lift). */
+    private val unlatchedBy = HashSet<String>()
+
+    /** Fire / ADS elements holding right now (the gyro's "while aiming or firing"). */
+    private val aimHolders = HashSet<String>()
+
+    /** True while an on-screen fire or aim element is held or latched. */
+    val aiming: Boolean get() = aimHolders.isNotEmpty()
+
+    private fun trackAim(e: ControlElement) {
+        if (!e.role.aims) return
+        if (heldBy.containsKey(e.id) || e.id in _latched.value) aimHolders += e.id else aimHolders -= e.id
+        OnScreenAim.active = aimHolders.isNotEmpty()
+    }
+
+    /**
+     * Holds exactly [binds] for an extra [owner] that isn't an element's own press: a move
+     * stick's auto-sprint and run lock. Reference-counted with everything else.
+     */
+    fun holdExtra(owner: String, binds: List<Binding>) = hold(owner, binds.filter { it != Binding.None })
 
     /** D-pad: [dirs] holds the pressed directions as indices into up, down, left, right. */
     fun dpad(e: ControlElement, dirs: Set<Int>) {
@@ -162,6 +198,9 @@ class ControlsInput(
         heldBy.keys.toList().forEach { hold(it, emptyList()) }
         keyDirs.clear()
         _latched.value = emptySet()
+        unlatchedBy.clear()
+        aimHolders.clear()
+        OnScreenAim.active = false
         val padWasUsed = announced
         minHold.values.forEach { it.cancel() }; minHold.clear()
         deferredRelease.values.forEach { it.cancel() }; deferredRelease.clear()
@@ -300,6 +339,8 @@ class ControlsInput(
     companion object {
         const val AXIS_MAX = 32766
         const val MIN_HOLD_MS = 50L
+        /** Mixed mode: a press shorter than this is a tap and latches. */
+        const val MIXED_TAP_MS = 250L
         const val RESEND_MS = 100L
         const val WHEEL_REPEAT_MS = 120L
         /** The standard Xbox set, as GamepadMapper announces for physical pads. */
@@ -325,4 +366,12 @@ class ControlsInput(
             return x / m * scaled to y / m * scaled
         }
     }
+}
+
+/**
+ * Whether an on-screen fire or aim-down-sights element is held right now, for the gyro's
+ * "While aiming or firing" option (the gyro reads it on the main thread with every sample).
+ */
+object OnScreenAim {
+    @Volatile var active: Boolean = false
 }

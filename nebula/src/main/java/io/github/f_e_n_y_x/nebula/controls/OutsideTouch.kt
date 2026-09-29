@@ -21,8 +21,15 @@ enum class OutsideTouch(val id: String, val label: String, val help: String) {
         fun of(id: String?): OutsideTouch? = entries.firstOrNull { it.id == id }
         /** The GTA presets look; every other profile keeps the mouse (trackpad) outside the controls. */
         fun default(profileId: String): OutsideTouch =
-            if (profileId == ControlsProfile.GTA_TOUCH_ID || profileId == ControlsProfile.GTA_ID || profileId == ControlsProfile.GTA_MOUSE_ID) LOOK else TRACKPAD
+            if (profileId in LOOK_PRESETS) LOOK else TRACKPAD
+        private val LOOK_PRESETS = setOf(
+            ControlsProfile.GTA_TOUCH_ID, ControlsProfile.GTA_ID, ControlsProfile.GTA_MOUSE_ID,
+            ControlsProfile.SHOOTER_PAD_ID, ControlsProfile.SHOOTER_KBM_ID, ControlsProfile.GTA_PUBG_ID,
+        )
+        /** The user's choice for this profile, else what the profile (or layout file) says, else [default]. */
+        fun resolve(stored: String?, profile: ControlsProfile): OutsideTouch = of(stored) ?: profile.outside ?: default(profile.id)
         fun read(p: LegacyPrefs, profileId: String): OutsideTouch = of(p.prefs.getString(KEY + profileId, null)) ?: default(profileId)
+        fun read(p: LegacyPrefs, profile: ControlsProfile): OutsideTouch = resolve(p.prefs.getString(KEY + profile.id, null), profile)
         fun write(p: LegacyPrefs, profileId: String, v: OutsideTouch) { p.prefs.edit().putString(KEY + profileId, v.id).apply() }
     }
 }
@@ -35,9 +42,12 @@ enum class LookOutput(val id: String, val label: String, val help: String) {
     companion object {
         private const val KEY = "nebula_osc_look_output:"
         /** The GTA V touch preset looks with the mouse; everything else with the right stick (works in any game). */
-        fun default(profileId: String): LookOutput = if (profileId == ControlsProfile.GTA_TOUCH_ID) MOUSE else STICK
-        fun read(p: LegacyPrefs, profileId: String): LookOutput =
-            entries.firstOrNull { it.id == p.prefs.getString(KEY + profileId, null) } ?: default(profileId)
+        fun default(profileId: String): LookOutput =
+            if (profileId == ControlsProfile.GTA_TOUCH_ID || profileId == ControlsProfile.GTA_PUBG_ID || profileId == ControlsProfile.SHOOTER_KBM_ID) MOUSE else STICK
+        fun of(id: String?): LookOutput? = entries.firstOrNull { it.id == id }
+        fun resolve(stored: String?, profile: ControlsProfile): LookOutput = of(stored) ?: profile.look ?: default(profile.id)
+        fun read(p: LegacyPrefs, profileId: String): LookOutput = of(p.prefs.getString(KEY + profileId, null)) ?: default(profileId)
+        fun read(p: LegacyPrefs, profile: ControlsProfile): LookOutput = resolve(p.prefs.getString(KEY + profile.id, null), profile)
         fun write(p: LegacyPrefs, profileId: String, v: LookOutput) { p.prefs.edit().putString(KEY + profileId, v.id).apply() }
     }
 }

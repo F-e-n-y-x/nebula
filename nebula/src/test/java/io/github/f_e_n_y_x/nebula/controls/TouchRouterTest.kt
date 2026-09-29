@@ -166,13 +166,15 @@ class TouchRouterTest {
     }
 
     @Test
-    fun `fire-and-look RT fires at once and looks after 12 dp`() = runTest {
+    fun `fire-and-look RT fires at once and looks as soon as it moves`() = runTest {
         val r = rig(elements = listOf(zone, ls, rt.copy(lookThrough = true), a))
         val (tx, ty) = centre(rt)
         r.router.down(0, tx, ty, 0)
         assertEquals(255, r.pc.pad.rt)
-        r.router.move(listOf(Finger(0, tx - 8f, ty)), 16)
-        assertEquals("not looking before 12 dp", 0, r.pc.mouseX)
+        r.router.move(listOf(Finger(0, tx - 2f, ty)), 16)
+        assertEquals("a tap's jitter doesn't look", 0, r.pc.mouseX)
+        r.router.move(listOf(Finger(0, tx - 8f, ty)), 24)
+        assertTrue("looking after a few dp: ${r.pc.mouseX}", r.pc.mouseX < 0)
         r.router.move(listOf(Finger(0, tx - 14f, ty)), 32)
         r.router.move(listOf(Finger(0, tx - 40f, ty)), 48)
         assertTrue("looking: ${r.pc.mouseX}", r.pc.mouseX < 0)

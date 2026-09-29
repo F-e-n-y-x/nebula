@@ -467,8 +467,8 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             }
         }
 
-        val outsideMode = remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(prefs, controlsProfile.id) }
-        val lookMode = remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.LookOutput.read(prefs, controlsProfile.id) }
+        val outsideMode = remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(prefs, controlsProfile) }
+        val lookMode = remember(controlsProfile.id, tick) { io.github.f_e_n_y_x.nebula.controls.LookOutput.read(prefs, controlsProfile) }
         input.outside = if (oscShown || zonesShown) outsideMode else null
         if (oscShown || zonesShown) {
             OnScreenControls(
@@ -580,6 +580,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 hapticsNote = hapticsNote,
                 phoneHasGyro = phoneHasGyro,
                 controlsProfileId = controlsProfile.id.takeIf { ui.osc },
+                controlsProfile = controlsProfile.takeIf { ui.osc },
                 actions = StreamMenuActions(
                     onResume = { menu = false },
                     onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },

@@ -83,6 +83,9 @@ object ProfileJson {
         .apply { p.origin?.let { put("origin", it) } }
         .put("landscape", elementsToJson(p.landscape))
         .apply { p.portrait?.let { put("portrait", elementsToJson(it)) } }
+        .apply { p.outside?.let { put("outside", it.id) } }
+        .apply { p.look?.let { put("look", it.id) } }
+        .apply { p.meta?.let { put("meta", LayoutFile.metaToJson(it)) } }
 
     private fun profileFromJsonOrNull(o: JSONObject): ControlsProfile? = runCatching { profileFromJson(o) }.getOrNull()
 
@@ -96,6 +99,9 @@ object ProfileJson {
             createdAtMs = o.optLong("createdAt", 0),
             updatedAtMs = o.optLong("updatedAt", 0),
             origin = o.optString("origin").ifBlank { null },
+            outside = OutsideTouch.of(o.optString("outside").ifBlank { null }),
+            look = LookOutput.of(o.optString("look").ifBlank { null }),
+            meta = o.optJSONObject("meta")?.let { m -> runCatching { LayoutFile.parseMeta(m) }.getOrNull() },
         )
     }
 
@@ -137,6 +143,10 @@ object ProfileJson {
         .put("keepWithController", e.keepWithController)
         .put("lookThrough", e.lookThrough)
         .put("antiDeadzone", e.antiDeadzone.toDouble())
+        .put("sprint", e.sprint.token())
+        .put("sprintAt", e.sprintAt.toDouble())
+        .put("runLock", e.runLock)
+        .put("role", e.role.id)
 
     /** Null for an element this version doesn't know (a newer kind); the rest of the profile still loads. */
     fun elementFromJson(o: JSONObject): ControlElement? {
@@ -176,6 +186,10 @@ object ProfileJson {
             keepWithController = o.optBoolean("keepWithController", false),
             lookThrough = o.optBoolean("lookThrough", false),
             antiDeadzone = o.optDouble("antiDeadzone", ControlElement.DEFAULT_ANTI_DEADZONE.toDouble()).toFloat().coerceIn(0f, 0.45f),
+            sprint = Binding.parse(o.optString("sprint", "none")),
+            sprintAt = o.optDouble("sprintAt", ControlElement.DEFAULT_SPRINT_AT.toDouble()).toFloat(),
+            runLock = o.optBoolean("runLock", false),
+            role = ElementRole.of(o.optString("role")) ?: ElementRole.NONE,
         ).clampedSize()
     }
 }

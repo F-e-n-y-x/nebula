@@ -64,8 +64,14 @@ class LookBoard {
         l.knob.value = Offset(v.knobX, v.knobY)
         l.origin.value = if (v.originX.isNaN()) Offset.Unspecified else Offset(v.originX, v.originY)
         l.dirs.value = v.dirs
+        l.sprint.value = v.sprint
+        l.lockArmed.value = v.lockArmed
+        l.locked.value = v.locked
     }
-    fun clear() = looks.values.forEach { it.pressed.value = false; it.knob.value = Offset.Zero; it.origin.value = Offset.Unspecified; it.dirs.value = emptySet() }
+    fun clear() = looks.values.forEach {
+        it.pressed.value = false; it.knob.value = Offset.Zero; it.origin.value = Offset.Unspecified; it.dirs.value = emptySet()
+        it.sprint.value = false; it.lockArmed.value = false; it.locked.value = false
+    }
 }
 
 /**

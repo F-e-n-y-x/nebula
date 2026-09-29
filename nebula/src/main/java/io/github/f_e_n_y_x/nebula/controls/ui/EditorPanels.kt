@@ -594,14 +594,14 @@ internal fun ProfilesPanel(
         }
 
         val legacy = remember { io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx) }
-        var outside by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(legacy, current.id)) }
+        var outside by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(legacy, current)) }
         Field("Touches outside controls", outside.help) {
             Segmented(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.entries.map { it.label to it }, outside) { v ->
                 outside = v
                 io.github.f_e_n_y_x.nebula.controls.OutsideTouch.write(legacy, current.id, v)
             }
         }
-        var lookOut by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.LookOutput.read(legacy, current.id)) }
+        var lookOut by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.LookOutput.read(legacy, current)) }
         Field("Look with", lookOut.help + " Used by the Look area and by fire-and-look buttons.") {
             Segmented(io.github.f_e_n_y_x.nebula.controls.LookOutput.entries.map { it.label to it }, lookOut) { v ->
                 lookOut = v
