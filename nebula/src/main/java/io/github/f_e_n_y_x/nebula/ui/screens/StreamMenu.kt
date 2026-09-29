@@ -2,8 +2,8 @@ package io.github.f_e_n_y_x.nebula.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +33,7 @@ import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import io.github.f_e_n_y_x.nebula.controls.OutsideTouch
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,8 @@ class StreamMenuActions(
     val onFramegenPause: (Boolean, Boolean) -> Boolean = { _, _ -> false },
     /** Opens the on-screen controls editor over the stream. */
     val onEditControls: () -> Unit = {},
+    /** Portrait streaming "Follow rotation" on or off, for the running stream and after. */
+    val onPortraitFollow: (Boolean) -> Unit = {},
 )
 
 /**
@@ -114,6 +117,10 @@ fun StreamMenu(
     controlsProfileId: String? = null,
     /** The profile itself, so a layout file's own "outside touches" choice shows. */
     controlsProfile: io.github.f_e_n_y_x.nebula.controls.ControlsProfile? = null,
+    /** Mic state for the quick toggle (the same one [hostSection] shows). */
+    hostState: StreamHostState? = null,
+    /** Portrait streaming "Follow rotation", or null where the stream can't follow (TV). */
+    portraitFollow: Boolean? = null,
 ) {
     val s = Nebula.scale
     val form = Nebula.form
@@ -131,18 +138,33 @@ fun StreamMenu(
         io.github.f_e_n_y_x.nebula.framegen.FramegenSettingsSheet(onBack = { framegenSettings = false })
         return
     }
+    val tick by prefs.changes().collectAsState(initial = null)
+    val (framegen, framegenQueued) = io.github.f_e_n_y_x.nebula.framegen.rememberFramegenPanelState(stats?.post, stats?.receivedFps, prefs)
+    val quickShown = remember(tick) { QuickToggles.read(prefs.prefs.all).isNotEmpty() }
+    // Opening the menu focuses the first quick toggle (the top of the panel, so nothing scrolls
+    // away); with none shown, Resume.
+    val firstQuick = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (!quickShown) return@LaunchedEffect
+        // After the enter animation's first frame, when the tiles are attached and the input
+        // layer has let go of focus.
+        kotlinx.coroutines.delay(120)
+        runCatching { firstQuick.requestFocus() }
+    }
     Box(Modifier.fillMaxSize()) {
-        // Scrim: tapping outside the panel resumes.
+        // Scrim: tapping outside the panel resumes. A tap handler, not clickable: a focusable
+        // scrim would take the D-pad's first focus (invisibly) and OK would close the menu.
         Box(
             Modifier.fillMaxSize().background(Color(0x99000000))
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = actions.onResume),
+                .pointerInput(Unit) { detectTapGestures { actions.onResume() } },
         )
         val panelShape = if (side) RoundedCornerShape(topStart = s.dp(20), bottomStart = s.dp(20)) else RoundedCornerShape(topStart = s.dp(20), topEnd = s.dp(20))
         Column(
             (if (side) Modifier.align(Alignment.CenterEnd).width(s.dp(420)).fillMaxHeight() else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.78f))
                 .background(NebulaColors.panel, panelShape)
                 .border(1.dp, NebulaColors.border, panelShape)
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                // Swallows taps on the panel's gaps (they'd reach the scrim); not a focus target.
+                .pointerInput(Unit) { detectTapGestures { } }
                 .then(if (side) Modifier.statusBarsPadding() else Modifier)
                 .navigationBarsPadding(),
         ) {
@@ -151,14 +173,27 @@ fun StreamMenu(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = s.dp(22), end = s.dp(22), top = s.dp(22), bottom = s.dp(12)),
             verticalArrangement = Arrangement.spacedBy(s.dp(18)),
         ) {
-            Header(gameName, mode, stats)
+            // The title, then the quick toggles, so they're in view without scrolling even on a
+            // phone held sideways; the stream's details follow.
+            QuickToggleStrip(
+                title = { m -> Text(gameName, style = Nebula.type.heading, color = NebulaColors.text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = m) },
+                ui = ui, prefs = prefs, tick = tick,
+                controlsProfileId = controlsProfileId, controlsProfile = controlsProfile,
+                framegen = framegen, framegenQueued = framegenQueued, post = stats?.post,
+                onFramegenPause = actions.onFramegenPause,
+                mic = hostState,
+                portraitFollow = portraitFollow, onPortraitFollow = actions.onPortraitFollow,
+                onKeyboard = if (ui.keyboardKind == KeyboardKind.PHONE) actions.onKeyboard else actions.onPcKeyboard,
+                firstFocus = firstQuick,
+            )
+            Header(mode, stats)
             StatsBlock(stats, full = true)
             resolution?.let {
                 ResolutionRow(it, onOpen = { picking = true })
                 RotateRow(it, onRotated = actions.onResume)
             }
             io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
-            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId, controlsProfile)
+            Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId, controlsProfile, tick, focusResume = !quickShown)
             hostSection?.invoke()
             FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)
             if (unsupported.isNotEmpty()) {
@@ -186,10 +221,9 @@ fun StreamMenu(
 }
 
 @Composable
-private fun Header(gameName: String, mode: DisplayMode, stats: StreamStats?) {
+private fun Header(mode: DisplayMode, stats: StreamStats?) {
     val s = Nebula.scale
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-        Text(gameName, style = Nebula.type.heading, color = NebulaColors.text, maxLines = 2)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
             Pill(if (stats != null) "● Live" else "Connecting…", color = if (stats != null) NebulaColors.success else NebulaColors.textSecondary, background = if (stats != null) NebulaColors.successTint else NebulaColors.raised)
             Pill(
@@ -243,10 +277,14 @@ private fun Stat(label: String, value: String) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean, controlsProfileId: String? = null, controlsProfile: io.github.f_e_n_y_x.nebula.controls.ControlsProfile? = null) {
+private fun Controls(
+    ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuActions, gameKey: String, zoomed: Boolean, hostSection: Boolean,
+    controlsProfileId: String? = null, controlsProfile: io.github.f_e_n_y_x.nebula.controls.ControlsProfile? = null,
+    tick: Any? = null, focusResume: Boolean = true,
+) {
     val s = Nebula.scale
     val first = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+    LaunchedEffect(Unit) { if (focusResume) runCatching { first.requestFocus() } }
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             NebulaButton("Resume", onClick = actions.onResume, icon = Icons.Rounded.PlayArrow, modifier = Modifier.focusRequester(first))
@@ -257,10 +295,10 @@ private fun Controls(ui: StreamUiPrefs, prefs: LegacyPrefs, actions: StreamMenuA
         }
         OverlayTransparency(ui.overlayOpacity, actions.onOverlayOpacity)
         if (controlsProfileId != null) {
-            var outside by remember(controlsProfileId) { mutableStateOf(controlsProfile?.let { OutsideTouch.read(prefs, it) } ?: OutsideTouch.read(prefs, controlsProfileId)) }
+            // Re-read on every change: the quick toggle above writes the same key.
+            val outside = remember(controlsProfileId, controlsProfile, tick) { controlsProfile?.let { OutsideTouch.read(prefs, it) } ?: OutsideTouch.read(prefs, controlsProfileId) }
             MenuSetting("Touch outside controls · remembered for these controls") {
                 Segmented(listOf("Mouse" to OutsideTouch.TRACKPAD, "Look" to OutsideTouch.LOOK, "Off" to OutsideTouch.OFF), outside) { v ->
-                    outside = v
                     OutsideTouch.write(prefs, controlsProfileId, v)
                 }
             }

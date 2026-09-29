@@ -80,12 +80,10 @@ fun FramegenMenuSection(
 ) {
     val s = Nebula.scale
     val ctx = LocalContext.current
-    val tick by prefs.changes().collectAsState(initial = null)
-    val queued by FramegenSelfTestRunner.queuedAfterStream.collectAsState()
-    val config = remember(tick) { FramegenConfig.from(prefs.prefs.all) }
-    val upscaler = remember(tick) { UpscalerConfig.from(prefs.prefs.all) }
-    val report = remember(tick) { FramegenSelfTestRunner.savedReport(ctx) }
-    val state = framegenPanelState(post, receivedFps, config, upscaler, report?.verdict ?: SelfTestVerdict.NOT_RUN, report?.firstFailure, queued)
+    val (menu, queued) = rememberFramegenPanelState(post, receivedFps, prefs)
+    val state = menu.panel
+    val config = menu.config
+    val upscaler = menu.upscalerConfig
     // A refusal or a failed pause, shown in place (a toast would be hidden behind the menu on TV).
     var notice by remember { mutableStateOf<String?>(null) }
 
@@ -95,20 +93,7 @@ fun FramegenMenuSection(
             StatusPill(state)
         }
         ToggleRow("Frame generation", state.detail, state.switchOn) { want ->
-            notice = null
-            when (state.toggle(want)) {
-                FramegenPanelState.Toggle.PAUSE -> if (!onPause(true, false)) notice = "Frame generation can't be paused right now."
-                FramegenPanelState.Toggle.RESUME -> if (!onPause(false, false)) notice = "Frame generation can't be resumed right now."
-                FramegenPanelState.Toggle.FORCE_RESUME -> if (!onPause(false, true)) notice = "Frame generation can't be resumed right now."
-                FramegenPanelState.Toggle.ENABLE -> {
-                    prefs.put(FramegenKeys.ENABLED, true)
-                    notice = "Frame generation starts with the next stream."
-                }
-                FramegenPanelState.Toggle.DISABLE -> prefs.put(FramegenKeys.ENABLED, false)
-                FramegenPanelState.Toggle.REFUSE_UNSUPPORTED -> notice = "This device can't run frame generation. The full device check is in All frame generation settings."
-                FramegenPanelState.Toggle.REFUSE_NO_ENGINE -> notice = "Import Lossless.dll in All frame generation settings first."
-                FramegenPanelState.Toggle.REFUSE_NEEDS_CHECK -> notice = if (queued) FramegenPanelState.QUEUED_MESSAGE else FramegenPanelState.NEEDS_CHECK_MESSAGE
-            }
+            notice = performFramegenToggle(state.toggle(want), onPause, { prefs.put(FramegenKeys.ENABLED, it) }, queued)
         }
         notice?.let { Text(it, style = Nebula.type.label, color = NebulaColors.warning, modifier = Modifier.padding(horizontal = s.dp(4))) }
         if (state.offerCheckAfterStream || queued) {
@@ -165,6 +150,25 @@ fun FramegenMenuSection(
         )
         NebulaButton("All frame generation settings", onClick = onOpenSettings, style = ButtonStyle.Secondary, icon = Icons.Outlined.Tune, modifier = Modifier.fillMaxWidth())
     }
+}
+
+/** The panel's state plus the saved settings behind it, refreshed on every settings change. */
+data class FramegenMenuState(val panel: FramegenPanelState, val config: FramegenConfig, val upscalerConfig: UpscalerConfig)
+
+/**
+ * What the Frame generation panel and the quick toggle show, from the stream's stats, the saved
+ * settings and the device check. Second: the device check is queued for after the stream.
+ */
+@Composable
+fun rememberFramegenPanelState(post: PostProcessStats?, receivedFps: Float?, prefs: LegacyPrefs): Pair<FramegenMenuState, Boolean> {
+    val ctx = LocalContext.current
+    val tick by prefs.changes().collectAsState(initial = null)
+    val queued by FramegenSelfTestRunner.queuedAfterStream.collectAsState()
+    val config = remember(tick) { FramegenConfig.from(prefs.prefs.all) }
+    val upscaler = remember(tick) { UpscalerConfig.from(prefs.prefs.all) }
+    val report = remember(tick) { FramegenSelfTestRunner.savedReport(ctx) }
+    val panel = framegenPanelState(post, receivedFps, config, upscaler, report?.verdict ?: SelfTestVerdict.NOT_RUN, report?.firstFailure, queued)
+    return FramegenMenuState(panel, config, upscaler) to queued
 }
 
 @Composable

@@ -73,6 +73,28 @@ data class FramegenPanelState(
     }
 }
 
+/**
+ * Performs [t] (from [FramegenPanelState.toggle]) the way the panel's switch and the quick toggle
+ * both do: pause / resume the running pipeline instantly, or change the saved setting (which the
+ * stream applies per LiveSettings: never a decoder rebuild). Returns the notice to show in place,
+ * or null.
+ */
+fun performFramegenToggle(
+    t: FramegenPanelState.Toggle,
+    onPause: (paused: Boolean, force: Boolean) -> Boolean,
+    setEnabled: (Boolean) -> Unit,
+    checkQueued: Boolean,
+): String? = when (t) {
+    FramegenPanelState.Toggle.PAUSE -> if (!onPause(true, false)) "Frame generation can't be paused right now." else null
+    FramegenPanelState.Toggle.RESUME -> if (!onPause(false, false)) "Frame generation can't be resumed right now." else null
+    FramegenPanelState.Toggle.FORCE_RESUME -> if (!onPause(false, true)) "Frame generation can't be resumed right now." else null
+    FramegenPanelState.Toggle.ENABLE -> { setEnabled(true); "Frame generation starts with the next stream." }
+    FramegenPanelState.Toggle.DISABLE -> { setEnabled(false); null }
+    FramegenPanelState.Toggle.REFUSE_UNSUPPORTED -> "This device can't run frame generation. The full device check is in All frame generation settings."
+    FramegenPanelState.Toggle.REFUSE_NO_ENGINE -> "Import Lossless.dll in All frame generation settings first."
+    FramegenPanelState.Toggle.REFUSE_NEEDS_CHECK -> if (checkQueued) FramegenPanelState.QUEUED_MESSAGE else FramegenPanelState.NEEDS_CHECK_MESSAGE
+}
+
 fun framegenPanelState(
     post: PostProcessStats?,
     receivedFps: Float?,

@@ -350,6 +350,11 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
      * "Follow rotation": the screen now faces [orientation] (null while flat or unknown). After it
      * has held for the debounce, the stream is switched to the rotated size.
      */
+    /** Portrait streaming, from the stream menu: saved like Settings › Stream, and followed at once. */
+    fun setPortraitStreaming(v: PortraitStreaming) {
+        viewModelScope.launch { c.prefs.updateStreamSettings { it.copy(portraitStreaming = v) } }
+    }
+
     fun onScreenOrientation(orientation: Orientation?) {
         if (settings.value.portraitStreaming != PortraitStreaming.FOLLOW_ROTATION) {
             follower.reset()
