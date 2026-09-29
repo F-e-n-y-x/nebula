@@ -21,6 +21,8 @@ object VirtualKeys {
         put(0xDB, "["); put(0xDC, "\\"); put(0xDD, "]"); put(0xDE, "'")
         put(0x6A, "Num *"); put(0x6B, "Num +"); put(0x6D, "Num -"); put(0x6E, "Num ."); put(0x6F, "Num /")
         put(0x0C, "Clear")
+        put(0xAD, "Mute"); put(0xAE, "Volume down"); put(0xAF, "Volume up")
+        put(0xB0, "Next track"); put(0xB1, "Previous track"); put(0xB2, "Stop"); put(0xB3, "Play / pause")
     }
 
     fun name(vk: Int): String = named[vk] ?: "Key 0x${vk.toString(16).uppercase()}"
@@ -33,6 +35,7 @@ object VirtualKeys {
         "Arrows & navigation" to listOf(0x26, 0x28, 0x25, 0x27, 0x24, 0x23, 0x21, 0x22, 0x2D, 0x2E),
         "Function" to (1..12).map { 0x6F + it },
         "Symbols" to listOf(0xC0, 0xBD, 0xBB, 0xDB, 0xDD, 0xDC, 0xBA, 0xDE, 0xBC, 0xBE, 0xBF),
+        "Media" to listOf(0xB3, 0xB1, 0xB0, 0xB2, 0xAE, 0xAF, 0xAD),
     )
 
     /** Android KeyEvent code → Windows VK, or null when there's no PC equivalent. */

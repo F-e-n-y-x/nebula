@@ -113,6 +113,9 @@ object ProfileJson {
         return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(::elementFromJson) }
     }
 
+    /** A [ControlElement.group] id: the same characters as an element id, up to 40. */
+    val GROUP_ID = Regex("^[A-Za-z0-9_.:-]{1,40}$")
+
     fun elementToJson(e: ControlElement): JSONObject = JSONObject()
         .put("id", e.id)
         .put("kind", e.kind.id)
@@ -148,6 +151,7 @@ object ProfileJson {
         .put("sprintAt", e.sprintAt.toDouble())
         .put("runLock", e.runLock)
         .put("role", e.role.id)
+        .apply { e.group?.let { put("group", it) } }
 
     /** Null for an element this version doesn't know (a newer kind); the rest of the profile still loads. */
     fun elementFromJson(o: JSONObject): ControlElement? {
@@ -191,6 +195,7 @@ object ProfileJson {
             sprintAt = o.optDouble("sprintAt", ControlElement.DEFAULT_SPRINT_AT.toDouble()).toFloat(),
             runLock = o.optBoolean("runLock", false),
             role = ElementRole.of(o.optString("role")) ?: ElementRole.NONE,
+            group = o.optString("group").takeIf { GROUP_ID.matches(it) },
         ).clampedSize()
     }
 }

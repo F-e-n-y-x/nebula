@@ -96,7 +96,7 @@ object LayoutFile {
     private val ELEMENT_KEYS = setOf(
         "id", "kind", "x", "y", "w", "h", "label", "opacity", "mode", "shape", "bindings", "stick", "click", "floating",
         "deadzone", "sensitivity", "steps", "tint", "zone", "acceleration", "invertY", "showRing", "keepWithController",
-        "lookThrough", "antiDeadzone", "sprint", "sprintAt", "runLock", "role",
+        "lookThrough", "antiDeadzone", "sprint", "sprintAt", "runLock", "role", "group",
     )
     private val STEP_KEYS = setOf("binding", "holdMs", "gapMs")
     private val ID = Regex("^[A-Za-z0-9_.:-]{1,40}$")
@@ -291,6 +291,9 @@ object LayoutFile {
         enumId(o, "stick", p, StickOutput.entries.map { it.id })
         enumId(o, "zone", p, ZoneType.entries.map { it.id })
         enumId(o, "role", p, ElementRole.entries.map { it.id })
+        o.opt("group")?.let { v ->
+            if (v !is String || !ProfileJson.GROUP_ID.matches(v)) throw ControlsFormatException("$p.group: letters, digits and _ . : - only, up to 40")
+        }
         o.opt("bindings")?.let { v ->
             val a = v as? JSONArray ?: throw ControlsFormatException("$p.bindings: must be a list")
             val max = if (kind == ElementKind.COMBO) 5 else 4

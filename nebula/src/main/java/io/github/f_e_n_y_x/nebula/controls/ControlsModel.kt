@@ -186,6 +186,13 @@ data class ControlElement(
     val runLock: Boolean = false,
     /** What the element is for (fire, aim, jump…); see [ElementRole]. */
     val role: ElementRole = ElementRole.NONE,
+    /**
+     * Editor-only: elements placed together from a ready-made group (ABXY, WASD…) share this id,
+     * so the editor moves, resizes, duplicates and deletes them as one until they're split.
+     * `"<template>:<random>"`, e.g. `"abxy:3f9a1c"`. Play ignores it: every member is an
+     * ordinary element. Null for a loose element.
+     */
+    val group: String? = null,
 ) {
 
     /** Zones are sized as a share of the controls area; everything else in dp. */
