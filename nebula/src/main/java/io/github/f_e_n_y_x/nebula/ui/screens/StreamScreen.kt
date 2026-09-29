@@ -84,6 +84,7 @@ import io.github.f_e_n_y_x.nebula.controls.hasControllerZones
 import io.github.f_e_n_y_x.nebula.controls.ui.ControlsEditor
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
 import io.github.f_e_n_y_x.nebula.data.engine.GyroAssist
+import io.github.f_e_n_y_x.nebula.controls.isShooter
 import io.github.f_e_n_y_x.nebula.data.engine.GyroToggle
 import io.github.f_e_n_y_x.nebula.data.engine.MotionRouting
 import io.github.f_e_n_y_x.nebula.data.engine.SurfaceStreamTarget
@@ -475,6 +476,14 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 remote, { pad }, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown },
                 routing = routing, outside = outsideMode, look = lookMode, background = { inputView?.background },
             )
+        }
+        // First time a shooter layout is in play: a short tutorial (Style → "How shooter controls work" shows it again).
+        var tutorialDone by remember { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.ui.ShooterTutorial.seen(prefs)) }
+        if (oscShown && live && !menu && !editingControls && !tutorialDone && controlsProfile.isShooter()) {
+            io.github.f_e_n_y_x.nebula.controls.ui.ShooterTutorialOverlay(controlsProfile.landscape) {
+                io.github.f_e_n_y_x.nebula.controls.ui.ShooterTutorial.markSeen(prefs)
+                tutorialDone = true
+            }
         }
         val statsAtTop = ui.stats.enabled && ui.stats.position.row == 0
         if (overlaysOn && ui.mouseBar) MouseBar(remote, opacity = ui.overlayOpacity, onKeyboard = openKeyboard, onHide = { prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, false) }, atTop = oscShown, topInset = if (statsAtTop) 60 + (ui.stats.metrics.size.coerceAtMost(8) * if (ui.stats.layout == io.github.f_e_n_y_x.nebula.settings.StatLayout.CARD) 18 else 0) else 12)

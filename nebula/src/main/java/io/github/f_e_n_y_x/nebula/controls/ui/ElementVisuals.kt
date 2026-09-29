@@ -83,7 +83,11 @@ fun ElementFace(e: ControlElement, look: ElementLook, latched: State<Boolean>, m
             val what = when (e.zone) {
                 io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_MOUSE -> "Camera → mouse"
                 io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_STICK -> "Camera → ${if (e.stick == StickOutput.LEFT) "left" else "right"} stick"
-                io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> "Floating ${if (e.stick == StickOutput.LEFT) "left" else "right"} stick"
+                io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> when (e.stick) {
+                    StickOutput.KEYS -> "Floating WASD stick"
+                    StickOutput.LEFT -> "Floating left stick"
+                    StickOutput.RIGHT -> "Floating right stick"
+                }
             } + if (e.keepWithController) " · with controller" else ""
             Text(
                 what, style = t.label, color = NebulaColors.textSecondary, textAlign = TextAlign.Center,
@@ -219,7 +223,9 @@ private fun DrawScope.drawMoveMarks(e: ControlElement, look: ElementLook, o: Off
     if (hasSprint) {
         val c = o + Offset(0f, -ring * e.sprintAt)
         val a = 7.dp.toPx()
-        val col = if (look.sprint.value) on else dim
+        val sprinting = look.sprint.value
+        if (sprinting) drawCircle(NebulaColors.accent, 13.dp.toPx(), c)
+        val col = if (sprinting) Color.White else dim
         for (k in 0..1) {
             val y = c.y + k * a * 0.9f - a * 0.45f
             val p = Path().apply { moveTo(c.x - a, y + a / 2); lineTo(c.x, y - a / 2); lineTo(c.x + a, y + a / 2) }

@@ -28,9 +28,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = container
         val start = intent?.getStringExtra("start")
+        io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
         setContent {
             NebulaTheme { NebulaApp(container, start) }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        // singleTask: a layout link while Nebula runs arrives here; same checks as onCreate.
+        setIntent(intent)
+        io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
     }
 
     override fun onStart() {

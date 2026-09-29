@@ -31,6 +31,7 @@ enum class OutsideTouch(val id: String, val label: String, val help: String) {
         fun read(p: LegacyPrefs, profileId: String): OutsideTouch = of(p.prefs.getString(KEY + profileId, null)) ?: default(profileId)
         fun read(p: LegacyPrefs, profile: ControlsProfile): OutsideTouch = resolve(p.prefs.getString(KEY + profile.id, null), profile)
         fun write(p: LegacyPrefs, profileId: String, v: OutsideTouch) { p.prefs.edit().putString(KEY + profileId, v.id).apply() }
+        fun clear(p: LegacyPrefs, profileId: String) { p.prefs.edit().remove(KEY + profileId).apply() }
     }
 }
 
@@ -49,5 +50,6 @@ enum class LookOutput(val id: String, val label: String, val help: String) {
         fun read(p: LegacyPrefs, profileId: String): LookOutput = of(p.prefs.getString(KEY + profileId, null)) ?: default(profileId)
         fun read(p: LegacyPrefs, profile: ControlsProfile): LookOutput = resolve(p.prefs.getString(KEY + profile.id, null), profile)
         fun write(p: LegacyPrefs, profileId: String, v: LookOutput) { p.prefs.edit().putString(KEY + profileId, v.id).apply() }
+        fun clear(p: LegacyPrefs, profileId: String) { p.prefs.edit().remove(KEY + profileId).apply() }
     }
 }

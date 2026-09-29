@@ -240,7 +240,8 @@ object DefaultProfiles {
         btn("fire-left", "FIRE", b.fire, 0.075f, 0.33f, 64f, ElementRole.FIRE, kind = fireKind)
         btn("fire", "FIRE", b.fire, 0.80f, 0.55f, 80f, ElementRole.FIRE, look = true, kind = fireKind)
         btn("ads", "ADS", b.ads, 0.925f, 0.33f, 58f, ElementRole.ADS, mode = b.adsMode, kind = if (b.ads is Binding.Trigger) ElementKind.TRIGGER else ElementKind.BUTTON)
-        btn("jump", "Jump", b.jump, 0.94f, 0.58f, 54f, ElementRole.JUMP)
+        // Jump sits in from the edge: the stream's mic and menu buttons live on the right edge.
+        btn("jump", "Jump", b.jump, 0.895f, 0.6f, 54f, ElementRole.JUMP)
         btn("crouch", "Crouch", b.crouch, 0.905f, 0.83f, 54f, ElementRole.CROUCH, mode = b.crouchMode)
         when {
             b.prone != Binding.None -> btn("prone", "Prone", b.prone, 0.795f, 0.9f, 48f, ElementRole.PRONE)

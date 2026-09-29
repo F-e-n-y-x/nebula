@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Host game rumble and audio haptics on this device (controllers need no permission). -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Scanning a controls-layout QR code (asked for when the scanner opens; nothing is recorded). -->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <!-- Settings → About installs Nebula updates (downloaded, checksum- and signer-verified) through
          PackageInstaller; the user confirms every install and must allow "Install unknown apps". -->
@@ -39,6 +41,7 @@
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
         android:name=".NebulaApplication"
@@ -64,6 +67,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <!-- nebula://layout?url=https://… opens a shared controls layout. The link only names
+                 a file to download: it is fetched over https (size-capped), validated, previewed,
+                 and added only when the user taps Add. Nothing else in the intent is used. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nebula" android:host="layout" />
+            </intent-filter>
         </activity>
 
         <service
@@ -86,6 +98,13 @@
         <receiver
             android:name=".update.UpdateInstallReceiver"
             android:exported="false" />
+
+        <!-- Controls editor → Share: layout files and preview images, from cache/layouts only. -->
+        <provider
+            android:name=".controls.ui.LayoutFileProvider"
+            android:authorities="${applicationId}.layouts"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
         <!-- Settings → Diagnostics: the exported zip is shared from cache/diagnostics only. -->
         <provider

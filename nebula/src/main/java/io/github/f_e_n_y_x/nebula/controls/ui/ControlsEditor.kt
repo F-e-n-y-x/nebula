@@ -78,6 +78,10 @@ import io.github.f_e_n_y_x.nebula.controls.LayoutOrientation
 import io.github.f_e_n_y_x.nebula.controls.Snapping
 import io.github.f_e_n_y_x.nebula.settings.overlayOpacity
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
+import io.github.f_e_n_y_x.nebula.controls.DefaultProfiles
+import io.github.f_e_n_y_x.nebula.controls.LayoutFit
+import io.github.f_e_n_y_x.nebula.controls.isShooter
+import androidx.compose.material.icons.rounded.Style
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
 import io.github.f_e_n_y_x.nebula.ui.components.nebulaClickable
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
@@ -154,6 +158,8 @@ fun ControlsEditor(
     var gridOn by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf(Panel.NONE) }
     var confirmClose by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf(false) }
+    var tutorial by remember { mutableStateOf(false) }
     var guides by remember { mutableStateOf<Pair<List<Float>, List<Float>>>(emptyList<Float>() to emptyList()) }
     val globalOpacity = remember { overlayOpacity(ctx) / 100f }
     val selected = editor.selected
@@ -270,6 +276,7 @@ fun ControlsEditor(
             onUndo = { act { undo() } }, onRedo = { act { redo() } },
             onGrid = { gridOn = !gridOn },
             onAdd = { panel = if (panel == Panel.LIBRARY) Panel.NONE else Panel.LIBRARY },
+            onStyle = { picking = true },
             onSave = save,
             // A side panel takes one edge; the toolbar moves to the other so neither covers the other.
             modifier = Modifier.align(
@@ -321,6 +328,39 @@ fun ControlsEditor(
                     Panel.NONE -> Unit
                 }
             }
+        }
+    }
+
+    val (areaW, areaH) = areaDp()
+    if (picking) {
+        StylePickerDialog(
+            standard = store.standardOptions(),
+            onPick = { preset ->
+                picking = false
+                val land = orientation == LayoutOrientation.LANDSCAPE
+                val fitted = if (land) LayoutFit.fit(preset.landscape, areaW, areaH) else LayoutFit.fit(preset.layout(orientation), areaH, areaW)
+                act { replaceAll(fitted) }
+                // The style's touch settings come with it; a per-profile override set earlier would hide them.
+                val legacy = io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx)
+                if (!session.base.isBuiltIn) {
+                    io.github.f_e_n_y_x.nebula.controls.OutsideTouch.clear(legacy, session.base.id)
+                    io.github.f_e_n_y_x.nebula.controls.LookOutput.clear(legacy, session.base.id)
+                }
+                session.base = session.base.copy(
+                    outside = preset.outside, look = preset.look,
+                    meta = preset.meta?.copy(name = session.base.name, author = ""),
+                )
+                rev++
+                if (preset.isShooter() && !ShooterTutorial.seen(legacy)) tutorial = true
+            },
+            onTutorial = { picking = false; tutorial = true },
+            onDismiss = { picking = false },
+        )
+    }
+    if (tutorial) {
+        ShooterTutorialOverlay(editor.elements.takeIf { l -> l.any { it.role == io.github.f_e_n_y_x.nebula.controls.ElementRole.FIRE } } ?: DefaultProfiles.shooterPad().landscape) {
+            tutorial = false
+            ShooterTutorial.markSeen(io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx))
         }
     }
 
@@ -525,6 +565,7 @@ private fun EditorToolbar(
     onRedo: () -> Unit,
     onGrid: () -> Unit,
     onAdd: () -> Unit,
+    onStyle: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -557,6 +598,7 @@ private fun EditorToolbar(
         ToolIcon(Icons.AutoMirrored.Rounded.Redo, "Redo", onRedo, enabled = canRedo)
         ToolIcon(if (gridOn) Icons.Rounded.GridOn else Icons.Rounded.GridOff, if (gridOn) "Grid and snapping on" else "Grid and snapping off", onGrid, active = gridOn)
         ToolIcon(Icons.Rounded.Add, "Add element", onAdd)
+        ToolIcon(Icons.Rounded.Style, "Style: start from a layout", onStyle)
         Divider()
         Box(
             Modifier.nebulaClickable(shape, onSave).background(if (dirty) NebulaColors.accent else NebulaColors.raised, shape)
