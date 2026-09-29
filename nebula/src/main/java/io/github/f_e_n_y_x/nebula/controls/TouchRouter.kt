@@ -49,6 +49,12 @@ data class Visual(
     val originX: Float = Float.NaN,
     val originY: Float = Float.NaN,
     val dirs: Set<Int> = emptySet(),
+    /** Move stick: pushed past the ring, auto-sprint held. */
+    val sprint: Boolean = false,
+    /** Move stick: the thumb is on the run-lock mark; letting go locks. */
+    val lockArmed: Boolean = false,
+    /** Move stick: run lock on (running forward with no finger). */
+    val locked: Boolean = false,
 )
 
 /** The stream's trackpad/touch layer, fed only the fingers the router gives it (see [TouchRouter]). */
@@ -86,9 +92,15 @@ class TouchRouter(
         abstract val id: String?
     }
 
-    private class Press(val e: ControlElement, val downX: Float, val downY: Float) : Owner() {
+    private class Press(val e: ControlElement, val downX: Float, val downY: Float, val downT: Long) : Owner() {
         override val id get() = e.id
         var look: Look? = null
+    }
+
+    /** Auto-sprint / run-lock state of the finger on a move stick. */
+    private class MoveState {
+        var sprinting = false
+        var armed = false
     }
 
     private class Dpad(val e: ControlElement, val rect: RRect) : Owner() {
@@ -99,6 +111,7 @@ class TouchRouter(
     private class Stick(val e: ControlElement, val rect: RRect, val ox: Float, val oy: Float, val radius: Float, val start: Long) : Owner() {
         override val id get() = e.id
         var travelled = 0f
+        val move = MoveState()
     }
 
     private class Pad(val e: ControlElement, val start: Long) : Owner() {
@@ -108,7 +121,15 @@ class TouchRouter(
 
     private class FloatStick(val e: ControlElement, val rect: RRect, val ox: Float, val oy: Float, val radius: Float) : Owner() {
         override val id get() = e.id
+        val move = MoveState()
     }
+
+    /** A run-locked move stick: its element, and where to draw it (element px). */
+    private class Lock(val e: ControlElement, val originX: Float, val originY: Float)
+    private val locks = LinkedHashMap<String, Lock>()
+
+    /** Element ids whose run lock is on (tests and the overlay). */
+    val runLocked: Set<String> get() = locks.keys
 
     /** A finger that looks: a camera zone, the Look background, or a fire-and-look button. */
     private class Look(val zoneId: String?, val side: Side, val stick: CameraStick?, val mouse: CameraMouse?) : Owner() {
@@ -138,6 +159,12 @@ class TouchRouter(
         last[id] = x to y
         lastT[id] = t
         val owner = claim(x, y, t)
+        // Touching a run-locked stick again stops the run (PUBG); the finger then steers as usual.
+        when (owner) {
+            is Stick -> unlock(owner.e.id)
+            is FloatStick -> unlock(owner.e.id)
+            else -> Unit
+        }
         owners[id] = owner
         when (owner) {
             is Press -> {
@@ -196,6 +223,7 @@ class TouchRouter(
         if (bgFingers.isNotEmpty()) { bgFingers.clear(); background()?.cancel() }
         decaying.values.forEach { it.release() }
         decaying.clear()
+        locks.keys.toList().forEach { unlock(it) }
         // Nothing may wait out a minimum hold after a cancel.
         input.releaseAll()
     }
@@ -226,7 +254,7 @@ class TouchRouter(
         for ((e, r) in controls) {
             if (!r.contains(x, y)) continue
             return when (e.kind) {
-                ElementKind.BUTTON, ElementKind.TRIGGER, ElementKind.COMBO, ElementKind.MACRO -> Press(e, x, y)
+                ElementKind.BUTTON, ElementKind.TRIGGER, ElementKind.COMBO, ElementKind.MACRO -> Press(e, x, y, t)
                 ElementKind.DPAD -> Dpad(e, r)
                 ElementKind.STICK -> {
                     val full = min(r.width, r.height) / 2f
@@ -242,8 +270,7 @@ class TouchRouter(
             val side = if (e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT
             return when (e.zone) {
                 ZoneType.FLOATING_STICK -> FloatStick(e, r, x, y, FLOAT_RING_DP * l.density)
-                ZoneType.CAMERA_STICK -> Look(e.id, side, CameraStick(e.sensitivity, e.acceleration, e.antiDeadzone, e.invertY), null)
-                ZoneType.CAMERA_MOUSE -> Look(e.id, side, null, CameraMouse.forZone(e))
+                else -> zoneLook(e, e.id)
             }
         }
         return when (l.background) {
@@ -258,6 +285,24 @@ class TouchRouter(
         LookOutput.MOUSE -> Look(zoneId, Side.RIGHT, null, CameraMouse())
     }
 
+    private fun zoneLook(e: ControlElement, zoneId: String?): Look {
+        val side = if (e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT
+        return if (e.zone == ZoneType.CAMERA_MOUSE) Look(zoneId, side, null, CameraMouse.forZone(e))
+        else Look(zoneId, side, CameraStick(e.sensitivity, e.acceleration, e.antiDeadzone, e.invertY), null)
+    }
+
+    /**
+     * The look a fire-and-look finger uses: the layout's right-hand camera zone when it has one
+     * (so aiming with the fire button turns exactly as fast as the look area), else the Look
+     * background's.
+     */
+    private fun aimLook(): Look {
+        val zone = layout.elements.firstOrNull { (e, _) ->
+            e.kind == ElementKind.ZONE && e.zone != ZoneType.FLOATING_STICK && e.stick != StickOutput.LEFT
+        }?.first
+        return if (zone != null) zoneLook(zone, null) else newLook()
+    }
+
     private fun release(id: Int, o: Owner, t: Long, cancelled: Boolean) {
         val pos = last.remove(id)
         lastT.remove(id)
@@ -265,21 +310,31 @@ class TouchRouter(
             is Press -> {
                 o.look?.let { endLook(it) }
                 val n = (pressCount[o.e.id] ?: 1) - 1
-                if (n <= 0) { pressCount.remove(o.e.id); input.elementUp(o.e); visual(o.e.id, Visual()) } else pressCount[o.e.id] = n
+                if (n <= 0) { pressCount.remove(o.e.id); input.elementUp(o.e, if (cancelled) Long.MAX_VALUE else t - o.downT); visual(o.e.id, Visual()) } else pressCount[o.e.id] = n
             }
             is Dpad -> { if (o.dirs.isNotEmpty()) input.dpad(o.e, emptySet()); visual(o.e.id, Visual()) }
             is Stick -> {
-                input.stick(o.e, 0f, 0f)
-                visual(o.e.id, Visual())
-                if (!cancelled && t - o.start < TAP_MS && o.travelled < o.radius * 0.25f) input.click(o.e)
+                if (!cancelled && o.move.armed) {
+                    lock(o.e, o.ox - o.rect.left, o.oy - o.rect.top)
+                } else {
+                    input.stick(o.e, 0f, 0f)
+                    endMove(o.e, o.move)
+                    visual(o.e.id, Visual())
+                    if (!cancelled && t - o.start < TAP_MS && o.travelled < o.radius * 0.25f) input.click(o.e)
+                }
             }
             is Pad -> {
                 visual(o.e.id, Visual())
                 if (!cancelled && t - o.start < TAP_MS && o.travelled < TAP_SLOP_DP * layout.density) input.click(o.e)
             }
             is FloatStick -> {
-                input.setStick(if (o.e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT, 0f, 0f)
-                visual(o.e.id, Visual())
+                if (!cancelled && o.move.armed) {
+                    lock(o.e, o.ox - o.rect.left, o.oy - o.rect.top)
+                } else {
+                    pushForward(o.e, 0f)
+                    endMove(o.e, o.move)
+                    visual(o.e.id, Visual())
+                }
             }
             is Look -> { endLook(o); o.zoneId?.let { visual(it, Visual()) } }
             Background -> {
@@ -307,8 +362,15 @@ class TouchRouter(
         if (!o.e.lookThrough) return
         val look = o.look
         if (look == null) {
-            // Fire at once; look once the finger has travelled far enough to mean it.
-            if (hypot(f.x - o.downX, f.y - o.downY) >= ControlElement.LOOK_THROUGH_DP * layout.density) o.look = newLook()
+            // Fire at once; aim as soon as the finger moves more than a tap's jitter. The travel so
+            // far isn't lost: it turns the camera now, so the aim starts exactly where the drag did.
+            val tx = f.x - o.downX
+            val ty = f.y - o.downY
+            if (hypot(tx, ty) >= ControlElement.LOOK_THROUGH_DP * layout.density) {
+                val l = aimLook()
+                o.look = l
+                lookMove(l, tx, ty, dt, t)
+            }
             return
         }
         lookMove(look, dx, dy, dt, t)
@@ -345,8 +407,11 @@ class TouchRouter(
         var ny = (y - o.oy) / o.radius
         val m = hypot(nx, ny)
         if (m > 1f) { nx /= m; ny /= m }
+        moveExtras(o.e, o.move, (x - o.ox) / o.radius, (y - o.oy) / o.radius)
+        // On the lock mark the character already runs straight ahead.
+        if (o.move.armed) { nx = 0f; ny = -1f }
         input.stick(o.e, nx, -ny)
-        visual(o.e.id, Visual(pressed = true, knobX = nx, knobY = ny, originX = if (o.e.floating) o.ox - o.rect.left else Float.NaN, originY = if (o.e.floating) o.oy - o.rect.top else Float.NaN))
+        visual(o.e.id, Visual(pressed = true, knobX = nx, knobY = ny, originX = if (o.e.floating) o.ox - o.rect.left else Float.NaN, originY = if (o.e.floating) o.oy - o.rect.top else Float.NaN, sprint = o.move.sprinting, lockArmed = o.move.armed))
     }
 
     private fun floatAt(o: FloatStick, x: Float, y: Float) {
@@ -354,10 +419,63 @@ class TouchRouter(
         var ny = (y - o.oy) / o.radius
         val m = hypot(nx, ny)
         if (m > 1f) { nx /= m; ny /= m }
-        val (sx, sy) = ControlsInput.applyDeadzone(nx, -ny, o.e.deadzone)
-        input.setStick(if (o.e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT, sx, sy)
-        visual(o.e.id, Visual(pressed = true, knobX = nx, knobY = ny, originX = o.ox - o.rect.left, originY = o.oy - o.rect.top))
+        moveExtras(o.e, o.move, (x - o.ox) / o.radius, (y - o.oy) / o.radius)
+        if (o.move.armed) { nx = 0f; ny = -1f }
+        if (o.e.stick == StickOutput.KEYS) {
+            // A floating WASD stick (keyboard shooters): the same direction keys as a key stick.
+            input.stick(o.e, nx, -ny)
+        } else {
+            val (sx, sy) = ControlsInput.applyDeadzone(nx, -ny, o.e.deadzone)
+            input.setStick(if (o.e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT, sx, sy)
+        }
+        visual(o.e.id, Visual(pressed = true, knobX = nx, knobY = ny, originX = o.ox - o.rect.left, originY = o.oy - o.rect.top, sprint = o.move.sprinting, lockArmed = o.move.armed))
     }
+
+    /**
+     * Auto-sprint and run lock from the thumb's raw offset ([rx], [ry]: multiples of the radius,
+     * y down, not clamped). Sprint holds while the thumb is pushed forward past the ring; the
+     * lock arms while it sits on the mark above the stick.
+     */
+    private fun moveExtras(e: ControlElement, s: MoveState, rx: Float, ry: Float) {
+        if (e.sprint == Binding.None && !e.runLock) return
+        val m = hypot(rx, ry)
+        val forward = ry < 0f && Math.toDegrees(kotlin.math.atan2(kotlin.math.abs(rx), -ry).toDouble()) <= ControlElement.SPRINT_CONE_DEG
+        val armed = e.runLock && -ry >= ControlElement.RUN_LOCK_AT && kotlin.math.abs(rx) <= RUN_LOCK_WIDTH
+        val sprinting = e.sprint != Binding.None && (armed || (forward && m >= e.sprintAt.coerceIn(1f, 2f)))
+        s.armed = armed
+        if (sprinting != s.sprinting) {
+            s.sprinting = sprinting
+            input.holdExtra(sprintOwner(e), if (sprinting) listOf(e.sprint) else emptyList())
+        }
+    }
+
+    private fun endMove(e: ControlElement, s: MoveState) {
+        if (s.sprinting) input.holdExtra(sprintOwner(e), emptyList())
+        s.sprinting = false
+        s.armed = false
+    }
+
+    /** Run lock: keep running forward (and sprinting) with no finger on the stick. */
+    private fun lock(e: ControlElement, ox: Float, oy: Float) {
+        locks[e.id] = Lock(e, ox, oy)
+        pushForward(e, 1f)
+        if (e.sprint != Binding.None) input.holdExtra(sprintOwner(e), listOf(e.sprint))
+        visual(e.id, Visual(pressed = false, knobX = 0f, knobY = -1f, originX = if (e.kind == ElementKind.ZONE || e.floating) ox else Float.NaN, originY = if (e.kind == ElementKind.ZONE || e.floating) oy else Float.NaN, sprint = e.sprint != Binding.None, locked = true))
+    }
+
+    private fun unlock(id: String) {
+        val l = locks.remove(id) ?: return
+        pushForward(l.e, 0f)
+        input.holdExtra(sprintOwner(l.e), emptyList())
+        visual(id, Visual())
+    }
+
+    private fun pushForward(e: ControlElement, amount: Float) {
+        if (e.kind == ElementKind.STICK || e.stick == StickOutput.KEYS) input.stick(e, 0f, amount)
+        else input.setStick(if (e.stick == StickOutput.LEFT) Side.LEFT else Side.RIGHT, 0f, amount)
+    }
+
+    private fun sprintOwner(e: ControlElement) = e.id + "#sprint"
 
     private fun bgDown(id: Int, x: Float, y: Float, t: Long) {
         val f = Finger(id, x, y)
@@ -377,5 +495,7 @@ class TouchRouter(
         const val FLOAT_RING_DP = 64f
         /** A floating stick element's largest radius, dp. */
         const val FLOAT_STICK_DP = 60f
+        /** The run-lock mark catches the thumb this far either side of the stick's axis (× radius). */
+        const val RUN_LOCK_WIDTH = 1.2f
     }
 }

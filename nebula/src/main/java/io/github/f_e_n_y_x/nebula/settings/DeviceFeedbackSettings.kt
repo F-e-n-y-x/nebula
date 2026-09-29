@@ -35,11 +35,17 @@ enum class MotionHold(val id: String, val label: String) {
     LEFT_TRIGGER("l2", "While L2 / LT is held"),
     RIGHT_TRIGGER("r2", "While R2 / RT is held"),
     EITHER_TRIGGER("either", "While either trigger is held"),
-    TOGGLE("toggle", "Toggle with a button");
+    TOGGLE("toggle", "Toggle with a button"),
+    /** PUBG's "scope on": either trigger, or an on-screen fire / aim button (also KB+M layouts). */
+    AIMING("aiming", "While aiming or firing");
 
-    /** True when gyro should act for these trigger positions (0–255); [toggledOn] is the toggle button's state. */
-    fun allows(leftTrigger: Int, rightTrigger: Int, toggledOn: Boolean = false): Boolean = when (this) {
+    /**
+     * True when gyro should act for these trigger positions (0–255); [toggledOn] is the toggle
+     * button's state, [aiming] whether an on-screen fire or aim button is held.
+     */
+    fun allows(leftTrigger: Int, rightTrigger: Int, toggledOn: Boolean = false, aiming: Boolean = false): Boolean = when (this) {
         ALWAYS -> true
+        AIMING -> aiming || leftTrigger >= TRIGGER_THRESHOLD || rightTrigger >= TRIGGER_THRESHOLD
         LEFT_TRIGGER -> leftTrigger >= TRIGGER_THRESHOLD
         RIGHT_TRIGGER -> rightTrigger >= TRIGGER_THRESHOLD
         EITHER_TRIGGER -> leftTrigger >= TRIGGER_THRESHOLD || rightTrigger >= TRIGGER_THRESHOLD
@@ -208,7 +214,7 @@ data class MotionSettings(
             V_INVERT_X_KEY to s.invertX,
             V_INVERT_Y_KEY to s.invertY,
             V_ACTIVATION_KEY to when (s.hold) {
-                MotionHold.LEFT_TRIGGER, MotionHold.EITHER_TRIGGER -> android.view.KeyEvent.KEYCODE_BUTTON_L2
+                MotionHold.LEFT_TRIGGER, MotionHold.EITHER_TRIGGER, MotionHold.AIMING -> android.view.KeyEvent.KEYCODE_BUTTON_L2
                 MotionHold.RIGHT_TRIGGER -> android.view.KeyEvent.KEYCODE_BUTTON_R2
                 MotionHold.ALWAYS, MotionHold.TOGGLE -> V_ACTIVATION_ALWAYS
             },

@@ -38,6 +38,10 @@ class ElementLook {
     val origin = mutableStateOf(Offset.Unspecified)
     /** Pressed D-pad / key-stick directions (0 up, 1 down, 2 left, 3 right). */
     val dirs = mutableStateOf(emptySet<Int>())
+    /** Move stick: auto-sprint held / on the run-lock mark / run-locked. */
+    val sprint = mutableStateOf(false)
+    val lockArmed = mutableStateOf(false)
+    val locked = mutableStateOf(false)
 }
 
 internal val Fill = Color(0x8C111113)
@@ -79,7 +83,11 @@ fun ElementFace(e: ControlElement, look: ElementLook, latched: State<Boolean>, m
             val what = when (e.zone) {
                 io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_MOUSE -> "Camera → mouse"
                 io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_STICK -> "Camera → ${if (e.stick == StickOutput.LEFT) "left" else "right"} stick"
-                io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> "Floating ${if (e.stick == StickOutput.LEFT) "left" else "right"} stick"
+                io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> when (e.stick) {
+                    StickOutput.KEYS -> "Floating WASD stick"
+                    StickOutput.LEFT -> "Floating left stick"
+                    StickOutput.RIGHT -> "Floating right stick"
+                }
             } + if (e.keepWithController) " · with controller" else ""
             Text(
                 what, style = t.label, color = NebulaColors.textSecondary, textAlign = TextAlign.Center,
@@ -125,9 +133,10 @@ private fun DrawScope.drawStick(e: ControlElement, look: ElementLook) {
         // The whole area catches the thumb; show its bounds faintly and the stick only while held.
         drawRoundRect(Color(0x14FFFFFF), cornerRadius = CornerRadius(16.dp.toPx()))
         drawRoundRect(Color(0x33FFFFFF), cornerRadius = CornerRadius(16.dp.toPx()), style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f))))
-        if (!look.pressed.value) return
+        if (!look.pressed.value && !look.locked.value) return
     }
     val ring = if (e.floating) min(radius, 60.dp.toPx()) else radius
+    drawMoveMarks(e, look, o, ring)
     drawCircle(Color(0x66111113), ring, o)
     drawCircle(if (look.pressed.value) NebulaColors.accentText else Edge, ring - stroke / 2, o, style = Stroke(stroke))
     if (e.stick == StickOutput.KEYS) {
@@ -184,8 +193,9 @@ private fun DrawScope.drawZone(e: ControlElement, look: ElementLook) {
     )
     val o = look.origin.value.takeIf { it.isSpecified() } ?: return
     when (e.zone) {
-        io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> if (e.showRing) {
+        io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK -> if (e.showRing || look.locked.value) {
             val ring = FLOAT_RING.toPx()
+            drawMoveMarks(e, look, o, ring)
             drawCircle(Color(0x66111113), ring, o)
             drawCircle(NebulaColors.accentText, ring, o, style = Stroke(1.5.dp.toPx()))
             val k = look.knob.value
@@ -197,6 +207,41 @@ private fun DrawScope.drawZone(e: ControlElement, look: ElementLook) {
             drawCircle(Color(0x33B7A2FF), 26.dp.toPx(), o)
             drawLine(NebulaColors.accentText, o, o + Offset(k.x, k.y) * 40.dp.toPx(), 3.dp.toPx())
         }
+    }
+}
+
+/**
+ * Auto-sprint and run-lock marks above a move stick: a chevron at the sprint ring and a lock
+ * above it. They light up while sprinting / armed, and the lock stays lit while run-locked.
+ */
+private fun DrawScope.drawMoveMarks(e: ControlElement, look: ElementLook, o: Offset, ring: Float) {
+    val hasSprint = e.sprint != io.github.f_e_n_y_x.nebula.controls.Binding.None
+    if (!hasSprint && !e.runLock) return
+    val active = look.pressed.value || look.locked.value
+    val dim = if (active) Color(0x88FFFFFF) else Color(0x40FFFFFF)
+    val on = NebulaColors.accentText
+    if (hasSprint) {
+        val c = o + Offset(0f, -ring * e.sprintAt)
+        val a = 7.dp.toPx()
+        val sprinting = look.sprint.value
+        if (sprinting) drawCircle(NebulaColors.accent, 13.dp.toPx(), c)
+        val col = if (sprinting) Color.White else dim
+        for (k in 0..1) {
+            val y = c.y + k * a * 0.9f - a * 0.45f
+            val p = Path().apply { moveTo(c.x - a, y + a / 2); lineTo(c.x, y - a / 2); lineTo(c.x + a, y + a / 2) }
+            drawPath(p, col, style = Stroke(2.dp.toPx()))
+        }
+    }
+    if (e.runLock) {
+        val c = o + Offset(0f, -ring * io.github.f_e_n_y_x.nebula.controls.ControlElement.RUN_LOCK_AT)
+        val lit = look.lockArmed.value || look.locked.value
+        val r = 13.dp.toPx()
+        drawCircle(if (lit) NebulaColors.accent else Color(0x55111113), r, c)
+        drawCircle(if (lit) on else dim, r, c, style = Stroke(1.5.dp.toPx()))
+        // A small padlock: body and shackle.
+        val bw = 10.dp.toPx(); val bh = 7.dp.toPx()
+        drawRoundRect(if (lit) Color.White else dim, Offset(c.x - bw / 2, c.y - bh / 2 + 2.dp.toPx()), Size(bw, bh), CornerRadius(2.dp.toPx()))
+        drawArc(if (lit) Color.White else dim, 180f, 180f, false, Offset(c.x - bw * 0.32f, c.y - bh - 1.dp.toPx()), Size(bw * 0.64f, bh * 1.3f), style = Stroke(1.6.dp.toPx()))
     }
 }
 

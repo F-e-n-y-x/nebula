@@ -5,11 +5,23 @@ import org.json.JSONObject
 
 /** One entry point for "Import": Nebula profiles and both V+ Crown formats. */
 object ProfileImport {
-    enum class Source(val label: String) { NEBULA("Nebula profile"), CROWN("V+ Crown profile") }
+    enum class Source(val label: String) { LAYOUT("Nebula layout"), NEBULA("Nebula profile"), CROWN("V+ Crown profile") }
 
-    data class Outcome(val profile: ControlsProfile, val source: Source, val skipped: List<CrownImport.Skipped> = emptyList())
+    data class Outcome(
+        val profile: ControlsProfile,
+        val source: Source,
+        val skipped: List<CrownImport.Skipped> = emptyList(),
+        /** A layout file's metadata (author, game, target…). */
+        val meta: LayoutMeta? = null,
+    )
 
     fun parse(text: String, fallback: CrownImport.Basis, newId: String, now: Long): Outcome {
+        if (text.length > LayoutFile.MAX_BYTES * 16) throw ControlsFormatException("That file is too large to be a controls profile")
+        // Shared layouts (files and share codes) are validated strictly.
+        if (LayoutFile.looksLikeLayout(text)) {
+            val parsed = LayoutFile.parse(text, newId, now)
+            return Outcome(parsed.profile, Source.LAYOUT, meta = parsed.meta)
+        }
         val root = try {
             JSONObject(text.trim())
         } catch (e: JSONException) {

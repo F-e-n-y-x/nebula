@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Shared controls layouts and their preview images; only this cache folder is exposed. -->
+    <cache-path name="layouts" path="layouts/" />
+</paths>

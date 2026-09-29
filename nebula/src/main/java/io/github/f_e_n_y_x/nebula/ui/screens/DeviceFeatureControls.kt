@@ -322,6 +322,7 @@ private fun holdShort(h: MotionHold) = when (h) {
     MotionHold.RIGHT_TRIGGER -> "Hold R2"
     MotionHold.EITHER_TRIGGER -> "Hold either"
     MotionHold.TOGGLE -> "Toggle"
+    MotionHold.AIMING -> "Aiming / firing"
 }
 
 /** Host rumble routing and strength (V+'s keys). */

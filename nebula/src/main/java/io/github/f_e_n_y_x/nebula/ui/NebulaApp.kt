@@ -207,6 +207,7 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null) {
             if (showChrome && !rail) NebulaBottomBar(section!!, go)
         }
         if (rail) NebulaRail(section!!, go, transparent = overlayRail)
+        io.github.f_e_n_y_x.nebula.controls.ui.LayoutLinkHost()
     }
 }
 

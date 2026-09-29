@@ -126,7 +126,7 @@ class GyroAssist(
         val (lt, rt) = index?.let { pad()?.triggers(it) } ?: (0 to 0)
         val dt = if (lastGyroNanos == 0L) 0f else (nanos - lastGyroNanos) / 1e9f
         lastGyroNanos = nanos
-        if (!s.hold.allows(lt, rt, GyroToggle.on)) {
+        if (!s.hold.allows(lt, rt, GyroToggle.on, io.github.f_e_n_y_x.nebula.controls.OnScreenAim.active)) {
             aim.reset()
             centerStick()
             return

@@ -87,13 +87,16 @@ import io.github.f_e_n_y_x.nebula.ui.screens.Segmented
 import io.github.f_e_n_y_x.nebula.ui.screens.ToggleRow
 import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import java.util.UUID
 import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------- shared bits
 
 @Composable
-private fun PanelHeader(eyebrow: String, title: String, onClose: () -> Unit) {
+internal fun PanelHeader(eyebrow: String, title: String, onClose: () -> Unit) {
     val s = Nebula.scale
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -106,7 +109,7 @@ private fun PanelHeader(eyebrow: String, title: String, onClose: () -> Unit) {
 }
 
 @Composable
-private fun Field(title: String, help: String? = null, content: @Composable () -> Unit) {
+internal fun Field(title: String, help: String? = null, content: @Composable () -> Unit) {
     val s = Nebula.scale
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
         Text(title, style = Nebula.type.label, color = NebulaColors.textSecondary)
@@ -116,7 +119,7 @@ private fun Field(title: String, help: String? = null, content: @Composable () -
 }
 
 @Composable
-private fun SmallAction(text: String, icon: ImageVector?, onClick: () -> Unit, danger: Boolean = false) {
+internal fun SmallAction(text: String, icon: ImageVector?, onClick: () -> Unit, danger: Boolean = false) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
     Row(
@@ -135,7 +138,7 @@ private fun SmallAction(text: String, icon: ImageVector?, onClick: () -> Unit, d
 }
 
 @Composable
-private fun TextInput(value: String, onChange: (String) -> Unit, placeholder: String) {
+internal fun TextInput(value: String, onChange: (String) -> Unit, placeholder: String) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
     BasicTextField(
@@ -149,7 +152,7 @@ private fun TextInput(value: String, onChange: (String) -> Unit, placeholder: St
 
 /** A binding slot: tap to pick what it sends. */
 @Composable
-private fun BindingRow(title: String, binding: Binding, allowNone: Boolean = true, onPick: (Binding) -> Unit) {
+internal fun BindingRow(title: String, binding: Binding, allowNone: Boolean = true, onPick: (Binding) -> Unit) {
     val s = Nebula.scale
     var picking by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(s.dp(10))
@@ -211,9 +214,10 @@ internal fun Inspector(
         }
         when (e.kind) {
             ElementKind.BUTTON, ElementKind.TRIGGER -> {
-                Field("Sends") { BindingRow("Press", e.binding, allowNone = false) { b -> onEdit(null) { it.copy(bindings = listOf(b)) } } }
+                Field("Sends") { BindingRow("Press", e.binding, allowNone = e.lookThrough) { b -> onEdit(null) { it.copy(bindings = listOf(b)) } } }
                 PressModeField(e, onEdit)
                 if (e.kind == ElementKind.BUTTON) ShapeField(e, onEdit)
+                RoleField(e, onEdit)
             }
             ElementKind.COMBO -> {
                 Field("Sends together", "Up to five, pressed at once while held. Keys work too, e.g. Ctrl + Shift + Esc.") {
@@ -285,6 +289,7 @@ internal fun Inspector(
                         onValueChange = { v -> onEdit("deadzone") { it.copy(deadzone = v / 100f) } },
                     )
                 }
+                if (e.stick != StickOutput.RIGHT) MoveFields(e, onEdit)
             }
             ElementKind.ZONE -> ZoneFields(e, onEdit)
             ElementKind.TOUCHPAD -> {
@@ -329,7 +334,15 @@ private fun ZoneFields(e: ControlElement, onEdit: (String?, (ControlElement) -> 
     Field("Type", e.zone.help) {
         Segmented(io.github.f_e_n_y_x.nebula.controls.ZoneType.entries.map { it.label to it }, e.zone) { z -> onEdit(null) { it.copy(zone = z) } }
     }
-    if (e.zone != io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_MOUSE) {
+    if (e.zone == io.github.f_e_n_y_x.nebula.controls.ZoneType.FLOATING_STICK) {
+        Field("Moves") {
+            Segmented(listOf("Left stick" to StickOutput.LEFT, "Right stick" to StickOutput.RIGHT, "Direction keys" to StickOutput.KEYS), e.stick) { o ->
+                onEdit(null) { it.copy(stick = o, bindings = if (o == StickOutput.KEYS && it.bindings.size < 4) WASD else it.bindings) }
+            }
+        }
+        if (e.stick == StickOutput.KEYS) DirectionFields(e, onEdit)
+        if (e.stick != StickOutput.RIGHT) MoveFields(e, onEdit)
+    } else if (e.zone != io.github.f_e_n_y_x.nebula.controls.ZoneType.CAMERA_MOUSE) {
         Field("Stick") {
             Segmented(listOf("Left stick" to StickOutput.LEFT, "Right stick" to StickOutput.RIGHT), if (e.stick == StickOutput.LEFT) StickOutput.LEFT else StickOutput.RIGHT) { o ->
                 onEdit(null) { it.copy(stick = o) }
@@ -392,13 +405,52 @@ private fun DirectionFields(e: ControlElement, onEdit: (String?, (ControlElement
     }
 }
 
+/** Auto-sprint and run lock for a move stick (PUBG / CoD Mobile). */
+@Composable
+private fun MoveFields(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
+    Field("Auto-sprint", "Held while you push the stick forward past its ring: L3 on a gamepad, Shift on a keyboard. None turns it off.") {
+        BindingRow("Sprint", e.sprint) { b -> onEdit(null) { it.copy(sprint = b) } }
+    }
+    if (e.sprint != Binding.None) {
+        Field("Sprint starts at") {
+            SliderField(
+                label = "Sprint starts at", value = e.sprintAt * 100f, range = 100f..200f, step = 5f, unit = "% of the ring",
+                onValueChange = { v -> onEdit("sprintAt") { it.copy(sprintAt = v / 100f) } },
+            )
+        }
+    }
+    ToggleRow(
+        "Run lock",
+        "Drag up to the lock above the stick and let go to keep running (and sprinting); touch the stick again to stop.",
+        e.runLock,
+    ) { v -> onEdit(null) { it.copy(runLock = v) } }
+}
+
+/** What the element is for; fire and aim buttons can gate the gyro ("While aiming or firing"). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RoleField(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
+    val s = Nebula.scale
+    Field("Used for", "Fire and Aim count as aiming for the gyro's \"While aiming or firing\". The others only describe the layout when you share it.") {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(6)), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
+            io.github.f_e_n_y_x.nebula.controls.ElementRole.entries.filter { it != io.github.f_e_n_y_x.nebula.controls.ElementRole.MOVE }.forEach { r ->
+                Chip(r.label, r == e.role) { onEdit(null) { it.copy(role = r) } }
+            }
+        }
+    }
+}
+
 @Composable
 private fun PressModeField(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
-    Field("Behaviour", if (e.mode == PressMode.TOGGLE) "Tap once to hold it down, tap again to let go." else "Held while your finger is on it.") {
+    Field("Behaviour", when (e.mode) {
+        PressMode.TOGGLE -> "Tap once to hold it down, tap again to let go."
+        PressMode.MIXED -> "A quick tap keeps it held until the next tap; a long press holds it only while your finger stays (PUBG's mixed aim)."
+        PressMode.HOLD -> "Held while your finger is on it."
+    }) {
         Segmented(PressMode.entries.map { it.label to it }, e.mode) { m -> onEdit(null) { it.copy(mode = m) } }
     }
     if (e.kind == ElementKind.BUTTON || e.kind == ElementKind.TRIGGER) {
-        Field("Fire and look", "Pressed at once; drag the same finger to look around too (like RT in mobile shooters).") {
+        Field("Fire and look", "Pressed at once; drag the same finger to aim too, as fast as the look area (the right fire button in mobile shooters, or an eye button for free look).") {
             Segmented(listOf("Off" to false, "On" to true), e.lookThrough) { v -> onEdit(null) { it.copy(lookThrough = v) } }
         }
     }
@@ -535,18 +587,22 @@ internal fun ProfilesPanel(
     var renaming by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var pendingOpen by remember { mutableStateOf<ControlsProfile?>(null) }
-    var importResult by remember { mutableStateOf<ProfileImport.Outcome?>(null) }
+    var importPreview by remember { mutableStateOf<ProfileImport.Outcome?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
+    var sharing by remember { mutableStateOf(false) }
+    var browsing by remember { mutableStateOf(false) }
+    var scanning by remember { mutableStateOf(false) }
+    var linkToFetch by remember { mutableStateOf<String?>(null) }
 
     fun open(p: ControlsProfile) { if (session.dirty && p.id != current.id) pendingOpen = p else onOpen(p) }
 
+    /** Parses and validates; nothing is saved until the preview's Add. */
     fun importText(text: String) {
+        val link = io.github.f_e_n_y_x.nebula.controls.LayoutLink.urlOf(text.trim())
+        if (link != null) { linkToFetch = link; return }
         val dm = ctx.resources.displayMetrics
         try {
-            val outcome = ProfileImport.parse(text, CrownImport.Basis(dm.widthPixels, dm.heightPixels, dm.density), "p-" + UUID.randomUUID().toString().take(12), System.currentTimeMillis())
-            var added = outcome.profile
-            store.update { l -> l.add(outcome.profile).also { added = it.second }.first }
-            importResult = outcome.copy(profile = added)
+            importPreview = ProfileImport.parse(text, CrownImport.Basis(dm.widthPixels, dm.heightPixels, dm.density), "p-" + UUID.randomUUID().toString().take(12), System.currentTimeMillis())
         } catch (e: ControlsFormatException) {
             importError = e.message
         }
@@ -556,12 +612,6 @@ internal fun ProfilesPanel(
         if (uri != null) {
             val text = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } }.getOrNull()
             if (text == null || text.length > 4_000_000) importError = "Couldn't read that file" else importText(text)
-        }
-    }
-    val saveDoc = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) {
-            val ok = runCatching { ctx.contentResolver.openOutputStream(uri)?.use { it.write(ProfileJson.exportProfile(session.build()).toByteArray()) } }.isSuccess
-            android.widget.Toast.makeText(ctx, if (ok) "Saved ${current.name}" else "Couldn't save the file", android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -594,14 +644,14 @@ internal fun ProfilesPanel(
         }
 
         val legacy = remember { io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(ctx) }
-        var outside by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(legacy, current.id)) }
+        var outside by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.read(legacy, current)) }
         Field("Touches outside controls", outside.help) {
             Segmented(io.github.f_e_n_y_x.nebula.controls.OutsideTouch.entries.map { it.label to it }, outside) { v ->
                 outside = v
                 io.github.f_e_n_y_x.nebula.controls.OutsideTouch.write(legacy, current.id, v)
             }
         }
-        var lookOut by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.LookOutput.read(legacy, current.id)) }
+        var lookOut by remember(current.id) { mutableStateOf(io.github.f_e_n_y_x.nebula.controls.LookOutput.read(legacy, current)) }
         Field("Look with", lookOut.help + " Used by the Look area and by fire-and-look buttons.") {
             Segmented(io.github.f_e_n_y_x.nebula.controls.LookOutput.entries.map { it.label to it }, lookOut) { v ->
                 lookOut = v
@@ -618,12 +668,7 @@ internal fun ProfilesPanel(
                 copy?.let { onOpen(it) }
             })
             if (lib.resolve(null).id != current.id) SmallAction("Make default", null, { store.update { it.setDefault(current.id) }; onChanged() })
-            SmallAction("Share", Icons.Rounded.Share, {
-                val json = ProfileJson.exportProfile(session.build())
-                val send = Intent(Intent.ACTION_SEND).setType("application/json").putExtra(Intent.EXTRA_TEXT, json).putExtra(Intent.EXTRA_SUBJECT, "${current.name} · Nebula controls")
-                ctx.startActivity(Intent.createChooser(send, "Share controls profile"))
-            })
-            SmallAction("Save file", Icons.Rounded.FileDownload, { saveDoc.launch(ProfileImport.fileName(current)) })
+            SmallAction("Share", Icons.Rounded.Share, { sharing = true })
             if (orientation == LayoutOrientation.PORTRAIT) SmallAction("Copy landscape layout", null, { onReplaceLayout(current.landscape) })
             SmallAction("Reset to standard", null, {
                 val std = DefaultProfiles.standard(store.standardOptions())
@@ -659,6 +704,9 @@ internal fun ProfilesPanel(
             }
         }
 
+        Field("Layout library", "Ready-made and shared layouts, by game. Each one is checked and previewed before it's added.") {
+            NebulaButton("Browse layouts", onClick = { browsing = true }, style = ButtonStyle.Secondary, modifier = Modifier.testTag("browse-layouts"))
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             SmallAction("New profile", null, {
                 var added: ControlsProfile? = null
@@ -671,9 +719,10 @@ internal fun ProfilesPanel(
                 val text = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString()
                 if (text.isNullOrBlank()) importError = "The clipboard is empty" else importText(text)
             })
+            SmallAction("Scan QR", Icons.Rounded.QrCodeScanner, { scanning = true })
         }
         Text(
-            "Import takes Nebula profiles and V+ Crown exports (.crown.json or .mdat). Group buttons, wheel pads and V+-only actions are left out; you'll see which.",
+            "Import takes Nebula layout files, share codes and links, older Nebula profiles and V+ Crown exports (.crown.json or .mdat). Group buttons, wheel pads and V+-only actions are left out; you'll see which.",
             style = Nebula.type.label, color = NebulaColors.textMuted,
         )
     }
@@ -720,24 +769,34 @@ internal fun ProfilesPanel(
             onDismiss = { pendingOpen = null },
         )
     }
-    importResult?.let { r ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { importResult = null },
-            containerColor = NebulaColors.raised,
-            title = { Text("Imported ${r.profile.name}", style = Nebula.type.heading, color = NebulaColors.text) },
-            text = {
-                Column(Modifier.heightIn(max = s.dp(320)).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
-                    Text("${r.source.label} · ${r.profile.landscape.size} controls imported.", style = Nebula.type.body, color = NebulaColors.textSecondary)
-                    if (r.skipped.isNotEmpty()) {
-                        Text("Left out (${r.skipped.size}):", style = Nebula.type.bodyStrong, color = NebulaColors.text)
-                        r.skipped.forEach { k -> Text("• ${k.what}: ${k.reason}", style = Nebula.type.label, color = NebulaColors.textMuted) }
-                    }
-                }
-            },
-            confirmButton = { NebulaButton("Open it", onClick = { val p = r.profile; importResult = null; open(p) }) },
-            dismissButton = { NebulaButton("Close", onClick = { importResult = null }, style = ButtonStyle.Ghost) },
-            shape = RoundedCornerShape(s.dp(18)),
-        )
+    importPreview?.let { r ->
+        LayoutPreviewDialog(r, onAdd = { p ->
+            var added: ControlsProfile? = null
+            store.update { l -> l.add(p).also { added = it.second }.first }
+            importPreview = null
+            added?.let { a ->
+                android.widget.Toast.makeText(ctx, "Added ${a.name}", android.widget.Toast.LENGTH_SHORT).show()
+                open(a)
+            }
+        }, onDismiss = { importPreview = null })
+    }
+    if (sharing) {
+        ShareLayoutDialog(session.build(), onMeta = { m -> session.base = session.base.copy(meta = m) }, onDismiss = { sharing = false })
+    }
+    if (browsing) {
+        LayoutBrowserDialog(store, onAdded = { a -> browsing = false; open(a) }, onDismiss = { browsing = false })
+    }
+    if (scanning) {
+        QrScanDialog(onCode = { code -> scanning = false; importText(code) }, onDismiss = { scanning = false })
+    }
+    linkToFetch?.let { url ->
+        LaunchedEffect(url) {
+            val r = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { fetcher(ctx).fetch(url, io.github.f_e_n_y_x.nebula.controls.LayoutFile.MAX_BYTES).body }
+            }
+            linkToFetch = null
+            r.onSuccess { importText(it) }.onFailure { e -> importError = (e as? ControlsFormatException)?.message ?: "Couldn't download the layout: ${e.message ?: e.javaClass.simpleName}" }
+        }
     }
     importError?.let { msg ->
         androidx.compose.material3.AlertDialog(
