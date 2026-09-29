@@ -11,6 +11,8 @@ import io.github.f_e_n_y_x.nebula.domain.LibraryRepository
 import io.github.f_e_n_y_x.nebula.domain.NotifyAction
 import io.github.f_e_n_y_x.nebula.domain.NowPlaying
 import io.github.f_e_n_y_x.nebula.domain.NowPlayingResolver
+import io.github.f_e_n_y_x.nebula.domain.NowPlayingState
+import io.github.f_e_n_y_x.nebula.domain.NowPlayingTracker
 import io.github.f_e_n_y_x.nebula.domain.RunningNotificationPolicy
 import io.github.f_e_n_y_x.nebula.domain.RunningSince
 import io.github.f_e_n_y_x.nebula.domain.SessionSuppression
@@ -21,7 +23,11 @@ import io.github.f_e_n_y_x.nebula.domain.model.RunningGame
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -77,6 +83,36 @@ class NowPlayingCenter(
     fun consumeResume() { _pendingResume.value = null }
 
     private fun nowS() = System.currentTimeMillis() / 1000
+    private fun nowMs() = System.currentTimeMillis()
+
+    /** Per host: what the home card and the details page show (shared, so a quit on one hides both). */
+    private val _states = MutableStateFlow<Map<String, NowPlayingState>>(emptyMap())
+
+    fun state(hostId: String): Flow<NowPlayingState> = _states.map { it[hostId] ?: NowPlayingState() }.distinctUntilChanged()
+    fun stateNow(hostId: String): NowPlayingState = _states.value[hostId] ?: NowPlayingState()
+
+    private fun updateState(hostId: String, f: (NowPlayingState) -> NowPlayingState) =
+        _states.update { m -> m + (hostId to f(m[hostId] ?: NowPlayingState())) }
+
+    /** An answer from [hostId], asked at [atMs]; [ok] false when it couldn't be reached. */
+    fun onAnswer(hostId: String, ok: Boolean, np: NowPlaying?, atMs: Long) = updateState(hostId) { NowPlayingTracker.answer(it, ok, np, atMs) }
+
+    fun onQuitStarted(np: NowPlaying) = updateState(np.hostId) { NowPlayingTracker.quitStarted(it, np.gameKey) }
+
+    /** A quit came back; [stopped] also when the game had already closed. Forgets its local start time. */
+    fun onQuitFinished(np: NowPlaying, stopped: Boolean) {
+        if (stopped) {
+            since.clear(np.hostId)
+            suppression.onRunning(np.hostId, null)
+        }
+        updateState(np.hostId) { NowPlayingTracker.quitFinished(it, np.gameKey, stopped, nowMs()) }
+    }
+
+    /** "Quit game" in the stream menu: the card shouldn't show the game on the way back. */
+    fun onQuitFromStream(hostId: String) {
+        since.clear(hostId)
+        updateState(hostId) { NowPlayingTracker.quitFromStream(it, nowMs()) }
+    }
 
     fun appVisible(): Boolean =
         runCatching { ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) }.getOrDefault(false)
@@ -87,11 +123,15 @@ class NowPlayingCenter(
 
     /** Asks [host] what it runs now; failure when it can't be reached. */
     suspend fun check(host: Host): Result<NowPlaying?> {
+        val at = nowMs()
         val r = hosts.running(host.id)
-        if (r.isFailure) return Result.failure(r.exceptionOrNull()!!)
+        if (r.isFailure) {
+            onAnswer(host.id, ok = false, np = null, atMs = at)
+            return Result.failure(r.exceptionOrNull()!!)
+        }
         val running = r.getOrNull()
         val games = if (running == null) emptyList() else withTimeoutOrNull(GAMES_TIMEOUT_MS) { library.observeGames(host.id).first() }.orEmpty()
-        return Result.success(resolve(host, running, games))
+        return Result.success(resolve(host, running, games).also { onAnswer(host.id, ok = true, np = it, atMs = at) })
     }
 
     /** Paired hosts once the saved list has loaded (a cold worker process starts with none). */

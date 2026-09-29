@@ -24,9 +24,14 @@ data class NowPlaying(
     /** The display it runs on, when the host says; Resume reconnects to the same one. */
     val display: DisplayMode? = null,
     val connectedClients: Int? = null,
+    /** False when the PC can't tell when it closes (it counts as running until quit). */
+    val tracked: Boolean = true,
 ) {
     /** One running session: a different game, or the same one started again, is a new session. */
     val sessionKey: String get() = "$hostId|$gameId|$sinceEpochS"
+
+    /** This game on this host, whatever its start time (a quit hides it by this). */
+    val gameKey: String get() = "$hostId|$gameId"
 }
 
 /** "1 h 20 m" style durations for the card and the notification. */
@@ -60,6 +65,12 @@ object Elapsed {
     /** The card's status line: "Running on atom · 1 h 20 m". */
     fun cardLine(np: NowPlaying, nowEpochS: Long): String =
         "Running on ${np.hostName}" + (duration(np, nowEpochS)?.let { " · $it" } ?: "")
+
+    /** The stale card's line when the PC doesn't answer: "Last seen running on atom 5 m ago". */
+    fun lastSeenLine(np: NowPlaying, seenAtEpochS: Long, nowEpochS: Long): String {
+        val ago = nowEpochS - seenAtEpochS
+        return "Last seen running on ${np.hostName} " + if (ago < 60) "just now" else "${format(ago)} ago"
+    }
 
     /** The notification's text: "GTA V is running on atom — 1 h 20 m. Close it to save resources?" */
     fun notificationText(np: NowPlaying, nowEpochS: Long): String =
@@ -121,6 +132,7 @@ object NowPlayingResolver {
             exact = start != null,
             display = running.display,
             connectedClients = running.connectedClients,
+            tracked = running.tracked,
         )
     }
 
@@ -205,4 +217,97 @@ object StopGame {
         }
         return StopOutcome(StopKind.FAILED, "Couldn't stop $gameName: ${e?.message ?: "the PC refused."}")
     }
+}
+
+/** What the Now playing card shows for one host. */
+sealed interface NowPlayingView {
+    data object Hidden : NowPlayingView
+    data class Live(val np: NowPlaying) : NowPlayingView
+    /** The PC didn't answer the last time it was asked: what it ran when it last did. */
+    data class LastSeen(val np: NowPlaying, val seenAtMs: Long) : NowPlayingView
+
+    val nowPlaying: NowPlaying? get() = when (this) {
+        Hidden -> null
+        is Live -> np
+        is LastSeen -> np
+    }
+}
+
+/**
+ * One host's Now playing bookkeeping (epoch milliseconds). Answers carry the time they were asked,
+ * so an old answer (re-resolved when the game list changes, or still in flight during a quit) never
+ * brings back a game a newer answer or a quit has cleared.
+ */
+data class NowPlayingState(
+    /** What the newest answer said runs (null = nothing). */
+    val live: NowPlaying? = null,
+    /** The newest answer came back (false: the PC didn't answer). */
+    val reachable: Boolean = true,
+    /** When [live] was last confirmed by the PC. */
+    val seenAtMs: Long = 0,
+    /** Time of the newest answer applied; older ones are ignored. */
+    val answerAtMs: Long = 0,
+    /** [NowPlaying.gameKey] being quit right now (hidden meanwhile). */
+    val quitting: String? = null,
+    /** Game just quit: hidden until [hiddenUntilMs] even if a lagging answer still reports it. */
+    val hiddenKey: String? = null,
+    val hiddenUntilMs: Long = 0,
+    /** When the last quit finished (asks the PC again soon after). */
+    val quitAtMs: Long = 0,
+)
+
+object NowPlayingTracker {
+    /** A quit session stays hidden this long even if the PC is slow to say it closed. */
+    const val QUIT_GRACE_MS = 3_000L
+    /** After a quit, ask the PC every [FAST_POLL_MS] for this long (Proton games take a few seconds). */
+    const val FAST_POLL_WINDOW_MS = 12_000L
+    const val FAST_POLL_MS = 1_500L
+    /** A PC that stopped answering: "last seen running" for at most this long, then nothing. */
+    const val LAST_SEEN_MAX_MS = 6 * 3_600_000L
+
+    /** An answer asked at [atMs]: [ok] false when the PC couldn't be reached. */
+    fun answer(s: NowPlayingState, ok: Boolean, np: NowPlaying?, atMs: Long): NowPlayingState {
+        if (atMs < s.answerAtMs) return s
+        return if (ok) {
+            s.copy(live = np, reachable = true, seenAtMs = if (np != null) atMs else 0, answerAtMs = atMs)
+        } else {
+            s.copy(reachable = false, answerAtMs = atMs)
+        }
+    }
+
+    /** Quit pressed (card, details page, notification): hide it at once. */
+    fun quitStarted(s: NowPlayingState, gameKey: String): NowPlayingState = s.copy(quitting = gameKey)
+
+    /**
+     * The quit came back. [stopped] (or it had already closed): forget it, ignore answers asked
+     * before now, and hide a lagging report of it for [QUIT_GRACE_MS]. Otherwise show it again.
+     */
+    fun quitFinished(s: NowPlayingState, gameKey: String, stopped: Boolean, nowMs: Long): NowPlayingState =
+        if (!stopped) s.copy(quitting = null)
+        else s.copy(
+            quitting = null,
+            live = s.live?.takeIf { it.gameKey != gameKey },
+            answerAtMs = maxOf(s.answerAtMs, nowMs),
+            hiddenKey = gameKey,
+            hiddenUntilMs = nowMs + QUIT_GRACE_MS,
+            quitAtMs = nowMs,
+        )
+
+    /** Quit from the stream menu: the stream ends and the PC closes the game shortly after. */
+    fun quitFromStream(s: NowPlayingState, nowMs: Long): NowPlayingState =
+        s.live?.let { quitFinished(s, it.gameKey, stopped = true, nowMs = nowMs) } ?: s.copy(answerAtMs = maxOf(s.answerAtMs, nowMs), quitAtMs = nowMs)
+
+    fun view(s: NowPlayingState, nowMs: Long): NowPlayingView {
+        val np = s.live ?: return NowPlayingView.Hidden
+        if (np.gameKey == s.quitting) return NowPlayingView.Hidden
+        if (np.gameKey == s.hiddenKey && nowMs < s.hiddenUntilMs) return NowPlayingView.Hidden
+        if (!s.reachable) {
+            return if (nowMs - s.seenAtMs < LAST_SEEN_MAX_MS) NowPlayingView.LastSeen(np, s.seenAtMs) else NowPlayingView.Hidden
+        }
+        return NowPlayingView.Live(np)
+    }
+
+    /** How long to wait before asking the PC again. */
+    fun nextPollMs(s: NowPlayingState, nowMs: Long, normalMs: Long): Long =
+        if (s.quitAtMs > 0 && nowMs - s.quitAtMs < FAST_POLL_WINDOW_MS) FAST_POLL_MS else normalMs
 }

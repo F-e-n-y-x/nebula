@@ -35,6 +35,8 @@ data class RunningGame(
     val sinceEpochS: Long? = null,
     val display: DisplayMode? = null,
     val connectedClients: Int? = null,
+    /** False when the PC started something it can't follow (a launcher that handed off): it runs until quit. */
+    val tracked: Boolean = true,
 )
 
 /** Whether a host-linked action is offered. */

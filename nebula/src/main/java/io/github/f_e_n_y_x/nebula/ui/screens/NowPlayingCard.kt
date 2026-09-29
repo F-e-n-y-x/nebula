@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,11 +51,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.Elapsed
 import io.github.f_e_n_y_x.nebula.domain.NowPlaying
+import io.github.f_e_n_y_x.nebula.domain.NowPlayingView
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.Game
 import io.github.f_e_n_y_x.nebula.ui.NowPlayingViewModel
@@ -85,14 +89,20 @@ fun NowPlayingSection(
     onlyGameId: String? = null,
 ) {
     val vm = viewModel(key = "now-playing-$hostId") { NowPlayingViewModel(container, hostId, games) }
-    val np by vm.nowPlaying.collectAsStateWithLifecycle()
+    val view by vm.view.collectAsStateWithLifecycle()
     val quitting by vm.quitting.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var confirm by remember { mutableStateOf(false) }
     LaunchedEffect(vm) { vm.messages.collect { Toast.makeText(ctx, it, Toast.LENGTH_LONG).show() } }
+    // Screen entry and every return to the app ask the PC again (the 30 s poll is only a backstop).
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refreshNow() }
 
-    val shown = np?.takeIf { onlyGameId == null || it.gameId == onlyGameId } ?: return
+    val shown = view.nowPlaying?.takeIf { onlyGameId == null || it.gameId == onlyGameId } ?: return
+    (view as? NowPlayingView.LastSeen)?.let { stale ->
+        LastSeenCard(shown, stale.seenAtMs / 1000, compact, modifier, onRefresh = { vm.refreshNow(force = true) })
+        return
+    }
     NotificationRationale(container, shown)
     NowPlayingCard(
         np = shown,
@@ -179,6 +189,9 @@ fun NowPlayingCard(np: NowPlaying, quitting: Boolean, compact: Boolean, onResume
                     }
                     Text(np.gameName, style = t.bodyStrong, color = NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(line, style = t.label, color = NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (!np.tracked) {
+                        Text("The PC can't tell when it closes: quit it here when you're done.", style = t.label, color = NebulaColors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
                 if (!stacked) {
                     Spacer(Modifier.width(s.dp(10)))
@@ -190,6 +203,40 @@ fun NowPlayingCard(np: NowPlaying, quitting: Boolean, compact: Boolean, onResume
                 Buttons(quitting, onResume, onQuit, fill = true)
             }
         }
+    }
+}
+
+/**
+ * The PC stopped answering: what it ran when it last did, muted, with Refresh instead of Resume and
+ * Quit (neither would reach it).
+ */
+@Composable
+fun LastSeenCard(np: NowPlaying, seenAtEpochS: Long, compact: Boolean, modifier: Modifier = Modifier, onRefresh: () -> Unit) {
+    val s = Nebula.scale
+    val t = Nebula.type
+    val shape = RoundedCornerShape(s.dp(16))
+    val now by produceState(System.currentTimeMillis() / 1000, seenAtEpochS) {
+        while (true) {
+            value = System.currentTimeMillis() / 1000
+            delay(15_000)
+        }
+    }
+    val line = Elapsed.lastSeenLine(np, seenAtEpochS, now)
+    Row(
+        modifier.fillMaxWidth().background(Color(0xCC101013), shape)
+            .border(1.dp, NebulaColors.border, shape)
+            .padding(start = s.dp(14), end = s.dp(4), top = s.dp(if (compact) 4 else 8), bottom = s.dp(if (compact) 4 else 8))
+            .focusGroup(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(s.dp(7)).background(NebulaColors.textSecondary, CircleShape))
+        Spacer(Modifier.width(s.dp(10)))
+        Column(Modifier.weight(1f).alpha(0.8f).semantics(mergeDescendants = true) { contentDescription = "${np.gameName}. $line. The PC isn't answering." }) {
+            Text(np.gameName, style = t.bodyStrong, color = NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(line, style = t.label, color = NebulaColors.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(s.dp(8)))
+        NebulaButton("Refresh", onClick = onRefresh, style = ButtonStyle.Secondary, icon = Icons.Rounded.Refresh)
     }
 }
 

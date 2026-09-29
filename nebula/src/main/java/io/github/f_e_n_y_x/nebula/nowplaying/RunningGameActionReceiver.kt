@@ -30,6 +30,7 @@ class RunningGameActionReceiver : BroadcastReceiver() {
             RunningGameNotifications.ACTION_DISMISSED -> center.notifications.markDismissed(np.hostId, np.sessionKey)
             RunningGameNotifications.ACTION_STOP -> {
                 center.notifications.showStopping(np)
+                center.onQuitStarted(np)
                 val pending = goAsync()
                 scope.launch {
                     try {
@@ -44,15 +45,17 @@ class RunningGameActionReceiver : BroadcastReceiver() {
                         val now = System.currentTimeMillis() / 1000
                         when (outcome?.kind) {
                             StopKind.STOPPED, StopKind.ALREADY_CLOSED -> {
-                                center.since.clear(np.hostId)
-                                center.suppression.onRunning(np.hostId, null)
+                                center.onQuitFinished(np, stopped = true)
                                 center.notifications.showStopped(np, outcome.message)
                             }
                             // Unreachable, refused or timed out: say so and keep Resume / Stop for a retry.
-                            else -> center.notifications.showRunning(
-                                np, alert = false, nowEpochS = now,
-                                error = outcome?.message ?: "${np.hostName} didn't answer in time. ${np.gameName} may still be running.",
-                            )
+                            else -> {
+                                center.onQuitFinished(np, stopped = false)
+                                center.notifications.showRunning(
+                                    np, alert = false, nowEpochS = now,
+                                    error = outcome?.message ?: "${np.hostName} didn't answer in time. ${np.gameName} may still be running.",
+                                )
+                            }
                         }
                     } finally {
                         pending.finish()

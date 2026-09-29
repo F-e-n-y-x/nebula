@@ -450,6 +450,8 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
     }
 
     fun end(quitApp: Boolean = false) {
+        // The Now playing card mustn't show the game again on the way back.
+        if (quitApp) c.nowPlaying.onQuitFromStream(hostId)
         c.stream.stop(quitApp)
         c.onStreamEnded()
     }

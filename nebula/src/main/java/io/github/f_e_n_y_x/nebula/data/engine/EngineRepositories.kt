@@ -129,6 +129,7 @@ class EngineHostRepository(private val engine: NebulaEngine) : HostRepository {
                         null -> null
                     },
                     connectedClients = r.connectedClients,
+                    tracked = r.tracked,
                 )
             }
         }.recoverCatching { throw IllegalStateException(if (it is java.io.IOException) "Couldn't reach the PC." else it.message ?: "Couldn't ask the PC.") }
