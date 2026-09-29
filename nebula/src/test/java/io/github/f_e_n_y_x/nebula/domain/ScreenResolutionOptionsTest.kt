@@ -68,4 +68,21 @@ class ScreenResolutionOptionsTest {
         assertTrue(ResolutionOptions.forScreen(Resolution(640, 360)).all { minOf(it.resolution.width, it.resolution.height) >= ResolutionOptions.MIN_HEIGHT })
         assertEquals(emptyList<ResolutionOption>(), ResolutionOptions.forScreen(Resolution(0, 0)))
     }
+
+    @Test fun settingsListStartsWithThisScreenThenPresetsCustomAndCurrent() {
+        val presets = listOf("1280x720" to "720p", "1920x1080" to "1080p", "2560x1440" to "1440p")
+        val c = ResolutionOptions.settingsChoices(Resolution(3120, 1440), presets, listOf(Resolution(1600, 900), Resolution(1920, 1080)), "1234x568")
+        assertEquals(
+            listOf(
+                "3120x1440" to "This screen · 3120×1440", "2808x1296" to "90% · 2808×1296", "2496x1152" to "80% · 2496×1152",
+                "2340x1080" to "75% · 2340×1080", "2080x960" to "67% · 2080×960", "1560x720" to "50% · 1560×720",
+                "1280x720" to "720p · 1280×720", "1920x1080" to "1080p · 1920×1080", "2560x1440" to "1440p · 2560×1440",
+                "1600x900" to "Custom · 1600×900", "1234x568" to "Current · 1234×568",
+            ),
+            c,
+        )
+        // A current value that's already listed isn't repeated; junk isn't offered.
+        assertEquals(11 - 1, ResolutionOptions.settingsChoices(Resolution(3120, 1440), presets, listOf(Resolution(1600, 900)), "2340x1080").size)
+        assertTrue(ResolutionOptions.settingsChoices(Resolution(3120, 1440), presets, emptyList(), "bad").none { it.first == "bad" })
+    }
 }

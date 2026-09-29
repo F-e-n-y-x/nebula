@@ -183,7 +183,18 @@ private fun Modifier.card(s: io.github.f_e_n_y_x.nebula.ui.theme.NebulaScale) =
 private fun PickRow(spec: SettingSpec, k: SettingKind.Pick, prefs: LegacyPrefs, enabled: Boolean, mod: Modifier) {
     val s = Nebula.scale
     val current = prefs.string(spec, k.default)
-    val label = k.choices.firstOrNull { it.value == current }?.label ?: current ?: "—"
+    val ctx = LocalContext.current
+    // Resolution also offers this screen's sizes (Native, 90% … 50%), like the live picker.
+    val choices = if (spec.key == "list_resolution") remember(current) {
+        val (w, h) = deviceResolution(ctx)
+        io.github.f_e_n_y_x.nebula.domain.ResolutionOptions.settingsChoices(
+            io.github.f_e_n_y_x.nebula.domain.model.Resolution(w, h),
+            k.choices.mapNotNull { c -> c.value?.let { it to (c.label ?: it) } },
+            customResolutions(ctx).map { (cw, ch) -> io.github.f_e_n_y_x.nebula.domain.model.Resolution(cw, ch) },
+            current,
+        ).map { (v, l) -> io.github.f_e_n_y_x.nebula.settings.Choice(v, l) }
+    } else k.choices
+    val label = choices.firstOrNull { it.value == current }?.label ?: current ?: "—"
     var open by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(s.dp(12))
     Row(
@@ -199,7 +210,7 @@ private fun PickRow(spec: SettingSpec, k: SettingKind.Pick, prefs: LegacyPrefs, 
         Text(label, style = Nebula.type.label, color = NebulaColors.accentText, maxLines = 2, modifier = Modifier.weight(0.65f, fill = false))
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = NebulaColors.textMuted, modifier = Modifier.size(s.dp(20)))
     }
-    if (open) ChoiceDialog(spec.title, k.choices, current, onPick = { prefs.put(spec.key, it); open = false }, onDismiss = { open = false })
+    if (open) ChoiceDialog(spec.title, choices, current, onPick = { prefs.put(spec.key, it); open = false }, onDismiss = { open = false })
 }
 
 @Composable
