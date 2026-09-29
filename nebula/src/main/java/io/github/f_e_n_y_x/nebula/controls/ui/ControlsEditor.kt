@@ -76,6 +76,7 @@ import io.github.f_e_n_y_x.nebula.controls.ElementShape
 import io.github.f_e_n_y_x.nebula.controls.LayoutEditor
 import io.github.f_e_n_y_x.nebula.controls.LayoutOrientation
 import io.github.f_e_n_y_x.nebula.controls.Snapping
+import io.github.f_e_n_y_x.nebula.controls.groupTitle
 import io.github.f_e_n_y_x.nebula.settings.overlayOpacity
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
 import io.github.f_e_n_y_x.nebula.controls.DefaultProfiles
@@ -163,9 +164,10 @@ fun ControlsEditor(
     var guides by remember { mutableStateOf<Pair<List<Float>, List<Float>>>(emptyList<Float>() to emptyList()) }
     val globalOpacity = remember { overlayOpacity(ctx) / 100f }
     val selected = editor.selected
-    LaunchedEffect(editor.selectedId) {
-        if (editor.selectedId != null && panel != Panel.PROFILES) panel = Panel.INSPECTOR
-        if (editor.selectedId == null && panel == Panel.INSPECTOR) panel = Panel.NONE
+    val hasSelection = editor.selectedId != null || editor.selectedGroup != null
+    LaunchedEffect(editor.selectedId, editor.selectedGroup) {
+        if (hasSelection && panel != Panel.PROFILES) panel = Panel.INSPECTOR
+        if (!hasSelection && panel == Panel.INSPECTOR) panel = Panel.NONE
     }
 
     val save: () -> Unit = {
@@ -184,13 +186,15 @@ fun ControlsEditor(
     val close: () -> Unit = { if (session.dirty) confirmClose = true else onClose() }
     BackHandler {
         when {
-            panel == Panel.LIBRARY || panel == Panel.PROFILES -> panel = if (editor.selectedId != null) Panel.INSPECTOR else Panel.NONE
-            editor.selectedId != null -> act { select(null) }
+            panel == Panel.LIBRARY || panel == Panel.PROFILES -> panel = if (hasSelection) Panel.INSPECTOR else Panel.NONE
+            hasSelection -> act { select(null) }
             else -> close()
         }
     }
 
     val density = LocalDensity.current
+    // The controls area in dp, measured below; groups are placed and scaled in it.
+    val areaDp = remember { floatArrayOf(640f, 360f) }
     Box(Modifier.fillMaxSize()) {
         background()
         // A light scrim so the controls read as editable, not live.
@@ -199,6 +203,8 @@ fun ControlsEditor(
         BoxWithConstraints(Modifier.controlsArea()) {
             val w = constraints.maxWidth
             val h = constraints.maxHeight
+            areaDp[0] = w / density.density
+            areaDp[1] = h / density.density
             val gridPx = with(density) { GRID_DP.dp.toPx() }
             if (gridOn) {
                 Canvas(Modifier.fillMaxSize()) {
@@ -220,11 +226,18 @@ fun ControlsEditor(
                         awaitFirstDown(requireUnconsumed = false)
                         var pinched = false
                         var moved = 0f
+                        var zoomTotal = 1f
                         do {
                             val ev = awaitPointerEvent()
                             if (ev.changes.count { it.pressed } >= 2) {
                                 val sel = editor.selected
-                                if (sel != null) {
+                                val g = editor.selectedGroup
+                                if (g != null) {
+                                    if (!pinched) { editor.beginGesture(); pinched = true }
+                                    zoomTotal *= ev.calculateZoom()
+                                    editor.scaleGroup(g, zoomTotal, areaDp[0], areaDp[1])
+                                    rev++
+                                } else if (sel != null) {
                                     if (!pinched) { editor.beginGesture(); pinched = true }
                                     val z = ev.calculateZoom()
                                     resizeBy(editor, sel.id, z, gridOn)
@@ -244,11 +257,14 @@ fun ControlsEditor(
                 gx.forEach { drawLine(NebulaColors.accentText, Offset(it, 0f), Offset(it, size.height), 1.dp.toPx()) }
                 gy.forEach { drawLine(NebulaColors.accentText, Offset(0f, it), Offset(size.width, it), 1.dp.toPx()) }
             }
+            // Every group's outline under the controls; the selected one in accent.
+            GroupOutlines(editor.elements, editor.selectedGroup, w, h)
             // Zones sit under everything else, as they do while playing.
             editor.elements.sortedBy { it.kind != ElementKind.ZONE }.forEach { e ->
                 key(e.id) {
                     EditableElement(
-                        e = e, selected = e.id == editor.selectedId, areaW = w, areaH = h, opacity = globalOpacity,
+                        e = e, selected = e.id == editor.selectedId, inSelectedGroup = e.group != null && e.group == editor.selectedGroup,
+                        areaW = w, areaH = h, opacity = globalOpacity,
                         editor = editor, gridOn = gridOn, gridPx = gridPx,
                         onGuides = { guides = it }, onChanged = { rev++ },
                     )
@@ -257,13 +273,19 @@ fun ControlsEditor(
             selected?.let { sel ->
                 ResizeHandle(sel, w, h, editor, gridOn) { rev++ }
             }
+            editor.selectedGroup?.let { g ->
+                GroupLabelAndHandle(g, editor.selectedMembers, w, h, editor, areaDp) { rev++ }
+            }
         }
 
         // Where panels go: away from the selected element.
         val sideDock = form.isLandscape || !form.isCompact
+        val members = editor.selectedMembers
+        val focusX = selected?.x ?: members.takeIf { it.isNotEmpty() }?.map { it.x }?.average()?.toFloat()
+        val focusY = selected?.y ?: members.takeIf { it.isNotEmpty() }?.map { it.y }?.average()?.toFloat()
         val dock = when {
-            sideDock -> if ((selected?.x ?: 0f) > 0.5f) Dock.START else Dock.END
-            else -> if ((selected?.y ?: 1f) > 0.5f) Dock.TOP else Dock.BOTTOM
+            sideDock -> if ((focusX ?: 0f) > 0.5f) Dock.START else Dock.END
+            else -> if ((focusY ?: 1f) > 0.5f) Dock.TOP else Dock.BOTTOM
         }
         val toolbarAtBottom = !sideDock && dock == Dock.TOP && panel != Panel.NONE
 
@@ -289,9 +311,9 @@ fun ControlsEditor(
             ),
         )
 
-        if (panel == Panel.NONE && editor.selectedId == null) {
+        if (panel == Panel.NONE && !hasSelection) {
             Hint(
-                if (editor.elements.isEmpty()) "Tap + to add a button, stick, D-pad or touchpad"
+                if (editor.elements.isEmpty()) "Tap + to add controls or a ready-made group (ABXY, WASD, number row…)"
                 else "Tap to select · drag to move · pinch or drag the corner to resize",
                 // Under the toolbar, where no default control sits.
                 Modifier.align(Alignment.TopCenter).padding(top = Nebula.scale.dp(76)),
@@ -301,19 +323,36 @@ fun ControlsEditor(
         AnimatedVisibility(panel != Panel.NONE, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             EditorPanel(dock, sideDock) {
                 when (panel) {
-                    Panel.INSPECTOR -> selected?.let { sel ->
-                        Inspector(
-                            e = sel, globalOpacity = globalOpacity,
-                            onEdit = { mergeKey, change -> act { edit(sel.id, mergeKey, change) } },
-                            onDuplicate = { act { duplicate(sel.id) } },
-                            onDelete = { act { delete(sel.id) } },
-                            onFront = { act { bringToFront(sel.id) } },
-                            onDone = { act { select(null) } },
-                        )
+                    Panel.INSPECTOR -> {
+                        val g = editor.selectedGroup
+                        if (g != null && members.isNotEmpty()) {
+                            GroupInspector(
+                                group = g, members = members, areaW = areaDp[0], areaH = areaDp[1], globalOpacity = globalOpacity,
+                                onScale = { f -> act { beginGesture(); scaleGroup(g, f, areaDp[0], areaDp[1]); endGesture() } },
+                                onOpacity = { v -> act { editGroup(g, "opacity") { it.copy(opacity = v) } } },
+                                onSelectMember = { id -> act { select(id) } },
+                                onDuplicate = { act { duplicateGroup(g) } },
+                                onFront = { act { bringGroupToFront(g) } },
+                                onSplit = { act { splitGroup(g) } },
+                                onDelete = { act { deleteGroup(g) } },
+                                onDone = { act { select(null) } },
+                            )
+                        } else selected?.let { sel ->
+                            Inspector(
+                                e = sel, globalOpacity = globalOpacity,
+                                onEdit = { mergeKey, change -> act { edit(sel.id, mergeKey, change) } },
+                                onDuplicate = { act { duplicate(sel.id) } },
+                                onDelete = { act { delete(sel.id) } },
+                                onFront = { act { bringToFront(sel.id) } },
+                                onDone = { act { select(null) } },
+                                onSelectGroup = { sel.group?.let { gg -> act { selectGroup(gg) } } },
+                                onLeaveGroup = { act { removeFromGroup(sel.id) } },
+                            )
+                        }
                     }
-                    Panel.LIBRARY -> ElementLibrary(
-                        onPick = { kind ->
-                            act { if (kind == ElementKind.ZONE) add(kind, 0.75f, 0.5f) else add(kind, 0.5f, if (orientation == LayoutOrientation.PORTRAIT) 0.72f else 0.5f) }
+                    Panel.LIBRARY -> ElementPalette(
+                        onPick = { item ->
+                            act { addItem(item, areaDp[0], areaDp[1], orientation == LayoutOrientation.PORTRAIT) }
                             panel = Panel.INSPECTOR
                         },
                         onClose = { panel = Panel.NONE },
@@ -323,7 +362,7 @@ fun ControlsEditor(
                         onOpen = { p -> session.open(p); rev++ },
                         onReplaceLayout = { list -> act { replaceAll(list) } },
                         onChanged = { rev++ },
-                        onClose = { panel = if (editor.selectedId != null) Panel.INSPECTOR else Panel.NONE },
+                        onClose = { panel = if (hasSelection) Panel.INSPECTOR else Panel.NONE },
                     )
                     Panel.NONE -> Unit
                 }
@@ -396,6 +435,7 @@ private fun resizeBy(editor: LayoutEditor, id: String, zoom: Float, gridOn: Bool
 private fun EditableElement(
     e: ControlElement,
     selected: Boolean,
+    inSelectedGroup: Boolean,
     areaW: Int,
     areaH: Int,
     opacity: Float,
@@ -412,37 +452,65 @@ private fun EditableElement(
     Box(
         Modifier
             .elementBounds(e, areaW, areaH)
-            .pointerInput(e.id, gridOn, areaW, areaH) {
+            .pointerInput(e.id, e.group, gridOn, areaW, areaH) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     down.consume()
-                    if (editor.selectedId != e.id) { editor.select(e.id); onChanged() }
-                    val start = editor.elements.firstOrNull { it.id == e.id } ?: return@awaitEachGesture
-                    val sz = start.sizePx(areaW, areaH, density)
-                    val wPx = sz.width.toFloat()
-                    val hPx = sz.height.toFloat()
-                    var left = start.x * areaW - wPx / 2
-                    var top = start.y * areaH - hPx / 2
-                    val others = editor.elements.filter { it.id != e.id }.map { o ->
+                    val g = e.group
+                    val groupWasSelected = g != null && editor.selectedGroup == g
+                    // A grouped control moves its whole group, unless it (or a sibling) was picked on its own.
+                    val pickedAlone = g != null && editor.elements.any { it.id == editor.selectedId && it.group == g }
+                    val groupMode = g != null && (groupWasSelected || !pickedAlone)
+                    if (groupMode && !groupWasSelected) { editor.selectGroup(g); onChanged() }
+                    else if (!groupMode && editor.selectedId != e.id) { editor.select(e.id); onChanged() }
+                    if (editor.elements.none { it.id == e.id }) return@awaitEachGesture
+
+                    fun boxOf(o: ControlElement): SnapBox {
                         val osz = o.sizePx(areaW, areaH, density)
                         val ow = osz.width.toFloat()
                         val oh = osz.height.toFloat()
-                        SnapBox(o.x * areaW - ow / 2, o.y * areaH - oh / 2, ow, oh)
+                        return SnapBox(o.x * areaW - ow / 2, o.y * areaH - oh / 2, ow, oh)
                     }
+                    // What moves (this control, or its group) and its bounding box when the move began.
+                    var startBox = SnapBox(0f, 0f, 0f, 0f)
+                    var left = 0f
+                    var top = 0f
+                    var others = emptyList<SnapBox>()
+                    fun measure() {
+                        val moving = if (groupMode) editor.elements.filter { it.group == g } else editor.elements.filter { it.id == e.id }
+                        val ids = moving.map { it.id }.toSet()
+                        startBox = union(moving.map(::boxOf))
+                        left = startBox.left
+                        top = startBox.top
+                        others = editor.elements.filter { it.id !in ids }.map(::boxOf)
+                    }
+                    measure()
                     val threshold = with(density) { SNAP_DP.dp.toPx() }
                     var began = false
                     var travelled = 0f
                     var pinchBase = 0f
+                    var pinchStart = 0f
+                    var pinchedEver = false
+                    // A group's moves and scales are relative to the gesture start; switching between them starts afresh.
+                    fun rebase() { if (began) { editor.endGesture(); editor.beginGesture() }; measure() }
                     do {
                         val ev = awaitPointerEvent()
                         val pressed = ev.changes.filter { it.pressed }
                         if (pressed.size >= 2) {
-                            // Two fingers on the element: pinch resize.
-                            if (!began) { editor.beginGesture(); began = true }
+                            // Two fingers: pinch resize (the whole group in group mode).
                             val d = hypot(pressed[0].position.x - pressed[1].position.x, pressed[0].position.y - pressed[1].position.y)
-                            if (pinchBase > 0f && d > 0f) { resizeBy(editor, e.id, d / pinchBase, gridOn); onChanged() }
+                            if (groupMode) {
+                                if (pinchStart == 0f) { rebase(); pinchStart = d }
+                                if (!began) { editor.beginGesture(); began = true }
+                                if (pinchStart > 0f && d > 0f) { editor.scaleGroup(g!!, d / pinchStart, areaW / density.density, areaH / density.density); onChanged() }
+                            } else {
+                                if (!began) { editor.beginGesture(); began = true }
+                                if (pinchBase > 0f && d > 0f) { resizeBy(editor, e.id, d / pinchBase, gridOn); onChanged() }
+                            }
                             pinchBase = d
+                            pinchedEver = true
                         } else {
+                            if (pinchStart > 0f) { pinchStart = 0f; rebase() }
                             pinchBase = 0f
                             val c = ev.changes.firstOrNull { it.id == down.id } ?: ev.changes.first()
                             val delta = c.positionChange()
@@ -451,8 +519,9 @@ private fun EditableElement(
                                 if (!began) { editor.beginGesture(); began = true }
                                 left += delta.x
                                 top += delta.y
-                                val r = Snapping.move(SnapBox(left, top, wPx, hPx), others, areaW.toFloat(), areaH.toFloat(), gridPx, threshold, gridOn)
-                                editor.moveTo(e.id, (r.left + wPx / 2) / areaW, (r.top + hPx / 2) / areaH)
+                                val r = Snapping.move(SnapBox(left, top, startBox.width, startBox.height), others, areaW.toFloat(), areaH.toFloat(), gridPx, threshold, gridOn)
+                                if (groupMode) editor.moveGroup(g!!, (r.left - startBox.left) / areaW, (r.top - startBox.top) / areaH)
+                                else editor.moveTo(e.id, (r.left + startBox.width / 2) / areaW, (r.top + startBox.height / 2) / areaH)
                                 onGuides(r.guidesX to r.guidesY)
                                 onChanged()
                             }
@@ -461,9 +530,15 @@ private fun EditableElement(
                     } while (ev.changes.any { it.pressed })
                     onGuides(emptyList<Float>() to emptyList())
                     if (began) { editor.endGesture(); onChanged() }
+                    // A tap on a control of the already-selected group picks that control.
+                    if (!began && !pinchedEver && groupWasSelected) { editor.select(e.id); onChanged() }
                 }
             }
-            .semantics { contentDescription = "${e.kind.label} ${e.label}".trim() + if (selected) ", selected" else "" },
+            .semantics {
+                contentDescription = "${e.kind.label} ${e.label}".trim() +
+                    (e.group?.let { ", in ${groupTitle(it)}" } ?: "") +
+                    if (selected) ", selected" else if (inSelectedGroup) ", group selected" else ""
+            },
     ) {
         Box(Modifier.fillMaxSize().graphicsLayer { alpha = (opacity * e.opacity).coerceAtLeast(if (e.kind == ElementKind.ZONE) 0.85f else 0.35f) }) {
             ElementFace(e, look, latched)
@@ -473,10 +548,10 @@ private fun EditableElement(
             val stroke = if (selected) 2.dp.toPx() else 1.dp.toPx()
             val inset = -3.dp.toPx()
             drawRoundRect(
-                if (selected) NebulaColors.accentText else Color(0x55FFFFFF),
+                if (selected || inSelectedGroup) NebulaColors.accentText else Color(0x55FFFFFF),
                 topLeft = Offset(inset, inset), size = Size(size.width - inset * 2, size.height - inset * 2),
                 cornerRadius = CornerRadius(10.dp.toPx()),
-                style = Stroke(stroke, pathEffect = if (selected) null else PathEffect.dashPathEffect(floatArrayOf(8f, 8f))),
+                style = Stroke(stroke, pathEffect = if (selected || inSelectedGroup) null else PathEffect.dashPathEffect(floatArrayOf(8f, 8f))),
             )
         }
         if (e.mode == io.github.f_e_n_y_x.nebula.controls.PressMode.TOGGLE) {
@@ -485,6 +560,103 @@ private fun EditableElement(
                 modifier = Modifier.align(Alignment.TopCenter).offset(y = (-14).dp).background(Color(0xCC0A0A0B), shape).padding(horizontal = 4.dp),
             )
         }
+    }
+}
+
+private fun union(boxes: List<SnapBox>): SnapBox {
+    if (boxes.isEmpty()) return SnapBox(0f, 0f, 0f, 0f)
+    val l = boxes.minOf { it.left }
+    val t = boxes.minOf { it.top }
+    return SnapBox(l, t, boxes.maxOf { it.right } - l, boxes.maxOf { it.bottom } - t)
+}
+
+private fun groupBox(members: List<ControlElement>, areaW: Int, areaH: Int, density: androidx.compose.ui.unit.Density): SnapBox =
+    union(
+        members.map { o ->
+            val sz = o.sizePx(areaW, areaH, density)
+            SnapBox(o.x * areaW - sz.width / 2f, o.y * areaH - sz.height / 2f, sz.width.toFloat(), sz.height.toFloat())
+        },
+    )
+
+/** A frame around each placed group: faint and dashed, or in accent (with a soft fill) when it's selected. */
+@Composable
+private fun GroupOutlines(elements: List<ControlElement>, selectedGroup: String?, areaW: Int, areaH: Int) {
+    val density = LocalDensity.current
+    val groups = elements.mapNotNull { it.group }.distinct()
+    if (groups.isEmpty()) return
+    Canvas(Modifier.fillMaxSize()) {
+        val pad = 8.dp.toPx()
+        groups.forEach { g ->
+            val b = groupBox(elements.filter { it.group == g }, areaW, areaH, density)
+            val sel = g == selectedGroup
+            val tl = Offset(b.left - pad, b.top - pad)
+            val sz = Size(b.width + pad * 2, b.height + pad * 2)
+            if (sel) drawRoundRect(NebulaColors.accentTint.copy(alpha = 0.35f), tl, sz, CornerRadius(14.dp.toPx()))
+            drawRoundRect(
+                if (sel) NebulaColors.accentText else Color(0x40FFFFFF), tl, sz, CornerRadius(14.dp.toPx()),
+                style = Stroke(if (sel) 2.dp.toPx() else 1.dp.toPx(), pathEffect = if (sel) null else PathEffect.dashPathEffect(floatArrayOf(4f, 8f))),
+            )
+        }
+    }
+}
+
+/**
+ * The selected group's name tag (top-left of its frame) and its corner handle: dragging the
+ * handle scales every member and the gaps between them about the group's centre.
+ */
+@Composable
+private fun GroupLabelAndHandle(group: String, members: List<ControlElement>, areaW: Int, areaH: Int, editor: LayoutEditor, areaDp: FloatArray, onChanged: () -> Unit) {
+    if (members.isEmpty()) return
+    val density = LocalDensity.current
+    val b = groupBox(members, areaW, areaH, density)
+    val pad = with(density) { 8.dp.toPx() }
+    val tag = with(density) { 24.dp.roundToPx() }
+    val clear = with(density) { 72.dp.roundToPx() }
+    Text(
+        groupTitle(group), style = Nebula.type.label, color = Color.White, maxLines = 1,
+        modifier = Modifier
+            .offset {
+                // Above the frame, or below it when the frame is near the top (under the toolbar).
+                val above = (b.top - pad - tag).roundToInt()
+                val y = if (above >= clear) above else (b.bottom + pad + 4.dp.toPx()).roundToInt().coerceAtMost((areaH - tag).coerceAtLeast(0))
+                IntOffset((b.left - pad).roundToInt().coerceIn(0, (areaW - 40).coerceAtLeast(0)), y)
+            }
+            .background(NebulaColors.accent, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 2.dp),
+    )
+    val touch = 36.dp
+    Box(
+        Modifier
+            .offset {
+                val t = touch.roundToPx()
+                IntOffset(
+                    (b.right + pad - t / 2f).roundToInt().coerceIn(0, (areaW - t).coerceAtLeast(0)),
+                    (b.bottom + pad - t / 2f).roundToInt().coerceIn(0, (areaH - t).coerceAtLeast(0)),
+                )
+            }
+            .size(touch)
+            .semantics { contentDescription = "Resize group" }
+            .pointerInput(group, areaW, areaH) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false).consume()
+                    editor.beginGesture()
+                    val b0 = groupBox(editor.elements.filter { it.group == group }, areaW, areaH, density)
+                    var dx = 0f
+                    var dy = 0f
+                    do {
+                        val ev = awaitPointerEvent()
+                        ev.changes.forEach { c -> val d = c.positionChange(); dx += d.x; dy += d.y; c.consume() }
+                        // The centre stays put, so each side grows by twice the drag.
+                        val f = ((b0.width + 2 * dx) + (b0.height + 2 * dy)) / (b0.width + b0.height).coerceAtLeast(1f)
+                        editor.scaleGroup(group, f.coerceAtLeast(0.05f), areaDp[0], areaDp[1])
+                        onChanged()
+                    } while (ev.changes.any { it.pressed })
+                    editor.endGesture()
+                    onChanged()
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(18.dp).background(NebulaColors.accent, RoundedCornerShape(4.dp)).border(2.dp, Color.White, RoundedCornerShape(4.dp)))
     }
 }
 

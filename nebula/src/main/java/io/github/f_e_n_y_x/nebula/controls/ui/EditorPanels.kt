@@ -24,22 +24,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Circle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.ControlCamera
-import androidx.compose.material.icons.rounded.Crop75
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.FlipToFront
-import androidx.compose.material.icons.rounded.Games
-import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.PanTool
-import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.SwapHoriz
-import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -79,6 +70,9 @@ import io.github.f_e_n_y_x.nebula.controls.Side
 import io.github.f_e_n_y_x.nebula.controls.StickOutput
 import io.github.f_e_n_y_x.nebula.controls.VirtualKeys
 import io.github.f_e_n_y_x.nebula.controls.describe
+import io.github.f_e_n_y_x.nebula.controls.groupTitle
+import androidx.compose.material.icons.rounded.SelectAll
+import androidx.compose.material.icons.rounded.LinkOff
 import io.github.f_e_n_y_x.nebula.ui.components.ButtonStyle
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaButton
 import io.github.f_e_n_y_x.nebula.ui.components.NebulaConfirmDialog
@@ -180,6 +174,8 @@ internal fun Inspector(
     onDelete: () -> Unit,
     onFront: () -> Unit,
     onDone: () -> Unit,
+    onSelectGroup: () -> Unit = {},
+    onLeaveGroup: () -> Unit = {},
 ) {
     val s = Nebula.scale
     Column(
@@ -191,6 +187,14 @@ internal fun Inspector(
             SmallAction("Duplicate", Icons.Rounded.ContentCopy, onDuplicate)
             SmallAction("To front", Icons.Rounded.FlipToFront, onFront)
             SmallAction("Delete", Icons.Rounded.Delete, onDelete, danger = true)
+        }
+        e.group?.let { g ->
+            Field("Group", "Part of \u201c${groupTitle(g)}\u201d. Drag it alone from here, or select the group to move and resize them all.") {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                    SmallAction("Select group", Icons.Rounded.SelectAll, onSelectGroup)
+                    SmallAction("Remove from group", Icons.Rounded.LinkOff, onLeaveGroup)
+                }
+            }
         }
         if (e.kind != ElementKind.DPAD) {
             Field("Label") { TextInput(e.label, { v -> onEdit("label") { it.copy(label = v.take(24)) } }, "No label") }
@@ -579,47 +583,6 @@ internal fun Chip(text: String, selected: Boolean, modifier: Modifier = Modifier
             .padding(horizontal = s.dp(12), vertical = s.dp(9)),
         contentAlignment = Alignment.Center,
     ) { Text(text, style = Nebula.type.label, color = if (selected) Color.White else NebulaColors.text) }
-}
-
-// ---------------------------------------------------------------- element library
-
-private data class LibraryItem(val kind: ElementKind, val icon: ImageVector, val help: String)
-
-private val libraryItems = listOf(
-    LibraryItem(ElementKind.BUTTON, Icons.Rounded.Circle, "A gamepad button, PC key or mouse button. Hold or toggle."),
-    LibraryItem(ElementKind.STICK, Icons.Rounded.ControlCamera, "Left or right analog stick, or four direction keys. Can float."),
-    LibraryItem(ElementKind.DPAD, Icons.Rounded.Games, "Four directions with diagonals: D-pad, WASD or arrows."),
-    LibraryItem(ElementKind.TRIGGER, Icons.Rounded.Crop75, "LT or RT, fully pressed while held."),
-    LibraryItem(ElementKind.ZONE, Icons.Rounded.PanTool, "A screen area for camera look (stick or mouse) or a floating joystick. Can keep working with a controller."),
-    LibraryItem(ElementKind.TOUCHPAD, Icons.Rounded.TouchApp, "A region that moves the PC's mouse; tap to click."),
-    LibraryItem(ElementKind.COMBO, Icons.Rounded.Link, "Several buttons or keys pressed together."),
-    LibraryItem(ElementKind.MACRO, Icons.Rounded.Repeat, "A timed sequence of presses, played once per tap."),
-    LibraryItem(ElementKind.SWITCH, Icons.Rounded.SwapHoriz, "Changes to another layout of the game's layout set (next, previous or a picker). Lets go of everything first."),
-)
-
-@Composable
-internal fun ElementLibrary(onPick: (ElementKind) -> Unit, onClose: () -> Unit) {
-    val s = Nebula.scale
-    Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(18)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-        PanelHeader("Add", "Controls", onClose)
-        libraryItems.forEach { item ->
-            val shape = RoundedCornerShape(s.dp(12))
-            Row(
-                Modifier.fillMaxWidth().nebulaClickable(shape, { onPick(item.kind) }).background(NebulaColors.surface, shape)
-                    .padding(horizontal = s.dp(14), vertical = s.dp(12)),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(s.dp(40)).background(NebulaColors.accentTint, RoundedCornerShape(s.dp(10))), contentAlignment = Alignment.Center) {
-                    Icon(item.icon, null, tint = NebulaColors.accentText, modifier = Modifier.size(s.dp(22)))
-                }
-                Spacer(Modifier.width(s.dp(12)))
-                Column(Modifier.weight(1f)) {
-                    Text(item.kind.label, style = Nebula.type.bodyStrong, color = NebulaColors.text)
-                    Text(item.help, style = Nebula.type.label, color = NebulaColors.textMuted)
-                }
-            }
-        }
-    }
 }
 
 // ---------------------------------------------------------------- profiles
