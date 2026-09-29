@@ -183,7 +183,8 @@ private fun ShelfPortrait(ui: HomeUi, a: ShelfActions) {
     val compact = Nebula.form.isCompact
     val cols = if (compact) 3 else 5
     val hero = ui.continueItems.firstOrNull()
-    val posters = ui.games.filter { it.id != hero?.game?.id }
+    // The library lists every game, the one in Continue playing included ("All N" counts them all).
+    val posters = ui.games
     val side = s.dp(if (compact) 16 else 24)
     val first = remember { FocusRequester() }
     val dpad = dpadLikely()
