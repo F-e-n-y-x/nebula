@@ -617,6 +617,9 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                 phoneHasGyro = phoneHasGyro,
                 controlsProfileId = controlsProfile.id.takeIf { ui.osc },
                 controlsProfile = controlsProfile.takeIf { ui.osc },
+                hostState = hostLink,
+                // A TV doesn't turn; everything else can follow the device rotation.
+                portraitFollow = portraitFollow.takeUnless { Nebula.form.isTv },
                 actions = StreamMenuActions(
                     onResume = { menu = false },
                     onResetZoom = { zoom = 1f; panX = 0f; panY = 0f },
@@ -640,6 +643,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     onDisconnect = { end(false) },
                     onQuit = { end(!ui.quitDisconnectsOnly) },
                     onFramegenPause = { paused, force -> container.stream.setFramegenPaused(paused, force) },
+                    onPortraitFollow = { vm.setPortraitStreaming(if (it) PortraitStreaming.FOLLOW_ROTATION else PortraitStreaming.OFF) },
                 ),
                 hostSection = { StreamHostMenuSection(hostLink, prefs, onTypeClipboard = typeClipboard, onSlept = { end(false) }) },
             )
