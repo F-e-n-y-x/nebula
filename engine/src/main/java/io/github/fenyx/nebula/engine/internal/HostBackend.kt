@@ -34,6 +34,13 @@ interface HostBackend {
     /** Body of a /nova/v1 JSON endpoint, or null when the host doesn't implement it. */
     fun novaJson(details: ComputerDetails, path: String): String?
 
+    /**
+     * POST [json] to a /nova/v1 endpoint and return the reply body; null when the host doesn't
+     * implement it. Throws [io.github.fenyx.nebula.engine.HostRefusedException] with the host's
+     * message when it refuses (bad value, not allowed).
+     */
+    fun novaPost(details: ComputerDetails, path: String, json: String): String? = null
+
     /** Bytes of a /nova/v1 binary endpoint (art, screenshots), or null when absent. */
     fun novaBytes(details: ComputerDetails, path: String): ByteArray?
 

@@ -81,6 +81,7 @@ class NovaApiTest {
     @Test fun `builds endpoint paths`() {
         assertEquals("nova/v1/apps/steam-570/art/hero", NovaApi.art("steam-570", ArtKind.HERO))
         assertEquals("nova/v1/apps/steam-570/details", NovaApi.details("steam-570"))
+        assertEquals("nova/v1/apps/steam-570/profile", NovaApi.profile("steam-570"))
         assertEquals("nova/v1/x", NovaApi.screenshot("/nova/v1/x"))
     }
 }
@@ -145,5 +146,37 @@ class MergeAppsTest {
         assertNull(merged[2].novaId)
         assertEquals(setOf(ArtKind.POSTER), merged[2].availableArt)
         assertTrue(merged[2].running)
+    }
+
+    @Test fun `profile replies parse with defaults for older hosts`() {
+        val full = NovaApi.parseProfile(
+            """{"profile":{"fps_cap":72,"fsr":3,"vkbasalt":true,"vkbasalt_cas":80,"mangohud":true,"bitrate_kbps":25000,"power":"balanced"},
+               "launcher":"steam","applies":false,"can_edit":false,"limits":{"fps_cap":[0,500],"bitrate_kbps":[1000,300000]}}""",
+        )
+        assertEquals(72, full.fpsCap)
+        assertEquals(3, full.fsr)
+        assertTrue(full.vkbasalt)
+        assertEquals(80, full.vkbasaltCas)
+        assertEquals(25_000, full.bitrateKbps)
+        assertEquals(io.github.fenyx.nebula.engine.HostPowerMode.BALANCED, full.power)
+        assertEquals("steam", full.launcher)
+        assertFalse(full.applies)
+        assertFalse(full.canEdit)
+        assertEquals(500, full.maxFpsCap)
+        assertEquals(1000, full.minBitrateKbps)
+        assertEquals(300_000, full.maxBitrateKbps)
+
+        // A host from before the stream settings: no bitrate_kbps, power or limits.
+        val old = NovaApi.parseProfile("""{"profile":{"fps_cap":60,"fsr":0,"vkbasalt":false,"vkbasalt_cas":50,"mangohud":false},"launcher":"proton","applies":true,"can_edit":true}""")
+        assertEquals(0, old.bitrateKbps)
+        assertEquals(io.github.fenyx.nebula.engine.HostPowerMode.DEFAULT, old.power)
+        assertEquals(800_000, old.maxBitrateKbps)
+        assertFalse(old.isDefault)
+        assertTrue(NovaApi.parseProfile("{}").isDefault)
+    }
+
+    @Test fun `profile bodies carry only the changed keys`() {
+        assertEquals("""{"power":"performance"}""", NovaApi.profileBody(mapOf("power" to io.github.fenyx.nebula.engine.HostPowerMode.PERFORMANCE)))
+        assertEquals("""{"bitrate_kbps":0}""", NovaApi.profileBody(mapOf("bitrate_kbps" to 0)))
     }
 }

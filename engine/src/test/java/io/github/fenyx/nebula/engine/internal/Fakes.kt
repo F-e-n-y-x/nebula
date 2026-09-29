@@ -60,6 +60,17 @@ class FakeBackend : HostBackend {
 
     override fun novaBytes(details: ComputerDetails, path: String) = novaBytes[path]
 
+    /** Replies to POSTs by path; each body sent is recorded in [posted]. */
+    var novaPostReplies: Map<String, String> = emptyMap()
+    val posted = mutableListOf<Pair<String, String>>()
+    var postRefusal: io.github.fenyx.nebula.engine.HostRefusedException? = null
+
+    override fun novaPost(details: ComputerDetails, path: String, json: String): String? {
+        posted += path to json
+        postRefusal?.let { throw it }
+        return novaPostReplies[path]
+    }
+
     override fun boxArt(details: ComputerDetails, app: NvApp): ByteArray? {
         boxArtCalls++
         return boxArt

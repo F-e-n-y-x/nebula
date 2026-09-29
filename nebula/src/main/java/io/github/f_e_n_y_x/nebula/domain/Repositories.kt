@@ -55,6 +55,14 @@ interface HostRepository {
      */
     suspend fun testConnection(hostId: String, onProgress: (Float) -> Unit = {}): Result<ConnectionReport> =
         Result.failure(io.github.f_e_n_y_x.nebula.domain.model.ConnectionTestError("This PC can't test the connection."))
+    /**
+     * [gameId]'s settings on the PC (Nova's per-game profile); success(null) when the PC has no
+     * such settings (not Nova, or an older Nova). Fails with a message ready to show.
+     */
+    suspend fun gameProfile(hostId: String, gameId: String): Result<io.github.f_e_n_y_x.nebula.domain.HostGameProfile?> = Result.success(null)
+    /** Changes one of [gameId]'s PC settings; returns what the PC now has. Failure messages are ready to show. */
+    suspend fun setGameProfile(hostId: String, gameId: String, change: io.github.f_e_n_y_x.nebula.domain.HostProfileChange): Result<io.github.f_e_n_y_x.nebula.domain.HostGameProfile> =
+        Result.failure(UnsupportedOperationException("This PC has no game settings."))
     /** Keep watching the network for hosts while the app is visible (onStart / onStop). */
     fun startWatching() {}
     fun stopWatching() {}

@@ -8,18 +8,22 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
 /**
- * Which display mode "Play" uses for a game: the user's remembered choice, else the host's default
- * for that app, else desktops mirror and games get a virtual display, else the global default.
+ * Which display mode "Play" uses for a game: the game's preset (Game settings), else the user's
+ * remembered choice, else the host's default for that app, else desktops mirror and games get a
+ * virtual display, else the global default.
  */
-class ResolvePlayModeUseCase(private val prefs: PreferencesRepository) {
-    operator fun invoke(game: Game): Flow<DisplayMode> =
-        combine(prefs.modeFor(game.hostId, game.id), prefs.streamSettings) { remembered, settings ->
-            resolve(game, remembered, settings)
+class ResolvePlayModeUseCase(private val prefs: PreferencesRepository, private val presets: GamePresetRepository? = null) {
+    operator fun invoke(game: Game): Flow<DisplayMode> {
+        val preset = presets?.observe(game.hostId, game.id) ?: kotlinx.coroutines.flow.flowOf(GamePreset.NONE)
+        return combine(prefs.modeFor(game.hostId, game.id), prefs.streamSettings, preset) { remembered, settings, p ->
+            resolve(game, remembered, settings, p.displayMode)
         }
+    }
 
     companion object {
-        fun resolve(game: Game, remembered: DisplayMode?, settings: StreamSettings): DisplayMode =
-            remembered
+        fun resolve(game: Game, remembered: DisplayMode?, settings: StreamSettings, preset: DisplayMode? = null): DisplayMode =
+            preset
+                ?: remembered
                 ?: game.hostDefaultMode
                 ?: when {
                     game.kind == GameKind.DESKTOP && game.name.contains("mirror", ignoreCase = true) -> DisplayMode.MIRROR

@@ -190,6 +190,35 @@ class DemoHost(private val context: Context) {
             delay(600)
             return if (commandId == "kill-game") Result.failure(IllegalStateException("That command is already running.")) else Result.success(Unit)
         }
+        override suspend fun gameProfile(hostId: String, gameId: String): Result<io.github.f_e_n_y_x.nebula.domain.HostGameProfile?> {
+            delay(250)
+            // Only atom runs Nova with game settings; desktops have no game to tune.
+            if (hostId != HOST_ID || gameId.startsWith("desktop")) return Result.success(null)
+            return Result.success(gameProfiles[gameId] ?: demoProfileDefault(gameId))
+        }
+        override suspend fun setGameProfile(hostId: String, gameId: String, change: io.github.f_e_n_y_x.nebula.domain.HostProfileChange): Result<io.github.f_e_n_y_x.nebula.domain.HostGameProfile> {
+            delay(350)
+            val current = gameProfiles[gameId] ?: demoProfileDefault(gameId)
+            val next = when (change) {
+                is io.github.f_e_n_y_x.nebula.domain.HostProfileChange.FpsCap -> current.copy(fpsCap = change.fps)
+                is io.github.f_e_n_y_x.nebula.domain.HostProfileChange.Fsr -> current.copy(fsr = change.level)
+                is io.github.f_e_n_y_x.nebula.domain.HostProfileChange.Sharpening -> current.copy(sharpening = change.on)
+                is io.github.f_e_n_y_x.nebula.domain.HostProfileChange.BitrateKbps -> current.copy(bitrateKbps = change.kbps)
+                is io.github.f_e_n_y_x.nebula.domain.HostProfileChange.Power -> current.copy(power = change.mode)
+            }
+            gameProfiles[gameId] = next
+            return Result.success(next)
+        }
+    }
+
+    /** The demo PC's game settings (Nova /nova/v1/apps/<id>/profile), changed from Game settings. */
+    private val gameProfiles = java.util.concurrent.ConcurrentHashMap<String, io.github.f_e_n_y_x.nebula.domain.HostGameProfile>()
+
+    /** GTA V starts with a frame cap and FSR on the demo PC so the details page shows host chips. */
+    private fun demoProfileDefault(gameId: String) = if (gameId == "gta5") {
+        io.github.f_e_n_y_x.nebula.domain.HostGameProfile(fpsCap = 120, fsr = 2, power = io.github.f_e_n_y_x.nebula.domain.HostPower.PERFORMANCE)
+    } else {
+        io.github.f_e_n_y_x.nebula.domain.HostGameProfile()
     }
 
     private var wakeAt = 0L

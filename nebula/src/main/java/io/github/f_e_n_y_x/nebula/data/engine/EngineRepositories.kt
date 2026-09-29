@@ -173,6 +173,19 @@ class EngineHostRepository(private val engine: NebulaEngine, private val display
     override suspend fun runCommand(hostId: String, commandId: String): Result<Unit> =
         runCatching { engine.runHostCommand(hostId, commandId) }.recoverCatching { throw IllegalStateException(hostActionMessage(it, sleep = false)) }
 
+    override suspend fun gameProfile(hostId: String, gameId: String): Result<io.github.f_e_n_y_x.nebula.domain.HostGameProfile?> =
+        runCatching { engine.appProfile(hostId, gameId)?.toDomain() }
+            .recoverCatching { throw IllegalStateException("Couldn't read this game's settings from the PC: ${it.message ?: it.javaClass.simpleName}") }
+
+    override suspend fun setGameProfile(hostId: String, gameId: String, change: io.github.f_e_n_y_x.nebula.domain.HostProfileChange): Result<io.github.f_e_n_y_x.nebula.domain.HostGameProfile> =
+        runCatching { engine.setAppProfile(hostId, gameId, mapOf(change.key to change.value)).toDomain() }
+            .recoverCatching {
+                val reason = (it as? io.github.fenyx.nebula.engine.HostRefusedException)?.let { r ->
+                    if (r.code == 403) "This device isn't allowed to change game settings. Allow \"Change game settings\" for it on the PC's Devices page." else r.message
+                } ?: it.message
+                throw IllegalStateException(reason ?: "The PC didn't save the change.")
+            }
+
     override fun pairingAs(): PairingAs = engine.pairingIdentity().let { PairingAs(it.displayName, it.deviceName) }
 
     override fun setPairingDeviceName(name: String) = engine.setPairingDeviceName(name)
@@ -182,6 +195,12 @@ class EngineHostRepository(private val engine: NebulaEngine, private val display
     override fun startWatching() = engine.startDiscovery()
     override fun stopWatching() = engine.stopDiscovery()
 }
+
+private fun io.github.fenyx.nebula.engine.HostAppProfile.toDomain() = io.github.f_e_n_y_x.nebula.domain.HostGameProfile(
+    fpsCap = fpsCap, fsr = fsr, sharpening = vkbasalt, bitrateKbps = bitrateKbps,
+    power = io.github.f_e_n_y_x.nebula.domain.HostPower.entries.firstOrNull { it.wire == power.wire } ?: io.github.f_e_n_y_x.nebula.domain.HostPower.DEFAULT,
+    launchSettingsApply = applies, canEdit = canEdit, maxFpsCap = maxFpsCap, minBitrateKbps = minBitrateKbps, maxBitrateKbps = maxBitrateKbps,
+)
 
 private fun EngineHostCommand.toDomain() = HostCommand(
     id = id, name = name, confirm = confirm, appScoped = appNovaId != null, icon = icon, runnable = runnable, running = running,

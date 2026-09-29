@@ -105,6 +105,14 @@ class NvHttpHostBackend(
         null
     }
 
+    override fun novaPost(details: ComputerDetails, path: String, json: String): String? = try {
+        http(details).novaPost(path, json)
+    } catch (e: FileNotFoundException) {
+        null
+    } catch (e: com.limelight.nvstream.http.HostHttpResponseException) {
+        throw io.github.fenyx.nebula.engine.HostRefusedException(e.getErrorMessage(), e.getErrorCode())
+    }
+
     override fun novaBytes(details: ComputerDetails, path: String): ByteArray? = try {
         http(details).novaGet(path).use { it.bytes() }
     } catch (e: FileNotFoundException) {

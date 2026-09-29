@@ -264,6 +264,19 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null, playLinks:
 private fun pairedFirstLast(hosts: List<Host>, lastHostId: String?): List<String> =
     hosts.filter { it.paired }.sortedByDescending { it.id == lastHostId }.map { it.id }
 
+/** Debug QA hand-offs from [debugStart] to the screen it opens. */
+object DebugStart {
+    /** `gamesettings:<game>`: the details page opens with Game settings showing. */
+    @Volatile var openGameSettingsFor: String? = null
+
+    /** True once for the game [debugStart] asked to show Game settings for. */
+    fun takeGameSettings(gameId: String): Boolean {
+        if (openGameSettingsFor != gameId) return false
+        openGameSettingsFor = null
+        return true
+    }
+}
+
 /** Debug builds only: `adb shell am start ... --es start details:gta5` opens a screen directly (QA screenshots). */
 private fun debugStart(spec: String?): Route? {
     if (!io.github.f_e_n_y_x.nebula.BuildConfig.DEBUG || spec.isNullOrBlank()) return null
@@ -275,6 +288,7 @@ private fun debugStart(spec: String?): Route? {
         "pair" -> Route.Pair(arg ?: "demo-deck")
         "library" -> Route.Library(host)
         "details" -> Route.Details(host, arg ?: "gta5")
+        "gamesettings" -> Route.Details(host, arg ?: "gta5").also { DebugStart.openGameSettingsFor = arg ?: "gta5" }
         "stream" -> Route.Stream(host, arg ?: "gta5", DisplayMode.VIRTUAL)
         "mirror" -> Route.Stream(host, arg ?: "gta5", DisplayMode.MIRROR)
         "settings" -> Route.Settings(arg)

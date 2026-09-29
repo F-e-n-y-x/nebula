@@ -68,6 +68,7 @@ import kotlinx.coroutines.flow.map
 import io.github.f_e_n_y_x.nebula.AppContainer
 import io.github.f_e_n_y_x.nebula.domain.HostGating
 import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Tune
 import io.github.f_e_n_y_x.nebula.domain.model.DisplayMode
 import io.github.f_e_n_y_x.nebula.domain.model.GameKind
 import io.github.f_e_n_y_x.nebula.ui.DetailsUi
@@ -97,6 +98,8 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
     val wake by hostVm.wake.collectAsStateWithLifecycle()
     val host by hostVm.host.collectAsStateWithLifecycle()
     var showCommands by remember { mutableStateOf(false) }
+    var showGameSettings by remember { mutableStateOf(false) }
+    val openGameSettings = { showGameSettings = true }
     val favourite by vm.favourite.collectAsStateWithLifecycle()
     val star: @Composable () -> Unit = { FavouriteButton(favourite, { vm.toggleFavourite() }) }
     HostActionToasts(hostVm)
@@ -142,7 +145,7 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                             if (LocalBackButtonVisibility.current) NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                             star()
-                            MoreMenu(refresh, openCommands)
+                            MoreMenu(refresh, openCommands, openGameSettings)
                         }
                         Spacer(Modifier.height(s.dp(8)))
                         Header(ui)
@@ -150,17 +153,17 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         Stats(ui)
                     }
                     Spacer(Modifier.height(s.dp(12)))
-                    PlayChoices(ui, play, showNote = false, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
+                    PlayChoices(ui, play, showNote = false, asleepHost = asleep, onCommands = openCommands, onGameSettings = openGameSettings, nowPlaying = nowPlaying)
                 } else Column(Modifier.weight(1.2f).verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                         if (LocalBackButtonVisibility.current) NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                         star()
-                        MoreMenu(refresh, openCommands)
+                        MoreMenu(refresh, openCommands, openGameSettings)
                     }
                     Spacer(Modifier.height(s.dp(20)))
                     Header(ui)
                     Spacer(Modifier.height(s.dp(22)))
-                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
+                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands, onGameSettings = openGameSettings, nowPlaying = nowPlaying)
                     Spacer(Modifier.height(s.dp(24)))
                     Stats(ui)
                 }
@@ -190,14 +193,14 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
                         if (LocalBackButtonVisibility.current) NebulaIconButton(Icons.AutoMirrored.Rounded.ArrowBack, "Back", { nav.back() })
                         Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
                             star()
-                            MoreMenu(refresh, openCommands)
+                            MoreMenu(refresh, openCommands, openGameSettings)
                         }
                     }
                     Column(Modifier.align(Alignment.BottomStart).padding(horizontal = s.dp(20))) { Header(ui) }
                 }
                 Column(Modifier.padding(horizontal = s.dp(20)).navigationBarsPadding()) {
                     Spacer(Modifier.height(s.dp(18)))
-                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands, nowPlaying = nowPlaying)
+                    PlayChoices(ui, play, asleepHost = asleep, onCommands = openCommands, onGameSettings = openGameSettings, nowPlaying = nowPlaying)
                     Spacer(Modifier.height(s.dp(22)))
                     Stats(ui)
                     if (showAbout) {
@@ -211,6 +214,9 @@ fun DetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gameI
     }
     WakeOverlay(host?.name ?: "your PC", game.name, wake, onCancel = hostVm::cancelWake, onRetry = hostVm::retryWake)
     if (showCommands) HostCommandsDialog(host?.name ?: "your PC", game.name, hostVm, onDismiss = { showCommands = false })
+    if (showGameSettings) GameSettingsDialog(container, hostId, gameId, game.name, onDismiss = { showGameSettings = false; vm.reloadHostProfile() })
+    // Debug QA: `--es start gamesettings:<game>` opens the details page with Game settings open.
+    LaunchedEffect(Unit) { if (io.github.f_e_n_y_x.nebula.ui.DebugStart.takeGameSettings(gameId)) showGameSettings = true }
     }
 }
 
@@ -238,7 +244,7 @@ private fun Header(ui: DetailsUi) {
 @Composable
 private fun PlayChoices(
     ui: DetailsUi, onPlay: (DisplayMode) -> Unit, showNote: Boolean = true, asleepHost: String? = null, onCommands: (() -> Unit)? = null,
-    nowPlaying: @Composable () -> Unit = {},
+    onGameSettings: (() -> Unit)? = null, nowPlaying: @Composable () -> Unit = {},
 ) {
     val s = Nebula.scale
     val ctx = LocalContext.current
@@ -264,13 +270,15 @@ private fun PlayChoices(
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(s.dp(12))) { modes.forEach { content(it, Modifier.weight(1f)) } }
     }
-    if (asleepHost != null || onCommands != null) {
+    if (asleepHost != null || onCommands != null || onGameSettings != null) {
         Spacer(Modifier.height(s.dp(10)))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
             if (asleepHost != null) Pill("$asleepHost is asleep · Play wakes it", color = NebulaColors.warning)
+            if (onGameSettings != null) NebulaButton("Game settings", onClick = onGameSettings, style = ButtonStyle.Ghost, icon = Icons.Outlined.Tune)
             if (onCommands != null) NebulaButton("Host commands", onClick = onCommands, style = ButtonStyle.Ghost, icon = Icons.Outlined.Terminal)
         }
     }
+    GameSettingsChips(ui)
     if (!showNote) return
     Spacer(Modifier.height(s.dp(10)))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -380,9 +388,36 @@ private fun About(ui: DetailsUi, wide: Boolean = false) {
     }
 }
 
+/**
+ * What Game settings changes for this game, at a glance: this device's preset ("1440p · 120 fps ·
+ * FG") and the PC's settings ("PC: 60 fps cap · FSR 2"). Nothing when the game uses Settings.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun GameSettingsChips(ui: DetailsUi) {
+    val s = Nebula.scale
+    val ctx = LocalContext.current
+    val game = ui.game ?: return
+    val controls = remember(game.hostId, game.id) { io.github.f_e_n_y_x.nebula.controls.ControlsStore.get(ctx) }
+    val data by controls.data.collectAsStateWithLifecycle()
+    val controlsName = remember(data, game.id) {
+        val lib = controls.library(data)
+        val key = io.github.f_e_n_y_x.nebula.controls.ControlsStore.gameKey(game.hostId, game.id)
+        lib.assignedTo(key)?.let { id -> lib.findSet(id)?.name ?: lib.find(id)?.name }
+    }
+    val mine = io.github.f_e_n_y_x.nebula.domain.GamePresets.chips(ui.preset, controlsName)
+    val pc = ui.hostProfile?.chips().orEmpty()
+    if (mine.isEmpty() && pc.isEmpty()) return
+    Spacer(Modifier.height(s.dp(10)))
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(6)), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
+        mine.forEach { Pill(it, color = NebulaColors.text, leading = { Icon(Icons.Outlined.Tune, null, tint = NebulaColors.accent, modifier = Modifier.size(s.dp(14))) }) }
+        pc.forEach { Pill("PC · $it", color = NebulaColors.textSecondary) }
+    }
+}
+
 /** "More" actions for D-pad and TV users, who can't pull to refresh. */
 @Composable
-private fun MoreMenu(onRefresh: () -> Unit, onCommands: (() -> Unit)? = null) {
+private fun MoreMenu(onRefresh: () -> Unit, onCommands: (() -> Unit)? = null, onGameSettings: (() -> Unit)? = null) {
     var open by remember { mutableStateOf(false) }
     Box {
         NebulaIconButton(Icons.Rounded.MoreVert, "More actions", { open = true })
@@ -392,6 +427,13 @@ private fun MoreMenu(onRefresh: () -> Unit, onCommands: (() -> Unit)? = null) {
                 leadingIcon = { Icon(Icons.Outlined.Refresh, null, tint = NebulaColors.textSecondary) },
                 onClick = { open = false; onRefresh() },
             )
+            if (onGameSettings != null) {
+                DropdownMenuItem(
+                    text = { Text("Game settings…", style = Nebula.type.body, color = NebulaColors.text) },
+                    leadingIcon = { Icon(Icons.Outlined.Tune, null, tint = NebulaColors.textSecondary) },
+                    onClick = { open = false; onGameSettings() },
+                )
+            }
             if (onCommands != null) {
                 DropdownMenuItem(
                     text = { Text("Host commands…", style = Nebula.type.body, color = NebulaColors.text) },

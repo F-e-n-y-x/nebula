@@ -569,11 +569,11 @@ internal fun Setting(title: String, help: String, control: @Composable () -> Uni
 }
 
 @Composable
-internal fun <T> Segmented(options: List<Pair<String, T>>, selected: T, onSelect: (T) -> Unit) {
+internal fun <T> Segmented(options: List<Pair<String, T>>, selected: T, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
     val s = Nebula.scale
     val outer = RoundedCornerShape(s.dp(12))
     Row(
-        Modifier.horizontalScroll(rememberScrollState())
+        modifier.horizontalScroll(rememberScrollState())
             .background(NebulaColors.surface, outer).border(1.dp, NebulaColors.controlBorder, outer).padding(s.dp(4)),
         horizontalArrangement = Arrangement.spacedBy(s.dp(4)),
     ) {

@@ -76,6 +76,7 @@ import io.github.f_e_n_y_x.nebula.ui.screens.WakeOverlay
 import io.github.f_e_n_y_x.nebula.ui.screens.favouriteLabel
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
 import kotlinx.coroutines.flow.map
@@ -107,6 +108,7 @@ fun TvDetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gam
     val commands by hostVm.commands.collectAsStateWithLifecycle()
     val favourite by vm.favourite.collectAsStateWithLifecycle()
     var showCommands by remember { mutableStateOf(false) }
+    var showGameSettings by remember { mutableStateOf(false) }
     HostActionToasts(hostVm)
     LaunchedEffect(host?.status) { hostVm.loadCommands(force = true) }
     // A sleeping PC is woken first; the game launches once it answers.
@@ -139,11 +141,13 @@ fun TvDetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gam
                         favouriteLabel(favourite), { vm.toggleFavourite() },
                         icon = if (favourite) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                     )
+                    TvActionButton("Game settings", { showGameSettings = true }, icon = Icons.Outlined.Tune)
                     if (HostGating.showCommandsEntry(host, commands)) {
                         TvActionButton("Host commands", { showCommands = true }, icon = Icons.Outlined.Terminal)
                     }
                     TvActionButton(if (ui.refreshing) "Refreshing…" else "Refresh", { vm.refresh(onArtCleared = { coil3.SingletonImageLoader.get(context).memoryCache?.clear() }) }, icon = Icons.Outlined.Refresh)
                 }
+                io.github.f_e_n_y_x.nebula.ui.screens.GameSettingsChips(ui)
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Check, null, tint = NebulaColors.success, modifier = Modifier.size(16.dp))
@@ -194,6 +198,10 @@ fun TvDetailsScreen(container: AppContainer, nav: Navigator, hostId: String, gam
         viewing?.let { start -> ScreenshotViewer(shots, start) { viewing = null } }
         WakeOverlay(host?.name ?: "your PC", game.name, wake, onCancel = hostVm::cancelWake, onRetry = hostVm::retryWake)
         if (showCommands) HostCommandsDialog(host?.name ?: "your PC", game.name, hostVm, onDismiss = { showCommands = false })
+        if (showGameSettings) {
+            io.github.f_e_n_y_x.nebula.ui.screens.GameSettingsDialog(container, hostId, gameId, game.name, onDismiss = { showGameSettings = false; vm.reloadHostProfile() })
+        }
+        LaunchedEffect(Unit) { if (io.github.f_e_n_y_x.nebula.ui.DebugStart.takeGameSettings(gameId)) showGameSettings = true }
     }
 }
 

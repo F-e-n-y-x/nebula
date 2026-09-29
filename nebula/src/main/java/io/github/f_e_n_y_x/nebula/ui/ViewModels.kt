@@ -206,6 +206,10 @@ data class DetailsUi(
     val refreshing: Boolean = false,
     /** Bumped after a refresh so artwork is requested again. */
     val artVersion: Int = 0,
+    /** This game's preset on this device (Game settings). */
+    val preset: io.github.f_e_n_y_x.nebula.domain.GamePreset = io.github.f_e_n_y_x.nebula.domain.GamePreset.NONE,
+    /** The game's settings on the PC, when it has them. */
+    val hostProfile: io.github.f_e_n_y_x.nebula.domain.HostGameProfile? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -213,6 +217,7 @@ class DetailsViewModel(private val c: AppContainer, val hostId: String, val game
     private val details = MutableStateFlow<GameDetails?>(null)
     private val refreshing = MutableStateFlow(false)
     private val artVersion = MutableStateFlow(0)
+    private val hostProfile = MutableStateFlow<io.github.f_e_n_y_x.nebula.domain.HostGameProfile?>(null)
     private val options = c.prefs.libraryOptions
     private val game = combine(c.library.observeGames(hostId), options) { l, o ->
         l.firstOrNull { it.id == gameId }?.forNetwork(o.dataSaver && c.isMetered())
@@ -221,18 +226,24 @@ class DetailsViewModel(private val c: AppContainer, val hostId: String, val game
     val ui: StateFlow<DetailsUi> = combine(
         combine(game, details, ::Pair),
         game.flatMapLatest { g -> if (g == null) flowOf(DisplayMode.VIRTUAL) else c.resolvePlayMode(g) },
-        combine(c.prefs.modeFor(hostId, gameId), c.prefs.streamSettings, c.prefs.videoModeFor(hostId, gameId)) { m, st, v ->
-            // A size saved for this game from the stream menu wins over Settings.
-            m to (v?.let { st.copy(resolution = it.resolution, fps = it.fps) } ?: st)
+        combine(c.prefs.modeFor(hostId, gameId), c.prefs.streamSettings, c.prefs.videoModeFor(hostId, gameId), c.presets.observe(hostId, gameId)) { m, st, v, p ->
+            // This game's preset, then a size saved from the stream menu, then Settings.
+            Triple(m, io.github.f_e_n_y_x.nebula.domain.GamePresets.effective(st, v, p, c.deviceResolution()).applyTo(st), p)
         },
         options,
-        combine(refreshing, artVersion, ::Pair),
-    ) { (g, d), m, (remembered, s), o, (r, v) ->
-        DetailsUi(g, d, m, remembered != null, s, o, o.dataSaver && c.isMetered(), r, v)
+        combine(refreshing, artVersion, hostProfile, ::Triple),
+    ) { (g, d), m, (remembered, s, p), o, (r, v, hp) ->
+        DetailsUi(g, d, m, remembered != null, s, o, o.dataSaver && c.isMetered(), r, v, p, hp)
     }.stateIn(this, DetailsUi())
 
     init {
         viewModelScope.launch { details.value = runCatching { c.library.details(hostId, gameId) }.getOrNull() }
+        reloadHostProfile()
+    }
+
+    /** Reads the game's settings on the PC again (after Game settings closes). */
+    fun reloadHostProfile() = viewModelScope.launch {
+        hostProfile.value = c.hosts.gameProfile(hostId, gameId).getOrNull()
     }
 
     fun remember(mode: DisplayMode) = viewModelScope.launch { c.prefs.setMode(hostId, gameId, mode) }
@@ -269,6 +280,13 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
             .also { _game.value = it }
     }
     private var session: Job? = null
+    /** The Game settings overlay this stream put in place (frame generation, upscaler), if any. */
+    private var overlayToken: String? = null
+
+    private fun finishOverlay() {
+        overlayToken?.let { c.finishPostProcessing(it) }
+        overlayToken = null
+    }
 
     /** The bitrate the stream was started with, then whatever the menu last applied (kbps). */
     private val _bitrateKbps = MutableStateFlow(0)
@@ -311,12 +329,17 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
             }
             c.prefs.setMode(hostId, gameId, mode)
             val base = c.prefs.streamSettings.first()
-            val initial = Portrait.startMode(
-                startingMode(base, c.prefs.videoModeFor(hostId, gameId).first(), c.deviceResolution()),
-                base.portraitStreaming, c.deviceOrientation(),
+            // This game's preset (Game settings) wins, then a mode saved from the stream menu, then Settings.
+            val preset = c.presets.observe(hostId, gameId).first()
+            val effective = io.github.f_e_n_y_x.nebula.domain.GamePresets.effective(
+                base, c.prefs.videoModeFor(hostId, gameId).first(), preset, c.deviceResolution(),
             )
+            val initial = Portrait.startMode(effective.videoMode, base.portraitStreaming, c.deviceOrientation())
             _startMode.value = initial
-            val settings = base.copy(resolution = initial.resolution, fps = initial.fps)
+            val settings = effective.applyTo(base).copy(resolution = initial.resolution, fps = initial.fps)
+            // Frame generation and the upscaler are read from Settings when the stream starts.
+            overlayToken = c.postProcessing.apply(hostId, gameId, io.github.f_e_n_y_x.nebula.presets.PostProcessingOverlay.overridesFor(preset))
+            if (!preset.isEmpty) Log.i(TAG, "Game settings for ${g.name}: ${preset.toJson()}")
             _bitrateKbps.value = settings.bitrateKbps
             val sw = LiveResolutionSwitcher(initial, reconnect = { c.stream.switchMode(it) }, clock = SystemClock::elapsedRealtime)
             switcher = sw
@@ -328,7 +351,10 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
                     announced = true
                     c.onStreamLive(g.name)
                 }
-                if (it is StreamState.Ended || it is StreamState.Failed) c.onStreamEnded()
+                if (it is StreamState.Ended || it is StreamState.Failed) {
+                    finishOverlay()
+                    c.onStreamEnded()
+                }
             }
         }
     }
@@ -359,6 +385,7 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
                     _switch.value = sw.state.value
                     _state.value = StreamState.Failed("Couldn't change the resolution. ${outcome.reason}")
                     session?.cancel()
+                    finishOverlay()
                     c.onStreamEnded()
                 }
                 SwitchOutcome.Busy -> Unit
@@ -457,6 +484,7 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
                     _switch.value = sw.state.value
                     _state.value = StreamState.Failed("Couldn't rotate the stream. ${outcome.reason}")
                     session?.cancel()
+                    finishOverlay()
                     c.onStreamEnded()
                 }
                 SwitchOutcome.Unchanged, SwitchOutcome.Busy -> Unit
@@ -468,7 +496,11 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
 
     private suspend fun rememberChoice(target: VideoMode, remember: Boolean) {
         when {
-            remember -> c.prefs.setVideoMode(hostId, gameId, target)
+            remember -> {
+                c.prefs.setVideoMode(hostId, gameId, target)
+                // A Game settings size or frame rate would hide the choice: it takes the new values.
+                c.presets.update(hostId, gameId) { io.github.f_e_n_y_x.nebula.domain.GamePresets.withStreamMenuChoice(it, target) }
+            }
             gameVideoMode.value != null -> c.prefs.setVideoMode(hostId, gameId, null)
         }
     }
@@ -525,11 +557,13 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
         // The Now playing card mustn't show the game again on the way back.
         if (quitApp) c.nowPlaying.onQuitFromStream(hostId)
         c.stream.stop(quitApp)
+        finishOverlay()
         c.onStreamEnded()
     }
 
     override fun onCleared() {
         c.stream.stop(quitApp = false)
+        finishOverlay()
         c.onStreamEnded()
     }
 

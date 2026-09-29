@@ -66,7 +66,26 @@ class AppContainer(context: Context) {
         engine?.let { EngineStreamRepository(it, screen, context, display) } ?: demo.streamRepository, sessionHistory::add,
     )
     val artwork: ArtworkRepository = engine?.let { EngineArtworkRepository(it) } ?: demo.artworkRepository
-    val resolvePlayMode = ResolvePlayModeUseCase(prefs)
+    /** Per-game presets on this device (Game settings on a game's page). */
+    val presets: io.github.f_e_n_y_x.nebula.domain.GamePresetRepository = io.github.f_e_n_y_x.nebula.data.GamePresetStore(context)
+    /** A game preset's frame generation and upscaler choices, in force while its stream runs. */
+    val postProcessing: io.github.f_e_n_y_x.nebula.presets.PostProcessingOverlay = io.github.f_e_n_y_x.nebula.presets.PostProcessingOverlay.create(context)
+    val resolvePlayMode = ResolvePlayModeUseCase(prefs, presets)
+
+    /**
+     * Ends a game preset's frame generation / upscaler overlay (after a stream, or at start after
+     * a crash) and keeps what was changed during the stream for that game.
+     */
+    fun finishPostProcessing(token: String? = null) {
+        // Restored at once (a new stream may start right after); the game's preset is updated after.
+        val done = runCatching { postProcessing.finish(token) }.getOrNull() ?: return
+        if (done.changedDuringStream.isEmpty() || done.hostId.isEmpty() || done.gameId.isEmpty()) return
+        background.launch {
+            presets.update(done.hostId, done.gameId) { io.github.f_e_n_y_x.nebula.presets.PostProcessingOverlay.keepChanges(it, done.changedDuringStream) }
+        }
+    }
+
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     /** Pinned games, per host, stored on this device only. */
     val favourites: io.github.f_e_n_y_x.nebula.domain.FavouritesRepository = io.github.f_e_n_y_x.nebula.data.FavouritesStore(context)
 
@@ -107,6 +126,8 @@ class AppContainer(context: Context) {
 
     init {
         io.github.f_e_n_y_x.nebula.diagnostics.StickCalibrations.install(app)
+        // A stream that ended with the process (crash, force stop) left its game's overlay in place.
+        finishPostProcessing()
         // Keep the engine's cache limit in step with the setting.
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             prefs.libraryOptions.map { it.cacheLimitMb }.distinctUntilChanged().collect { artwork.setLimit(it * 1024L * 1024L) }

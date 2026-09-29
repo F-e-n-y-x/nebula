@@ -8,6 +8,7 @@ import io.github.fenyx.nebula.engine.AppDetails
 import io.github.fenyx.nebula.engine.ArtKind
 import io.github.fenyx.nebula.engine.Host
 import io.github.fenyx.nebula.engine.HostApp
+import io.github.fenyx.nebula.engine.HostAppProfile
 import io.github.fenyx.nebula.engine.HostCommandList
 import io.github.fenyx.nebula.engine.HostRefusedException
 import io.github.fenyx.nebula.engine.NovaCapabilities
@@ -395,6 +396,30 @@ class HostRepository(
             LimeLog.warning("App list failed for ${details.name}: ${e.message}")
             null
         }
+    }
+
+    /**
+     * The host performance profile of [appId]; null when the host has no profile API (not Nova,
+     * or older than app_profiles) or doesn't know the app.
+     */
+    suspend fun appProfile(hostId: String, appId: String): HostAppProfile? = withContext(io) {
+        val details = known[hostId] ?: return@withContext null
+        if (nova[hostId]?.has(NovaFeature.APP_PROFILES) != true) return@withContext null
+        val novaApp = novaAppFor(hostId, details, appId) ?: return@withContext null
+        backend.novaJson(details, NovaApi.profile(novaApp.id))?.let(NovaApi::parseProfile)
+    }
+
+    /**
+     * Changes [appId]'s host profile ([changes] uses the wire keys: fps_cap, fsr, vkbasalt,
+     * vkbasalt_cas, mangohud, bitrate_kbps, power) and returns the profile the host now has.
+     * Throws [HostRefusedException] with the host's reason when it refuses.
+     */
+    suspend fun setAppProfile(hostId: String, appId: String, changes: Map<String, Any>): HostAppProfile = withContext(io) {
+        val details = known[hostId] ?: throw HostRefusedException("This PC is no longer in the list.")
+        val novaApp = novaAppFor(hostId, details, appId) ?: throw HostRefusedException("${details.name} doesn't list this game any more.")
+        val reply = backend.novaPost(details, NovaApi.profile(novaApp.id), NovaApi.profileBody(changes))
+            ?: throw HostRefusedException("${details.name} can't change game settings. Update Nova on it.", 404)
+        NovaApi.parseProfile(reply)
     }
 
     suspend fun appDetails(hostId: String, appId: String): AppDetails? = withContext(io) {
