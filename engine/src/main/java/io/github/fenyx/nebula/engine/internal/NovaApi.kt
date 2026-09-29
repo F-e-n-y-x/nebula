@@ -6,6 +6,7 @@ import io.github.fenyx.nebula.engine.HostCommandList
 import io.github.fenyx.nebula.engine.ArtKind
 import io.github.fenyx.nebula.engine.NovaCapabilities
 import io.github.fenyx.nebula.engine.NovaDisplayMode
+import io.github.fenyx.nebula.engine.RunningApp
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -30,6 +31,7 @@ object NovaApi {
     const val CAPABILITIES = "nova/v1/capabilities"
     const val APPS = "nova/v1/apps"
     const val COMMANDS = "nova/v1/commands"
+    const val RUNNING = "nova/v1/running"
 
     fun details(novaId: String) = "nova/v1/apps/$novaId/details"
     fun art(novaId: String, kind: ArtKind) = "nova/v1/apps/$novaId/art/${kind.wire}"
@@ -95,6 +97,28 @@ object NovaApi {
                 running = o.optBoolean("running", false),
             )
         }
+    }
+
+    /**
+     * GET /nova/v1/running: `{running, app:{id,name,index}, since, display, connected_clients}`.
+     * Returns null when nothing runs. `app.id` may be the GameStream id (a number) or Nova's own id;
+     * numeric ids become [RunningApp.appId], others [RunningApp.novaId].
+     */
+    fun parseRunning(body: String): RunningApp? {
+        val o = JSONObject(body.trim().ifEmpty { "{}" })
+        val app = o.optJSONObject("app")
+        if (!o.optBoolean("running", app != null) || app == null) return null
+        val rawId = app.opt("id")?.takeUnless { it == JSONObject.NULL }?.toString()?.trim().orEmpty()
+        val numeric = rawId.toIntOrNull()?.takeIf { it > 0 }
+        return RunningApp(
+            appId = numeric?.toString(),
+            novaId = rawId.takeIf { it.isNotEmpty() && numeric == null },
+            name = app.optString("name").trim().takeIf { it.isNotEmpty() && it != "null" },
+            sinceEpochS = o.optLong("since", 0L).takeIf { it > 0 },
+            display = NovaDisplayMode.fromWire(o.optString("display")),
+            connectedClients = if (o.has("connected_clients") && !o.isNull("connected_clients")) o.optInt("connected_clients", 0) else null,
+            fromNova = true,
+        )
     }
 
     fun parseApps(body: String): List<NovaApp> {

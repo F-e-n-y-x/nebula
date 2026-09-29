@@ -13,6 +13,9 @@ import io.github.fenyx.nebula.engine.HostRefusedException
 import io.github.fenyx.nebula.engine.NovaCapabilities
 import io.github.fenyx.nebula.engine.PairingFailure
 import io.github.fenyx.nebula.engine.PairingState
+import io.github.fenyx.nebula.engine.RunningApp
+import io.github.fenyx.nebula.engine.NovaFeature
+import io.github.fenyx.nebula.engine.HostState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -198,6 +201,48 @@ class HostRepository(
         val details = known[hostId] ?: throw IOException("Unknown host")
         if (details.activeAddress == null) throw IOException("${details.name} isn't reachable")
         if (!backend.superCmd(details, commandId)) throw HostRefusedException("${details.name} didn't run the command")
+    }
+
+    /**
+     * What runs on the host now, or null when nothing does. Nova hosts with the "running" feature
+     * answer /nova/v1/running (start time, display); others fall back to a serverinfo poll's
+     * `currentgame`. Throws IOException when the host can't be reached.
+     */
+    suspend fun running(hostId: String): RunningApp? = withContext(io) {
+        val details = known[hostId] ?: throw IOException("Unknown host")
+        val caps = nova[hostId]
+        if (caps?.has(NovaFeature.RUNNING) == true && details.activeAddress != null) {
+            val body = try {
+                backend.novaJson(details, NovaApi.RUNNING)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                LimeLog.info("Nova running state unavailable for ${details.name}: ${e.message}")
+                null
+            }
+            if (body != null) {
+                val r = NovaApi.parseRunning(body) ?: return@withContext null
+                // Resolve a Nova-only id to the GameStream id the library uses.
+                if (r.appId == null && r.novaId != null) {
+                    val gs = novaByAppId[hostId]?.entries?.firstOrNull { it.value.id == r.novaId }?.key
+                        ?: novaApps[hostId]?.firstOrNull { it.id == r.novaId }?.gameStreamId?.toString()
+                    return@withContext r.copy(appId = gs)
+                }
+                return@withContext r
+            }
+        }
+        val host = refresh(hostId) ?: throw IOException("Unknown host")
+        if (host.state != HostState.ONLINE) throw IOException("${details.name} isn't reachable")
+        host.runningAppId?.let { RunningApp(appId = it.toString()) }
+    }
+
+    /** Quits the app running on the host (`/cancel`). Same errors as [sleep]. */
+    suspend fun quitApp(hostId: String) = withContext(io) {
+        val details = known[hostId] ?: throw IOException("Unknown host")
+        if (details.activeAddress == null) throw IOException("${details.name} isn't reachable")
+        if (!backend.quitApp(details)) throw HostRefusedException("${details.name} didn't close the game")
+        synchronized(details) { details.runningGameId = 0 }
+        publish()
     }
 
     /** Tells the host to forget this client (best effort) and drops the pinned certificate. */

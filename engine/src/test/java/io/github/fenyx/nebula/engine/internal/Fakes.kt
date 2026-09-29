@@ -80,6 +80,18 @@ class FakeBackend : HostBackend {
         return true
     }
 
+    var quitResult: Boolean = true
+    var quitError: Exception? = null
+    var quits = 0
+
+    override fun quitApp(details: ComputerDetails): Boolean {
+        if (!online) throw IOException("offline")
+        quitError?.let { throw it }
+        quits++
+        if (quitResult) runningGameId = 0
+        return quitResult
+    }
+
     override fun superCmd(details: ComputerDetails, cmdId: String): Boolean {
         if (!online) throw IOException("offline")
         commandsRun += cmdId

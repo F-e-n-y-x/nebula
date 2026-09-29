@@ -141,6 +141,15 @@ class NebulaEngine private constructor(context: Context) {
     /** Runs a host command (`/supercmd?cmdId=`). Same errors as [sleepHost]. */
     suspend fun runHostCommand(hostId: String, commandId: String) = repository.runCommand(hostId, commandId)
 
+    /**
+     * What runs on the host now (null when nothing does): /nova/v1/running on Nova hosts with the
+     * "running" feature, else serverinfo `currentgame`. Throws IOException when unreachable.
+     */
+    suspend fun running(hostId: String): RunningApp? = repository.running(hostId)
+
+    /** Quits the app running on the host (`/cancel`). Same errors as [sleepHost]. */
+    suspend fun quitApp(hostId: String) = repository.quitApp(hostId)
+
     suspend fun unpair(hostId: String) = repository.unpair(hostId)
 
     /** Removes a host from the saved list. */

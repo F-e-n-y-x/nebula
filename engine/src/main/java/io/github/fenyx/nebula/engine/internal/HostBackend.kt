@@ -44,6 +44,12 @@ interface HostBackend {
     /** GET /pcsleep. True when the host accepted; throws HostRefusedException when it refused. */
     fun pcSleep(details: ComputerDetails): Boolean
 
+    /**
+     * GET /cancel: quits the app running on the host. True once the host closed it; throws
+     * HostRefusedException when it refused or the app kept running, IOException when unreachable.
+     */
+    fun quitApp(details: ComputerDetails): Boolean
+
     /** GET /supercmd?cmdId=. True when the host ran it; throws HostRefusedException when it refused. */
     fun superCmd(details: ComputerDetails, cmdId: String): Boolean
 }

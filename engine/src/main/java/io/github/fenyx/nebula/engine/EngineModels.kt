@@ -35,6 +35,8 @@ object NovaFeature {
     const val SUPER_CMD = "supercmd"
     const val WOL = "wol"
     const val MIC = "mic"
+    /** GET /nova/v1/running says what runs on the host now, since when and on which display. */
+    const val RUNNING = "running"
     const val CLIPBOARD = "clipboard"
     const val PERMISSION_POWER = "power"
     const val PERMISSION_CLIPBOARD = "clipboard"
@@ -71,6 +73,25 @@ data class HostCommandList(val allowed: Boolean?, val commands: List<HostCommand
 
 /** The host answered but refused the action (missing permission, busy, disabled in config). */
 class HostRefusedException(message: String, val code: Int = 0) : java.io.IOException(message)
+
+/**
+ * What the host is running now: GET /nova/v1/running on Nova hosts with the "running" feature, else
+ * serverinfo's `currentgame` (then only [appId] is known).
+ */
+data class RunningApp(
+    /** GameStream app id as a string, when known (the same id [HostApp.id] uses). */
+    val appId: String?,
+    /** Nova's own app id, when the host sent one that isn't a GameStream id. */
+    val novaId: String? = null,
+    val name: String? = null,
+    /** When the app started, epoch seconds; null when the host doesn't say. */
+    val sinceEpochS: Long? = null,
+    val display: NovaDisplayMode? = null,
+    /** Devices streaming it right now; null when the host doesn't say. */
+    val connectedClients: Int? = null,
+    /** True when this came from /nova/v1/running (exact start time), false for serverinfo. */
+    val fromNova: Boolean = false,
+)
 
 /** A saved or discovered streaming host. */
 data class Host(

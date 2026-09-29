@@ -124,6 +124,13 @@ class NvHttpHostBackend(
 
     override fun pcSleep(details: ComputerDetails): Boolean = refusalsMapped { http(details).pcSleep() }
 
+    override fun quitApp(details: ComputerDetails): Boolean = try {
+        refusalsMapped { http(details).quitApp() }
+    } catch (e: HostHttpResponseException) {
+        // NvHTTP reports 599 when the host said yes but the app is still running.
+        if (e.getErrorCode() == 599) throw HostRefusedException("The game is still running on the PC", 599) else throw e
+    }
+
     override fun superCmd(details: ComputerDetails, cmdId: String): Boolean =
         refusalsMapped { http(details).sendSuperCmd(java.net.URLEncoder.encode(cmdId, "UTF-8")) }
 
