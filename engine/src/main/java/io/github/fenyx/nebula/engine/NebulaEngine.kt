@@ -170,6 +170,13 @@ class NebulaEngine private constructor(context: Context) {
     /** Rich metadata; Nova hosts only (null elsewhere). */
     suspend fun details(hostId: String, appId: String): AppDetails? = repository.appDetails(hostId, appId)
 
+    /** [appId]'s host performance profile; null when the host has none (older or non-Nova hosts). */
+    suspend fun appProfile(hostId: String, appId: String): HostAppProfile? = repository.appProfile(hostId, appId)
+
+    /** Changes [appId]'s host profile (wire keys); throws [HostRefusedException] with the host's reason. */
+    suspend fun setAppProfile(hostId: String, appId: String, changes: Map<String, Any>): HostAppProfile =
+        repository.setAppProfile(hostId, appId, changes)
+
     /** Encoded image bytes (decode with BitmapFactory or Coil), disk-cached. */
     suspend fun loadArt(hostId: String, appId: String, kind: ArtKind): ByteArray? = repository.loadArt(hostId, appId, kind)
 

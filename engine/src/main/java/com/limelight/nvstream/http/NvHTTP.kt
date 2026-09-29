@@ -759,6 +759,30 @@ class NvHTTP(
         throw HostHttpResponseException(response.code, response.message)
     }
 
+    /**
+     * POST a JSON body to a Nova host extension endpoint (e.g. "nova/v1/apps/<id>/profile") over
+     * the paired HTTPS channel and return the reply body. Throws [FileNotFoundException] when the
+     * host doesn't implement it, and [HostHttpResponseException] carrying the host's `error`
+     * message for other refusals (400 bad value, 403 not allowed).
+     */
+    @Throws(IOException::class, InterruptedException::class)
+    fun novaPost(pathSegments: String, json: String): String {
+        val url = getHttpsUrl(true).newBuilder()
+            .addPathSegments(pathSegments)
+            .addQueryParameter("uniqueid", uniqueId)
+            .addQueryParameter("clientname", clientName)
+            .addQueryParameter("uuid", UUID.randomUUID().toString())
+            .build()
+        val body = json.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+        httpClientLongConnectTimeout.newCall(Request.Builder().url(url).post(body).build()).execute().use { response ->
+            val text = response.body.string()
+            if (response.isSuccessful) return text
+            if (response.code == 404 && !text.contains("\"error\"")) throw FileNotFoundException(url.encodedPath)
+            val reason = runCatching { org.json.JSONObject(text).optString("error") }.getOrNull().orEmpty()
+            throw HostHttpResponseException(response.code, reason.ifEmpty { response.message })
+        }
+    }
+
     @Throws(IOException::class, InterruptedException::class)
     fun getDisplays(): DisplayCatalog {
         try {

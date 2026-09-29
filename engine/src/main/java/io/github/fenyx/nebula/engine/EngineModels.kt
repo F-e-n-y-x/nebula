@@ -41,6 +41,47 @@ object NovaFeature {
     const val PERMISSION_POWER = "power"
     const val PERMISSION_CLIPBOARD = "clipboard"
     const val PERMISSION_COMMANDS = "host_commands"
+    /** GET/POST /nova/v1/apps/<id>/profile: a game's host settings (frame cap, FSR, bitrate cap, power). */
+    const val APP_PROFILES = "app_profiles"
+    const val PERMISSION_APP_PROFILES = "app_profiles"
+}
+
+/** Streaming power mode a game asks the host for ("default" follows the host's setting). */
+enum class HostPowerMode(val wire: String) {
+    DEFAULT("default"),
+    PERFORMANCE("performance"),
+    BALANCED("balanced");
+
+    companion object {
+        fun of(wire: String?): HostPowerMode = entries.firstOrNull { it.wire == wire } ?: DEFAULT
+    }
+}
+
+/**
+ * A game's host performance profile (GET /nova/v1/apps/<id>/profile). Launch settings ([fpsCap],
+ * [fsr], [vkbasalt], [mangohud]) reach the game only when [applies]; [bitrateKbps] and [power]
+ * apply to the stream whatever the launcher. Zero / false / DEFAULT mean "not set".
+ */
+data class HostAppProfile(
+    val fpsCap: Int = 0,
+    /** Proton fullscreen FSR, 1 (sharpest) to 5; 0 = off. */
+    val fsr: Int = 0,
+    val vkbasalt: Boolean = false,
+    val vkbasaltCas: Int = 50,
+    val mangohud: Boolean = false,
+    /** Stream bitrate cap in kbps; 0 = none. */
+    val bitrateKbps: Int = 0,
+    val power: HostPowerMode = HostPowerMode.DEFAULT,
+    /** "command", "proton", "steam", "lutris" or "none". */
+    val launcher: String = "command",
+    val applies: Boolean = true,
+    val canEdit: Boolean = true,
+    val maxFpsCap: Int = 1000,
+    val minBitrateKbps: Int = 500,
+    val maxBitrateKbps: Int = 800_000,
+) {
+    /** True when nothing is set. */
+    val isDefault: Boolean get() = fpsCap <= 0 && fsr <= 0 && !vkbasalt && !mangohud && bitrateKbps <= 0 && power == HostPowerMode.DEFAULT
 }
 
 /**

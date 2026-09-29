@@ -178,6 +178,43 @@ class HostRepositoryTest {
         assertEquals(setOf(ArtKind.HERO), apps.single().availableArt)
     }
 
+    @Test fun `game profiles are read and changed through the nova profile api`() = runTest {
+        backend.apps = listOf(NvApp("Cyberpunk 2077", 881, false))
+        val reply = """{"profile":{"fps_cap":60,"fsr":2,"vkbasalt":false,"vkbasalt_cas":50,"mangohud":false,"bitrate_kbps":40000,"power":"performance"},"launcher":"proton","applies":true,"can_edit":true}"""
+        backend.novaJson = mapOf(
+            NovaApi.CAPABILITIES to """{"nova":true,"version":"0.3","features":["apps","app_profiles"]}""",
+            NovaApi.APPS to """[{"id":"0123456789abcdef","appid":881,"name":"Cyberpunk 2077"}]""",
+            NovaApi.profile("0123456789abcdef") to reply,
+        )
+        backend.novaPostReplies = mapOf(NovaApi.profile("0123456789abcdef") to reply.replace("\"fps_cap\":60", "\"fps_cap\":90"))
+        val repo = repo()
+        val id = repo.addPaired()
+        repo.refresh(id)
+        repo.loadApps(id)
+
+        val p = repo.appProfile(id, "881")!!
+        assertEquals(60, p.fpsCap)
+        assertEquals(40_000, p.bitrateKbps)
+        assertEquals(io.github.fenyx.nebula.engine.HostPowerMode.PERFORMANCE, p.power)
+
+        assertEquals(90, repo.setAppProfile(id, "881", mapOf("fps_cap" to 90)).fpsCap)
+        assertEquals(NovaApi.profile("0123456789abcdef") to """{"fps_cap":90}""", backend.posted.single())
+        assertNull(repo.appProfile(id, "999"))
+    }
+
+    @Test fun `hosts without app_profiles have no game profile`() = runTest {
+        backend.apps = listOf(NvApp("Dota 2", 881, false))
+        backend.novaJson = mapOf(
+            NovaApi.CAPABILITIES to """{"nova":true,"version":"0.2","features":["apps"]}""",
+            NovaApi.APPS to """[{"id":"steam-570","appid":881,"name":"Dota 2"}]""",
+            NovaApi.profile("steam-570") to """{"profile":{}}""",
+        )
+        val repo = repo()
+        val id = repo.addPaired()
+        repo.refresh(id)
+        assertNull(repo.appProfile(id, "881"))
+    }
+
     @Test fun `plain hosts are never probed before pairing`() = runTest {
         backend.novaJson = mapOf(NovaApi.CAPABILITIES to """{"nova":true}""")
         val repo = repo()

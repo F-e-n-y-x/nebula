@@ -34,6 +34,40 @@ object NovaApi {
     const val RUNNING = "nova/v1/running"
 
     fun details(novaId: String) = "nova/v1/apps/$novaId/details"
+    fun profile(novaId: String) = "nova/v1/apps/$novaId/profile"
+
+    /**
+     * GET or POST /nova/v1/apps/<id>/profile:
+     * `{"profile":{fps_cap,fsr,vkbasalt,vkbasalt_cas,mangohud,bitrate_kbps,power},"launcher","applies","can_edit","limits"}`.
+     * Fields a host doesn't send keep their defaults (hosts before the stream settings lack bitrate_kbps and power).
+     */
+    fun parseProfile(body: String): io.github.fenyx.nebula.engine.HostAppProfile {
+        val json = JSONObject(body)
+        val p = json.optJSONObject("profile") ?: JSONObject()
+        val limits = json.optJSONObject("limits")
+        fun max(key: String, fallback: Int) = limits?.optJSONArray(key)?.optInt(1, fallback) ?: fallback
+        fun min(key: String, fallback: Int) = limits?.optJSONArray(key)?.optInt(0, fallback) ?: fallback
+        return io.github.fenyx.nebula.engine.HostAppProfile(
+            fpsCap = p.optInt("fps_cap", 0).coerceAtLeast(0),
+            fsr = p.optInt("fsr", 0).coerceIn(0, 5),
+            vkbasalt = p.optBoolean("vkbasalt", false),
+            vkbasaltCas = p.optInt("vkbasalt_cas", 50).coerceIn(0, 100),
+            mangohud = p.optBoolean("mangohud", false),
+            bitrateKbps = p.optInt("bitrate_kbps", 0).coerceAtLeast(0),
+            power = io.github.fenyx.nebula.engine.HostPowerMode.of(p.optString("power", "default")),
+            launcher = json.optString("launcher", "command"),
+            applies = json.optBoolean("applies", true),
+            canEdit = json.optBoolean("can_edit", true),
+            maxFpsCap = max("fps_cap", 1000),
+            minBitrateKbps = min("bitrate_kbps", 500),
+            maxBitrateKbps = max("bitrate_kbps", 800_000),
+        )
+    }
+
+    /** The POST body for a profile change: only the keys given (`fps_cap`, `bitrate_kbps`, `power`, …). */
+    fun profileBody(changes: Map<String, Any>): String = JSONObject().apply {
+        changes.forEach { (k, v) -> put(k, if (v is io.github.fenyx.nebula.engine.HostPowerMode) v.wire else v) }
+    }.toString()
     fun art(novaId: String, kind: ArtKind) = "nova/v1/apps/$novaId/art/${kind.wire}"
 
     /** Screenshot paths come from the host already relative to the Nova root. */
