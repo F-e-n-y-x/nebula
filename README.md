@@ -51,7 +51,14 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 - 🎮 **On-screen controls editor** — place, resize and snap buttons, sticks, triggers and macros;
   per-game profiles; import V+ layouts.
 - 👆 **Touch zones** — swipe-to-look camera, floating sticks, fire-and-look triggers; every finger
-  handled on its own, so you can move, look and shoot at once. Ready-made "GTA V: touch only" layout.
+  handled on its own, so you can move, look and shoot at once.
+- 🔫 **PUBG-style shooter layouts** — left fire button, drag-to-aim fire, auto-sprint and run-lock,
+  aim / crouch / prone / peek, ready-made for GTA V, controller games and keyboard+mouse games.
+- 📤 **Share layouts** — export as a file, a one-line code or a QR code, and import on any device
+  with a preview and "fit to this screen".
+- 🌐 **Layout library** — browse and download community layouts per game in the app
+  (Profiles → Browse layouts), from [nebula-layouts](https://github.com/F-e-n-y-x/nebula-layouts).
+  Made a good one? Tap *Share to library* in the app, or open a pull request there.
 
 **Everywhere**
 - ⭐ **Favourites** pinned to the top of the library, and a **diagnostics** hub (controller test,
@@ -65,7 +72,7 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 
 | Feature | Status |
 |---|---|
-| PUBG-style shooter controls, shareable layout files (QR) and an online layout library | 🔨 Building |
+| "Now playing" card and a notification when a game keeps running on the PC | 🔨 Building |
 | TV home, Shelf and Auto home styles, tablet split view, quick-connect tile and widget | 🔨 Building |
 | Adaptive bitrate and connection test | 🔨 Building |
 | Local cursor (instant pointer drawn on the device) | 🔨 Building |
