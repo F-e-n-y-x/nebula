@@ -101,12 +101,6 @@ class ReleasesTest {
         assertFalse(SignerMatch.same(emptySet(), emptySet()))
     }
 
-    @Test fun `masks tokens`() {
-        assertEquals("", maskToken(null))
-        assertEquals("••••", maskToken("short"))
-        assertEquals("••••••••wxyz", maskToken("github_pat_0123456789wxyz"))
-    }
-
     @Test fun `notes excerpt is bounded`() {
         assertEquals("short", Releases.notesExcerpt("  short \r\n"))
         assertEquals(401, Releases.notesExcerpt("x".repeat(1000)).length)

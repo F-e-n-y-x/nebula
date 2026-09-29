@@ -1,7 +1,5 @@
 package io.github.f_e_n_y_x.nebula.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -12,8 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.InstallMobile
@@ -23,18 +19,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -48,9 +39,8 @@ import io.github.f_e_n_y_x.nebula.update.Releases
 import io.github.f_e_n_y_x.nebula.update.UpdateInstaller
 import io.github.f_e_n_y_x.nebula.update.UpdateState
 import io.github.f_e_n_y_x.nebula.update.UpdateViewModel
-import io.github.f_e_n_y_x.nebula.update.maskToken
 
-/** Settings → About: update check, download and install from the private GitHub releases. */
+/** Settings → About: update check, download and install from the GitHub releases. */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun UpdateSection() {
@@ -102,7 +92,6 @@ internal fun UpdateSection() {
 
         var pre by remember { mutableStateOf(vm.settings.includePrereleases) }
         ToggleRow("Include pre-releases", "Offer nebula-v…-rc and other test builds too.", pre) { pre = it; vm.setIncludePrereleases(it) }
-        TokenField(vm)
     }
 }
 
@@ -113,44 +102,5 @@ private fun Busy(text: String) {
         CircularProgressIndicator(Modifier.size(s.dp(16)), color = NebulaColors.accentText, strokeWidth = 2.dp)
         Spacer(Modifier.width(s.dp(10)))
         Text(text, style = Nebula.type.secondary, color = NebulaColors.textSecondary)
-    }
-}
-
-/** Write-only token field: the stored token is shown masked and never read back into the field. */
-@Composable
-private fun TokenField(vm: UpdateViewModel) {
-    val s = Nebula.scale
-    var hasToken by remember { mutableStateOf(vm.settings.hasToken) }
-    var masked by remember { mutableStateOf(maskToken(vm.settings.token())) }
-    var draft by remember { mutableStateOf("") }
-    var focused by remember { mutableStateOf(false) }
-    Setting(
-        "GitHub token",
-        "The releases are private. Paste a fine-grained token with read-only Contents access to F-e-n-y-x/nebula. " +
-            "It is stored encrypted on this device and only sent to api.github.com." +
-            if (hasToken) " Saved: $masked" else "",
-    ) {
-        val shape = RoundedCornerShape(s.dp(12))
-        Column(verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-            BasicTextField(
-                value = draft, onValueChange = { draft = it.trim() }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                textStyle = Nebula.type.body.copy(color = NebulaColors.text), cursorBrush = SolidColor(NebulaColors.accentText),
-                modifier = Modifier.fillMaxWidth().background(NebulaColors.surface, shape)
-                    .border(if (focused) 2.dp else 1.dp, if (focused) NebulaColors.accentText else NebulaColors.controlBorder, shape)
-                    .padding(horizontal = s.dp(12), vertical = s.dp(10)).onFocusChanged { focused = it.isFocused },
-                decorationBox = { inner -> if (draft.isEmpty()) Text(if (hasToken) "Replace token" else "github_pat_…", style = Nebula.type.body, color = NebulaColors.textMuted); inner() },
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                NebulaButton("Save token", onClick = {
-                    if (draft.isNotEmpty()) {
-                        vm.setToken(draft)
-                        masked = maskToken(draft); hasToken = true; draft = ""
-                    }
-                }, style = ButtonStyle.Secondary)
-                if (hasToken) NebulaButton("Remove token", onClick = { vm.setToken(null); hasToken = false; masked = "" }, style = ButtonStyle.Ghost)
-            }
-        }
     }
 }

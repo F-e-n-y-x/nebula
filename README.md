@@ -63,7 +63,7 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 **Everywhere**
 - ⭐ **Favourites** pinned to the top of the library, and a **diagnostics** hub (controller test,
   stick calibration, capability report, log export).
-- 🔄 **Update checks** from releases, and links to both projects in About.
+- 🔄 **Updates** from GitHub releases right in the app (checksum and signature verified), and links to both projects in About.
 - 📱 Phone, tablet and Android TV layouts, full D-pad support.
 - 🔧 Every Moonlight V+ setting, with search — and a test that fails the build if any setting shown
   does nothing.
@@ -84,9 +84,12 @@ Replay clips and an auto keyboard when a PC text field is focused.
 
 ## Install
 
-Private builds only for now: install the latest `nebula-*.apk` from the releases page (or the one
-your host shares). Android 8.0 or newer. Frame generation needs a Vulkan 1.1 GPU; the in-app
-device check tells you if yours qualifies.
+Download `nebula-*.apk` from the [releases page](https://github.com/F-e-n-y-x/nebula/releases) and
+open it on the device (allow "Install unknown apps" once). Android 8.0 or newer. Later updates
+install from **Settings → About → Updates**.
+
+Frame generation needs a Vulkan 1.1 GPU and your own copy of `Lossless.dll` from Lossless Scaling
+(Steam): **Settings → Frame generation → Import Lossless.dll**. It is not included in the download.
 
 ## Build
 

@@ -11,24 +11,15 @@ import okhttp3.Response
 /** Result of asking GitHub for the release list. */
 sealed interface CheckResult {
     data class Ok(val releases: List<Release>) : CheckResult
-    /** 401/403/404 with no token: the repository is private (or gone). Never an "update available". */
-    data object NeedsToken : CheckResult
-    /** 401 with a token: the token is wrong or expired. */
-    data object BadToken : CheckResult
-    /** 403/404 with a token: the token can't read this repository (scope). */
-    data object NoAccess : CheckResult
+    /** 401/403/404: the repository is gone or not public. Never an "update available". */
+    data object NotFound : CheckResult
     data object RateLimited : CheckResult
     data class Failed(val message: String) : CheckResult
 }
 
 /**
- * GitHub releases for the private `F-e-n-y-x/nebula` repository.
- *
- * The optional token (a fine-grained, read-only PAT with Contents: read on that one repository) is
- * sent as `Authorization: Bearer` to api.github.com only. Asset downloads answer with a redirect to a
- * signed objects.githubusercontent.com URL; OkHttp drops the Authorization header when a redirect
- * changes host (RetryAndFollowUpInterceptor), so the token never reaches the CDN — see
- * UpdateClientTest.`token is not forwarded across a cross-host redirect`.
+ * GitHub releases for the public `F-e-n-y-x/nebula` repository, read anonymously.
+ * Asset downloads answer with a redirect to a signed objects.githubusercontent.com URL.
  */
 class UpdateClient(
     private val http: OkHttpClient = defaultClient(),
@@ -37,13 +28,12 @@ class UpdateClient(
     /** Tests use plain-HTTP mock servers; production refuses anything but HTTPS. */
     private val allowHttp: Boolean = false,
 ) {
-    fun fetchReleases(token: String?): CheckResult {
+    fun fetchReleases(): CheckResult {
         val url = "$apiBase/repos/$repo/releases?per_page=20"
         if (!urlAllowed(url)) return CheckResult.Failed("Refusing a non-HTTPS update URL")
-        val request = apiRequest(url, token, "application/vnd.github+json")
+        val request = apiRequest(url, "application/vnd.github+json")
         return try {
             http.newCall(request).execute().use { r ->
-                val hasToken = !token.isNullOrBlank()
                 when {
                     r.isSuccessful -> {
                         val body = r.body.string()
@@ -51,9 +41,7 @@ class UpdateClient(
                     }
                     r.code == 403 && r.header("x-ratelimit-remaining") == "0" -> CheckResult.RateLimited
                     r.code == 429 -> CheckResult.RateLimited
-                    !hasToken && r.code in listOf(401, 403, 404) -> CheckResult.NeedsToken
-                    r.code == 401 -> CheckResult.BadToken
-                    r.code == 403 || r.code == 404 -> CheckResult.NoAccess
+                    r.code in listOf(401, 403, 404) -> CheckResult.NotFound
                     else -> CheckResult.Failed("GitHub answered ${r.code}")
                 }
             }
@@ -63,10 +51,10 @@ class UpdateClient(
     }
 
     /** A small text asset (a checksum file); null when missing or too large. */
-    fun fetchText(asset: ReleaseAsset, token: String?, maxBytes: Long = 64 * 1024): String? {
+    fun fetchText(asset: ReleaseAsset, maxBytes: Long = 64 * 1024): String? {
         if (!urlAllowed(asset.apiUrl)) return null
         return try {
-            http.newCall(apiRequest(asset.apiUrl, token, "application/octet-stream")).execute().use { r ->
+            http.newCall(apiRequest(asset.apiUrl, "application/octet-stream")).execute().use { r ->
                 if (!r.isSuccessful) return null
                 val bytes = r.body.source().use { src ->
                     val buf = okio.Buffer()
@@ -87,13 +75,13 @@ class UpdateClient(
      * @return The SHA-256 of what was written, lowercase hex.
      * @throws IOException on HTTP errors, size-limit breaches or I/O failures; [dest] is not left behind.
      */
-    fun download(asset: ReleaseAsset, token: String?, dest: File, maxBytes: Long = MAX_APK, onProgress: (Long, Long) -> Unit = { _, _ -> }): String {
+    fun download(asset: ReleaseAsset, dest: File, maxBytes: Long = MAX_APK, onProgress: (Long, Long) -> Unit = { _, _ -> }): String {
         if (!urlAllowed(asset.apiUrl)) throw IOException("Refusing a non-HTTPS download URL")
         if (asset.size > maxBytes) throw IOException("Update is larger than ${maxBytes / (1024 * 1024)} MB")
         val part = File(dest.parentFile, dest.name + ".part")
         part.delete()
         try {
-            http.newCall(apiRequest(asset.apiUrl, token, "application/octet-stream")).execute().use { r ->
+            http.newCall(apiRequest(asset.apiUrl, "application/octet-stream")).execute().use { r ->
                 checkDownload(r)
                 val total = r.body.contentLength().takeIf { it > 0 } ?: asset.size
                 if (total > maxBytes) throw IOException("Update is larger than ${maxBytes / (1024 * 1024)} MB")
@@ -127,12 +115,11 @@ class UpdateClient(
         if (!r.isSuccessful) throw IOException("Download failed (${r.code})")
     }
 
-    private fun apiRequest(url: String, token: String?, accept: String): Request =
+    private fun apiRequest(url: String, accept: String): Request =
         Request.Builder().url(url)
             .header("Accept", accept)
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "Nebula-Updater")
-            .apply { if (!token.isNullOrBlank()) header("Authorization", "Bearer ${token.trim()}") }
             .build()
 
     private fun urlAllowed(url: String) = url.startsWith("https://") || (allowHttp && url.startsWith("http://"))

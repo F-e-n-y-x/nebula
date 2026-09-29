@@ -34,56 +34,48 @@ class UpdateClientTest {
     private fun client() = UpdateClient(apiBase = api.url("/").toString().trimEnd('/'), allowHttp = true)
     private fun sha(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
-    @Test fun `sends the token and api headers to github`() {
+    @Test fun `asks github anonymously with the api headers`() {
         api.enqueue(MockResponse.Builder().code(200).body("[]").build())
-        val r = client().fetchReleases("tok123")
+        val r = client().fetchReleases()
         assertEquals(CheckResult.Ok(emptyList()), r)
         val req = api.takeRequest()
         assertEquals("/repos/F-e-n-y-x/nebula/releases?per_page=20", req.target)
-        assertEquals("Bearer tok123", req.headers["Authorization"])
+        assertNull(req.headers["Authorization"])
         assertEquals("application/vnd.github+json", req.headers["Accept"])
         assertEquals("2022-11-28", req.headers["X-GitHub-Api-Version"])
     }
 
-    @Test fun `no token means no authorization header`() {
-        api.enqueue(MockResponse.Builder().code(200).body("[]").build())
-        client().fetchReleases(null)
-        assertNull(api.takeRequest().headers["Authorization"])
-    }
-
-    @Test fun `private repo without a token is never an update`() {
+    @Test fun `missing repo or errors are never an update`() {
         api.enqueue(MockResponse.Builder().code(404).body("{\"message\":\"Not Found\"}").build())
-        assertEquals(CheckResult.NeedsToken, client().fetchReleases(null))
+        assertEquals(CheckResult.NotFound, client().fetchReleases())
         api.enqueue(MockResponse.Builder().code(401).build())
-        assertEquals(CheckResult.BadToken, client().fetchReleases("bad"))
-        api.enqueue(MockResponse.Builder().code(404).build())
-        assertEquals(CheckResult.NoAccess, client().fetchReleases("wrong-scope"))
+        assertEquals(CheckResult.NotFound, client().fetchReleases())
         api.enqueue(MockResponse.Builder().code(403).addHeader("x-ratelimit-remaining", "0").build())
-        assertEquals(CheckResult.RateLimited, client().fetchReleases(null))
+        assertEquals(CheckResult.RateLimited, client().fetchReleases())
         api.enqueue(MockResponse.Builder().code(500).build())
-        assertTrue(client().fetchReleases("t") is CheckResult.Failed)
+        assertTrue(client().fetchReleases() is CheckResult.Failed)
     }
 
     @Test fun `refuses plain http in production mode`() {
         val prod = UpdateClient(apiBase = api.url("/").toString().trimEnd('/'))
-        assertTrue(prod.fetchReleases(null) is CheckResult.Failed)
+        assertTrue(prod.fetchReleases() is CheckResult.Failed)
         assertEquals(0, api.requestCount)
     }
 
-    @Test fun `token is not forwarded across a cross-host redirect`() {
+    @Test fun `follows the cross-host redirect to the download`() {
         val payload = ByteArray(5000) { (it % 251).toByte() }
         cdn.enqueue(MockResponse.Builder().code(200).body(okio.Buffer().write(payload)).build())
         api.enqueue(MockResponse.Builder().code(302).addHeader("Location", cdn.url("/signed/nebula.apk").toString()).build())
         val asset = ReleaseAsset(9, "nebula.apk", payload.size.toLong(), null, api.url("/repos/F-e-n-y-x/nebula/releases/assets/9").toString())
         val dest = File(dir, "nebula.apk")
-        val hash = client().download(asset, "secret-token", dest)
+        val hash = client().download(asset, dest)
 
         assertEquals(sha(payload), hash)
         assertTrue(dest.readBytes().contentEquals(payload))
         val first = api.takeRequest()
-        assertEquals("Bearer secret-token", first.headers["Authorization"])
+        assertNull(first.headers["Authorization"])
         assertEquals("application/octet-stream", first.headers["Accept"])
-        assertNull("Authorization leaked to the CDN host", cdn.takeRequest().headers["Authorization"])
+        assertEquals("/signed/nebula.apk", cdn.takeRequest().target)
     }
 
     @Test fun `download enforces the size cap and leaves nothing behind`() {
@@ -91,7 +83,7 @@ class UpdateClientTest {
         val asset = ReleaseAsset(1, "a.apk", -1, null, api.url("/a").toString())
         val dest = File(dir, "a.apk")
         try {
-            client().download(asset, null, dest, maxBytes = 1024)
+            client().download(asset, dest, maxBytes = 1024)
             throw AssertionError("expected a size error")
         } catch (e: IOException) {
             assertTrue(e.message!!.contains("larger"))
@@ -104,7 +96,7 @@ class UpdateClientTest {
         api.enqueue(MockResponse.Builder().code(200).body("short").build())
         val asset = ReleaseAsset(1, "a.apk", 100, null, api.url("/a").toString())
         try {
-            client().download(asset, null, File(dir, "a.apk"))
+            client().download(asset, File(dir, "a.apk"))
             throw AssertionError("expected an error")
         } catch (e: IOException) {
             assertTrue(e.message!!.contains("incomplete"))
@@ -113,9 +105,9 @@ class UpdateClientTest {
 
     @Test fun `fetches small checksum files`() {
         api.enqueue(MockResponse.Builder().code(200).body("${"c".repeat(64)}  a.apk\n").build())
-        val text = client().fetchText(ReleaseAsset(2, "a.apk.sha256", 80, null, api.url("/s").toString()), null)
+        val text = client().fetchText(ReleaseAsset(2, "a.apk.sha256", 80, null, api.url("/s").toString()))
         assertEquals("c".repeat(64), Releases.parseChecksumFile(text!!, "a.apk"))
         api.enqueue(MockResponse.Builder().code(200).body("x".repeat(100)).build())
-        assertNull(client().fetchText(ReleaseAsset(2, "big", 100, null, api.url("/s").toString()), null, maxBytes = 10))
+        assertNull(client().fetchText(ReleaseAsset(2, "big", 100, null, api.url("/s").toString()), maxBytes = 10))
     }
 }

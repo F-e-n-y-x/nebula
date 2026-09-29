@@ -33,7 +33,7 @@ class UpdateViewModel(
     private val client: UpdateClient = UpdateClient(),
 ) : ViewModel() {
     private val app = context.applicationContext
-    val settings = UpdateSettings(app)
+    val settings = UpdateSettings(app).also { it.forgetLegacyToken() }
     private val dir = File(app.cacheDir, "updates")
 
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
@@ -48,8 +48,7 @@ class UpdateViewModel(
         if (_state.value is UpdateState.Checking || _state.value is UpdateState.Downloading) return
         _state.value = UpdateState.Checking
         viewModelScope.launch {
-            val token = settings.token()
-            val result = withContext(Dispatchers.IO) { client.fetchReleases(token) }
+            val result = withContext(Dispatchers.IO) { client.fetchReleases() }
             settings.lastCheckMs = System.currentTimeMillis()
             _state.value = when (result) {
                 is CheckResult.Ok -> {
@@ -61,9 +60,7 @@ class UpdateViewModel(
                         else -> UpdateState.Available(next, apk)
                     }
                 }
-                CheckResult.NeedsToken -> UpdateState.Error("Couldn't check: the release repository is private and needs a GitHub token.")
-                CheckResult.BadToken -> UpdateState.Error("Couldn't check: GitHub rejected the token (wrong or expired).")
-                CheckResult.NoAccess -> UpdateState.Error("Couldn't check: the token can't read F-e-n-y-x/nebula (give it Contents: read).")
+                CheckResult.NotFound -> UpdateState.Error("Couldn't check: GitHub can't find the F-e-n-y-x/nebula releases.")
                 CheckResult.RateLimited -> UpdateState.Error("Couldn't check: GitHub rate limit reached. Try again later.")
                 is CheckResult.Failed -> UpdateState.Error("Couldn't check for updates (${result.message}).")
             }
@@ -80,9 +77,8 @@ class UpdateViewModel(
     }
 
     private fun fetchAndVerify(release: Release, apk: ReleaseAsset): UpdateState {
-        val token = settings.token()
         val fromFile = Releases.pickChecksumAsset(release.assets, apk)?.let { a ->
-            client.fetchText(a, token)?.let { Releases.parseChecksumFile(it, apk.name) }
+            client.fetchText(a)?.let { Releases.parseChecksumFile(it, apk.name) }
         }
         val expected = when (val e = Releases.expectedSha256(Releases.digestHex(apk), fromFile)) {
             is Releases.Expected.Hash -> e.hex
@@ -93,7 +89,7 @@ class UpdateViewModel(
         dir.listFiles()?.forEach { it.delete() } // one update at a time; drop older downloads
         val file = File(dir, "nebula-${release.version}.apk")
         val actual = try {
-            client.download(apk, token, file) { done, total -> _state.value = UpdateState.Downloading(release, done, total) }
+            client.download(apk, file) { done, total -> _state.value = UpdateState.Downloading(release, done, total) }
         } catch (e: IOException) {
             return UpdateState.Error("Download failed: ${e.message}")
         }
@@ -119,11 +115,6 @@ class UpdateViewModel(
             val error = withContext(Dispatchers.IO) { runCatching { UpdateInstaller.install(app, s.file) }.exceptionOrNull() }
             if (error != null) _state.value = UpdateState.Error("Couldn't start the installer: ${error.message}")
         }
-    }
-
-    fun setToken(token: String?) {
-        settings.setToken(token)
-        _state.value = UpdateState.Idle
     }
 
     fun setIncludePrereleases(on: Boolean) {
