@@ -47,7 +47,16 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 - 🎤 **Microphone** and 📋 **two-way clipboard** with the PC.
 - ⚙️ **Host commands** — run PC actions you define in Nova.
 
+**Touch controls**
+- 🎮 **On-screen controls editor** — place, resize and snap buttons, sticks, triggers and macros;
+  per-game profiles; import V+ layouts.
+- 👆 **Touch zones** — swipe-to-look camera, floating sticks, fire-and-look triggers; every finger
+  handled on its own, so you can move, look and shoot at once. Ready-made "GTA V: touch only" layout.
+
 **Everywhere**
+- ⭐ **Favourites** pinned to the top of the library, and a **diagnostics** hub (controller test,
+  stick calibration, capability report, log export).
+- 🔄 **Update checks** from releases, and links to both projects in About.
 - 📱 Phone, tablet and Android TV layouts, full D-pad support.
 - 🔧 Every Moonlight V+ setting, with search — and a test that fails the build if any setting shown
   does nothing.
@@ -56,16 +65,15 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 
 | Feature | Status |
 |---|---|
-| On-screen controls editor with per-game profiles | 🔨 Building |
+| PUBG-style shooter controls, shareable layout files (QR) and an online layout library | 🔨 Building |
 | TV home, Shelf and Auto home styles, tablet split view, quick-connect tile and widget | 🔨 Building |
-| Diagnostics: controller test, stick calibration, capability report, log export | 🔨 Building |
 | Adaptive bitrate and connection test | 🔨 Building |
-| Local cursor (instant pointer drawn on the device) and portrait streaming | 🔨 Building |
-| Per-game presets (resolution, bitrate, frame generation, controls) | 🔨 Building |
+| Local cursor (instant pointer drawn on the device) | 🔨 Building |
+| Per-game presets (resolution, bitrate, frame generation, controls) | ⏸ Paused |
 
 ### Planned
 
-Replay clips, auto keyboard when a PC text field is focused, and auto-update from releases.
+Replay clips and an auto keyboard when a PC text field is focused.
 
 ## Install
 
