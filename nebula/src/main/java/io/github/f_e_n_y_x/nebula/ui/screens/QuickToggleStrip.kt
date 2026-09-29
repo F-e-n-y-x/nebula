@@ -105,6 +105,16 @@ fun QuickToggleStrip(
     val s = Nebula.scale
     val shown = remember(tick) { QuickToggles.read(prefs.prefs.all) }
     var editing by remember { mutableStateOf(false) }
+    // The focused tile goes away when the editor opens (and the editor when it closes): move
+    // focus with it, or a remote's D-pad would be left on the footer.
+    val editorFirst = remember { FocusRequester() }
+    var wasEditing by remember { mutableStateOf(false) }
+    LaunchedEffect(editing) {
+        if (editing == wasEditing) return@LaunchedEffect
+        wasEditing = editing
+        kotlinx.coroutines.delay(60)
+        runCatching { if (editing) editorFirst.requestFocus() else firstFocus?.requestFocus() }
+    }
     var notice by remember { mutableStateOf<String?>(null) }
     // Frame generation's live state comes with the next stats window; show the tap at once.
     var fgPending by remember { mutableStateOf<Boolean?>(null) }
@@ -190,7 +200,7 @@ fun QuickToggleStrip(
             )
         }
         if (editing) {
-            QuickToggleEditor(shown, onChange = { prefs.put(QuickToggles.KEY, QuickToggles.encode(it)) }, onReset = { prefs.put(QuickToggles.KEY, null) })
+            QuickToggleEditor(shown, editorFirst, onChange = { prefs.put(QuickToggles.KEY, QuickToggles.encode(it)) }, onReset = { prefs.put(QuickToggles.KEY, null) })
         } else if (shown.isEmpty()) {
             Text("No quick settings. Edit to choose some.", style = Nebula.type.label, color = NebulaColors.textMuted)
         } else {
@@ -268,7 +278,7 @@ private fun QuickTile(t: QuickToggle, st: QuickTileState, icon: ImageVector, onC
 
 /** Show / hide and reorder: shown ones first, in order, with up and down; the rest below. */
 @Composable
-private fun QuickToggleEditor(shown: List<QuickToggle>, onChange: (List<QuickToggle>) -> Unit, onReset: () -> Unit) {
+private fun QuickToggleEditor(shown: List<QuickToggle>, firstFocus: FocusRequester, onChange: (List<QuickToggle>) -> Unit, onReset: () -> Unit) {
     val s = Nebula.scale
     val full = shown.size >= QuickToggles.MAX
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
@@ -276,7 +286,7 @@ private fun QuickToggleEditor(shown: List<QuickToggle>, onChange: (List<QuickTog
             "Choose up to ${QuickToggles.MAX} (${shown.size} shown). Up and down set the order.",
             style = Nebula.type.label, color = NebulaColors.textMuted,
         )
-        QuickToggles.editorOrder(shown).forEach { t -> key(t) {
+        QuickToggles.editorOrder(shown).forEachIndexed { n, t -> key(t) {
             val isShown = t in shown
             val canAdd = isShown || !full
             val index = shown.indexOf(t)
@@ -284,6 +294,7 @@ private fun QuickToggleEditor(shown: List<QuickToggle>, onChange: (List<QuickTog
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(6))) {
                 Row(
                     Modifier.weight(1f).heightIn(min = s.dp(48))
+                        .then(if (n == 0) Modifier.focusRequester(firstFocus) else Modifier)
                         .semantics { stateDescription = if (isShown) "Shown" else if (canAdd) "Hidden" else "Hidden, ${QuickToggles.MAX} already shown" }
                         .nebulaClickable(shape, { if (canAdd) onChange(QuickToggles.toggleShown(shown, t)) }, role = Role.Checkbox)
                         .background(NebulaColors.surface, shape)
