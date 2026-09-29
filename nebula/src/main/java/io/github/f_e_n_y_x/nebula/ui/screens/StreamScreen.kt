@@ -61,8 +61,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -739,52 +737,31 @@ private fun FloatBall(ui: StreamUiPrefs, sp: android.content.SharedPreferences, 
     var poke by remember { mutableIntStateOf(0) }
     var faded by remember { mutableStateOf(false) }
     LaunchedEffect(poke) { faded = false; delay(ui.floatBallHideMs.toLong().coerceAtLeast(500)); faded = true }
-    val align = when (ui.floatBallPosition) {
-        "top_left" -> Alignment.TopStart
-        "top_center" -> Alignment.TopCenter
-        "top_right" -> Alignment.TopEnd
-        "center_left" -> Alignment.CenterStart
-        "bottom_left" -> Alignment.BottomStart
-        "bottom_center" -> Alignment.BottomCenter
-        "bottom_right" -> Alignment.BottomEnd
-        else -> Alignment.CenterEnd
+    // One source of truth: the ball's spot as a share (0–1) of the free width and height. Presets
+    // are just starting spots; a dragged spot belongs to the preset it was dragged from.
+    var spot by remember(ui.floatBallPosition) {
+        mutableStateOf(FloatBallSpot.read(sp, ui.floatBallPosition) ?: FloatBallSpot.preset(ui.floatBallPosition))
     }
-    // A dragged spot belongs to the preset it was dragged from; picking another preset drops it.
-    var dragged by remember(ui.floatBallPosition) {
-        mutableStateOf(FloatBallSpot.read(sp, ui.floatBallPosition))
-    }
+    var dragging by remember { mutableStateOf(false) }
     BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(10))) {
-        val density = androidx.compose.ui.platform.LocalDensity.current
-        val ballPx = with(density) { s.dp(44).toPx() }
-        val maxX = (constraints.maxWidth - ballPx).coerceAtLeast(0f)
-        val maxY = (constraints.maxHeight - ballPx).coerceAtLeast(0f)
-        // While dragging: pixels from the top-left corner.
-        var live by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
-        // Where the preset alignment put the ball, so a first drag starts from there.
-        var startAt by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-        val spot = live ?: dragged?.let { androidx.compose.ui.geometry.Offset(it.first * maxX, it.second * maxY) }
+        val ballPx = with(androidx.compose.ui.platform.LocalDensity.current) { s.dp(44).toPx() }
+        val maxX = (constraints.maxWidth - ballPx).coerceAtLeast(1f)
+        val maxY = (constraints.maxHeight - ballPx).coerceAtLeast(1f)
         Box(
-            (if (spot != null) Modifier.offset { IntOffset(spot.x.roundToInt(), spot.y.roundToInt()) } else Modifier.align(align))
-                .size(s.dp(44)).alpha(if (faded && live == null) base * 0.4f else base)
+            Modifier.offset { IntOffset((spot.first * maxX).roundToInt(), (spot.second * maxY).roundToInt()) }
+                .size(s.dp(44)).alpha(if (faded && !dragging) base * 0.4f else base)
                 .background(Color(0xCC17171A), CircleShape).border(1.dp, NebulaColors.controlBorder, CircleShape)
-                .onGloballyPositioned { c -> if (live == null && dragged == null) startAt = c.positionInParent() }
-                .pointerInput(maxX, maxY) {
+                .pointerInput(maxX, maxY, ui.floatBallPosition) {
                     detectDragGestures(
-                        onDragStart = { poke++; live = spot ?: startAt },
+                        onDragStart = { dragging = true; poke++ },
                         onDrag = { change, amount ->
                             change.consume()
-                            val p = (live ?: startAt) + amount
-                            live = androidx.compose.ui.geometry.Offset(p.x.coerceIn(0f, maxX), p.y.coerceIn(0f, maxY))
+                            // Read the current spot at each event, never a copy from composition.
+                            val cur = spot
+                            spot = ((cur.first * maxX + amount.x) / maxX).coerceIn(0f, 1f) to ((cur.second * maxY + amount.y) / maxY).coerceIn(0f, 1f)
                         },
-                        onDragEnd = {
-                            live?.let { p ->
-                                val f = (if (maxX > 0) p.x / maxX else 0f) to (if (maxY > 0) p.y / maxY else 0f)
-                                dragged = f
-                                FloatBallSpot.write(sp, ui.floatBallPosition, f)
-                            }
-                            live = null; poke++
-                        },
-                        onDragCancel = { live = null },
+                        onDragEnd = { dragging = false; poke++; FloatBallSpot.write(sp, ui.floatBallPosition, spot) },
+                        onDragCancel = { dragging = false },
                     )
                 }
                 .pointerInput(ui.floatBallTap, ui.floatBallDoubleTap, ui.floatBallLongPress) {
@@ -806,6 +783,18 @@ internal object FloatBallSpot {
     const val KEY_X = "float_ball_drag_x"
     const val KEY_Y = "float_ball_drag_y"
     const val KEY_PRESET = "float_ball_drag_preset"
+
+    /** A preset position as a spot: edges are 0 or 1, centres 0.5 (default: centre right). */
+    fun preset(position: String): Pair<Float, Float> = when (position) {
+        "top_left" -> 0f to 0f
+        "top_center" -> 0.5f to 0f
+        "top_right" -> 1f to 0f
+        "center_left" -> 0f to 0.5f
+        "bottom_left" -> 0f to 1f
+        "bottom_center" -> 0.5f to 1f
+        "bottom_right" -> 1f to 1f
+        else -> 1f to 0.5f
+    }
 
     fun read(sp: android.content.SharedPreferences, preset: String): Pair<Float, Float>? {
         if (sp.getString(KEY_PRESET, null) != preset || !sp.contains(KEY_X) || !sp.contains(KEY_Y)) return null
