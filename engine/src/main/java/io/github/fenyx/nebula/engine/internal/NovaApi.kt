@@ -100,7 +100,7 @@ object NovaApi {
     }
 
     /**
-     * GET /nova/v1/running: `{running, app:{id,name,index}, since, display, connected_clients}`.
+     * GET /nova/v1/running: `{running, app:{id,name,index}, since, display, connected_clients, tracked?}`.
      * Returns null when nothing runs. `app.id` may be the GameStream id (a number) or Nova's own id;
      * numeric ids become [RunningApp.appId], others [RunningApp.novaId].
      */
@@ -118,6 +118,7 @@ object NovaApi {
             display = NovaDisplayMode.fromWire(o.optString("display")),
             connectedClients = if (o.has("connected_clients") && !o.isNull("connected_clients")) o.optInt("connected_clients", 0) else null,
             fromNova = true,
+            tracked = !(o.has("tracked") && !o.isNull("tracked") && !o.optBoolean("tracked", true)),
         )
     }
 

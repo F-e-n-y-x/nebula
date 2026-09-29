@@ -30,6 +30,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -63,6 +67,8 @@ class HostRepository(
     /** GameStream app id → matched Nova app, per host, from the last merged app list. */
     private val novaByAppId = ConcurrentHashMap<String, Map<String, NovaApp>>()
     private val pairing = ConcurrentHashMap.newKeySet<String>()
+    /** The freshest word on what each host runs (serverinfo poll, /nova/v1/running, /cancel). */
+    private val runningMarks = MutableStateFlow<Map<String, RunningMark>>(emptyMap())
 
     private val _hosts = MutableStateFlow<List<Host>>(emptyList())
     val hosts: StateFlow<List<Host>> = _hosts.asStateFlow()
@@ -123,6 +129,7 @@ class HostRepository(
             }
         }
         if (fresh != null) probeNova(hostId, details)
+        mark(hostId, if (fresh == null) RunningMark.unknown() else RunningMark.of(synchronized(details) { details.runningGameId }))
         publish()
         currentHost(hostId)
     }
@@ -221,13 +228,18 @@ class HostRepository(
                 null
             }
             if (body != null) {
-                val r = NovaApi.parseRunning(body) ?: return@withContext null
+                val parsed = NovaApi.parseRunning(body)
                 // Resolve a Nova-only id to the GameStream id the library uses.
-                if (r.appId == null && r.novaId != null) {
-                    val gs = novaByAppId[hostId]?.entries?.firstOrNull { it.value.id == r.novaId }?.key
-                        ?: novaApps[hostId]?.firstOrNull { it.id == r.novaId }?.gameStreamId?.toString()
-                    return@withContext r.copy(appId = gs)
-                }
+                val r = if (parsed != null && parsed.appId == null && parsed.novaId != null) {
+                    val gs = novaByAppId[hostId]?.entries?.firstOrNull { it.value.id == parsed.novaId }?.key
+                        ?: novaApps[hostId]?.firstOrNull { it.id == parsed.novaId }?.gameStreamId?.toString()
+                    parsed.copy(appId = gs)
+                } else parsed
+                // A fresh answer beats the cached serverinfo `currentgame` and the last app list.
+                val gsId = r?.appId?.toIntOrNull()
+                if (r == null || gsId != null) synchronized(details) { details.runningGameId = gsId ?: 0 }
+                mark(hostId, if (r == null) RunningMark.none() else RunningMark(r.appId, RunningMark.State.RUNNING))
+                publish()
                 return@withContext r
             }
         }
@@ -242,6 +254,7 @@ class HostRepository(
         if (details.activeAddress == null) throw IOException("${details.name} isn't reachable")
         if (!backend.quitApp(details)) throw HostRefusedException("${details.name} didn't close the game")
         synchronized(details) { details.runningGameId = 0 }
+        mark(hostId, RunningMark.none())
         publish()
     }
 
@@ -345,12 +358,26 @@ class HostRepository(
     }
 
     /** Emits the host's app list now and after every [appPollIntervalMs] while collected. */
-    fun apps(hostId: String): Flow<List<HostApp>> = flow {
-        while (currentCoroutineContext().isActive) {
-            loadApps(hostId)?.let { emit(it) }
-            delay(appPollIntervalMs)
+    fun apps(hostId: String): Flow<List<HostApp>> {
+        val polled = flow {
+            var last: List<HostApp>? = null
+            while (currentCoroutineContext().isActive) {
+                val at = System.nanoTime()
+                val list = loadApps(hostId)
+                if (list != null) last = list
+                // A failed fetch keeps the last list, but not its "running" (the host can't say now).
+                last?.let { emit(PolledApps(it, ok = list != null, atNs = at)) }
+                delay(appPollIntervalMs)
+            }
         }
-    }.distinctUntilChanged().flowOn(io)
+        return combine(polled, runningMarks.map { it[hostId] }.distinctUntilChanged()) { p, mark -> withRunning(p, mark) }
+            .filterNotNull().distinctUntilChanged().flowOn(io)
+    }
+
+    /** Records a fresh answer about what [hostId] runs; open app lists follow it at once. */
+    private fun mark(hostId: String, mark: RunningMark) {
+        runningMarks.update { it + (hostId to mark) }
+    }
 
     /** One app-list fetch; null when the host is unknown or the fetch failed. */
     suspend fun loadApps(hostId: String): List<HostApp>? = withContext(io) {
@@ -460,7 +487,35 @@ class HostRepository(
         _hosts.value = known.keys.mapNotNull(::currentHost).sortedBy { it.name.lowercase() }
     }
 
+    /** One app-list fetch: [ok] false when it failed and [apps] is the previous list. */
+    internal data class PolledApps(val apps: List<HostApp>, val ok: Boolean, val atNs: Long)
+
+    /** What a host was last known to run, and when (monotonic). */
+    internal data class RunningMark(val appId: String?, val state: State, val atNs: Long = System.nanoTime()) {
+        enum class State { RUNNING, NONE, UNKNOWN }
+
+        companion object {
+            fun none() = RunningMark(null, State.NONE)
+            fun unknown() = RunningMark(null, State.UNKNOWN)
+            fun of(runningGameId: Int) = if (runningGameId != 0) RunningMark(runningGameId.toString(), State.RUNNING) else none()
+        }
+    }
+
     companion object {
+        /**
+         * An app list's "running" flags, corrected by a newer [mark]: a quit or a fresh "nothing
+         * runs" clears them at once, and an unreachable host shows nothing running (it can't say).
+         */
+        internal fun withRunning(p: PolledApps, mark: RunningMark?): List<HostApp> {
+            if (mark != null && mark.atNs >= p.atNs) {
+                return when (mark.state) {
+                    RunningMark.State.NONE, RunningMark.State.UNKNOWN -> p.apps.map { it.copy(running = false) }
+                    RunningMark.State.RUNNING -> if (mark.appId == null) p.apps else p.apps.map { it.copy(running = it.id == mark.appId) }
+                }
+            }
+            return if (p.ok) p.apps else p.apps.map { it.copy(running = false) }
+        }
+
         /**
          * Joins the GameStream app list with Nova metadata. Nova entries are matched by the
          * GameStream id they report, then by name.

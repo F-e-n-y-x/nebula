@@ -91,6 +91,11 @@ data class RunningApp(
     val connectedClients: Int? = null,
     /** True when this came from /nova/v1/running (exact start time), false for serverinfo. */
     val fromNova: Boolean = false,
+    /**
+     * False when Nova started something it can't follow (a launcher that handed off and exited):
+     * it counts as running until quit. Hosts that don't say are tracked.
+     */
+    val tracked: Boolean = true,
 )
 
 /** A saved or discovered streaming host. */
