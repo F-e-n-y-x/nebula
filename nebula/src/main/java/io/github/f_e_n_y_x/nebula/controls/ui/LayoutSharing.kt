@@ -221,7 +221,7 @@ private fun newProfileId() = "p-" + UUID.randomUUID().toString().take(12)
  * screen when asked.
  */
 @Composable
-internal fun LayoutPreviewDialog(outcome: ProfileImport.Outcome, onAdd: (ControlsProfile) -> Unit, onDismiss: () -> Unit) {
+internal fun LayoutPreviewDialog(outcome: ProfileImport.Outcome, onAdd: (ControlsProfile, (ControlsProfile) -> ControlsProfile) -> Unit, onDismiss: () -> Unit) {
     val s = Nebula.scale
     val (aw, ah) = areaDp()
     val p = outcome.profile
@@ -232,7 +232,7 @@ internal fun LayoutPreviewDialog(outcome: ProfileImport.Outcome, onAdd: (Control
         onDismissRequest = onDismiss,
         containerColor = NebulaColors.raised,
         modifier = Modifier.testTag("layout-preview"),
-        title = { Text(p.name, style = Nebula.type.heading, color = NebulaColors.text, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        title = { Text(outcome.set?.set?.name ?: p.name, style = Nebula.type.heading, color = NebulaColors.text, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
             Column(Modifier.heightIn(max = s.dp(420)).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
                 LayoutThumbnail(p.landscape.map { it.thumb() }, meta?.aspect, Modifier.widthIn(max = s.dp(340)).border(1.dp, NebulaColors.border, RoundedCornerShape(s.dp(10))), labels = true)
@@ -245,6 +245,12 @@ internal fun LayoutPreviewDialog(outcome: ProfileImport.Outcome, onAdd: (Control
                     add("${p.landscape.size} controls")
                 }
                 Text(facts.joinToString(" · "), style = Nebula.type.label, color = NebulaColors.textSecondary)
+                outcome.set?.let { set ->
+                    Text(
+                        "Layout set · ${set.layouts.size} layouts: ${set.layouts.joinToString(", ") { it.name }}. The preview shows ${p.name}; a layout switch on screen moves between them.",
+                        style = Nebula.type.label, color = NebulaColors.text,
+                    )
+                }
                 meta?.description?.takeIf { it.isNotBlank() }?.let { Text(it, style = Nebula.type.body, color = NebulaColors.textSecondary) }
                 if (outcome.skipped.isNotEmpty()) {
                     Text("Left out (${outcome.skipped.size}):", style = Nebula.type.bodyStrong, color = NebulaColors.text)
@@ -258,7 +264,8 @@ internal fun LayoutPreviewDialog(outcome: ProfileImport.Outcome, onAdd: (Control
             }
         },
         confirmButton = {
-            NebulaButton("Add to my profiles", onClick = { onAdd(if (fit) LayoutFit.fit(p, aw, ah) else p) }, modifier = Modifier.testTag("layout-add"))
+            val fitter: (ControlsProfile) -> ControlsProfile = { q -> if (fit) LayoutFit.fit(q, aw, ah) else q }
+            NebulaButton(if (outcome.set != null) "Add the set" else "Add to my profiles", onClick = { onAdd(fitter(p), fitter) }, modifier = Modifier.testTag("layout-add"))
         },
         dismissButton = { NebulaButton("Cancel", onClick = onDismiss, style = ButtonStyle.Ghost) },
         shape = RoundedCornerShape(s.dp(18)),
@@ -274,13 +281,22 @@ internal fun LayoutPreviewDialog(outcome: ProfileImport.Outcome, onAdd: (Control
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) -> Unit, onDismiss: () -> Unit) {
+internal fun ShareLayoutDialog(
+    profile: ControlsProfile,
+    onMeta: (LayoutMeta) -> Unit,
+    onDismiss: () -> Unit,
+    /** Share this whole layout set (a version 2 set file) instead; [profile] is the layout to preview. */
+    set: io.github.f_e_n_y_x.nebula.controls.LayoutSet? = null,
+    setLayouts: List<ControlsProfile> = emptyList(),
+) {
     val s = Nebula.scale
     val ctx = LocalContext.current
     val (aw, ah) = areaDp()
     val device = deviceClass()
-    val base = profile.meta
-    var name by remember { mutableStateOf(base?.name?.takeIf { it.isNotBlank() } ?: profile.name) }
+    val base = if (set != null) set.meta else profile.meta
+    val target = if (set != null) LayoutFile.detectAll(setLayouts) else LayoutTarget.detect(profile.landscape, profile.look)
+    val title = set?.name ?: profile.name
+    var name by remember { mutableStateOf(base?.name?.takeIf { it.isNotBlank() } ?: title) }
     var author by remember { mutableStateOf(base?.author.orEmpty()) }
     var game by remember { mutableStateOf(base?.game?.name.orEmpty()) }
     var appId by remember { mutableStateOf(base?.game?.steamAppId?.toString().orEmpty()) }
@@ -289,16 +305,18 @@ internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) ->
     var library by remember { mutableStateOf(false) }
 
     fun meta() = LayoutMeta(
-        name = name.trim().ifBlank { profile.name }.take(LayoutFile.MAX_NAME),
+        name = name.trim().ifBlank { title }.take(LayoutFile.MAX_NAME),
         author = author.trim().take(LayoutFile.MAX_AUTHOR),
         game = game.trim().takeIf { it.isNotBlank() }?.let { GameRef(it.take(LayoutFile.MAX_GAME), appId.trim().toIntOrNull()?.takeIf { id -> id in 1..99_999_999 }) },
-        target = LayoutTarget.detect(profile.landscape, profile.look),
+        target = target,
         device = device,
         aspect = aw / ah,
         description = description.trim().take(LayoutFile.MAX_DESCRIPTION),
         tags = base?.tags.orEmpty(),
     )
-    fun file() = LayoutFile.encode(profile, meta().also(onMeta))
+    fun json(m: LayoutMeta, pretty: Boolean = true) = if (set != null) LayoutFile.encodeSet(set, setLayouts, m, pretty) else LayoutFile.encode(profile, m, pretty)
+    fun code(m: LayoutMeta) = LayoutFile.shareCodeOf(json(m, pretty = false))
+    fun file() = json(meta().also(onMeta))
 
     val saveDoc = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) {
@@ -313,7 +331,7 @@ internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) ->
                 .verticalScroll(rememberScrollState()).padding(s.dp(20)).testTag("share-layout"),
             verticalArrangement = Arrangement.spacedBy(s.dp(12)),
         ) {
-            PanelHeader("Share layout", profile.name, onDismiss)
+            PanelHeader(if (set != null) "Share layout set" else "Share layout", title, onDismiss)
             LayoutThumbnail(profile.landscape.map { it.thumb() }, aw / ah, Modifier.align(Alignment.CenterHorizontally).widthIn(max = s.dp(340)).border(1.dp, NebulaColors.border, RoundedCornerShape(s.dp(10))), labels = true)
             Field("Name") { TextInput(name, { name = it.take(LayoutFile.MAX_NAME) }, "Layout name") }
             Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
@@ -325,7 +343,8 @@ internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) ->
             }
             Field("Description") { TextInput(description, { description = it.take(LayoutFile.MAX_DESCRIPTION) }, "How it plays, which in-game settings it expects") }
             Text(
-                "${LayoutTarget.detect(profile.landscape, profile.look).label} · ${device.label} · ${profile.landscape.size} controls. Positions are shares of the screen, so it fits other devices.",
+                (if (set != null) "${setLayouts.size} layouts (${setLayouts.joinToString(", ") { it.name }}) · " else "") +
+                    "${target.label} · ${device.label} · ${profile.landscape.size} controls. Positions are shares of the screen, so it fits other devices.",
                 style = Nebula.type.label, color = NebulaColors.textMuted,
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
@@ -335,7 +354,7 @@ internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) ->
                     val uri = runCatching { writeCache(ctx, LayoutFile.fileName(m), json.toByteArray()) }.getOrNull()
                     val send = Intent(Intent.ACTION_SEND).setType("application/json")
                         .putExtra(Intent.EXTRA_SUBJECT, "${m.name} · Nebula layout")
-                        .putExtra(Intent.EXTRA_TEXT, LayoutFile.shareCode(profile, m))
+                        .putExtra(Intent.EXTRA_TEXT, code(m))
                         .apply { if (uri != null) { putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
                     ctx.startActivity(Intent.createChooser(send, "Share layout"))
                 })
@@ -345,10 +364,10 @@ internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) ->
                     Toast.makeText(ctx, "Layout copied", Toast.LENGTH_SHORT).show()
                 })
                 SmallAction("Copy code", Icons.Rounded.ContentCopy, {
-                    copyText(ctx, "Nebula layout", LayoutFile.shareCode(profile, meta().also(onMeta)))
+                    copyText(ctx, "Nebula layout", code(meta().also(onMeta)))
                     Toast.makeText(ctx, "Share code copied: paste it into Import on the other device", Toast.LENGTH_SHORT).show()
                 })
-                SmallAction("QR code", Icons.Rounded.QrCode2, { qr = LayoutFile.shareCode(profile, meta().also(onMeta)) })
+                SmallAction("QR code", Icons.Rounded.QrCode2, { qr = code(meta().also(onMeta)) })
                 SmallAction("Preview image", Icons.Rounded.Image, {
                     val m = meta()
                     val png = java.io.ByteArrayOutputStream().also { LayoutThumb.bitmap(profile.landscape.map { it.thumb() }, aw / ah).compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
@@ -365,7 +384,8 @@ internal fun ShareLayoutDialog(profile: ControlsProfile, onMeta: (LayoutMeta) ->
         QrDialog(code, meta().name) { qr = null }
     }
     if (library) {
-        ShareToLibraryDialog(profile, meta().also(onMeta), onDismiss = { library = false })
+        val m = meta().also(onMeta)
+        ShareToLibraryDialog(json(m), m, onDismiss = { library = false })
     }
 }
 
@@ -402,10 +422,9 @@ private fun QrDialog(code: String, name: String, onDismiss: () -> Unit) {
  * layouts don't fit in a link; then the JSON goes to the clipboard to paste.
  */
 @Composable
-private fun ShareToLibraryDialog(profile: ControlsProfile, meta: LayoutMeta, onDismiss: () -> Unit) {
+private fun ShareToLibraryDialog(json: String, meta: LayoutMeta, onDismiss: () -> Unit) {
     val s = Nebula.scale
     val ctx = LocalContext.current
-    val json = remember(profile, meta) { LayoutFile.encode(profile, meta) }
     val path = remember(meta) { io.github.f_e_n_y_x.nebula.controls.LibraryPaths.pathFor(meta) }
     fun open(url: String) = runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)) }
         .onFailure { Toast.makeText(ctx, "No browser to open GitHub", Toast.LENGTH_SHORT).show() }
@@ -513,7 +532,7 @@ internal fun LayoutBrowserDialog(store: ControlsStore, onAdded: (ControlsProfile
         val e = pick ?: return@LaunchedEffect
         downloading = e.id
         val r = withContext(Dispatchers.IO) { runCatching { fetcher(ctx).layout(url, e, newProfileId(), System.currentTimeMillis()) } }
-        r.onSuccess { parsed -> pending = ProfileImport.Outcome(parsed.profile, ProfileImport.Source.LAYOUT, meta = parsed.meta) }
+        r.onSuccess { parsed -> pending = ProfileImport.Outcome.of(parsed) }
             .onFailure { ex -> error = (ex as? ControlsFormatException)?.message ?: "Couldn't download ${e.meta.name}: ${ex.message ?: ex.javaClass.simpleName}" }
         downloading = null
         pick = null
@@ -586,9 +605,9 @@ internal fun LayoutBrowserDialog(store: ControlsStore, onAdded: (ControlsProfile
     }
 
     pending?.let { o ->
-        LayoutPreviewDialog(o, onAdd = { p ->
+        LayoutPreviewDialog(o, onAdd = { p, fit ->
             var added: ControlsProfile? = null
-            store.update { l -> l.add(p).also { added = it.second }.first }
+            store.update { l -> ProfileImport.addTo(l, o, p, fit).also { added = it.second }.first }
             pending = null
             added?.let(onAdded)
         }, onDismiss = { pending = null })
@@ -610,7 +629,7 @@ private fun LibraryCard(e: LibraryEntry, busy: Boolean, onClick: () -> Unit) {
         }
         Text(e.meta.name, style = Nebula.type.bodyStrong, color = NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
-            listOfNotNull(e.meta.author.takeIf { it.isNotBlank() }?.let { "by $it" }, e.meta.target.label, "${e.controls} controls").joinToString(" · "),
+            listOfNotNull(e.meta.author.takeIf { it.isNotBlank() }?.let { "by $it" }, e.meta.target.label, if (e.layouts.isNotEmpty()) "${e.layouts.size} layouts" else "${e.controls} controls").joinToString(" · "),
             style = Nebula.type.label, color = NebulaColors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
         if (e.meta.description.isNotBlank()) {
@@ -653,14 +672,14 @@ fun LayoutLinkHost() {
                 }
             }
             LayoutInbox.url.value = null
-            r.onSuccess { outcome = ProfileImport.Outcome(it.profile, ProfileImport.Source.LAYOUT, meta = it.meta) }
+            r.onSuccess { outcome = ProfileImport.Outcome.of(it) }
                 .onFailure { e -> error = (e as? ControlsFormatException)?.message ?: "Couldn't download the layout: ${e.message ?: e.javaClass.simpleName}" }
         }
     }
     outcome?.let { o ->
-        LayoutPreviewDialog(o, onAdd = { p ->
+        LayoutPreviewDialog(o, onAdd = { p, fit ->
             var added: ControlsProfile? = null
-            ControlsStore.get(ctx).update { l -> l.add(p).also { added = it.second }.first }
+            ControlsStore.get(ctx).update { l -> ProfileImport.addTo(l, o, p, fit).also { added = it.second }.first }
             outcome = null
             Toast.makeText(ctx, "Added ${added?.name}: pick it in the controls editor's Profiles", Toast.LENGTH_LONG).show()
         }, onDismiss = { outcome = null })

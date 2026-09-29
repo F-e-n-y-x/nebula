@@ -62,7 +62,7 @@ data class LayoutMeta(
 )
 
 /**
- * The shareable layout file (`"format": "nebula-layout", "version": 1`): one profile's layouts
+ * The shareable layout file (`"format": "nebula-layout"`, versions 1 and 2): one profile's layouts
  * plus [LayoutMeta] and the profile's touch settings, as data only. The JSON Schema lives in the
  * layout library (`schema/nebula-layout-1.schema.json`); [parse] enforces the same rules and more
  * (unique ids, macro length), strictly: an unknown key, kind, binding or out-of-range number
@@ -71,10 +71,18 @@ data class LayoutMeta(
  *
  * Written compactly: fields at their default are left out (readers fill them in), so small
  * layouts fit a QR code as a [shareCode].
+ *
+ * Version 2 (designs/specs/nebula-layout-v2.md, `schema/nebula-layout-2.schema.json`) adds layout
+ * sets ([encodeSet], [Parsed.set]), the [ElementKind.SWITCH] element and chord bindings
+ * (`key:0x10+key:0x45`). Files are written as version 1 whenever the content fits it, so older
+ * Nebula keeps reading them.
  */
 object LayoutFile {
     const val FORMAT = "nebula-layout"
-    const val VERSION = 1
+    /** The newest version read and written. */
+    const val VERSION = 2
+    const val MAX_LAYOUTS = LayoutSet.MAX_LAYOUTS
+    const val MAX_LAYOUT_NAME = 24
     /** Largest layout file accepted, in bytes (a full 64-control layout is ~20 KB). */
     const val MAX_BYTES = 256 * 1024
     const val MAX_ELEMENTS = 64
@@ -96,30 +104,103 @@ object LayoutFile {
     private val ELEMENT_KEYS = setOf(
         "id", "kind", "x", "y", "w", "h", "label", "opacity", "mode", "shape", "bindings", "stick", "click", "floating",
         "deadzone", "sensitivity", "steps", "tint", "zone", "acceleration", "invertY", "showRing", "keepWithController",
-        "lookThrough", "antiDeadzone", "sprint", "sprintAt", "runLock", "role",
+        "lookThrough", "antiDeadzone", "sprint", "sprintAt", "runLock", "role", "group",
     )
     private val STEP_KEYS = setOf("binding", "holdMs", "gapMs")
+    private val SET_TOP_KEYS = setOf("\$schema", "format", "version", "meta", "set", "layouts")
+    private val LAYOUT_KEYS = setOf("id", "name", "settings", "landscape", "portrait")
+    private val SET_KEYS = setOf("start", "cycle")
+    private val SWITCH_KEYS = setOf("id", "kind", "x", "y", "w", "h", "label", "opacity", "shape", "tint", "switchTo", "group")
+    private val LAYOUT_ID = Regex("^[a-z0-9][a-z0-9-]{0,31}$")
     private val ID = Regex("^[A-Za-z0-9_.:-]{1,40}$")
     private val TAG = Regex("^[a-z0-9][a-z0-9-]{0,23}$")
 
-    data class Parsed(val profile: ControlsProfile, val meta: LayoutMeta)
+    /**
+     * A read file. [profile] is the layout to preview (a set's start layout). For a set, [set]
+     * holds every layout, with their file ids as profile ids and switch targets
+     * ([ProfileLibrary.addSet] gives them real ids).
+     */
+    data class Parsed(val profile: ControlsProfile, val meta: LayoutMeta, val set: ParsedSet? = null, val version: Int = 1)
+
+    /** A set file's layouts; [set] names them by file id. */
+    data class ParsedSet(val set: LayoutSet, val layouts: List<ControlsProfile>)
 
     // ---------------------------------------------------------------- writing
 
     /** The file for [p]; [meta] defaults to what the profile carries, else its name. */
     fun encode(p: ControlsProfile, meta: LayoutMeta = p.meta ?: LayoutMeta(p.name, target = LayoutTarget.detect(p.landscape, p.look)), pretty: Boolean = true): String {
+        // A single layout has no other layout to name: such switches become the picker.
+        val q = p.copy(landscape = unnamed(p.landscape), portrait = p.portrait?.let(::unnamed))
         val o = JSONObject()
             .put("format", FORMAT)
-            .put("version", VERSION)
+            .put("version", versionFor(q))
             .put("meta", metaToJson(meta))
+        putLayout(o, q)
+        return if (pretty) o.toString(2) else o.toString()
+    }
+
+    /** 2 when [p] uses chords or switch elements, else 1 (readable by older Nebula). */
+    fun versionFor(p: ControlsProfile): Int = if ((p.landscape + p.portrait.orEmpty()).any(::needsV2)) 2 else 1
+
+    private fun needsV2(e: ControlElement): Boolean =
+        e.kind == ElementKind.SWITCH || e.group != null || (e.bindings + e.click + e.sprint + e.steps.map { it.binding }).any { it is Binding.Chord }
+
+    private fun unnamed(l: List<ControlElement>) = l.map { if (it.kind == ElementKind.SWITCH && it.switchTo is SwitchTarget.Layout) it.copy(switchTo = SwitchTarget.Picker) else it }
+
+    private fun putLayout(o: JSONObject, p: ControlsProfile) {
         val settings = JSONObject()
         p.outside?.let { settings.put("outside", it.id) }
         p.look?.let { settings.put("look", it.id) }
         if (settings.length() > 0) o.put("settings", settings)
         o.put("landscape", JSONArray().apply { p.landscape.forEach { put(compact(it)) } })
         p.portrait?.let { list -> o.put("portrait", JSONArray().apply { list.forEach { put(compact(it)) } }) }
+    }
+
+    /**
+     * A set file (version 2) for [set] and its [layouts] (the member profiles, any order).
+     * Layout ids come from the layouts' names; switch targets are rewritten to them, and a switch
+     * to a layout outside the set becomes the picker.
+     */
+    fun encodeSet(set: LayoutSet, layouts: List<ControlsProfile>, meta: LayoutMeta = set.meta ?: LayoutMeta(set.name, target = detectAll(layouts)), pretty: Boolean = true): String {
+        val members = set.members.mapNotNull { id -> layouts.firstOrNull { it.id == id } }.take(MAX_LAYOUTS)
+        if (members.isEmpty()) throw ControlsFormatException("The set has no layouts")
+        val fileIds = LinkedHashMap<String, String>()
+        for (p in members) {
+            val stem = slug(p.name).take(28).trim('-').ifBlank { "layout" }
+            var id = stem
+            var n = 2
+            while (id in fileIds.values) id = "$stem-${n++}"
+            fileIds[p.id] = id
+        }
+        fun retarget(l: List<ControlElement>) = l.map { e ->
+            val to = e.switchTo
+            if (e.kind == ElementKind.SWITCH && to is SwitchTarget.Layout) e.copy(switchTo = fileIds[to.id]?.let { SwitchTarget.Layout(it) } ?: SwitchTarget.Picker) else e
+        }
+        val names = HashSet<String>()
+        val arr = JSONArray()
+        for (p in members) {
+            var name = p.name.trim().take(MAX_LAYOUT_NAME).ifBlank { "Layout" }
+            var n = 2
+            while (!names.add(name.lowercase())) name = "${p.name.trim().take(MAX_LAYOUT_NAME - 3)} ${n++}"
+            val l = JSONObject().put("id", fileIds.getValue(p.id)).put("name", name)
+            putLayout(l, p.copy(landscape = retarget(p.landscape), portrait = p.portrait?.let(::retarget)))
+            arr.put(l)
+        }
+        val o = JSONObject()
+            .put("format", FORMAT)
+            .put("version", 2)
+            .put("meta", metaToJson(meta))
+        val setJson = JSONObject()
+        set.startId()?.let(fileIds::get)?.takeIf { it != fileIds.values.first() }?.let { setJson.put("start", it) }
+        val cycle = set.cycleOrder().mapNotNull(fileIds::get)
+        if (cycle.isNotEmpty() && cycle != fileIds.values.toList()) setJson.put("cycle", JSONArray(cycle))
+        if (setJson.length() > 0) o.put("set", setJson)
+        o.put("layouts", arr)
         return if (pretty) o.toString(2) else o.toString()
     }
+
+    /** What a set of layouts sends, all together. */
+    fun detectAll(layouts: List<ControlsProfile>): LayoutTarget = LayoutTarget.detect(layouts.flatMap { it.landscape + it.portrait.orEmpty() })
 
     fun metaToJson(m: LayoutMeta): JSONObject = JSONObject().apply {
         put("name", m.name)
@@ -139,6 +220,7 @@ object LayoutFile {
         val keep = setOf("id", "kind", "x", "y", "w", "h")
         val out = JSONObject()
         for (k in full.keys()) {
+            if (e.kind == ElementKind.SWITCH && k !in SWITCH_KEYS) continue
             val v = full.get(k)
             if (k in keep || !same(v, base.opt(k))) out.put(k, round(v))
         }
@@ -155,8 +237,16 @@ object LayoutFile {
     private fun round(v: Any): Any = if (v is Double || v is Float) Math.round((v as Number).toDouble() * 10000) / 10000.0 else v
 
     /** The compressed one-line form: [CODE_PREFIX] + base64url(deflate(minified JSON)). */
-    fun shareCode(p: ControlsProfile, meta: LayoutMeta = p.meta ?: LayoutMeta(p.name, target = LayoutTarget.detect(p.landscape, p.look))): String {
-        val bytes = encode(p, meta, pretty = false).toByteArray(Charsets.UTF_8)
+    fun shareCode(p: ControlsProfile, meta: LayoutMeta = p.meta ?: LayoutMeta(p.name, target = LayoutTarget.detect(p.landscape, p.look))): String =
+        shareCodeOf(encode(p, meta, pretty = false))
+
+    /** The share code of a set file. */
+    fun shareCodeOfSet(set: LayoutSet, layouts: List<ControlsProfile>, meta: LayoutMeta = set.meta ?: LayoutMeta(set.name, target = detectAll(layouts))): String =
+        shareCodeOf(encodeSet(set, layouts, meta, pretty = false))
+
+    /** [json] (a minified layout file) as a share code. */
+    fun shareCodeOf(json: String): String {
+        val bytes = json.toByteArray(Charsets.UTF_8)
         val d = Deflater(Deflater.BEST_COMPRESSION)
         d.setInput(bytes); d.finish()
         val out = ByteArrayOutputStream()
@@ -215,23 +305,81 @@ object LayoutFile {
         if (version !is Int) throw ControlsFormatException("The layout has no version")
         if (version > VERSION) throw ControlsFormatException("This layout was made by a newer Nebula; update Nebula to import it")
         if (version < 1) throw ControlsFormatException("Unknown layout version $version")
+        if (version >= 2 && root.has("layouts")) return parseSet(root, version, newId, now)
         unknownKeys(root, TOP_KEYS, "the file")
         val meta = parseMeta(root.opt("meta") as? JSONObject ?: throw ControlsFormatException("meta: missing"))
-        val settings = root.opt("settings")?.let { it as? JSONObject ?: throw ControlsFormatException("settings: must be an object") }
-        var outside: OutsideTouch? = null
-        var look: LookOutput? = null
-        if (settings != null) {
-            unknownKeys(settings, SETTINGS_KEYS, "settings")
-            settings.opt("outside")?.let { v -> outside = OutsideTouch.of(v as? String) ?: throw ControlsFormatException("settings.outside: unknown value $v") }
-            settings.opt("look")?.let { v -> look = LookOutput.of(v as? String) ?: throw ControlsFormatException("settings.look: unknown value $v") }
-        }
-        val landscape = parseElements(root.opt("landscape"), "landscape", required = true)
-        val portrait = root.opt("portrait")?.let { parseElements(it, "portrait", required = false) }
+        val (outside, look) = parseSettings(root.opt("settings"), "settings")
+        val ctx = Ctx(version, null)
+        val landscape = parseElements(root.opt("landscape"), "landscape", required = true, ctx)
+        val portrait = root.opt("portrait")?.let { parseElements(it, "portrait", required = false, ctx) }
         val profile = ControlsProfile(
             id = newId, name = meta.name, landscape = landscape, portrait = portrait,
             createdAtMs = now, updatedAtMs = now, origin = "library", outside = outside, look = look, meta = meta,
         )
-        return Parsed(profile, meta)
+        return Parsed(profile, meta, version = version)
+    }
+
+    /** What an element may use: the file's [version], and a set's layout ids (null in a single layout). */
+    private class Ctx(val version: Int, val layoutIds: Set<String>?)
+
+    private fun parseSettings(v: Any?, where: String): Pair<OutsideTouch?, LookOutput?> {
+        val settings = v?.let { it as? JSONObject ?: throw ControlsFormatException("$where: must be an object") } ?: return null to null
+        unknownKeys(settings, SETTINGS_KEYS, where)
+        val outside = settings.opt("outside")?.let { x -> OutsideTouch.of(x as? String) ?: throw ControlsFormatException("$where.outside: unknown value $x") }
+        val look = settings.opt("look")?.let { x -> LookOutput.of(x as? String) ?: throw ControlsFormatException("$where.look: unknown value $x") }
+        return outside to look
+    }
+
+    /** A version 2 set: up to [MAX_LAYOUTS] layouts, an optional start layout and cycle order. */
+    private fun parseSet(root: JSONObject, version: Int, newId: String, now: Long): Parsed {
+        listOf("settings", "landscape", "portrait").firstOrNull { root.has(it) }?.let {
+            throw ControlsFormatException("A layout set has no top-level \"$it\"; each layout has its own")
+        }
+        unknownKeys(root, SET_TOP_KEYS, "the file")
+        val meta = parseMeta(root.opt("meta") as? JSONObject ?: throw ControlsFormatException("meta: missing"))
+        val arr = root.opt("layouts") as? JSONArray ?: throw ControlsFormatException("layouts: must be a list")
+        if (arr.length() == 0) throw ControlsFormatException("layouts: the set has no layouts")
+        if (arr.length() > MAX_LAYOUTS) throw ControlsFormatException("layouts: at most $MAX_LAYOUTS")
+        val objs = (0 until arr.length()).map { i -> arr.opt(i) as? JSONObject ?: throw ControlsFormatException("layouts[$i]: must be an object") }
+        val ids = ArrayList<String>()
+        val names = HashSet<String>()
+        objs.forEachIndexed { i, l ->
+            unknownKeys(l, LAYOUT_KEYS, "layouts[$i]")
+            val id = (l.opt("id") as? String)?.takeIf { LAYOUT_ID.matches(it) } ?: throw ControlsFormatException("layouts[$i].id: lower-case letters, digits and -, up to 32")
+            if (id in ids) throw ControlsFormatException("layouts[$i].id: \"$id\" is used twice")
+            ids += id
+            val name = text(l, "name", "layouts[$i].name", MAX_LAYOUT_NAME, required = true)
+            if (!names.add(name.lowercase())) throw ControlsFormatException("layouts[$i].name: \"$name\" is used twice")
+        }
+        val ctx = Ctx(version, ids.toSet())
+        val layouts = objs.mapIndexed { i, l ->
+            val (outside, look) = parseSettings(l.opt("settings"), "layouts[$i].settings")
+            ControlsProfile(
+                id = ids[i], name = text(l, "name", "layouts[$i].name", MAX_LAYOUT_NAME, required = true),
+                landscape = parseElements(l.opt("landscape"), "layouts[$i].landscape", required = true, ctx),
+                portrait = l.opt("portrait")?.let { parseElements(it, "layouts[$i].portrait", required = false, ctx) },
+                createdAtMs = now, updatedAtMs = now, origin = "library", outside = outside, look = look,
+                // Shared on its own later, a layout keeps the set's details under its own name.
+                meta = meta.copy(name = "${meta.name.take(MAX_NAME - MAX_LAYOUT_NAME - 3)} · ${text(l, "name", "layouts[$i].name", MAX_LAYOUT_NAME, required = true)}"),
+            )
+        }
+        var start: String? = null
+        var cycle: List<String>? = null
+        root.opt("set")?.let { v ->
+            val st = v as? JSONObject ?: throw ControlsFormatException("set: must be an object")
+            unknownKeys(st, SET_KEYS, "set")
+            st.opt("start")?.let { x -> start = (x as? String)?.takeIf { it in ids } ?: throw ControlsFormatException("set.start: no layout \"${x.toString().take(32)}\"") }
+            st.opt("cycle")?.let { x ->
+                val a = x as? JSONArray ?: throw ControlsFormatException("set.cycle: must be a list")
+                if (a.length() !in 1..MAX_LAYOUTS) throw ControlsFormatException("set.cycle: 1 to $MAX_LAYOUTS layout ids")
+                val c = (0 until a.length()).map { j -> (a.opt(j) as? String)?.takeIf { it in ids } ?: throw ControlsFormatException("set.cycle[$j]: no layout \"${a.opt(j).toString().take(32)}\"") }
+                if (c.toSet().size != c.size) throw ControlsFormatException("set.cycle: each layout once")
+                cycle = c
+            }
+        }
+        val set = LayoutSet(id = "set-import", name = meta.name.take(LayoutSet.MAX_NAME), members = ids, cycle = cycle, start = start, meta = meta, origin = "library", createdAtMs = now, updatedAtMs = now)
+        val first = layouts.first { it.id == (set.startId() ?: ids.first()) }
+        return Parsed(first.copy(id = newId), meta, ParsedSet(set, layouts), version)
     }
 
     fun parseMeta(m: JSONObject): LayoutMeta {
@@ -259,7 +407,7 @@ object LayoutFile {
         )
     }
 
-    private fun parseElements(v: Any?, path: String, required: Boolean): List<ControlElement> {
+    private fun parseElements(v: Any?, path: String, required: Boolean, ctx: Ctx): List<ControlElement> {
         if (v == null) { if (required) throw ControlsFormatException("$path: missing") else return emptyList() }
         val a = v as? JSONArray ?: throw ControlsFormatException("$path: must be a list")
         if (required && a.length() == 0) throw ControlsFormatException("$path: the layout has no controls")
@@ -268,16 +416,27 @@ object LayoutFile {
         return (0 until a.length()).map { i ->
             val p = "$path[$i]"
             val o = a.opt(i) as? JSONObject ?: throw ControlsFormatException("$p: must be an object")
-            element(o, p).also { if (!ids.add(it.id)) throw ControlsFormatException("$p.id: \"${it.id}\" is used twice") }
+            element(o, p, ctx).also { if (!ids.add(it.id)) throw ControlsFormatException("$p.id: \"${it.id}\" is used twice") }
         }
     }
 
     /** One element, every field checked before [ProfileJson.elementFromJson] fills in defaults. */
-    private fun element(o: JSONObject, p: String): ControlElement {
-        unknownKeys(o, ELEMENT_KEYS, p)
+    private fun element(o: JSONObject, p: String, ctx: Ctx): ControlElement {
+        val ver = ctx.version
+        val isSwitch = ver >= 2 && o.opt("kind") == ElementKind.SWITCH.id
+        unknownKeys(o, if (isSwitch) SWITCH_KEYS else ELEMENT_KEYS, p)
         val id = (o.opt("id") as? String)?.takeIf { ID.matches(it) } ?: throw ControlsFormatException("$p.id: letters, digits and _ . : - only, up to 40")
         val kindId = o.opt("kind") as? String ?: throw ControlsFormatException("$p.kind: missing")
-        val kind = ElementKind.entries.firstOrNull { it.id == kindId } ?: throw ControlsFormatException("$p.kind: unknown control \"$kindId\"")
+        val kind = ElementKind.entries.firstOrNull { it.id == kindId && (ver >= 2 || it != ElementKind.SWITCH) }
+            ?: throw ControlsFormatException("$p.kind: unknown control \"${kindId.take(30)}\"")
+        if (isSwitch) o.opt("switchTo")?.let { t ->
+            val target = (t as? String)?.let(SwitchTarget::parse)?.takeIf { it !is SwitchTarget.Layout || LAYOUT_ID.matches(it.id) }
+                ?: throw ControlsFormatException("$p.switchTo: next, previous, picker or layout:<layout id>")
+            if (target is SwitchTarget.Layout) {
+                val ids = ctx.layoutIds ?: throw ControlsFormatException("$p.switchTo: \"${t}\" names a layout, but this file is a single layout, not a set")
+                if (target.id !in ids) throw ControlsFormatException("$p.switchTo: no layout \"${target.id}\" in this set")
+            }
+        }
         number(o.opt("x") ?: throw ControlsFormatException("$p.x: missing"), "$p.x", 0.0, 1.0)
         number(o.opt("y") ?: throw ControlsFormatException("$p.y: missing"), "$p.y", 0.0, 1.0)
         val sizeRange = if (kind == ElementKind.ZONE) ControlElement.MIN_ZONE.toDouble()..1.0 else ControlElement.MIN_SIZE_DP.toDouble()..ControlElement.MAX_SIZE_DP.toDouble()
@@ -291,14 +450,19 @@ object LayoutFile {
         enumId(o, "stick", p, StickOutput.entries.map { it.id })
         enumId(o, "zone", p, ZoneType.entries.map { it.id })
         enumId(o, "role", p, ElementRole.entries.map { it.id })
+        // Editor groups are a version 2 field; version 1 files from 0.4 development builds carried
+        // them too, so they're read there as well (they change nothing in play).
+        o.opt("group")?.let { g ->
+            if (g !is String || !ProfileJson.GROUP_ID.matches(g)) throw ControlsFormatException("$p.group: letters, digits and _ . : - only, up to 40")
+        }
         o.opt("bindings")?.let { v ->
             val a = v as? JSONArray ?: throw ControlsFormatException("$p.bindings: must be a list")
             val max = if (kind == ElementKind.COMBO) 5 else 4
             if (a.length() > max) throw ControlsFormatException("$p.bindings: at most $max")
-            for (i in 0 until a.length()) binding(a.opt(i), "$p.bindings[$i]")
+            for (i in 0 until a.length()) binding(a.opt(i), "$p.bindings[$i]", ver)
         }
-        o.opt("click")?.let { binding(it, "$p.click") }
-        o.opt("sprint")?.let { binding(it, "$p.sprint") }
+        o.opt("click")?.let { binding(it, "$p.click", ver) }
+        o.opt("sprint")?.let { binding(it, "$p.sprint", ver) }
         for (b in listOf("floating", "invertY", "showRing", "keepWithController", "lookThrough", "runLock")) {
             o.opt(b)?.let { if (it !is Boolean) throw ControlsFormatException("$p.$b: must be true or false") }
         }
@@ -317,7 +481,7 @@ object LayoutFile {
             for (i in 0 until a.length()) {
                 val s = a.opt(i) as? JSONObject ?: throw ControlsFormatException("$p.steps[$i]: must be an object")
                 unknownKeys(s, STEP_KEYS, "$p.steps[$i]")
-                binding(s.opt("binding") ?: throw ControlsFormatException("$p.steps[$i].binding: missing"), "$p.steps[$i].binding")
+                binding(s.opt("binding") ?: throw ControlsFormatException("$p.steps[$i].binding: missing"), "$p.steps[$i].binding", ver)
                 total += s.opt("holdMs")?.let { number(it, "$p.steps[$i].holdMs", 10.0, 5000.0) } ?: 60.0
                 total += s.opt("gapMs")?.let { number(it, "$p.steps[$i].gapMs", 0.0, 5000.0) } ?: 40.0
             }
@@ -345,12 +509,24 @@ object LayoutFile {
     private fun fmt(d: Double) = if (d == Math.floor(d)) d.toLong().toString() else d.toString()
 
     /** A binding token must be exactly one Nebula knows (`pad:4096`, `key:65`, `mouse:left`, `rt`, `wheel:up`, `none`). */
-    private fun binding(v: Any, path: String) {
+    private fun binding(v: Any, path: String, version: Int) {
         val t = (v as? String)?.trim()?.lowercase() ?: throw ControlsFormatException("$path: must be text")
         if (t == "none") return
-        val b = Binding.parse(t)
-        val ok = when (b) {
-            Binding.None -> false
+        if ('+' in t) {
+            if (version < 2) throw ControlsFormatException("$path: chords (\"${t.take(30)}\") need \"version\": 2")
+            val parts = t.split('+')
+            if (parts.size !in 2..Binding.MAX_CHORD) throw ControlsFormatException("$path: a chord joins 2 to ${Binding.MAX_CHORD} bindings")
+            if (parts.any { it == "none" }) throw ControlsFormatException("$path: a chord can't contain none")
+            parts.forEach { one(it, path) }
+            if (parts.map(Binding::parse).toSet().size != parts.size) throw ControlsFormatException("$path: a chord presses each binding once")
+            return
+        }
+        one(t, path)
+    }
+
+    private fun one(t: String, path: String) {
+        val ok = when (val b = Binding.parse(t)) {
+            Binding.None, is Binding.Chord -> false
             is Binding.Pad -> b.flag in PadFlags.names.keys
             else -> true
         }

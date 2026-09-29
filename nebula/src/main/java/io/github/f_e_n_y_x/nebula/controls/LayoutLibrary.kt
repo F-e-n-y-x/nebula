@@ -28,6 +28,8 @@ data class LibraryEntry(
     val controls: Int,
     /** Landscape controls for the thumbnail: kind, centre and size (zones as shares, else dp). */
     val preview: List<PreviewBox>,
+    /** A layout set's layout names (format 2); empty for a single layout. */
+    val layouts: List<String> = emptyList(),
 ) {
     val gameName: String get() = meta.game?.name ?: "Any game"
 
@@ -166,7 +168,8 @@ object LayoutIndex {
         for (k in listOf("name", "author", "game", "target", "device", "aspect", "description", "tags")) o.opt(k)?.let { metaJson.put(k, it) }
         val meta = LayoutFile.parseMeta(metaJson)
         val preview = o.optJSONArray("preview")?.let(::previewOf).orEmpty()
-        return LibraryEntry(id, meta, path, size, sha, (o.opt("controls") as? Int)?.coerceIn(0, 999) ?: preview.size, preview)
+        val layouts = o.optJSONArray("layouts")?.let { a -> (0 until minOf(a.length(), LayoutFile.MAX_LAYOUTS)).mapNotNull { (a.opt(it) as? String)?.take(LayoutFile.MAX_LAYOUT_NAME)?.takeIf { n -> n.isNotBlank() && n.none(Char::isISOControl) } } }.orEmpty()
+        return LibraryEntry(id, meta, path, size, sha, (o.opt("controls") as? Int)?.coerceIn(0, 999) ?: preview.size, preview, layouts)
     }
 
     private fun previewOf(a: JSONArray): List<PreviewBox> = (0 until minOf(a.length(), LayoutFile.MAX_ELEMENTS)).mapNotNull { i ->

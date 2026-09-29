@@ -85,6 +85,11 @@ class TouchRouter(
     private val input: ControlsInput,
     private val background: () -> BackgroundTouches? = { null },
     private val onVisual: (id: String, v: Visual) -> Unit = { _, _ -> },
+    /**
+     * A layout switch was tapped (the finger lifted on it). Called after the router has let go
+     * of that finger; the receiver releases everything else before it shows the next layout.
+     */
+    private val onSwitch: (ControlElement) -> Unit = {},
 ) {
     var layout: RouterLayout = RouterLayout.EMPTY
 
@@ -136,6 +141,11 @@ class TouchRouter(
         override val id get() = zoneId
     }
 
+    /** A finger on a layout switch: it fires when the finger lifts inside it. */
+    private class Switch(val e: ControlElement, val rect: RRect) : Owner() {
+        override val id get() = e.id
+    }
+
     private object Background : Owner() { override val id: String? = null }
     private object Ignored : Owner() { override val id: String? = null }
 
@@ -175,6 +185,7 @@ class TouchRouter(
             is Dpad -> dpadAt(owner, x, y)
             is Stick -> stickAt(owner, x, y)
             is Pad -> visual(owner.e.id, Visual(pressed = true))
+            is Switch -> visual(owner.e.id, Visual(pressed = true))
             is FloatStick -> { visual(owner.e.id, Visual(pressed = true, originX = owner.ox - owner.rect.left, originY = owner.oy - owner.rect.top)) }
             is Look -> owner.zoneId?.let { visual(it, Visual(pressed = true)) }
             Background -> bgDown(id, x, y, t)
@@ -200,6 +211,7 @@ class TouchRouter(
                 is Dpad -> dpadAt(o, f.x, f.y)
                 is Stick -> { o.travelled += hypot(dx, dy); stickAt(o, f.x, f.y) }
                 is Pad -> { o.travelled += hypot(dx, dy); input.touchpadMove(o.e, dx, dy) }
+                is Switch -> visual(o.e.id, Visual(pressed = o.rect.contains(f.x, f.y)))
                 is FloatStick -> floatAt(o, f.x, f.y)
                 is Look -> lookMove(o, dx, dy, dt, t)
                 Background -> { bgFingers[f.id] = f; bgMoved = true }
@@ -211,7 +223,9 @@ class TouchRouter(
 
     fun up(id: Int, t: Long) {
         val o = owners.remove(id) ?: return
+        val pos = last[id]
         release(id, o, t, cancelled = false)
+        if (o is Switch && pos != null && o.rect.contains(pos.first, pos.second)) onSwitch(o.e)
     }
 
     /** CANCEL, FLAG_CANCELED, focus loss: every finger lets go, nothing clicks. */
@@ -263,6 +277,7 @@ class TouchRouter(
                 }
                 ElementKind.TOUCHPAD -> Pad(e, t)
                 ElementKind.ZONE -> Ignored
+                ElementKind.SWITCH -> Switch(e, r)
             }
         }
         for ((e, r) in l.elements.filter { it.first.kind == ElementKind.ZONE }.asReversed()) {
@@ -323,6 +338,7 @@ class TouchRouter(
                     if (!cancelled && t - o.start < TAP_MS && o.travelled < o.radius * 0.25f) input.click(o.e)
                 }
             }
+            is Switch -> visual(o.e.id, Visual())
             is Pad -> {
                 visual(o.e.id, Visual())
                 if (!cancelled && t - o.start < TAP_MS && o.travelled < TAP_SLOP_DP * layout.density) input.click(o.e)

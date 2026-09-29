@@ -109,10 +109,8 @@ class ProfileModelTest {
         // The built-in can't be deleted.
         assertSame(l6, l6.delete(ControlsProfile.STANDARD_ID))
         assertEquals(
-            listOf(
-                "Standard gamepad", "Touch shooter · controller", "Touch shooter · keyboard & mouse", "GTA V · touch controls", "GTA V · touch gamepad",
-                "GTA V · controller + touch camera", "GTA V · controller + mouse camera", "Racing wheel", "Racing wheel copy 2",
-            ),
+            // Only Standard is bundled (0.4); the rest come from the layout library.
+            listOf("Standard gamepad", "Racing wheel", "Racing wheel copy 2"),
             l6.all.map { it.name },
         )
     }
@@ -138,7 +136,8 @@ class ProfileModelTest {
         val (_, b) = l1.add(ControlsProfile("x", "   ", emptyList()))
         assertEquals("Imported controls", b.name)
         // A library layout with a built-in's name is added beside it, not over it.
-        val (_, c) = l1.add(DefaultProfiles.touchShooterPad().copy(origin = "library"))
+        val withPresets = ProfileLibrary(l1.data, standard, { "p${++n}" }, { clock++ }, presets = DefaultProfiles.retired())
+        val (_, c) = withPresets.add(DefaultProfiles.touchShooterPad().copy(origin = "library"))
         assertEquals("Touch shooter · controller 2", c.name)
         assertFalse(c.isBuiltIn)
     }
@@ -150,12 +149,13 @@ class ProfileModelTest {
         val back = ProfileJson.decodeStore(ProfileJson.encodeStore(old))
         assertEquals(ControlsProfile.TOUCH_SHOOTER_KBM_ID, back.activeProfileId)
         assertEquals(mapOf("h:gta" to ControlsProfile.GTA_TOUCH_CONTROLS_ID, "h:cod" to ControlsProfile.TOUCH_SHOOTER_PAD_ID, "h:x" to "p-7"), back.games)
-        val l = lib(back)
+        // 0.4 no longer bundles them: the choices are kept as the user's own profiles.
+        val l = lib(RetiredPresets.adopt(back).first)
         assertEquals("GTA V · touch controls", l.resolve("h:gta").name)
         assertEquals("Touch shooter · keyboard & mouse", l.resolve("h:other").name)
         // An old id that reaches the library some other way still resolves.
-        assertEquals(ControlsProfile.TOUCH_SHOOTER_PAD_ID, lib().find("builtin:shooter-pubg-pad")?.id)
-        assertTrue(DefaultProfiles.presets().none { "pubg" in it.id || "pubg" in it.name.lowercase() || it.meta?.tags.orEmpty().any { t -> "pubg" in t } })
+        assertEquals(RetiredPresets.newIdFor(ControlsProfile.TOUCH_SHOOTER_PAD_ID), RetiredPresets.copyOf("builtin:shooter-pubg-pad")?.id)
+        assertTrue(DefaultProfiles.retired().none { "pubg" in it.id || "pubg" in it.name.lowercase() || it.meta?.tags.orEmpty().any { t -> "pubg" in t } })
     }
 
     @Test
@@ -176,7 +176,8 @@ class ProfileModelTest {
 
     @Test
     fun gtaPresetIsAReadOnlyTouchCameraKeptWithTheController() {
-        val l = lib()
+        // Read-only presets still work as such (0.4 bundles none; the retired GTA one is the example).
+        val l = ProfileLibrary(StoreData(), standard, { "p${++n}" }, { clock++ }, presets = DefaultProfiles.retired())
         val gta = l.find(ControlsProfile.GTA_ID)!!
         assertTrue(gta.isBuiltIn)
         assertTrue(gta.hasControllerZones())

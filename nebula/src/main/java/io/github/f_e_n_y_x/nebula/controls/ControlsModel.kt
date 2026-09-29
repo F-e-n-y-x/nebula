@@ -23,6 +23,18 @@ sealed interface Binding {
     data class Mouse(val button: MouseKey) : Binding
     /** One mouse-wheel notch per press (repeats while held). */
     data class Wheel(val up: Boolean) : Binding
+    /**
+     * Several bindings pressed together (layout format 2): Shift+E, LB+RB, Ctrl + left click.
+     * Pressed in order, released in reverse. [parts] are 2..[MAX_CHORD] plain bindings, all different.
+     */
+    data class Chord(val parts: List<Binding>) : Binding
+
+    /** What this presses: a chord's parts, one plain binding, or nothing for [None]. */
+    fun parts(): List<Binding> = when (this) {
+        None -> emptyList()
+        is Chord -> parts
+        else -> listOf(this)
+    }
 
     /** Stable text form used in Nebula's JSON: `pad:4096`, `key:65`, `mouse:left`, `lt`, `wheel:up`, `none`. */
     fun token(): String = when (this) {
@@ -32,11 +44,37 @@ sealed interface Binding {
         is Key -> "key:$vk"
         is Mouse -> "mouse:${button.id}"
         is Wheel -> if (up) "wheel:up" else "wheel:down"
+        is Chord -> parts.joinToString("+") { it.token() }
     }
 
     companion object {
+        const val MAX_CHORD = 4
+
+        /**
+         * [list] pressed together as one binding: nothing, the one binding, or a [Chord] (nested
+         * chords flattened, [None] and repeats dropped, at most [MAX_CHORD] parts).
+         */
+        fun chordOf(list: List<Binding>): Binding {
+            val flat = list.flatMap { it.parts() }.distinct().take(MAX_CHORD)
+            return when (flat.size) {
+                0 -> None
+                1 -> flat[0]
+                else -> Chord(flat)
+            }
+        }
+
         fun parse(token: String?): Binding {
-            val t = token?.trim()?.lowercase() ?: return None
+            val raw = token?.trim()?.lowercase() ?: return None
+            if ('+' in raw) {
+                val parts = raw.split('+').map { parseOne(it) }
+                // A damaged chord (a part Nebula doesn't know) is nothing rather than half a chord.
+                return if (parts.any { it == None } || parts.size > MAX_CHORD) None else chordOf(parts)
+            }
+            return parseOne(raw)
+        }
+
+        private fun parseOne(token: String): Binding {
+            val t = token.trim()
             val (head, arg) = t.split(':', limit = 2).let { it[0] to it.getOrNull(1) }
             return when (head) {
                 "pad" -> arg?.let(::parseInt)?.let { Pad(it) } ?: None
@@ -73,6 +111,37 @@ enum class ElementKind(val id: String, val label: String) {
     MACRO("macro", "Macro"),
     /** A screen area (e.g. the right half) for camera look or a floating stick; sized as a share of the screen. */
     ZONE("zone", "Touch zone"),
+    /** Goes to another layout of the game's layout set; sends nothing to the PC (layout format 2). */
+    SWITCH("switch", "Layout switch"),
+}
+
+/**
+ * Where a [ElementKind.SWITCH] goes. In a stored profile [Layout.id] is the target profile's id;
+ * in a layout file it is the file's layout id ([LayoutFile] maps between them).
+ */
+sealed interface SwitchTarget {
+    data object Next : SwitchTarget
+    data object Previous : SwitchTarget
+    /** A small list of the set's layouts. */
+    data object Picker : SwitchTarget
+    data class Layout(val id: String) : SwitchTarget
+
+    fun token(): String = when (this) {
+        Next -> "next"
+        Previous -> "previous"
+        Picker -> "picker"
+        is Layout -> "layout:$id"
+    }
+
+    companion object {
+        fun parse(token: String?): SwitchTarget? = when {
+            token == null || token == "next" -> Next
+            token == "previous" -> Previous
+            token == "picker" -> Picker
+            token.startsWith("layout:") && token.length > 7 -> Layout(token.substring(7))
+            else -> null
+        }
+    }
 }
 
 /** What a [ElementKind.ZONE] does with a finger. */
@@ -186,6 +255,15 @@ data class ControlElement(
     val runLock: Boolean = false,
     /** What the element is for (fire, aim, jump…); see [ElementRole]. */
     val role: ElementRole = ElementRole.NONE,
+    /**
+     * Editor-only: elements placed together from a ready-made group (ABXY, WASD…) share this id,
+     * so the editor moves, resizes, duplicates and deletes them as one until they're split.
+     * `"<template>:<random>"`, e.g. `"abxy:3f9a1c"`. Play ignores it: every member is an
+     * ordinary element. Null for a loose element. Layout format 2.
+     */
+    val group: String? = null,
+    /** Layout switch only: where it goes. */
+    val switchTo: SwitchTarget = SwitchTarget.Next,
 ) {
 
     /** Zones are sized as a share of the controls area; everything else in dp. */
@@ -299,6 +377,7 @@ fun newElement(kind: ElementKind, id: String, x: Float = 0.5f, y: Float = 0.5f):
         id, kind, x, y, 72f, 48f, label = "Macro", shape = ElementShape.PILL,
         steps = listOf(MacroStep(Binding.Pad(PadFlags.A)), MacroStep(Binding.Pad(PadFlags.B))),
     )
+    ElementKind.SWITCH -> ControlElement(id, kind, x, y, 88f, 34f, shape = ElementShape.PILL, opacity = 0.9f)
 }
 
 /** Gamepad button flags; the same values as the engine's `ControllerPacket` (and V+ Crown's `g` codes). */
@@ -343,6 +422,7 @@ fun Binding.describe(): String = when (this) {
     is Binding.Key -> VirtualKeys.name(vk)
     is Binding.Mouse -> button.label
     is Binding.Wheel -> if (up) "Wheel up" else "Wheel down"
+    is Binding.Chord -> parts.joinToString(" + ") { it.describe() }
 }
 
 /** A shooter layout: something fires and a finger can aim with it (tutorial, style picker). */

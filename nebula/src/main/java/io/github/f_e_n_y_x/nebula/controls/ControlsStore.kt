@@ -35,6 +35,22 @@ class ControlsStore private constructor(context: Context) {
     init {
         ProfilePrefsMigration.apply(prefs.prefs)
         scope.launch { for (d in writes) write(d) }
+        adoptRetiredPresets()
+    }
+
+    /** A default or game choice naming a preset 0.4 no longer bundles becomes a profile of the user's. */
+    private fun adoptRetiredPresets() {
+        val (d, moved) = RetiredPresets.adopt(_data.value, System.currentTimeMillis())
+        if (moved.isEmpty()) return
+        val all = prefs.prefs.all
+        val edit = prefs.prefs.edit()
+        for ((old, new) in moved) for (k in listOf(OutsideTouch.KEY, LookOutput.KEY)) {
+            (all[k + old] as? String)?.let { v -> if (all[k + new] == null) edit.putString(k + new, v) }
+        }
+        edit.apply()
+        _data.value = d
+        writes.trySend(d)
+        Log.i(TAG, "Kept ${moved.size} retired preset choice(s) as profiles: ${moved.values}")
     }
 
     fun standardOptions(): StandardOptions {
