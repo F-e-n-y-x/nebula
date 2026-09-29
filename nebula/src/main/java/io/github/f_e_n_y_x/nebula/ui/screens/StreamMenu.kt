@@ -464,7 +464,6 @@ private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: St
                 onClick = onQuit, style = ButtonStyle.Danger, icon = Icons.Rounded.PowerSettingsNew,
             )
         }
-        Text("Disconnect leaves the game running on your PC: resume it from Home. Back or B closes this menu.", style = Nebula.type.label, color = NebulaColors.textMuted)
     }
 }
 
