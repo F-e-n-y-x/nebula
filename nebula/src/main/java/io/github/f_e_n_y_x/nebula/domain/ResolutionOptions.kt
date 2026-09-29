@@ -95,6 +95,23 @@ object ResolutionOptions {
             .filter { it.kind != ResolutionOption.Kind.NATIVE && it.resolution !in shown }
     }
 
+    /**
+     * Settings → Stream's resolution list, as ("WxH" value, label) pairs: this screen's sizes first
+     * (the same "Native" / "75%" steps the live picker offers, in landscape), then [presets] (the
+     * catalog's fixed choices), then custom sizes, then [current] when it's none of those.
+     */
+    fun settingsChoices(device: Resolution, presets: List<Pair<String, String>>, custom: List<Resolution>, current: String?): List<Pair<String, String>> {
+        val out = mutableListOf<Pair<String, String>>()
+        fun add(value: String, label: String) { if (out.none { it.first == value }) out += value to label }
+        forScreen(device).forEach { add("${it.resolution.width}x${it.resolution.height}", "${if (it.kind == ResolutionOption.Kind.NATIVE) "This screen" else it.label} · ${it.size}") }
+        presets.forEach { (value, label) -> add(value, "$label · ${value.replace('x', '×')}") }
+        custom.sortedWith(compareBy({ it.width }, { it.height })).forEach { add("${it.width}x${it.height}", "Custom · ${it.size}") }
+        if (current != null && Regex("\\d+x\\d+").matches(current)) add(current, "Current · ${current.replace('x', '×')}")
+        return out
+    }
+
+    private val Resolution.size: String get() = "$width×$height"
+
     private tailrec fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
 
     /** The standard rates plus the current one and this screen's refresh rate, ascending. */
