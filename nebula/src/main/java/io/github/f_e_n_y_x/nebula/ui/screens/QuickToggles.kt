@@ -53,8 +53,8 @@ enum class QuickToggle(val id: String, val label: String) {
 /** Which toggles show and in what order, saved as a comma list under [KEY]. */
 object QuickToggles {
     const val KEY = "nebula_quick_toggles"
-    /** Two rows of four: fits the side panel and the portrait sheet without scrolling. */
-    const val MAX = 8
+    /** No real limit: every toggle can be pinned (rows of four; more than two rows scroll with the menu). */
+    val MAX: Int get() = QuickToggle.entries.size
     /** The last non-off gyro mode, so the toggle turns back on to what was used. */
     const val GYRO_LAST_KEY = "nebula_quick_gyro_last"
     /** The last non-off upscaler, likewise. */

@@ -306,7 +306,7 @@ private fun QuickToggleEditor(shown: List<QuickToggle>, firstFocus: FocusRequest
     val full = shown.size >= QuickToggles.MAX
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
         Text(
-            "Choose up to ${QuickToggles.MAX} (${shown.size} shown). Up and down set the order.",
+            "Choose which to show (${shown.size} of ${QuickToggles.MAX} shown). Up and down set the order.",
             style = Nebula.type.label, color = NebulaColors.textMuted,
         )
         QuickToggles.editorOrder(shown).forEachIndexed { n, t -> key(t) {

@@ -51,14 +51,16 @@ class QuickTogglesTest {
     }
 
     @Test
-    fun `show and hide, never past MAX`() {
+    fun `show and hide, every toggle can be pinned`() {
         val some = listOf(CONTROLS, GYRO)
         assertEquals(listOf(CONTROLS), QuickToggles.toggleShown(some, GYRO))
         assertEquals(listOf(CONTROLS, GYRO, MIC), QuickToggles.toggleShown(some, MIC))
-        val full = QuickToggle.entries.take(QuickToggles.MAX)
-        val extra = QuickToggle.entries.first { it !in full }
-        assertEquals(full, QuickToggles.toggleShown(full, extra))
-        assertEquals(full - full[2], QuickToggles.toggleShown(full, full[2]))
+        assertEquals(QuickToggle.entries.size, QuickToggles.MAX)
+        // Pin them one by one: all of them end up shown, in the order added.
+        val all = QuickToggle.entries.fold(emptyList<QuickToggle>()) { acc, t -> QuickToggles.toggleShown(acc, t) }
+        assertEquals(QuickToggle.entries.toList(), all)
+        assertEquals(all, QuickToggles.parse(QuickToggles.encode(all)))
+        assertEquals(all - all[2], QuickToggles.toggleShown(all, all[2]))
     }
 
     @Test
