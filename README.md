@@ -52,11 +52,11 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
   per-game profiles; import V+ layouts.
 - 👆 **Touch zones** — swipe-to-look camera, floating sticks, fire-and-look triggers; every finger
   handled on its own, so you can move, look and shoot at once.
-- 🔫 **PUBG-style shooter layouts** — left fire button, drag-to-aim fire, auto-sprint and run-lock,
-  aim / crouch / prone / peek, ready-made for GTA V, controller games and keyboard+mouse games.
+- 🎯 **Ready-made layouts** — genre templates (touch shooter for controller or keyboard & mouse)
+  and game layouts (GTA V), with a second fire button, drag-to-aim, sprint and run-lock built in.
 - 📤 **Share layouts** — export as a file, a one-line code or a QR code, and import on any device
   with a preview and "fit to this screen".
-- 🌐 **Layout library** — browse and download community layouts per game in the app
+- 🌐 **Layout library** — browse community layouts for any game or genre in the app
   (Profiles → Browse layouts), from [nebula-layouts](https://github.com/F-e-n-y-x/nebula-layouts).
   Made a good one? Tap *Share to library* in the app, or open a pull request there.
 
