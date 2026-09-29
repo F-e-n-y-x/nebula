@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
         // Not again when the activity is recreated with the same intent.
         if (savedInstanceState == null) handleResume(intent)
         val start = intent?.getStringExtra("start")
+        takeDemoTextField(intent)
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
         // A recreated activity already handled its launch link.
         if (savedInstanceState == null) takePlayLink(intent)
@@ -53,6 +54,12 @@ class MainActivity : ComponentActivity() {
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutInbox.offer(intent)
         handleResume(intent)
         takePlayLink(intent)
+        takeDemoTextField(intent)
+    }
+
+    /** QA on the demo build: `--es demo_text_field open|password|multiline|close`. Ignored elsewhere. */
+    private fun takeDemoTextField(intent: Intent?) {
+        intent?.getStringExtra("demo_text_field")?.let { container.demoTextField(it) }
     }
 
     /**

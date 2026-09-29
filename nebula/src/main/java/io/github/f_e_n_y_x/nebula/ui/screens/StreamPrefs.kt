@@ -57,6 +57,8 @@ data class StreamUiPrefs(
     val followRotation: Boolean,
     /** V+'s "Show latency message after streaming". */
     val latencyToast: Boolean,
+    /** What opens when a PC text field this device tapped takes focus. */
+    val textFieldKeyboard: TextFieldKeyboard = TextFieldKeyboard.DEVICE,
 ) {
     companion object {
         const val TRACKPAD_SPEED_KEY = "nebula_trackpad_speed"
@@ -134,6 +136,7 @@ data class StreamUiPrefs(
                 hdrMaxBrightness = b("checkbox_enable_hdr_high_brightness", false),
                 followRotation = b("checkbox_rotable_screen", false),
                 latencyToast = b("checkbox_enable_post_stream_toast", false),
+                textFieldKeyboard = TextFieldKeyboard.of(all[TextFieldKeyboard.KEY]),
             )
         }
     }

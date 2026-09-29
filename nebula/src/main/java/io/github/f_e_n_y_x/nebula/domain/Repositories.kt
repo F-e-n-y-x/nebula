@@ -181,6 +181,12 @@ interface StreamRepository {
     /** Host features the running stream asked for that Nebula doesn't do yet, by title. */
     val unsupportedFeatures: Flow<List<String>> get() = kotlinx.coroutines.flow.flowOf(emptyList())
 
+    /**
+     * The PC text field this device focused with a tap or click, or null when none has focus. Only
+     * hosts with remote text context (Nova 0.3+) report it; others stay null.
+     */
+    val textField: Flow<io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus?> get() = kotlinx.coroutines.flow.flowOf(null)
+
     /** The PC's cursor for drawing on this device while [setLocalCursor] is on. */
     val cursor: Flow<io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor> get() = kotlinx.coroutines.flow.flowOf(io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor())
     /**

@@ -292,6 +292,19 @@ enum class RemoteCursorMode {
  */
 class RemoteCursorImage(val id: Int, val width: Int, val height: Int, val hotspotX: Int, val hotspotY: Int, val argb: IntArray)
 
+/**
+ * A text field on the PC that took focus after this device tapped or clicked it (Nova and other
+ * hosts with remote text context). Nothing it holds is typed text: only which kind of field it is
+ * and, when known, where its caret or the tap is as a share of the video height ([focusY], 0 = top).
+ * A new [activation] means a new focus.
+ */
+data class RemoteTextFocus(
+    val activation: Long,
+    val password: Boolean = false,
+    val multiline: Boolean = false,
+    val focusY: Float? = null,
+)
+
 /** The local cursor: draw [image] at the pointer while [mode] is LOCAL and [visible]. */
 data class RemoteCursor(
     val mode: RemoteCursorMode = RemoteCursorMode.OFF,

@@ -19,6 +19,8 @@ import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.KeyboardAlt
+import androidx.compose.material.icons.outlined.KeyboardHide
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Mic
@@ -111,6 +113,8 @@ fun QuickToggleStrip(
     abrOn: Boolean = false,
     /** Turns adaptive bitrate on or off for this stream (and saves it). */
     onAbr: (Boolean) -> Unit = {},
+    /** The PC reports text field focus (Nova `text_context`, or a host that doesn't say). */
+    textFields: Boolean = true,
 ) {
     val s = Nebula.scale
     val shown = remember(tick) { QuickToggles.read(prefs.prefs.all) }
@@ -155,6 +159,7 @@ fun QuickToggleStrip(
         QuickToggle.MOUSE_BAR -> QuickTileState.switch(ui.mouseBar)
         QuickToggle.LAYOUT -> QuickTileState.layout(setLayout)
         QuickToggle.ABR -> QuickTileState.switch(abrOn)
+        QuickToggle.AUTO_KEYBOARD -> QuickTileState.autoKeyboard(ui.textFieldKeyboard, textFields)
     }
 
     fun tap(t: QuickToggle, st: QuickTileState) {
@@ -199,6 +204,7 @@ fun QuickToggleStrip(
             QuickToggle.MOUSE_BAR -> prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, !ui.mouseBar)
             QuickToggle.LAYOUT -> onNextLayout()
             QuickToggle.ABR -> onAbr(!abrOn)
+            QuickToggle.AUTO_KEYBOARD -> prefs.put(TextFieldKeyboard.KEY, TextFieldKeyboard.next(ui.textFieldKeyboard).id)
         }
     }
 
@@ -251,6 +257,7 @@ private fun icon(t: QuickToggle, st: QuickTileState): ImageVector = when (t) {
     QuickToggle.MOUSE_BAR -> Icons.Outlined.Mouse
     QuickToggle.LAYOUT -> Icons.Outlined.SwapHoriz
     QuickToggle.ABR -> Icons.Outlined.NetworkCheck
+    QuickToggle.AUTO_KEYBOARD -> if (st.on) Icons.Outlined.KeyboardAlt else Icons.Outlined.KeyboardHide
 }
 
 @Composable

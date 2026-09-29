@@ -270,6 +270,23 @@ class DemoHost(private val context: Context) {
 
     private val link = MutableStateFlow(StreamLink())
 
+    private val demoText = MutableStateFlow<io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus?>(null)
+    private var demoActivation = 0L
+
+    /**
+     * Pretend a text field on the demo PC took focus after a tap, or lost it: "open" (a search
+     * box near the top), "password", "multiline" (a note near the bottom) or "close". QA drives it
+     * with `am start … --es demo_text_field open`.
+     */
+    fun demoTextField(kind: String) {
+        demoText.value = when (kind) {
+            "open" -> io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus(++demoActivation, focusY = 0.18f)
+            "password" -> io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus(++demoActivation, password = true, focusY = 0.45f)
+            "multiline" -> io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus(++demoActivation, multiline = true, focusY = 0.85f)
+            else -> null
+        }
+    }
+
     /**
      * The demo stream reports the size it was asked for, and changes it live like a Nova host: a
      * switch takes about a second and a half; sizes wider than 4K "fail" so the rollback path can be
@@ -377,6 +394,9 @@ class DemoHost(private val context: Context) {
                 upscalerLabel = up.mode.label, upscaleMs = 1.1f, upscaleOut = "1920×1080 → 2340×1080",
             )
         }
+
+        // The demo PC focuses a "text field" on request (demoTextField), for keyboard QA.
+        override val textField: Flow<io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus?> get() = demoText
 
         // The demo PC "supports" the local cursor and sends a plain arrow.
         private val demoCursor = MutableStateFlow(io.github.f_e_n_y_x.nebula.domain.model.RemoteCursor())

@@ -198,6 +198,7 @@ fun StreamMenu(
                 firstFocus = firstQuick,
                 setLayout = setLayout, onNextLayout = actions.onNextLayout,
                 abrOn = stats?.abr != null, onAbr = actions.onAbr,
+                textFields = supports("text_context"),
             )
             Header(mode, stats)
             StatsBlock(stats, full = true)

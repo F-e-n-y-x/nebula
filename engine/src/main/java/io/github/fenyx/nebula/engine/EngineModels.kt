@@ -316,7 +316,6 @@ enum class MotionType(internal val wire: Byte) {
 enum class HostFeature(val title: String, val plannedFor: String, val why: String) {
     ADAPTIVE_TRIGGERS("Adaptive triggers", "0.4", "Android has no public API for DualSense trigger effects; they need the USB driver path."),
     DS5_HAPTICS("DualSense haptics", "0.4", "Host-authored DualSense haptics need the USB driver path."),
-    REMOTE_TEXT_CONTEXT("Keyboard on text focus", "0.4", "Opening the keyboard when a PC text field is focused isn't built yet."),
 }
 
 /** Why a stream ended. */
@@ -353,6 +352,8 @@ interface StreamListener {
     fun onFramegenEvent(event: io.github.fenyx.nebula.engine.framegen.FramegenEvent) {}
     /** The local cursor changed (see [StreamSession.setLocalCursor]); also in [StreamSession.cursor]. */
     fun onHostCursor(state: HostCursorState) {}
+    /** A PC text field took focus after this device's tap or click, or lost it (null); also in [StreamSession.textField]. */
+    fun onRemoteTextField(field: RemoteTextField?) {}
 }
 
 /** The on-disk artwork cache (posters, heroes, logos, screenshots), shared by every host. */

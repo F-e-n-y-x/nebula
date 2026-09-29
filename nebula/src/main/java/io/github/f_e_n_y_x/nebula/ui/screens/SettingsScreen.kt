@@ -387,12 +387,19 @@ private fun PcKeyboardSection() {
     val prefs = remember { LegacyPrefs(ctx) }
     val kb = remember { io.github.f_e_n_y_x.nebula.settings.KeyboardSettings(ctx) }
     var kind by remember { mutableStateOf(if (prefs.prefs.all[StreamUiPrefs.KEYBOARD_KIND_KEY] == KeyboardKind.PHONE.id) KeyboardKind.PHONE else KeyboardKind.PC) }
+    var textField by remember { mutableStateOf(TextFieldKeyboard.of(prefs.prefs.all[TextFieldKeyboard.KEY])) }
     var opacity by remember { mutableStateOf(io.github.f_e_n_y_x.nebula.settings.overlayOpacity(ctx)) }
     var page by remember { mutableStateOf(kb.read().page) }
     Column(Modifier.widthIn(max = s.dp(720)), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
         SectionTitle("PC keyboard")
         Setting("The keyboard gesture opens", "Three-finger tap, the float ball and the mouse bar's keyboard button. Both stay in the stream menu.") {
             Segmented(KeyboardKind.entries.map { it.label to it }, kind) { k -> kind = k; prefs.put(StreamUiPrefs.KEYBOARD_KIND_KEY, k.id) }
+        }
+        Setting(
+            "When you tap a text field on the PC",
+            "Opens this keyboard when a text field you tap or click on the PC takes focus, and closes it when the field loses focus. Over on-screen controls it shows a small \"Type on PC\" button instead. Needs a PC that reports text fields (Nova); it never sees what you type.",
+        ) {
+            Segmented(TextFieldKeyboard.entries.map { it.label to it }, textField) { k -> textField = k; prefs.put(TextFieldKeyboard.KEY, k.id) }
         }
         Setting("Layout", "Keys is a full compact PC keyboard; Nav, Numpad and Mini are smaller pages. Switch any time from the keyboard's bar.") {
             Segmented(io.github.f_e_n_y_x.nebula.input.KeyboardPage.entries.map { it.label to it.name }, page) { p -> page = p; kb.setPage(p) }

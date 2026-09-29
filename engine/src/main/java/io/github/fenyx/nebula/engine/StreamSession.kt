@@ -168,6 +168,19 @@ class StreamSession internal constructor(
         publishCursor(HostCursorState(LocalCursorStatus.FAILED))
     }
 
+    private val textFieldTracker = RemoteTextFieldTracker()
+    private val _textField = MutableStateFlow<RemoteTextField?>(null)
+
+    /**
+     * The PC text field this device's tap or click focused (control message 24), or null. The
+     * host sends it only for focus that follows this device's own input, and never any text.
+     */
+    val textField: StateFlow<RemoteTextField?> = _textField.asStateFlow()
+
+    /** True once connected when the host reports text field focus (`LI_FF_REMOTE_TEXT_CONTEXT`). */
+    val hostHasTextContext: Boolean
+        get() = isConnected && MoonBridge.getHostFeatureFlags() and MoonBridge.LI_FF_REMOTE_TEXT_CONTEXT != 0
+
     /** True once connected when the host offers the local cursor (`LI_FF_CURSOR_SHAPE`). */
     val hostHasLocalCursor: Boolean
         get() = isConnected && MoonBridge.getHostFeatureFlags() and MoonBridge.LI_FF_CURSOR_SHAPE != 0
@@ -556,6 +569,7 @@ class StreamSession internal constructor(
             main.removeCallbacks(graceExpired)
             main.removeCallbacks(cursorTimeout)
             _cursor.value = HostCursorState()
+            _textField.value = null
             holder.removeCallback(surfaceCallback)
             _backgrounded.value = false
             if (::link.isInitialized) link.stop()
@@ -610,6 +624,7 @@ class StreamSession internal constructor(
 
         override fun connectionStarted() {
             isConnected = true
+            textFieldTracker.reset()
             startAbr()
             onMain {
                 if (!ended.get()) link.onConnected()
@@ -694,7 +709,10 @@ class StreamSession internal constructor(
             if (state != null) onMain { cursorUpdated(state) } else LimeLog.warning("Local cursor: ignored a malformed shape $shapeId (${width}x$height)")
         }
 
-        override fun onRemoteTextContext(context: RemoteTextContext) = unsupported(HostFeature.REMOTE_TEXT_CONTEXT)
+        override fun onRemoteTextContext(context: RemoteTextContext) {
+            // Control thread; the tracker drops untrusted, stale and repeated packets.
+            if (textFieldTracker.onContext(context)) textFieldTracker.current.let { f -> onMain { if (!ended.get()) { _textField.value = f; listener.onRemoteTextField(f) } } }
+        }
 
         override fun onPerfUpdateV(performanceInfo: PerformanceInfo) {
             framegenController.onPerformanceInfo(performanceInfo)

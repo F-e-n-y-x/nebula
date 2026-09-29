@@ -24,7 +24,8 @@ enum class QuickToggle(val id: String, val label: String) {
     HAPTICS("haptics", "Haptics"),
     MOUSE_BAR("mouse_bar", "Mouse bar"),
     LAYOUT("layout", "Layout"),
-    ABR("abr", "Adaptive");
+    ABR("abr", "Adaptive"),
+    AUTO_KEYBOARD("auto_keyboard", "Auto keys");
 
     /** What the long name reads as in the editor and to TalkBack. */
     val longLabel: String get() = when (this) {
@@ -41,6 +42,7 @@ enum class QuickToggle(val id: String, val label: String) {
         MOUSE_BAR -> "Mouse buttons bar"
         LAYOUT -> "Next layout of the layout set"
         ABR -> "Adaptive bitrate"
+        AUTO_KEYBOARD -> "Keyboard for PC text fields"
     }
 
     companion object {
@@ -186,6 +188,11 @@ data class QuickTileState(
         }
 
         fun keyboard(kind: KeyboardKind) = QuickTileState(false, if (kind == KeyboardKind.PC) "PC keys" else "Device", kind = Kind.ACTION)
+
+        /** What opens on PC text field focus; greyed when the PC doesn't report text fields. */
+        fun autoKeyboard(k: TextFieldKeyboard, hostReports: Boolean): QuickTileState =
+            if (!hostReports) QuickTileState(false, "Not on this PC", enabled = false, reason = "This PC doesn't report text fields. Nova does from 0.3.", kind = Kind.CYCLE)
+            else QuickTileState(k != TextFieldKeyboard.OFF, k.short, kind = Kind.CYCLE)
 
         fun portrait(follow: Boolean?): QuickTileState =
             if (follow == null) QuickTileState(false, "Not here", enabled = false, reason = "Following the device rotation isn't available on this device.")

@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +44,7 @@ import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -347,6 +350,41 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         if (uiNow.keyboardKind == KeyboardKind.PHONE) inputView?.toggleKeyboard() else pcKeyboard = !pcKeyboard
     }
     val sink = remember(remote) { StreamKeySink(remote, pad, { uiNow }, keyboardOpen = { pcKeyboardNow }, onMenu = { menu = true }) }
+
+    // A PC text field this device tapped took focus (remote text context): open the keyboard
+    // chosen in Settings, and close it again when the field loses focus. Only what Nebula opened
+    // itself is closed; over on-screen controls (a game) it offers a chip instead of popping up.
+    val textField by container.stream.textField.collectAsStateWithLifecycle(null)
+    var autoOpened by remember { mutableStateOf<TextFieldKeyboard?>(null) }
+    var typeChip by remember { mutableStateOf(false) }
+    val openTextKeyboard: (TextFieldKeyboard) -> Unit = { k ->
+        typeChip = false
+        when (k) {
+            TextFieldKeyboard.DEVICE -> { inputView?.showKeyboard(); autoOpened = k }
+            TextFieldKeyboard.PC -> { pcKeyboard = true; autoOpened = k }
+            TextFieldKeyboard.OFF -> Unit
+        }
+    }
+    LaunchedEffect(textField?.activation, live) {
+        val field = textField
+        if (field == null || !live) {
+            typeChip = false
+            when (autoOpened) {
+                TextFieldKeyboard.DEVICE -> inputView?.hideKeyboard()
+                TextFieldKeyboard.PC -> pcKeyboard = false
+                else -> Unit
+            }
+            autoOpened = null
+            return@LaunchedEffect
+        }
+        val open = pcKeyboardNow || inputView?.keyboardVisible == true
+        when (AutoKeyboard.onFocus(uiNow.textFieldKeyboard, overlaysOn, oscShown, open)) {
+            AutoKeyboard.Action.OPEN_DEVICE -> openTextKeyboard(TextFieldKeyboard.DEVICE)
+            AutoKeyboard.Action.OPEN_PC -> openTextKeyboard(TextFieldKeyboard.PC)
+            AutoKeyboard.Action.OFFER -> typeChip = true
+            AutoKeyboard.Action.NONE -> Unit
+        }
+    }
     DisposableEffect(menu, live, editingControls) {
         activity.streamInput = if (overlaysOn) sink else null
         if (menu || editingControls) { pad.releaseAll(); inputView?.hideKeyboard() }
@@ -389,7 +427,15 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         // Virtual display already matches this screen: show it pixel for pixel unless told otherwise.
         val scale = if (mode == DisplayMode.VIRTUAL && !ui.scaleVirtual) ScaleMode.FIT else ui.scaleMode
         val base = videoRect(scale, cw, ch, vw, vh, ui.position, ui.offsetX, ui.offsetY)
-        val rect = zoomed(base, zoom, panX, panY, cw, ch)
+        val framed = zoomed(base, zoom, panX, panY, cw, ch)
+        // This device's keyboard over a focused PC text field: lift the picture so the line being
+        // typed on stays in view (the touch mapping moves with it).
+        val imeBottom = WindowInsets.ime.getBottom(density).toFloat()
+        val liftTarget = if (textField != null && imeBottom > 0f && overlaysOn) {
+            AutoKeyboard.liftFor(textField?.focusY, framed.top, framed.height, ch - imeBottom, ch, with(density) { 24.dp.toPx() })
+        } else 0f
+        val lift by animateFloatAsState(liftTarget, label = "text field lift")
+        val rect = if (lift != 0f) framed.copy(top = framed.top + lift) else framed
         input.rect = rect
         input.viewWidth = cw
         input.zoom = { factor, fx, fy ->
@@ -540,6 +586,14 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         }
         StreamMicIndicator(hostLink, visible = overlaysOn && !pcKeyboard, prefs = prefs)
         if (overlaysOn && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
+        // The PC's text field wants typing but a keyboard would cover the on-screen controls.
+        if (overlaysOn && typeChip && textField != null && !pcKeyboard && imeBottom <= 0f && uiNow.textFieldKeyboard != TextFieldKeyboard.OFF) {
+            TypeChip(
+                kind = uiNow.textFieldKeyboard, password = textField?.password == true,
+                onOpen = { openTextKeyboard(uiNow.textFieldKeyboard) }, onDismiss = { typeChip = false },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        }
         if (overlaysOn && ui.floatBall && !pcKeyboard) {
             FloatBall(
                 ui, prefs.prefs,

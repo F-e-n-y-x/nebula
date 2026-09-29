@@ -102,6 +102,9 @@ class AppContainer(context: Context) {
     /** Debug QA only: the demo host forgets its pairings so first-run setup can be replayed. */
     fun demoFirstRun() { if (isDemo) demo.forgetPairings() }
 
+    /** Demo build only: the demo PC focuses or leaves a text field (see [DemoHost.demoTextField]). */
+    fun demoTextField(kind: String) { if (isDemo) demo.demoTextField(kind) }
+
     @Volatile private var streaming = false
 
     /** Games left running on paired PCs: the home card and the "running on your PC" notification. */

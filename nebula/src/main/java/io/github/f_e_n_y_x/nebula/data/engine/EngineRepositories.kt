@@ -428,6 +428,12 @@ class EngineStreamRepository(
         s?.cursor?.map { it.toDomain() } ?: kotlinx.coroutines.flow.flowOf(RemoteCursor())
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    override val textField: Flow<io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus?> = current.flatMapLatest { s ->
+        s?.textField?.map { f -> f?.let { io.github.f_e_n_y_x.nebula.domain.model.RemoteTextFocus(it.activation, it.password, it.multiline, it.focusY) } }
+            ?: kotlinx.coroutines.flow.flowOf(null)
+    }
+
     override fun setLocalCursor(enabled: Boolean) {
         localCursor = enabled
         session?.setLocalCursor(enabled)
