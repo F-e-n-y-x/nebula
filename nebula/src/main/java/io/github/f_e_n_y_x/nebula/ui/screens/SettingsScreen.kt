@@ -456,14 +456,27 @@ private fun StreamSection(st: StreamSettings, update: ((StreamSettings) -> Strea
     val ctx = LocalContext.current
     val (dw, dh) = remember { deviceResolution(ctx) }
     var editCustom by remember { mutableStateOf(false) }
-    val custom = remember(editCustom) { customResolutions(ctx).map { (w, h) -> "${w}×$h" to Resolution(w, h) } }
+    // This screen's scaled sizes (90% … 50%, exact aspect), the same steps the live picker offers.
+    val screenSteps = remember(dw, dh) {
+        io.github.f_e_n_y_x.nebula.domain.ResolutionOptions.forScreen(Resolution(dw, dh))
+            .filter { it.kind == io.github.f_e_n_y_x.nebula.domain.ResolutionOption.Kind.SCREEN }
+            .map { "${it.label} ${it.size}" to it.resolution }
+    }
+    val custom = remember(editCustom) {
+        customResolutions(ctx).map { (w, h) -> "${w}×$h" to Resolution(w, h) }.filter { c -> screenSteps.none { it.second == c.second } }
+    }
     Column(Modifier.widthIn(max = s.dp(680)), verticalArrangement = Arrangement.spacedBy(s.dp(26))) {
-        Setting("Resolution", "Virtual display streams at exactly this size.") {
-            Segmented(
-                listOf("This device ${dw}×$dh" to Resolution.Native, "720p" to Resolution(1280, 720), "1080p" to Resolution(1920, 1080), "1440p" to Resolution(2560, 1440), "4K" to Resolution(3840, 2160)) +
-                    custom + ("Custom…" to CUSTOM_SENTINEL),
-                st.resolution,
-            ) { r -> if (r == CUSTOM_SENTINEL) editCustom = true else update { it.copy(resolution = r) } }
+        Setting("Resolution", "Virtual display streams at exactly this size. The percentages keep this screen's shape.") {
+            Column(verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+                Text("This screen", style = Nebula.type.label, color = NebulaColors.textMuted)
+                Segmented(listOf("Native ${dw}×$dh" to Resolution.Native) + screenSteps, st.resolution) { r -> update { it.copy(resolution = r) } }
+                Text("Standard", style = Nebula.type.label, color = NebulaColors.textMuted)
+                Segmented(
+                    listOf("720p" to Resolution(1280, 720), "1080p" to Resolution(1920, 1080), "1440p" to Resolution(2560, 1440), "4K" to Resolution(3840, 2160)) +
+                        custom + ("Custom…" to CUSTOM_SENTINEL),
+                    st.resolution,
+                ) { r -> if (r == CUSTOM_SENTINEL) editCustom = true else update { it.copy(resolution = r) } }
+            }
         }
         val nativeHz = remember { io.github.fenyx.nebula.engine.DisplayRefresh.nativeHz(ctx) }
         Setting("Frame rate", "Native is this screen's highest refresh rate ($nativeHz Hz). Higher than the screen can show doesn't look smoother.") {
