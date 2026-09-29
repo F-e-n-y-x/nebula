@@ -105,7 +105,8 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
-            <meta-data android:name="android.service.quicksettings.ACTIVE_TILE" android:value="true" />
+            <!-- Not an ACTIVE_TILE: an active tile stays "Unavailable" until the app asks for a
+                 refresh, and this one is cheap to render each time the panel opens. -->
         </service>
 
         <!-- Home-screen widget with the last three games (Glance). -->

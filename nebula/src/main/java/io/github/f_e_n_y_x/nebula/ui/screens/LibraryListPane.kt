@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.focusRequester
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.f_e_n_y_x.nebula.AppContainer
@@ -108,6 +109,7 @@ private fun ListPoster(g: Game, selected: Boolean, favourite: Boolean, onOpen: (
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
     var menu by remember { mutableStateOf(false) }
+    val cardFocus = rememberMenuFocus(menu)
     Column(Modifier.semantics { this.selected = selected }) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(2f / 3f)
@@ -115,6 +117,7 @@ private fun ListPoster(g: Game, selected: Boolean, favourite: Boolean, onOpen: (
                     // Keyboard: Enter plays straight away, Space (or a tap) shows the details.
                     if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyUp) onPlay(); true } else false
                 }
+                .focusRequester(cardFocus)
                 .gameKeys(onDetails = onOpen, onPlay = onPlay, onMenu = { menu = true })
                 .nebulaClickable(shape, onOpen, focusScale = 1.04f, onLongClick = { menu = true })
                 .border(if (selected) 2.dp else 1.dp, if (selected) NebulaColors.accentText else Color.White.copy(alpha = 0.1f), shape),

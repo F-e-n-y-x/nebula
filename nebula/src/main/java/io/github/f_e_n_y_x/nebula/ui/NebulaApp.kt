@@ -208,7 +208,6 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null, playLinks:
     LaunchedEffect(route) {
         if (route is Route.Stream) container.quick.onStreamOpened(route.hostId, route.gameId, route.mode)
     }
-    PlayLinkHandler(container, nav, playLinks)
 
     // Back at a section root goes home; NavDisplay handles the pops above that. Registered first,
     // so screen-level handlers (stream overlay, settings drill-down) take priority.
@@ -257,6 +256,8 @@ fun NebulaApp(container: AppContainer, startOverride: String? = null, playLinks:
         }
         if (rail) NebulaRail(section!!, go, transparent = overlayRail)
         io.github.f_e_n_y_x.nebula.controls.ui.LayoutLinkHost()
+        // Last, so its wake overlay draws over every screen.
+        PlayLinkHandler(container, nav, playLinks)
     }
 }
 

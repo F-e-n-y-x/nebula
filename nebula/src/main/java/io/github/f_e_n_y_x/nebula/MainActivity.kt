@@ -106,7 +106,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        return super.dispatchKeyEvent(event)
+        if (super.dispatchKeyEvent(event)) return true
+        // Outside a stream, a controller button no screen used stays in Nebula: unhandled, the
+        // system may act on it (Android TV sends some to the home screen). Guide/Mode still works.
+        return streamInput == null && KeyEvent.isGamepadButton(event.keyCode) && event.keyCode != KeyEvent.KEYCODE_BUTTON_MODE
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =

@@ -78,6 +78,7 @@ import io.github.f_e_n_y_x.nebula.ui.components.label
 import io.github.f_e_n_y_x.nebula.ui.screens.EmptyLibrary
 import io.github.f_e_n_y_x.nebula.ui.screens.FavouriteBadge
 import io.github.f_e_n_y_x.nebula.ui.screens.GameCardMenu
+import io.github.f_e_n_y_x.nebula.ui.screens.rememberMenuFocus
 import io.github.f_e_n_y_x.nebula.ui.screens.HomeActions
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.StarBorder
@@ -245,7 +246,7 @@ private fun TvHero(ui: HomeUi, g: Game, onPlay: () -> Unit, onDetails: () -> Uni
             TvActionButton("Details", onDetails, icon = Icons.Outlined.Info, modifier = Modifier.heightIn(min = 56.dp))
             val fav = g.id in ui.favouriteIds
             TvActionButton(
-                if (fav) "Favourite" else "Add to favourites", onToggleFavourite,
+                "Favourite", onToggleFavourite,
                 icon = if (fav) Icons.Rounded.Star else Icons.Rounded.StarBorder, modifier = Modifier.heightIn(min = 56.dp),
             )
         }
@@ -308,10 +309,11 @@ private fun TvRows(
                                     val k = "${row.key}/${g.id}"
                                     var menu by remember { mutableStateOf(false) }
                                     val fav = g.id in ui.favouriteIds
+                                    val cardFocus = rememberMenuFocus(menu)
                                     Box {
                                         PosterTvCard(
                                             g, fav,
-                                            Modifier.trackFocus(k, target, restore) { focusKey = k; onFocusGame(g) }
+                                            Modifier.focusRequester(cardFocus).trackFocus(k, target, restore) { focusKey = k; onFocusGame(g) }
                                                 .gameKeys(onDetails = { details(g) }, onPlay = { play(g, null) }, onMenu = { menu = true }),
                                             onClick = { play(g, null) }, onLongClick = { menu = true },
                                         )

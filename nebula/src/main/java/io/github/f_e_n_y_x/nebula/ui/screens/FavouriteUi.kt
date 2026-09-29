@@ -14,6 +14,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,6 +52,21 @@ fun FavouriteButton(favourite: Boolean, onToggle: () -> Unit, modifier: Modifier
         if (favourite) Icons.Rounded.Star else Icons.Rounded.StarBorder, favouriteLabel(favourite), onToggle, modifier,
         tint = if (favourite) FavouriteGold else NebulaColors.text,
     )
+}
+
+/**
+ * Gives D-pad focus back to a card when its menu closes: a dismissed popup leaves focus nowhere,
+ * and the next controller button would then fall through to the system. Attach the returned
+ * requester to the card's focusable element.
+ */
+@Composable
+fun rememberMenuFocus(menuOpen: Boolean): FocusRequester {
+    val card = remember { FocusRequester() }
+    var opened by remember { mutableStateOf(false) }
+    LaunchedEffect(menuOpen) {
+        if (menuOpen) opened = true else if (opened) runCatching { card.requestFocus() }
+    }
+    return card
 }
 
 /** What a long press (or held D-pad centre) on a game card opens. Anchor it inside the card's Box. */

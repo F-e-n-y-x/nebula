@@ -342,8 +342,10 @@ private fun ShelfPoster(g: Game, favourite: Boolean, modifier: Modifier, a: Shel
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(10))
     var menu by remember { mutableStateOf(false) }
+    val cardFocus = rememberMenuFocus(menu)
     Box(
         modifier
+            .focusRequester(cardFocus)
             .gameKeys(onDetails = { a.details(g) }, onPlay = { a.play(g, null) }, onMenu = { menu = true })
             .nebulaClickable(shape, { a.details(g) }, focusScale = 1.06f, onLongClick = { menu = true })
             .border(1.dp, Color.White.copy(alpha = 0.1f), shape),
