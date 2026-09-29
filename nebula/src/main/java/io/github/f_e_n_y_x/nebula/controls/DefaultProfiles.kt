@@ -166,14 +166,23 @@ object DefaultProfiles {
         )
     }
 
-    /** Suggested profile for a game, by name: GTA V gets its touch-controls layout. */
-    fun suggestedFor(gameName: String?): String? {
-        val n = gameName?.lowercase() ?: return null
-        return if ("grand theft auto" in n || Regex("""\bgta\b""").containsMatchIn(n)) ControlsProfile.GTA_TOUCH_CONTROLS_ID else null
-    }
-
     /** Ready-made profiles after Standard: genre templates first, then layouts made for one game. */
-    fun presets(): List<ControlsProfile> = listOf(touchShooterPad(), touchShooterKbm(), gtaTouchControls(), gtaTouchGamepad(), gtaTouchCamera(), gtaMouseCamera())
+    /**
+     * Ready-made read-only profiles offered beside Standard: none. Nebula bundles only the
+     * Standard controller; genre templates and game layouts (and layout sets) come from the
+     * layout library (Browse layouts) or are imported. The library source is pluggable
+     * ([LibrarySource], [LayoutIndex]).
+     */
+    fun presets(): List<ControlsProfile> = emptyList()
+
+    /** Ready-made layout sets: none bundled (GTA V's are in the layout library). */
+    fun presetSets(): List<LayoutSet> = emptyList()
+
+    /**
+     * The presets 0.3 bundled. No longer offered; kept so choices made with them survive
+     * ([RetiredPresets]), and as the source of the library's starter layouts.
+     */
+    fun retired(): List<ControlsProfile> = listOf(touchShooterPad(), touchShooterKbm(), gtaTouchControls(), gtaTouchGamepad(), gtaTouchCamera(), gtaMouseCamera())
 
     // ---------------------------------------------------------------- touch shooters
 

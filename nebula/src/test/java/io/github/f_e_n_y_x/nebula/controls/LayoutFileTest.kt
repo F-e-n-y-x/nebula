@@ -88,7 +88,7 @@ class LayoutFileTest {
         rejects("{\"format\":", "not valid JSON")
         rejects("[1,2]", "not a JSON object")
         rejects("{\"format\":\"nebula.controls.profile\"}", "format")
-        rejects(good().put("version", 2).toString(), "newer Nebula")
+        rejects(good().put("version", 3).toString(), "newer Nebula")
         rejects(good().put("version", "1").toString(), "no version")
         rejects(good().apply { remove("meta") }.toString(), "meta")
         rejects(good().put("landscape", JSONArray()).toString(), "no controls")

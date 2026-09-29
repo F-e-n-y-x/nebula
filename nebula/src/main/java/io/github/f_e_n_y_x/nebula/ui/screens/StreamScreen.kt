@@ -244,7 +244,19 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
     // On-screen controls: the game's profile, else the default, else the Standard pad (which follows Settings).
     val controlsStore = remember { ControlsStore.get(ctx) }
     val controlsData by controlsStore.data.collectAsState()
-    val controlsProfile = remember(controlsData, tick) { controlsStore.library(controlsData).resolve(gameKey) }
+    // With a layout set, the layout the stream is on (switch elements change it; it lasts the session).
+    var activeLayoutId by remember(gameKey) { mutableStateOf<String?>(null) }
+    val controlsLib = remember(controlsData, tick) { controlsStore.library(controlsData) }
+    val controlsActive = remember(controlsLib, activeLayoutId) { io.github.f_e_n_y_x.nebula.controls.ActiveLayout.of(controlsLib, gameKey, activeLayoutId) }
+    val controlsProfile = controlsActive.profile
+    var layoutPicker by remember { mutableStateOf(false) }
+    val switchContext = remember(controlsActive, controlsLib) {
+        io.github.f_e_n_y_x.nebula.controls.ui.SwitchContext(
+            current = controlsProfile.name,
+            names = controlsActive.layouts(controlsLib).associate { it.id to it.name },
+            inSet = controlsActive.set != null,
+        )
+    }
     // Edit mode over the live picture: nothing reaches the PC until it closes.
     var editingControls by remember { mutableStateOf(false) }
     LaunchedEffect(ended) { if (ended) editingControls = false }
@@ -475,6 +487,21 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
             OnScreenControls(
                 remote, { pad }, controlsProfile, ui.oscOpacity, zonesOnly = !oscShown, mixer = padMixer.takeIf { !oscShown },
                 routing = routing, outside = outsideMode, look = lookMode, background = { inputView?.background },
+                switchContext = switchContext,
+                onSwitch = { e ->
+                    val set = controlsActive.set
+                    if (set != null) {
+                        if (e.switchTo == io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Picker) layoutPicker = true
+                        else set.target(controlsProfile.id, e.switchTo)?.let { activeLayoutId = it }
+                    }
+                },
+            )
+        }
+        if (layoutPicker && controlsActive.set != null && live) {
+            io.github.f_e_n_y_x.nebula.controls.ui.LayoutPickerDialog(
+                layouts = controlsActive.layouts(controlsLib), current = controlsProfile.id, setName = controlsActive.set.name,
+                onPick = { id -> layoutPicker = false; activeLayoutId = id },
+                onDismiss = { layoutPicker = false },
             )
         }
         // First time a shooter layout is in play: a short tutorial (Style → "How shooter controls work" shows it again).

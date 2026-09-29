@@ -50,16 +50,8 @@ internal data class ControlStyle(val key: String, val title: String, val help: S
 
 internal fun controlStyles(standard: StandardOptions) = listOf(
     ControlStyle("standard", "Standard", "The gamepad: sticks, face buttons, bumpers and triggers.") { DefaultProfiles.standard(standard) },
-    ControlStyle(
-        "touch-shooter-pad", "Touch shooter · controller",
-        "For any shooter played with a controller: fire on both sides (drag the right one to aim), sprint past the ring, run lock, aim with a tap or a hold, lean.",
-    ) { DefaultProfiles.touchShooterPad() },
-    ControlStyle(
-        "touch-shooter-kbm", "Touch shooter · keyboard & mouse",
-        "The same for games played with keyboard and mouse: WASD stick, mouse look, left and right mouse buttons, Space, C, Z, R, F, Q / E lean, Alt free look.",
-    ) { DefaultProfiles.touchShooterKbm() },
-    ControlStyle("gta-touch-controls", "GTA V · touch controls", "The touch-shooter layout on GTA V's own controller map, with mouse look.") { DefaultProfiles.gtaTouchControls() },
-    ControlStyle("racing", "Racing (later)", "Steering, throttle and brake. Coming later.", null),
+    // Only the standard controller is bundled; shooter templates, GTA V and other game layouts
+    // are in the layout library (Profiles → Browse layouts).
 )
 
 /**
@@ -78,7 +70,7 @@ internal fun StylePickerDialog(standard: StandardOptions, onPick: (ControlsProfi
             verticalArrangement = Arrangement.spacedBy(s.dp(12)),
         ) {
             PanelHeader("Style", "Start from a layout", onDismiss)
-            Text("Replaces this layout (undo brings it back), sized for this screen. Save to keep it.", style = Nebula.type.label, color = NebulaColors.textMuted)
+            Text("Replaces this layout (undo brings it back), sized for this screen. Save to keep it. Layouts for shooters, GTA V and other games are in Profiles → Browse layouts.", style = Nebula.type.label, color = NebulaColors.textMuted)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
                 styles.forEach { st ->
                     val p = remember(st.key) { st.preset?.invoke() }

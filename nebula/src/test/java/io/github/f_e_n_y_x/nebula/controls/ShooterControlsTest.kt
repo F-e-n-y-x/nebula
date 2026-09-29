@@ -332,10 +332,10 @@ class ShooterControlsTest {
     }
 
     @Test
-    fun `presets are listed and GTA V is suggested its touch controls`() {
-        val ids = DefaultProfiles.presets().map { it.id }
+    fun `only Standard is bundled and the old presets are kept for adoption`() {
+        assertTrue(DefaultProfiles.presets().isEmpty())
+        val ids = DefaultProfiles.retired().map { it.id }
         assertTrue(ids.containsAll(listOf(ControlsProfile.GTA_TOUCH_CONTROLS_ID, ControlsProfile.TOUCH_SHOOTER_PAD_ID, ControlsProfile.TOUCH_SHOOTER_KBM_ID)))
-        assertEquals(ControlsProfile.GTA_TOUCH_CONTROLS_ID, DefaultProfiles.suggestedFor("Grand Theft Auto V"))
         assertNotNull(DefaultProfiles.gtaTouchControls().meta?.game?.steamAppId)
     }
 

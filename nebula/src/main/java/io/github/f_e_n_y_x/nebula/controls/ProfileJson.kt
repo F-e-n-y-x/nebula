@@ -40,8 +40,10 @@ object ProfileJson {
     data class StoreData(
         val profiles: List<ControlsProfile> = emptyList(),
         val activeProfileId: String = ControlsProfile.STANDARD_ID,
-        /** "hostId:gameId" → profile id. */
+        /** "hostId:gameId" → profile id or [LayoutSet] id. */
         val games: Map<String, String> = emptyMap(),
+        /** Layout sets made here or imported; their layouts are in [profiles]. */
+        val sets: List<LayoutSet> = emptyList(),
     )
 
     fun encodeStore(d: StoreData): String = JSONObject()
@@ -50,6 +52,7 @@ object ProfileJson {
         .put("activeProfileId", d.activeProfileId)
         .put("profiles", JSONArray().apply { d.profiles.forEach { put(profileToJson(it)) } })
         .put("games", JSONObject().apply { d.games.toSortedMap().forEach { (k, v) -> put(k, v) } })
+        .apply { if (d.sets.isNotEmpty()) put("sets", JSONArray().apply { d.sets.forEach { put(LayoutSet.toJson(it)) } }) }
         .toString()
 
     fun decodeStore(text: String): StoreData {
@@ -59,7 +62,9 @@ object ProfileJson {
         val profiles = root.optJSONArray("profiles")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(::profileFromJsonOrNull) } }.orEmpty()
         // Built-in ids that were renamed are moved over, so defaults and per-game choices keep working.
         val games = root.optJSONObject("games")?.let { g -> g.keys().asSequence().associateWith { ControlsProfile.currentId(g.optString(it)) }.filterValues { it.isNotBlank() } }.orEmpty()
-        return StoreData(profiles, ControlsProfile.currentId(root.optString("activeProfileId", ControlsProfile.STANDARD_ID)), games)
+        val sets = root.optJSONArray("sets")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(LayoutSet::fromJson) } }.orEmpty()
+            .map { st -> st.copy(members = st.members.map(ControlsProfile::currentId)) }
+        return StoreData(profiles, ControlsProfile.currentId(root.optString("activeProfileId", ControlsProfile.STANDARD_ID)), games, sets)
     }
 
     // ---- pieces ----
@@ -113,6 +118,9 @@ object ProfileJson {
         return (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(::elementFromJson) }
     }
 
+    /** A [ControlElement.group] id: the same characters as an element id, up to 40. */
+    val GROUP_ID = Regex("^[A-Za-z0-9_.:-]{1,40}$")
+
     fun elementToJson(e: ControlElement): JSONObject = JSONObject()
         .put("id", e.id)
         .put("kind", e.kind.id)
@@ -148,6 +156,8 @@ object ProfileJson {
         .put("sprintAt", e.sprintAt.toDouble())
         .put("runLock", e.runLock)
         .put("role", e.role.id)
+        .apply { e.group?.let { put("group", it) } }
+        .apply { if (e.kind == ElementKind.SWITCH) put("switchTo", e.switchTo.token()) }
 
     /** Null for an element this version doesn't know (a newer kind); the rest of the profile still loads. */
     fun elementFromJson(o: JSONObject): ControlElement? {
@@ -191,6 +201,8 @@ object ProfileJson {
             sprintAt = o.optDouble("sprintAt", ControlElement.DEFAULT_SPRINT_AT.toDouble()).toFloat(),
             runLock = o.optBoolean("runLock", false),
             role = ElementRole.of(o.optString("role")) ?: ElementRole.NONE,
+            group = o.optString("group").takeIf { GROUP_ID.matches(it) },
+            switchTo = SwitchTarget.parse(o.optString("switchTo").ifBlank { null }) ?: SwitchTarget.Next,
         ).clampedSize()
     }
 }

@@ -56,7 +56,12 @@ class ShooterTouchDeviceTest {
             .remove("nebula_osc_look_output:$profileId")
             .putString(LibrarySource.PREF_KEY, libraryUrl)
             .commit()
-        ControlsStore.get(ctx).update { it.setDefault(profileId) }
+        // The shooter presets are no longer bundled: play them as the user's own copy.
+        val id = io.github.f_e_n_y_x.nebula.controls.RetiredPresets.copyOf(profileId)?.let { p ->
+            ControlsStore.get(ctx).update { l -> if (l.find(p.id) == null) l.save(p).first else l }
+            p.id
+        } ?: profileId
+        ControlsStore.get(ctx).update { it.setDefault(id) }
         scenario = ActivityScenario.launch(Intent(ctx, MainActivity::class.java).putExtra("start", start))
         compose.waitUntil(20_000) {
             var landscape = false
@@ -253,7 +258,8 @@ class ShooterTouchDeviceTest {
         compose.onNodeWithContentDescription("Style: start from a layout").performClick()
         compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("style-picker").fetchSemanticsNode() }.isSuccess }
         shot("style-picker")
-        compose.onNodeWithTag("style:touch-shooter-pad").performScrollTo().performClick()
+        // Only Standard is bundled now; the tutorial is still one tap away.
+        compose.onNodeWithText("How shooter controls work", useUnmergedTree = true).performScrollTo().performClick()
         compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag("shooter-tutorial").fetchSemanticsNode() }.isSuccess }
         shot("tutorial")
         compose.onNodeWithTag("tutorial-done").performClick()

@@ -44,6 +44,23 @@ class ElementLook {
     val locked = mutableStateOf(false)
 }
 
+/**
+ * What layout switch elements show: the layout the stream is on and the set's layout names by
+ * profile id. [inSet] false (a single profile, or the editor without a set) draws them dimmed.
+ */
+data class SwitchContext(val current: String = "", val names: Map<String, String> = emptyMap(), val inSet: Boolean = false)
+
+val LocalSwitchContext = androidx.compose.runtime.staticCompositionLocalOf { SwitchContext() }
+
+/** A switch element's text: its own label, else the target's (or the current layout's) name. */
+fun switchText(e: ControlElement, c: SwitchContext): String {
+    if (e.label.isNotBlank()) return e.label
+    return when (val to = e.switchTo) {
+        is io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Layout -> c.names[to.id] ?: "Layout"
+        else -> c.current.ifBlank { "Layout" }
+    }
+}
+
 internal val Fill = Color(0x8C111113)
 internal val Edge = Color(0x66FFFFFF)
 internal val KnobColor = Color(0xCCEDEDEF)
@@ -68,6 +85,23 @@ fun ElementFace(e: ControlElement, look: ElementLook, latched: State<Boolean>, m
         },
         contentAlignment = Alignment.Center,
     ) {
+        if (e.kind == ElementKind.SWITCH) {
+            val c = LocalSwitchContext.current
+            val glyph = when (e.switchTo) {
+                io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Previous -> "‹ "
+                io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Picker -> "☰ "
+                is io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Layout -> "→ "
+                else -> ""
+            }
+            val tail = if (e.switchTo == io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next) " ›" else ""
+            Text(
+                glyph + switchText(e, c) + tail, style = t.label,
+                color = (e.tint?.let { Color(it.toInt()) } ?: NebulaColors.text).copy(alpha = if (c.inSet) 1f else 0.5f),
+                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+            return@Box
+        }
         val showLabel = e.kind != ElementKind.DPAD && !(e.kind == ElementKind.STICK && e.floating)
         if (showLabel && e.label.isNotBlank()) {
             val color = e.tint?.let { Color(it.toInt()) } ?: NebulaColors.text

@@ -15,6 +15,9 @@ import io.github.f_e_n_y_x.nebula.controls.OnScreenPad
 import io.github.f_e_n_y_x.nebula.data.engine.GamepadMapper
 import io.github.f_e_n_y_x.nebula.controls.ui.ControlsOverlay
 import io.github.f_e_n_y_x.nebula.controls.ui.LookBoard
+import io.github.f_e_n_y_x.nebula.controls.ui.LocalSwitchContext
+import io.github.f_e_n_y_x.nebula.controls.ui.SwitchContext
+import io.github.f_e_n_y_x.nebula.controls.ControlElement
 import io.github.f_e_n_y_x.nebula.controls.BackgroundTouches
 import io.github.f_e_n_y_x.nebula.controls.LookOutput
 import io.github.f_e_n_y_x.nebula.controls.OutsideTouch
@@ -56,6 +59,13 @@ fun OnScreenControls(
     look: LookOutput = LookOutput.STICK,
     /** The stream's trackpad layer, for background fingers in Trackpad / Touch mode. */
     background: () -> BackgroundTouches? = { null },
+    /**
+     * A layout switch was tapped. Every finger and held input has already been let go of when
+     * this runs, so the next layout starts clean.
+     */
+    onSwitch: (ControlElement) -> Unit = {},
+    /** What switch elements show (the layout the stream is on, the set's names). */
+    switchContext: SwitchContext = SwitchContext(),
 ) {
     // Timers (the 50 ms minimum hold, the resend, macros) need exact delays: a Handler-backed main
     // scope, not the composition's frame-driven one, which only runs on the next frame.
@@ -86,7 +96,18 @@ fun OnScreenControls(
     // Switching profile or orientation mid-press must not leave a key held on the PC.
     val backgroundNow by rememberUpdatedState(background)
     val board = remember { LookBoard() }
-    val router = remember(input) { TouchRouter(input, background = { backgroundNow() }, onVisual = board::apply) }
+    val onSwitchNow by rememberUpdatedState(onSwitch)
+    // The router is torn down before (and the next layout drawn after) the switch: nothing held
+    // on the PC survives into the next layout, and the lifting finger never lands on it.
+    lateinit var routerRef: TouchRouter
+    val router = remember(input) {
+        TouchRouter(input, background = { backgroundNow() }, onVisual = board::apply, onSwitch = { e ->
+            routerRef.cancel()
+            input.releaseAll()
+            board.clear()
+            onSwitchNow(e)
+        }).also { routerRef = it }
+    }
     LaunchedEffect(profile.id, orientation, zonesOnly) { router.cancel(); input.releaseAll() }
     DisposableEffect(router, routing) {
         routing?.router = router
@@ -103,7 +124,9 @@ fun OnScreenControls(
         val lay = remember(layout, placed, outside, look) { RouterLayout.of(layout, placed.first, placed.second, outside, look) }
         SideEffect { router.layout = lay }
     }
-    ControlsOverlay(layout, input, opacity.coerceIn(10, 100) / 100f, board, onArea = { r, d -> if (area?.first != r || area?.second != d) area = r to d })
+    androidx.compose.runtime.CompositionLocalProvider(LocalSwitchContext provides switchContext) {
+        ControlsOverlay(layout, input, opacity.coerceIn(10, 100) / 100f, board, onArea = { r, d -> if (area?.first != r || area?.second != d) area = r to d })
+    }
 }
 
 /** The router the stream's input layer should feed; set while on-screen controls are shown. Main thread. */

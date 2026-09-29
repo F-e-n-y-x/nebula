@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,15 +51,31 @@ fun ControlsMenuSection(gameKey: String, shown: Boolean, onShown: (Boolean) -> U
     ToggleRow("On-screen controls", "Virtual gamepad buttons over the stream.", shown, onShown)
     if (!shown || Nebula.form.isTv) return
     val active = lib.resolve(gameKey)
+    val activeSet = lib.resolveSet(gameKey)
     val own = lib.assignedTo(gameKey) != null
+    var setsOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var browsing by remember { androidx.compose.runtime.mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
         Text(
             if (own) "Controls profile · this game" else "Controls profile · the default, until you pick one for this game",
             style = Nebula.type.label, color = NebulaColors.textSecondary,
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            // Layout sets first: the game then switches between their layouts on screen.
+            lib.sets.forEach { set ->
+                val on = activeSet?.id == set.id
+                val shape = RoundedCornerShape(s.dp(10))
+                Box(
+                    Modifier.heightIn(min = s.dp(40)).semantics { selected = on }
+                        .nebulaClickable(shape, { store.update { it.assign(gameKey, set.id) } }, role = Role.RadioButton)
+                        .background(if (on) NebulaColors.accent else NebulaColors.surface, shape)
+                        .border(1.dp, if (on) NebulaColors.accentText else NebulaColors.controlBorder, shape)
+                        .padding(horizontal = s.dp(12), vertical = s.dp(9)),
+                    contentAlignment = Alignment.Center,
+                ) { Text("${set.name} · ${set.members.size} layouts", style = Nebula.type.label, color = if (on) Color.White else NebulaColors.text, maxLines = 1) }
+            }
             lib.all.forEach { p ->
-                val on = p.id == active.id
+                val on = activeSet == null && p.id == active.id
                 val shape = RoundedCornerShape(s.dp(10))
                 Box(
                     Modifier.heightIn(min = s.dp(40)).semantics { selected = on }
@@ -69,8 +87,24 @@ fun ControlsMenuSection(gameKey: String, shown: Boolean, onShown: (Boolean) -> U
                 ) { Text(p.name, style = Nebula.type.label, color = if (on) Color.White else NebulaColors.text, maxLines = 1) }
             }
         }
-        NebulaButton("Edit controls", onClick = onEdit, style = ButtonStyle.Secondary, icon = Icons.Outlined.Edit)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            NebulaButton("Edit controls", onClick = onEdit, style = ButtonStyle.Secondary, icon = Icons.Outlined.Edit)
+            NebulaButton("Browse layouts", onClick = { browsing = true }, style = ButtonStyle.Secondary, modifier = androidx.compose.ui.Modifier.testTag("menu-browse-layouts"))
+            NebulaButton("Layout sets", onClick = { setsOpen = true }, style = ButtonStyle.Secondary, modifier = androidx.compose.ui.Modifier.testTag("open-layout-sets"))
+        }
+        if (lib.all.size == 1 && lib.sets.isEmpty()) {
+            Text(
+                "Only the standard controller is built in. Browse layouts has layouts and layout sets made for games and genres; you can also import a file, share code or QR code in Edit controls → Profiles.",
+                style = Nebula.type.label, color = NebulaColors.textMuted,
+            )
+        }
     }
+    if (setsOpen) LayoutSetsDialog(gameKey, onDismiss = { setsOpen = false })
+    // A layout (or set) added here is given to this game at once.
+    if (browsing) LayoutBrowserDialog(store, onAdded = { a ->
+        browsing = false
+        store.update { l -> l.assign(gameKey, l.setsOf(a.id).firstOrNull()?.id ?: a.id) }
+    }, onDismiss = { browsing = false })
 }
 
 /**
@@ -107,6 +141,18 @@ fun ControlsSettingsSection(onOpenEditor: () -> Unit) {
                 ) { Text(p.name, style = Nebula.type.label, color = if (on) Color.White else NebulaColors.text, maxLines = 1) }
             }
         }
+        var setsOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
+        if (lib.sets.isNotEmpty()) {
+            Text("${lib.sets.size} layout set${if (lib.sets.size == 1) "" else "s"}: ${lib.sets.joinToString(", ") { it.name }}. Give one to a game from the stream menu.", style = Nebula.type.label, color = NebulaColors.textMuted)
+        }
+        if (lib.all.size == 1 && lib.sets.isEmpty()) {
+            Text(
+                "Only the standard controller is built in. Get layouts and layout sets made for your games from Browse layouts (in the controls editor's Profiles or the stream menu), or import a file, share code or QR code.",
+                style = Nebula.type.label, color = NebulaColors.textMuted, modifier = Modifier.testTag("controls-empty"),
+            )
+        }
+        if (!Nebula.form.isTv) NebulaButton("Layout sets", onClick = { setsOpen = true }, style = ButtonStyle.Secondary)
+        if (setsOpen) LayoutSetsDialog(null, onDismiss = { setsOpen = false })
         val games = data.games.size
         if (games > 0) Text("$games game${if (games == 1) " has its" else "s have their"} own profile.", style = Nebula.type.label, color = NebulaColors.textMuted)
         if (Nebula.form.isTv) {

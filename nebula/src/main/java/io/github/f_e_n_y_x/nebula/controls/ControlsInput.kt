@@ -214,7 +214,9 @@ class ControlsInput(
     // ---- bindings ----
 
     /** Makes [owner] hold exactly [binds]: presses what's new, releases what it no longer holds. */
-    private fun hold(owner: String, binds: List<Binding>) {
+    private fun hold(owner: String, requested: List<Binding>) {
+        // Chords are held as their parts, so Shift+E and a separate Shift share one count.
+        val binds = requested.flatMap { it.parts() }.distinct()
         val before = heldBy[owner].orEmpty()
         val gone = before.filter { it !in binds }
         val added = binds.filter { it !in before }
@@ -228,6 +230,7 @@ class ControlsInput(
     }
 
     internal fun press(b: Binding) {
+        if (b is Binding.Chord) { b.parts.forEach(::press); return }
         val key = b.token()
         val n = (counts[key] ?: 0) + 1
         counts[key] = n
@@ -235,6 +238,7 @@ class ControlsInput(
     }
 
     internal fun release(b: Binding) {
+        if (b is Binding.Chord) { b.parts.asReversed().forEach(::release); return }
         val key = b.token()
         val n = (counts[key] ?: return) - 1
         if (n <= 0) { counts.remove(key); apply(b, false) } else counts[key] = n
@@ -278,6 +282,7 @@ class ControlsInput(
             is Binding.Key -> out()?.virtualKey(b.vk, down, modifiersFor())
             is Binding.Mouse -> out()?.button(mouseOf(b.button), down)
             is Binding.Wheel -> if (down) scrollOnce(b)
+            is Binding.Chord -> b.parts.let { if (down) it else it.asReversed() }.forEach { apply(it, down) }
         }
     }
 

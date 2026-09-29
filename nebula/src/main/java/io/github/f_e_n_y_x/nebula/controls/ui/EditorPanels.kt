@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PanTool
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -214,7 +215,9 @@ internal fun Inspector(
         }
         when (e.kind) {
             ElementKind.BUTTON, ElementKind.TRIGGER -> {
-                Field("Sends") { BindingRow("Press", e.binding, allowNone = e.lookThrough) { b -> onEdit(null) { it.copy(bindings = listOf(b)) } } }
+                Field("Sends", "Pick several (Chord) to press them together, e.g. Shift + E or LB + RB; gamepad, keys and mouse can mix.") {
+                    BindingRow("Press", Binding.chordOf(e.bindings), allowNone = e.lookThrough) { b -> onEdit(null) { it.copy(bindings = b.parts().ifEmpty { listOf(Binding.None) }) } }
+                }
                 PressModeField(e, onEdit)
                 if (e.kind == ElementKind.BUTTON) ShapeField(e, onEdit)
                 RoleField(e, onEdit)
@@ -292,6 +295,10 @@ internal fun Inspector(
                 if (e.stick != StickOutput.RIGHT) MoveFields(e, onEdit)
             }
             ElementKind.ZONE -> ZoneFields(e, onEdit)
+            ElementKind.SWITCH -> {
+                SwitchFields(e, onEdit)
+                ShapeField(e, onEdit)
+            }
             ElementKind.TOUCHPAD -> {
                 Field("Tap sends") { BindingRow("Tap", e.click) { b -> onEdit(null) { it.copy(click = b) } } }
                 Field("Pointer speed", "Drag inside the pad to move the PC's mouse.") {
@@ -384,6 +391,38 @@ private fun ZoneFields(e: ControlElement, onEdit: (String?, (ControlElement) -> 
     ) { v -> onEdit(null) { it.copy(keepWithController = v) } }
 }
 
+/** Where a layout switch goes: through the set's cycle, a picker, or one layout of a set. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SwitchFields(e: ControlElement, onEdit: (String?, (ControlElement) -> ControlElement) -> Unit) {
+    val s = Nebula.scale
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val store = remember { io.github.f_e_n_y_x.nebula.controls.ControlsStore.get(ctx) }
+    val data by store.data.collectAsState()
+    val lib = remember(data) { store.library(data) }
+    val to = e.switchTo
+    Field(
+        "Goes to",
+        "Works when the game uses a layout set (stream menu → Controls → Layout sets). Switching lets go of every button, key and stick first. Sends nothing to the PC.",
+    ) {
+        Segmented(
+            listOf<Pair<String, io.github.f_e_n_y_x.nebula.controls.SwitchTarget?>>("Next" to io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next, "Previous" to io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Previous, "Picker" to io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Picker),
+            if (to is io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Layout) null else to,
+        ) { t -> if (t != null) onEdit(null) { it.copy(switchTo = t) } }
+        val targets = lib.sets.flatMap { it.members }.distinct().mapNotNull(lib::find)
+        if (targets.isNotEmpty()) {
+            Text("Or straight to one layout", style = Nebula.type.label, color = NebulaColors.textSecondary)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(6)), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
+                targets.forEach { p ->
+                    Chip(p.name, to is io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Layout && to.id == p.id) {
+                        onEdit(null) { it.copy(switchTo = io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Layout(p.id)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private val WASD = listOf(0x57, 0x53, 0x41, 0x44).map { Binding.Key(it) }
 private val ARROWS = listOf(0x26, 0x28, 0x25, 0x27).map { Binding.Key(it) }
 
@@ -471,7 +510,11 @@ private fun ShapeField(e: ControlElement, onEdit: (String?, (ControlElement) -> 
 @Composable
 private fun BindingPicker(title: String, current: Binding, allowNone: Boolean, onDismiss: () -> Unit, onPick: (Binding) -> Unit) {
     val s = Nebula.scale
-    var tab by remember { mutableStateOf(if (current is Binding.Key) 1 else if (current is Binding.Mouse || current is Binding.Wheel) 2 else 0) }
+    val first = current.parts().firstOrNull()
+    var tab by remember { mutableStateOf(if (first is Binding.Key) 1 else if (first is Binding.Mouse || first is Binding.Wheel) 2 else 0) }
+    // Chord mode: taps add to (or take from) a list pressed together; "Use" picks it.
+    var chord by remember { mutableStateOf(current is Binding.Chord) }
+    var parts by remember { mutableStateOf(current.parts()) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         val shape = RoundedCornerShape(s.dp(18))
         Column(
@@ -481,11 +524,22 @@ private fun BindingPicker(title: String, current: Binding, allowNone: Boolean, o
         ) {
             PanelHeader("Sends", title, onDismiss)
             Segmented(listOf("Gamepad" to 0, "Keyboard" to 1, "Mouse" to 2), tab) { tab = it }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                Segmented(listOf("One" to false, "Chord" to true), chord) { v -> chord = v; if (!v) parts = parts.take(1) }
+                if (chord) Text(
+                    if (parts.isEmpty()) "Tap up to ${Binding.MAX_CHORD} to press together" else Binding.chordOf(parts).describe(),
+                    style = Nebula.type.label, color = if (parts.isEmpty()) NebulaColors.textMuted else NebulaColors.text,
+                    modifier = Modifier.weight(1f), maxLines = 2,
+                )
+            }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(s.dp(12))) {
                 @Composable
                 fun chips(items: List<Binding>) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-                        items.forEach { b -> Chip(b.describe(), b == current) { onPick(b) } }
+                        items.forEach { b ->
+                            if (chord) Chip(b.describe(), b in parts) { parts = if (b in parts) parts - b else if (parts.size < Binding.MAX_CHORD) parts + b else parts }
+                            else Chip(b.describe(), b == current) { onPick(b) }
+                        }
                     }
                 }
                 when (tab) {
@@ -506,7 +560,10 @@ private fun BindingPicker(title: String, current: Binding, allowNone: Boolean, o
                     }
                 }
             }
-            if (allowNone) NebulaButton("Nothing", onClick = { onPick(Binding.None) }, style = ButtonStyle.Secondary)
+            Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                if (chord) NebulaButton("Use ${Binding.chordOf(parts).describe()}", onClick = { if (parts.isNotEmpty()) onPick(Binding.chordOf(parts)) }, modifier = Modifier.testTag("use-chord"))
+                if (allowNone) NebulaButton("Nothing", onClick = { onPick(Binding.None) }, style = ButtonStyle.Secondary)
+            }
         }
     }
 }
@@ -537,6 +594,7 @@ private val libraryItems = listOf(
     LibraryItem(ElementKind.TOUCHPAD, Icons.Rounded.TouchApp, "A region that moves the PC's mouse; tap to click."),
     LibraryItem(ElementKind.COMBO, Icons.Rounded.Link, "Several buttons or keys pressed together."),
     LibraryItem(ElementKind.MACRO, Icons.Rounded.Repeat, "A timed sequence of presses, played once per tap."),
+    LibraryItem(ElementKind.SWITCH, Icons.Rounded.SwapHoriz, "Changes to another layout of the game's layout set (next, previous or a picker). Lets go of everything first."),
 )
 
 @Composable
@@ -618,15 +676,12 @@ internal fun ProfilesPanel(
     Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).padding(s.dp(18)), verticalArrangement = Arrangement.spacedBy(s.dp(16))) {
         PanelHeader("Profiles", current.name, onClose)
 
-        val suggested = io.github.f_e_n_y_x.nebula.controls.DefaultProfiles.suggestedFor(gameName)?.let { lib.find(it) }
-        if (suggested != null && gameKey != null && lib.assignedTo(gameKey) != suggested.id) {
-            Field("Suggested for ${gameName ?: "this game"}", "${suggested.name}: plays with touch alone; a floating move stick, fire-and-look triggers, swipe right to look.") {
-                SmallAction("Use ${suggested.name}", null, {
-                    store.update { l -> l.assign(gameKey, suggested.id) }
-                    open(suggested)
-                    onChanged()
-                })
-            }
+        // Only the Standard controller is built in: point to the library and import.
+        if (lib.all.size == 1 && lib.sets.isEmpty()) {
+            Text(
+                "Nebula comes with the standard controller only. Get layouts made for ${gameName ?: "your games"} (and for shooters, racing and more) from Browse layouts below, or import a file, share code or QR code.",
+                style = Nebula.type.label, color = NebulaColors.textSecondary, modifier = Modifier.testTag("profiles-empty"),
+            )
         }
 
         if (gameKey != null) {
@@ -770,9 +825,9 @@ internal fun ProfilesPanel(
         )
     }
     importPreview?.let { r ->
-        LayoutPreviewDialog(r, onAdd = { p ->
+        LayoutPreviewDialog(r, onAdd = { p, fit ->
             var added: ControlsProfile? = null
-            store.update { l -> l.add(p).also { added = it.second }.first }
+            store.update { l -> io.github.f_e_n_y_x.nebula.controls.ProfileImport.addTo(l, r, p, fit).also { added = it.second }.first }
             importPreview = null
             added?.let { a ->
                 android.widget.Toast.makeText(ctx, "Added ${a.name}", android.widget.Toast.LENGTH_SHORT).show()
