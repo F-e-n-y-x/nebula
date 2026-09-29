@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Mouse
+import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material.icons.outlined.SportsEsports
@@ -106,6 +107,10 @@ fun QuickToggleStrip(
     setLayout: String? = null,
     /** Goes to the set's next layout, as a switch element set to "next" does. */
     onNextLayout: () -> Unit = {},
+    /** Adaptive bitrate is running for this stream. */
+    abrOn: Boolean = false,
+    /** Turns adaptive bitrate on or off for this stream (and saves it). */
+    onAbr: (Boolean) -> Unit = {},
 ) {
     val s = Nebula.scale
     val shown = remember(tick) { QuickToggles.read(prefs.prefs.all) }
@@ -149,6 +154,7 @@ fun QuickToggleStrip(
         QuickToggle.HAPTICS -> QuickTileState.switch(ui.haptics.enabled)
         QuickToggle.MOUSE_BAR -> QuickTileState.switch(ui.mouseBar)
         QuickToggle.LAYOUT -> QuickTileState.layout(setLayout)
+        QuickToggle.ABR -> QuickTileState.switch(abrOn)
     }
 
     fun tap(t: QuickToggle, st: QuickTileState) {
@@ -192,6 +198,7 @@ fun QuickToggleStrip(
             QuickToggle.HAPTICS -> HapticsSettings.write(prefs, ui.haptics.copy(enabled = !ui.haptics.enabled))
             QuickToggle.MOUSE_BAR -> prefs.put(StreamUiPrefs.MOUSE_BAR_KEY, !ui.mouseBar)
             QuickToggle.LAYOUT -> onNextLayout()
+            QuickToggle.ABR -> onAbr(!abrOn)
         }
     }
 
@@ -243,6 +250,7 @@ private fun icon(t: QuickToggle, st: QuickTileState): ImageVector = when (t) {
     QuickToggle.HAPTICS -> Icons.Outlined.Vibration
     QuickToggle.MOUSE_BAR -> Icons.Outlined.Mouse
     QuickToggle.LAYOUT -> Icons.Outlined.SwapHoriz
+    QuickToggle.ABR -> Icons.Outlined.NetworkCheck
 }
 
 @Composable

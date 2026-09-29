@@ -650,6 +650,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                         controlsActive.set?.target(controlsProfile.id, io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next)?.let { activeLayoutId = it }
                     },
                     onTestConnection = vm::testConnection,
+                    onAbr = vm::setAdaptiveBitrate,
                 ),
                 connectionTest = connectionTest,
                 hostSection = { StreamHostMenuSection(hostLink, prefs, onTypeClipboard = typeClipboard, onSlept = { end(false) }) },

@@ -195,7 +195,7 @@ fun HostsScreen(container: AppContainer, nav: Navigator) {
             HostCard(h,
                 wake = wake,
                 sleeping = busy == HostActionsViewModel.SLEEP,
-                onMenu = { menuFor = it },
+                onMenu = { if (it == "test") vm.testConnection(h.id) else menuFor = it },
                 onPrimary = {
                     when {
                         wake?.finished == false -> actions.cancelWake()
@@ -205,7 +205,6 @@ fun HostsScreen(container: AppContainer, nav: Navigator) {
                         else -> { vm.select(h.id); nav.top(Route.Library(h.id)) }
                     }
                 },
-                onTest = { vm.testConnection(h.id) }.takeIf { h.paired && h.status != HostStatus.OFFLINE },
             )
             when (menuFor) {
                 "sleep" -> SleepConfirmDialog(h.name, streaming = false, onConfirm = { menuFor = null; actions.sleep() }, onDismiss = { menuFor = null })
@@ -239,7 +238,8 @@ private fun HostCard(host: Host, wake: WakeState?, sleeping: Boolean, onMenu: (S
         else -> "Open library"
     }
     val sleepGate = HostGating.sleepGate(host)
-    val hasMenu = sleepGate != Gate.UNSUPPORTED || host.features.commands != Gate.UNSUPPORTED
+    val canTest = host.paired && host.status != HostStatus.OFFLINE
+    val hasMenu = canTest || sleepGate != Gate.UNSUPPORTED || host.features.commands != Gate.UNSUPPORTED
     Column(
         Modifier
             .fillMaxWidth()
@@ -292,13 +292,25 @@ private fun HostCard(host: Host, wake: WakeState?, sleeping: Boolean, onMenu: (S
     }
 }
 
-/** The host card's "⋮" menu: Sleep PC and host commands, when the host offers them. */
+/** The host card's "⋮" menu: Test connection, Sleep PC and host commands, when the host offers them. */
 @Composable
 private fun HostMenu(host: Host, sleepGate: Gate, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
         NebulaIconButton(Icons.Rounded.MoreVert, "More for ${host.name}", { open = true })
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = NebulaColors.raised) {
+            if (host.paired && host.status != HostStatus.OFFLINE) {
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text("Test connection", style = Nebula.type.body, color = NebulaColors.text)
+                            Text("Speed, loss and jitter, with a suggested bitrate", style = Nebula.type.label, color = NebulaColors.textMuted)
+                        }
+                    },
+                    leadingIcon = { Icon(Icons.Outlined.NetworkCheck, null, tint = NebulaColors.textSecondary) },
+                    onClick = { open = false; onPick("test") },
+                )
+            }
             if (sleepGate != Gate.UNSUPPORTED) {
                 val allowed = sleepGate == Gate.AVAILABLE
                 DropdownMenuItem(

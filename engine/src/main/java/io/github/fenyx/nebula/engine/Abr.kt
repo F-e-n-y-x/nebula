@@ -79,6 +79,29 @@ data class AbrSettings(val mode: AbrMode = AbrMode.OFF, val minKbps: Int = 0, va
     }
 }
 
+/**
+ * The settings after an on/off toggle (stream-menu quick toggle): off remembers the mode in
+ * [LAST_MODE_KEY], on brings it back (Balanced when none was saved).
+ */
+fun AbrSettings.toggled(on: Boolean, lastWire: String?): AbrSettings = when {
+    !on -> copy(mode = AbrMode.OFF)
+    mode != AbrMode.OFF -> this
+    else -> copy(mode = AbrMode.from(true, lastWire))
+}
+
+/** Nebula key (String, wire name): the mode to turn back on to after the quick toggle turned ABR off. */
+const val LAST_MODE_KEY = "nebula_abr_last_mode"
+
+/** Reads, toggles and saves the ABR setting; returns the new settings. */
+fun toggleAbr(prefs: SharedPreferences, on: Boolean): AbrSettings {
+    val current = AbrSettings.read(prefs)
+    val next = current.toggled(on, prefs.getString(LAST_MODE_KEY, null))
+    val editor = prefs.edit()
+    if (!on && current.mode != AbrMode.OFF) editor.putString(LAST_MODE_KEY, current.mode.wire)
+    next.write(editor).apply()
+    return next
+}
+
 /** Who is steering the bitrate of a stream with ABR on. */
 enum class AbrSource {
     /** The host decides (Nova or Foundation `/api/abr`). */

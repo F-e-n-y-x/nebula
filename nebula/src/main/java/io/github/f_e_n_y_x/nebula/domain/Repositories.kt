@@ -126,6 +126,12 @@ interface StreamRepository {
     suspend fun setDisplayScale(percent: Int): Boolean = false
     /** Changes the bitrate mid-stream; true once the PC accepted it. */
     suspend fun setBitrate(kbps: Int): Boolean = false
+    /**
+     * Turns adaptive bitrate on or off for the running stream and saves it as the setting (on
+     * resumes the last mode used, Balanced at first). Returns the saved mode's name, or null when
+     * this stream can't change it.
+     */
+    fun setAdaptiveBitrate(on: Boolean): String? = null
     /** RTT and jitter measured again during the stream, with a suggestion from its recent loss. */
     suspend fun testConnection(): Result<ConnectionReport> =
         Result.failure(io.github.f_e_n_y_x.nebula.domain.model.ConnectionTestError("Nothing is streaming."))

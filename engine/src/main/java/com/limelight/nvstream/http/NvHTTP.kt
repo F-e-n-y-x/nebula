@@ -1173,7 +1173,8 @@ class NvHTTP(
             val json = JSONObject(body)
             AbrAction(
                 if (json.has("newBitrate")) json.optInt("newBitrate") else null,
-                if (json.has("reason")) json.optString("reason") else null
+                if (json.has("reason")) json.optString("reason") else null,
+                if (json.has("bitrateApplied")) json.optBoolean("bitrateApplied") else null
             )
         } catch (e: Exception) {
             null
@@ -1577,7 +1578,9 @@ data class NetworkFeedback(
 
 data class AbrAction(
     val newBitrate: Int?,
-    val reason: String?
+    val reason: String?,
+    /** Nova and Foundation apply [newBitrate] to the encoder themselves and say so; null from older hosts. */
+    val bitrateApplied: Boolean? = null
 )
 
 // ---------------------------------------------------------------------------

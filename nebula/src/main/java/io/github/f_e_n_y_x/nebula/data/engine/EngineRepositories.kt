@@ -415,6 +415,12 @@ class EngineStreamRepository(
     }
 
     override suspend fun setDisplayScale(percent: Int): Boolean = session?.setDisplayScale(percent) ?: false
+    override fun setAdaptiveBitrate(on: Boolean): String? {
+        val next = io.github.fenyx.nebula.engine.toggleAbr(legacy.prefs, on)
+        val s = session ?: return null
+        return if (s.setAdaptiveBitrate(next)) next.mode.name else null
+    }
+
     override suspend fun testConnection(): Result<ConnectionReport> {
         val s = session?.takeIf { it.isConnected } ?: return Result.failure(ConnectionTestError("Nothing is streaming."))
         return runConnectionTest { s.testConnection(display.spec()) }

@@ -504,6 +504,16 @@ class StreamViewModel(private val c: AppContainer, val hostId: String, val gameI
         }
     }
 
+    /** Stream-menu quick toggle: adaptive bitrate on or off for this stream (and saved). */
+    fun setAdaptiveBitrate(on: Boolean) {
+        val mode = c.stream.setAdaptiveBitrate(on)
+        _switchNote.value = when {
+            mode == null -> SwitchNote("Adaptive bitrate applies from the next stream.", ok = true)
+            on -> SwitchNote("Adaptive bitrate on (${mode.lowercase()}): the PC lowers the bitrate when packets are lost.", ok = true)
+            else -> SwitchNote("Adaptive bitrate off: back to ${_bitrateKbps.value / 1000} Mbps.", ok = true)
+        }
+    }
+
     fun setBitrate(kbps: Int) = viewModelScope.launch {
         _bitrateNote.value = "Applying…"
         val ok = c.stream.setBitrate(kbps)

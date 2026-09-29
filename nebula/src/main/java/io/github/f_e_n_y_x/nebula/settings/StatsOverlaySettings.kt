@@ -17,6 +17,7 @@ enum class StatMetric(val id: String, val label: String, val short: String) {
     DECODE_LATENCY("decode_latency", "Decode time", "Decode"),
     RENDER_LATENCY("render_latency", "Render time", "Render"),
     BITRATE("bitrate", "Bitrate", "Bitrate"),
+    TARGET_BITRATE("target_bitrate", "Target bitrate (adaptive)", "Target"),
     PACKET_LOSS("packet_loss", "Frame loss", "Loss"),
     RESOLUTION("resolution", "Resolution", "Res"),
     CODEC("codec", "Codec and HDR", "Codec"),
@@ -155,6 +156,12 @@ fun StatMetric.format(x: StreamStats, battery: Int? = null): String = when (this
     StatMetric.DECODE_LATENCY -> "%.1f ms".format(x.decodeMs)
     StatMetric.RENDER_LATENCY -> "%.1f ms".format(x.renderMs)
     StatMetric.BITRATE -> "%.0f Mbps".format(x.bitrateMbps)
+    StatMetric.TARGET_BITRATE -> if (x.targetBitrateKbps <= 0) "—" else "%.0f Mbps".format(x.targetBitrateKbps / 1000f) + when (x.abr?.source) {
+        null -> ""
+        io.github.f_e_n_y_x.nebula.domain.model.AbrSource.HOST -> " ABR"
+        io.github.f_e_n_y_x.nebula.domain.model.AbrSource.LOCAL -> " ABR·local"
+        io.github.f_e_n_y_x.nebula.domain.model.AbrSource.CONNECTING -> " ABR…"
+    }
     StatMetric.PACKET_LOSS -> "%.1f%%".format(x.lossPercent)
     StatMetric.RESOLUTION -> x.resolution
     StatMetric.CODEC -> x.codec

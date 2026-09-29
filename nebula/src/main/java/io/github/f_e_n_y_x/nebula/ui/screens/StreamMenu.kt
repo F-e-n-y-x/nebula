@@ -90,6 +90,8 @@ class StreamMenuActions(
     val onNextLayout: () -> Unit = {},
     /** Re-measures RTT and jitter to the PC during the stream. */
     val onTestConnection: () -> Unit = {},
+    /** Adaptive bitrate on or off for this stream (the Adaptive quick toggle). */
+    val onAbr: (Boolean) -> Unit = {},
 )
 
 /**
@@ -194,6 +196,7 @@ fun StreamMenu(
                 onKeyboard = if (ui.keyboardKind == KeyboardKind.PHONE) actions.onKeyboard else actions.onPcKeyboard,
                 firstFocus = firstQuick,
                 setLayout = setLayout, onNextLayout = actions.onNextLayout,
+                abrOn = stats?.abr != null, onAbr = actions.onAbr,
             )
             Header(mode, stats)
             StatsBlock(stats, full = true)

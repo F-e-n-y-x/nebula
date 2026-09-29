@@ -218,4 +218,14 @@ class QuickTogglesTest {
         assertTrue(screen.contains("onNextLayout = {"))
         assertTrue(screen.contains("target(controlsProfile.id, io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next)"))
     }
+
+    @Test
+    fun `adaptive bitrate is a choosable toggle, off by default, wired to the stream`() {
+        assertEquals(QuickToggle.ABR, QuickToggle.of("abr"))
+        assertEquals("Adaptive bitrate", QuickToggle.ABR.longLabel)
+        assertFalse(QuickToggle.ABR in QuickToggles.DEFAULT)
+        assertTrue(QuickToggle.ABR in QuickToggles.editorOrder(QuickToggles.DEFAULT))
+        assertTrue(File(src, "ui/screens/StreamMenu.kt").readText().contains("abrOn = stats?.abr != null, onAbr = actions.onAbr"))
+        assertTrue(File(src, "ui/screens/StreamScreen.kt").readText().contains("onAbr = vm::setAdaptiveBitrate"))
+    }
 }

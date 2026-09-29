@@ -49,9 +49,14 @@ class StreamSession internal constructor(
     initialWidth: Int,
     initialHeight: Int,
     private val background: BackgroundPolicy = BackgroundPolicy(),
-    private val abrSettings: AbrSettings = AbrSettings(),
+    abrSettings: AbrSettings = AbrSettings(),
     private val initialBitrateKbps: Int = 0,
 ) {
+    /** Adaptive bitrate for this stream; the stream menu can turn it on and off live ([setAdaptiveBitrate]). */
+    @Volatile private var abrSettings: AbrSettings = abrSettings
+
+    /** The user's bitrate: the start value, then the last manual change. ABR never goes above it. */
+    @Volatile private var capKbps: Int = initialBitrateKbps
     private val main = Handler(Looper.getMainLooper())
     private val bandwidth = BandwidthMeter()
     private val ended = AtomicBoolean(false)
@@ -347,6 +352,7 @@ class StreamSession internal constructor(
     suspend fun setBitrate(kbps: Int): Boolean = suspendCancellableCoroutine { cont ->
         connection.setBitrate(kbps, object : NvConnection.BitrateAdjustmentCallback {
             override fun onSuccess(newBitrate: Int) {
+                capKbps = kbps
                 abrService?.notifyManualOverride(kbps)
                 _stats.update { it.copy(targetBitrateKbps = kbps, abr = abrState()) }
                 if (cont.isActive) cont.resume(true)
@@ -406,10 +412,24 @@ class StreamSession internal constructor(
         )
     }
 
+    /**
+     * Turns adaptive bitrate on or off for the running stream. Off returns the stream to the user's
+     * bitrate; on starts from it. Returns false when nothing is streaming.
+     */
+    fun setAdaptiveBitrate(settings: AbrSettings): Boolean {
+        abrSettings = settings
+        if (!isConnected) return false
+        stopAbr()
+        startAbr()
+        _stats.update { it.copy(abr = abrState()) }
+        return true
+    }
+
     /** Starts adaptive bitrate once connected, when it is on. */
     private fun startAbr() {
         val wire = abrSettings.mode.wire ?: return
-        if (abrService != null || initialBitrateKbps <= 0) return
+        val cap = capKbps
+        if (abrService != null || cap <= 0) return
         val service = AdaptiveBitrateService(
             nvHttpFactory = { connection.createNvHttp() },
             statsProvider = {
@@ -428,7 +448,7 @@ class StreamSession internal constructor(
             },
         )
         abrService = service
-        service.start(initialBitrateKbps, wire, abrSettings.minKbps, abrSettings.maxKbps)
+        service.start(cap, wire, abrSettings.minKbps, abrSettings.maxKbps)
         _stats.update { it.copy(abr = abrState()) }
     }
 
@@ -440,7 +460,7 @@ class StreamSession internal constructor(
     private fun abrState(): AbrState? {
         val service = abrService ?: return null
         if (!service.enabled) return null
-        val (lo, hi) = AdaptiveBitrateService.resolveRange(abrSettings.mode.wire!!, initialBitrateKbps, abrSettings.minKbps, abrSettings.maxKbps)
+        val (lo, hi) = service.range
         return AbrState(abrSettings.mode, sourceOf(service.source), lo, hi, service.lastReason)
     }
 

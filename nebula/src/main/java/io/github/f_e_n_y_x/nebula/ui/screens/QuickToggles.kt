@@ -23,7 +23,8 @@ enum class QuickToggle(val id: String, val label: String) {
     PORTRAIT("portrait", "Rotation"),
     HAPTICS("haptics", "Haptics"),
     MOUSE_BAR("mouse_bar", "Mouse bar"),
-    LAYOUT("layout", "Layout");
+    LAYOUT("layout", "Layout"),
+    ABR("abr", "Adaptive");
 
     /** What the long name reads as in the editor and to TalkBack. */
     val longLabel: String get() = when (this) {
@@ -39,6 +40,7 @@ enum class QuickToggle(val id: String, val label: String) {
         HAPTICS -> "Audio haptics"
         MOUSE_BAR -> "Mouse buttons bar"
         LAYOUT -> "Next layout of the layout set"
+        ABR -> "Adaptive bitrate"
     }
 
     companion object {

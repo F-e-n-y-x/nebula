@@ -74,9 +74,10 @@ class AdaptiveBitrateService(
         val range = resolveRange(mode, initialBitrate, minBitrateOverride, maxBitrateOverride)
         minBitrate = range.first
         maxBitrate = range.second
-        // The server applies its own preset for bounds sent as 0; send what the user chose.
+        // The server applies its own preset floor when sent 0. The cap is always sent, so a host with
+        // a wider preset (Foundation) also stays at or below the user's bitrate.
         requestedMin = minBitrateOverride.coerceAtLeast(0)
-        requestedMax = maxBitrateOverride.coerceAtLeast(0)
+        requestedMax = maxBitrate
         local = LocalAbrController(mode, minBitrate, maxBitrate)
         resetState()
         enabled = true
@@ -106,13 +107,27 @@ class AdaptiveBitrateService(
         }, START_DELAY_SECONDS, 1, TimeUnit.SECONDS)
     }
 
-    /** 用户手动调了码率（如游戏菜单滑块），ABR 同步基准并重置探测状态。*/
+    /**
+     * The user moved the bitrate slider mid-stream (and the host accepted it). That value is the
+     * user's new cap: ABR continues from it and never goes above it. The host learns the same
+     * through its `/bitrate` handler.
+     */
     fun notifyManualOverride(kbps: Int) {
-        if (!enabled) return
-        currentBitrate = kbps
-        local.reset(System.currentTimeMillis())
-        LimeLog.info("[ABR] 手动覆盖码率 -> ${kbps}kbps")
+        if (!enabled || kbps <= 0) return
+        runCatching { executor.execute {
+            currentBitrate = kbps
+            requestedMax = kbps
+            initialBitrate = kbps
+            maxBitrate = kbps
+            minBitrate = minBitrate.coerceAtMost(kbps)
+            local = LocalAbrController(mode, minBitrate, maxBitrate)
+            local.reset(System.currentTimeMillis())
+            LimeLog.info("[ABR] 手动覆盖码率 -> ${kbps}kbps (new cap)")
+        } }
     }
+
+    /** The range ABR moves in now (the cap follows manual changes). */
+    val range: Pair<Int, Int> get() = minBitrate to maxBitrate
 
     fun stop() {
         if (!enabled) return
@@ -199,21 +214,31 @@ class AdaptiveBitrateService(
         val action = http.reportNetworkFeedback(feedback) ?: return
         val newBitrate = action.newBitrate ?: return
         if (newBitrate == currentBitrate) return
+        if (action.bitrateApplied == true) {
+            // The host already retargeted its encoder; only record it here.
+            acceptBitrate(newBitrate, action.reason ?: "server", source = "server")
+            return
+        }
         val clamped = newBitrate.coerceIn(minBitrate, maxBitrate)
         applyBitrateInternal(clamped, action.reason ?: "server", source = "server")
+    }
+
+    /** Records a bitrate the host is already using and tells the listeners. */
+    private fun acceptBitrate(kbps: Int, reason: String, source: String) {
+        val from = currentBitrate
+        currentBitrate = kbps
+        lastReason = reason
+        LimeLog.info("[ABR][$source] ${from}kbps -> ${kbps}kbps ($reason)")
+        onBitrateChanged(kbps, reason)
+        try { bitrateListener?.invoke(kbps, reason) } catch (_: Exception) {}
     }
 
     /** 内部统一码率应用：复用缓存的 nvHttp 实例，避免每次新建 OkHttpClient + TLS。*/
     private fun applyBitrateInternal(kbps: Int, reason: String, source: String = "local"): Boolean {
         val http = nvHttp ?: return false
-        val from = currentBitrate
         return try {
             if (http.setBitrate(kbps)) {
-                currentBitrate = kbps
-                lastReason = reason
-                LimeLog.info("[ABR][$source] ${from}kbps -> ${kbps}kbps ($reason)")
-                onBitrateChanged(kbps, reason)
-                try { bitrateListener?.invoke(kbps, reason) } catch (_: Exception) {}
+                acceptBitrate(kbps, reason, source)
                 true
             } else false
         } catch (e: Exception) {
@@ -240,18 +265,20 @@ class AdaptiveBitrateService(
         private const val MAX_SERVER_ENABLE_RETRIES = 10
 
         /**
-         * The range ABR moves in: the mode preset (Foundation's numbers) with any bound the user set
-         * (above 0) taking its place. Never inverted.
+         * The range ABR moves in. The ceiling is the user's bitrate (the stream's starting value,
+         * from Settings or a per-game preset), lowered by [maxOverride] when set: ABR only works
+         * below the cap. The floor is [minOverride] when set, else the mode preset (Foundation's
+         * numbers). Never inverted. Nova computes the same range on the host.
          */
         @JvmStatic
         fun resolveRange(mode: String, initialBitrate: Int, minOverride: Int, maxOverride: Int): Pair<Int, Int> {
             val initial = initialBitrate.coerceAtLeast(500)
-            val (presetMin, presetMax) = when (mode) {
-                MODE_QUALITY -> maxOf(5000, (initial * 0.5).toInt()) to minOf(150_000, (initial * 1.5).toInt())
-                MODE_LOW_LATENCY -> 2000 to (initial * 1.2).toInt()
-                else -> maxOf(3000, (initial * 0.3).toInt()) to minOf(150_000, initial * 2)
+            val presetMin = when (mode) {
+                MODE_QUALITY -> maxOf(5000, (initial * 0.5).toInt())
+                MODE_LOW_LATENCY -> 2000
+                else -> maxOf(3000, (initial * 0.3).toInt())
             }
-            val hi = (if (maxOverride > 0) maxOverride else presetMax).coerceAtLeast(500)
+            val hi = (if (maxOverride > 0) minOf(maxOverride, initial) else initial).coerceAtLeast(500)
             val lo = (if (minOverride > 0) minOverride else presetMin).coerceIn(500, hi)
             return lo to hi
         }

@@ -362,6 +362,9 @@ class DemoHost(private val context: Context) {
             return true
         }
 
+        override fun setAdaptiveBitrate(on: Boolean): String? =
+            io.github.fenyx.nebula.engine.toggleAbr(io.github.f_e_n_y_x.nebula.settings.LegacyPrefs(context).prefs, on).mode.name
+
         override suspend fun testConnection(): Result<ConnectionReport> {
             delay(700)
             val (w, h) = io.github.f_e_n_y_x.nebula.ui.screens.deviceResolution(context)

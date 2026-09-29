@@ -536,17 +536,13 @@ private fun AdaptiveBitrateSetting(bitrateKbps: Int) {
                 abr.mode,
             ) { m -> save(abr.copy(mode = m)) }
             if (abr.mode != AbrMode.OFF) {
-                val (autoMin, autoMax) = com.limelight.nvstream.http.AdaptiveBitrateService.resolveRange(abr.mode.wire!!, bitrateKbps, 0, 0)
+                val (autoMin, _) = com.limelight.nvstream.http.AdaptiveBitrateService.resolveRange(abr.mode.wire!!, bitrateKbps, 0, 0)
                 SliderField(
                     label = "Lowest bitrate", value = abr.minKbps / 1000f, range = 0f..150f, step = 1f, unit = "Mbps",
                     onValueChange = { v -> save(abr.copy(minKbps = (v * 1000).roundToInt())) },
                 )
-                SliderField(
-                    label = "Highest bitrate", value = abr.maxKbps / 1000f, range = 0f..150f, step = 1f, unit = "Mbps",
-                    onValueChange = { v -> save(abr.copy(maxKbps = (v * 1000).roundToInt())) },
-                )
                 Text(
-                    "0 = automatic (${autoMin / 1000}–${autoMax / 1000} Mbps for this mode at ${bitrateKbps / 1000} Mbps). Your PC's own maximum always applies.",
+                    "0 = automatic (${autoMin / 1000} Mbps for this mode at ${bitrateKbps / 1000} Mbps). The Bitrate above, or a game's own bitrate, is the most it ever uses; your PC's maximum also applies.",
                     style = Nebula.type.label, color = NebulaColors.textMuted,
                 )
             }
@@ -555,10 +551,10 @@ private fun AdaptiveBitrateSetting(bitrateKbps: Int) {
 }
 
 private fun abrHelp(mode: AbrMode) = when (mode) {
-    AbrMode.OFF -> "The stream keeps the bitrate above. Turn this on for Wi-Fi or Tailscale."
+    AbrMode.OFF -> "The stream keeps the bitrate above. Turn this on for Wi-Fi or Tailscale: the PC lowers the bitrate when packets are lost and raises it back, never above yours."
     AbrMode.CONSERVATIVE -> "Drops quickly when packets are lost and climbs back slowly: steady and low latency."
     AbrMode.BALANCED -> "Drops on sustained loss and climbs after a few clean seconds."
-    AbrMode.AGGRESSIVE -> "Climbs quickly toward the highest bitrate: the sharpest picture on a good link."
+    AbrMode.AGGRESSIVE -> "Climbs back quickly toward your bitrate: the sharpest picture on a good link."
 }
 
 @Composable

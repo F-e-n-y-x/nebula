@@ -8,16 +8,18 @@ import org.junit.Test
 class AdaptiveBitrateRulesTest {
     private fun stats(loss: Float) = AbrStats(packetLoss = loss, rttMs = 10, decodeFps = 60f, droppedFrames = 0)
 
-    @Test fun `presets match Foundation`() {
-        assertEquals(6000 to 40000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 0, 0))
-        assertEquals(10000 to 30000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_QUALITY, 20000, 0, 0))
-        assertEquals(2000 to 24000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_LOW_LATENCY, 20000, 0, 0))
-        assertEquals(3000 to 10000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 5000, 0, 0))
+    @Test fun `floors match Foundation and the user's bitrate is the cap`() {
+        assertEquals(6000 to 20000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 0, 0))
+        assertEquals(10000 to 20000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_QUALITY, 20000, 0, 0))
+        assertEquals(2000 to 20000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_LOW_LATENCY, 20000, 0, 0))
+        assertEquals(3000 to 5000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 5000, 0, 0))
     }
 
-    @Test fun `user bounds replace the preset and never invert`() {
-        assertEquals(8000 to 50000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 8000, 50000))
-        assertEquals(6000 to 50000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 0, 50000))
+    @Test fun `user bounds only narrow the range and never invert`() {
+        assertEquals(8000 to 15000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 8000, 15000))
+        // A maximum above the stream bitrate never raises the cap.
+        assertEquals(8000 to 20000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 8000, 50000))
+        assertEquals(6000 to 15000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 0, 15000))
         assertEquals(12000 to 12000, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_BALANCED, 20000, 30000, 12000))
         assertEquals(500 to 500, AdaptiveBitrateService.resolveRange(AdaptiveBitrateService.MODE_LOW_LATENCY, 0, 100, 100))
     }
