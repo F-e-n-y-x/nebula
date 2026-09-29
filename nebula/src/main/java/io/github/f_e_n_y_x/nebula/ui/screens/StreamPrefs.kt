@@ -120,9 +120,9 @@ data class StreamUiPrefs(
                 floatBall = b("checkbox_enable_float_ball", true),
                 floatBallPosition = s("list_float_ball_position", "center_right"),
                 floatBallHideMs = i("seekbar_float_ball_auto_hide_delay", 2000),
-                floatBallTap = s("list_float_ball_single_click_action", "open_keyboard"),
-                floatBallDoubleTap = s("list_float_ball_double_click_action", "open_menu"),
-                floatBallLongPress = s("list_float_ball_long_click_action", "toggle_visibility"),
+                floatBallTap = s("list_float_ball_single_click_action", "open_menu"),
+                floatBallDoubleTap = s("list_float_ball_double_click_action", "open_keyboard"),
+                floatBallLongPress = s("list_float_ball_long_click_action", "toggle_controls"),
                 escMenu = b("checkbox_enable_esc_menu", true),
                 escMenuKey = s("list_esc_menu_key", "111").toIntOrNull() ?: 111,
                 gamepad = GamepadConfig(

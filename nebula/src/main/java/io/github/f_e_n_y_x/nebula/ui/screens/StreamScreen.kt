@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,6 +61,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -524,11 +527,12 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         if (overlaysOn && pcKeyboard) PcKeyboardOverlay(remote, onClose = { pcKeyboard = false })
         if (overlaysOn && ui.floatBall && !pcKeyboard) {
             FloatBall(
-                ui,
+                ui, prefs.prefs,
                 onAction = { action ->
                     when (action) {
                         "open_keyboard" -> openKeyboard()
                         "open_menu" -> menu = true
+                        "toggle_controls" -> prefs.put("checkbox_show_onscreen_controls", !ui.osc)
                         "toggle_visibility" -> prefs.put("checkbox_enable_float_ball", false)
                     }
                 },
@@ -724,9 +728,12 @@ private class StreamKeySink(
     }
 }
 
-/** V+'s quick float ball: tap / double tap / long press run the actions chosen in Settings. */
+/**
+ * V+'s quick float ball: tap / double tap / long press run the actions chosen in Settings. Drag it
+ * anywhere; the spot is kept (as a share of the screen) until another preset position is chosen.
+ */
 @Composable
-private fun FloatBall(ui: StreamUiPrefs, onAction: (String) -> Unit) {
+private fun FloatBall(ui: StreamUiPrefs, sp: android.content.SharedPreferences, onAction: (String) -> Unit) {
     val base = ui.overlayOpacity / 100f
     val s = Nebula.scale
     var poke by remember { mutableIntStateOf(0) }
@@ -742,10 +749,44 @@ private fun FloatBall(ui: StreamUiPrefs, onAction: (String) -> Unit) {
         "bottom_right" -> Alignment.BottomEnd
         else -> Alignment.CenterEnd
     }
-    Box(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(10))) {
+    // A dragged spot belongs to the preset it was dragged from; picking another preset drops it.
+    var dragged by remember(ui.floatBallPosition) {
+        mutableStateOf(FloatBallSpot.read(sp, ui.floatBallPosition))
+    }
+    BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(10))) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val ballPx = with(density) { s.dp(44).toPx() }
+        val maxX = (constraints.maxWidth - ballPx).coerceAtLeast(0f)
+        val maxY = (constraints.maxHeight - ballPx).coerceAtLeast(0f)
+        // While dragging: pixels from the top-left corner.
+        var live by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
+        // Where the preset alignment put the ball, so a first drag starts from there.
+        var startAt by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        val spot = live ?: dragged?.let { androidx.compose.ui.geometry.Offset(it.first * maxX, it.second * maxY) }
         Box(
-            Modifier.align(align).size(s.dp(44)).alpha(if (faded) base * 0.4f else base)
+            (if (spot != null) Modifier.offset { IntOffset(spot.x.roundToInt(), spot.y.roundToInt()) } else Modifier.align(align))
+                .size(s.dp(44)).alpha(if (faded && live == null) base * 0.4f else base)
                 .background(Color(0xCC17171A), CircleShape).border(1.dp, NebulaColors.controlBorder, CircleShape)
+                .onGloballyPositioned { c -> if (live == null && dragged == null) startAt = c.positionInParent() }
+                .pointerInput(maxX, maxY) {
+                    detectDragGestures(
+                        onDragStart = { poke++; live = spot ?: startAt },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            val p = (live ?: startAt) + amount
+                            live = androidx.compose.ui.geometry.Offset(p.x.coerceIn(0f, maxX), p.y.coerceIn(0f, maxY))
+                        },
+                        onDragEnd = {
+                            live?.let { p ->
+                                val f = (if (maxX > 0) p.x / maxX else 0f) to (if (maxY > 0) p.y / maxY else 0f)
+                                dragged = f
+                                FloatBallSpot.write(sp, ui.floatBallPosition, f)
+                            }
+                            live = null; poke++
+                        },
+                        onDragCancel = { live = null },
+                    )
+                }
                 .pointerInput(ui.floatBallTap, ui.floatBallDoubleTap, ui.floatBallLongPress) {
                     detectTapGestures(
                         onTap = { poke++; onAction(ui.floatBallTap) },
@@ -757,5 +798,21 @@ private fun FloatBall(ui: StreamUiPrefs, onAction: (String) -> Unit) {
         ) {
             Icon(Icons.Rounded.MoreHoriz, "Stream menu", tint = NebulaColors.text, modifier = Modifier.size(s.dp(22)))
         }
+    }
+}
+
+/** Where the float ball was dragged to: a share (0–1) of the free width and height, per preset. */
+internal object FloatBallSpot {
+    const val KEY_X = "float_ball_drag_x"
+    const val KEY_Y = "float_ball_drag_y"
+    const val KEY_PRESET = "float_ball_drag_preset"
+
+    fun read(sp: android.content.SharedPreferences, preset: String): Pair<Float, Float>? {
+        if (sp.getString(KEY_PRESET, null) != preset || !sp.contains(KEY_X) || !sp.contains(KEY_Y)) return null
+        return sp.getFloat(KEY_X, 1f).coerceIn(0f, 1f) to sp.getFloat(KEY_Y, 0.5f).coerceIn(0f, 1f)
+    }
+
+    fun write(sp: android.content.SharedPreferences, preset: String, spot: Pair<Float, Float>) {
+        sp.edit().putString(KEY_PRESET, preset).putFloat(KEY_X, spot.first.coerceIn(0f, 1f)).putFloat(KEY_Y, spot.second.coerceIn(0f, 1f)).apply()
     }
 }
