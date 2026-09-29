@@ -105,9 +105,11 @@ fun NebulaButton(
     style: ButtonStyle = ButtonStyle.Primary,
     icon: ImageVector? = null,
     sublabel: String? = null,
+    /** Smaller height, padding, icon and text (e.g. the stream menu's Disconnect / Quit). */
+    compact: Boolean = false,
 ) {
     val s = Nebula.scale
-    val shape = RoundedCornerShape(s.dp(12))
+    val shape = RoundedCornerShape(s.dp(if (compact) 10 else 12))
     val (bg, fg, border) = when (style) {
         ButtonStyle.Primary -> Triple(NebulaColors.accent, Color.White, null)
         ButtonStyle.Secondary -> Triple(Color(0x99111113), NebulaColors.text, NebulaColors.controlBorder)
@@ -116,17 +118,17 @@ fun NebulaButton(
     }
     Row(
         modifier = modifier
-            .heightIn(min = s.dp(if (sublabel != null) 56 else 48))
+            .heightIn(min = s.dp(if (compact) (if (sublabel != null) 44 else 38) else if (sublabel != null) 56 else 48))
             .nebulaClickable(shape, onClick)
             .background(bg, shape)
             .then(if (border != null) Modifier.border(1.dp, border, shape) else Modifier)
-            .padding(horizontal = s.dp(18), vertical = s.dp(10)),
+            .padding(horizontal = s.dp(if (compact) 12 else 18), vertical = s.dp(if (compact) 6 else 10)),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(s.dp(10)),
+        horizontalArrangement = Arrangement.spacedBy(s.dp(if (compact) 8 else 10)),
     ) {
-        if (icon != null) Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(s.dp(20)))
+        if (icon != null) Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(s.dp(if (compact) 16 else 20)))
         Column {
-            Text(text, style = Nebula.type.bodyStrong, color = fg, maxLines = 1)
+            Text(text, style = if (compact) Nebula.type.secondary.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold) else Nebula.type.bodyStrong, color = fg, maxLines = 1)
             if (sublabel != null) {
                 Text(sublabel, style = Nebula.type.label, color = fg.copy(alpha = 0.78f), maxLines = 1)
             }

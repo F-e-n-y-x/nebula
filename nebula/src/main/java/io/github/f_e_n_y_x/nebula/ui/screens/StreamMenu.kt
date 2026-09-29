@@ -458,10 +458,10 @@ private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: St
     // A Column: the caller's Box would otherwise stack the note on top of the buttons.
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-            NebulaButton("Disconnect", sublabel = "Game keeps running", onClick = actions.onDisconnect, style = ButtonStyle.Secondary, icon = Icons.Rounded.Close)
+            NebulaButton("Disconnect", sublabel = "Game keeps running", onClick = actions.onDisconnect, style = ButtonStyle.Secondary, icon = Icons.Rounded.Close, compact = true)
             NebulaButton(
                 quitLabel, sublabel = if (quitLabel == "Quit game") "Closes it on the PC" else "Game keeps running",
-                onClick = onQuit, style = ButtonStyle.Danger, icon = Icons.Rounded.PowerSettingsNew,
+                onClick = onQuit, style = ButtonStyle.Danger, icon = Icons.Rounded.PowerSettingsNew, compact = true,
             )
         }
     }
