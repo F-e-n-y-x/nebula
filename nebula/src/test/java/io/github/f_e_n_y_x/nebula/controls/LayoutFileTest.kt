@@ -174,14 +174,15 @@ class LayoutFileTest {
         )
         assertEquals(5, idx.entries.size)
         assertEquals(listOf("shooter", "racing", "action-adventure"), idx.genres())
-        // Templates first (by genre), then games by name.
-        assertEquals(listOf("Shooter templates", "Racing templates", "Apex Legends", "GTA V"), idx.browse().map { it.title })
+        // Templates first (by genre), then one Games section with a card per game, by name.
+        assertEquals(listOf("Shooter templates", "Racing templates", "Games"), idx.browse().map { it.title })
         assertEquals("For any shooter", idx.browse().first().subtitle)
-        assertEquals("Shooter · Action-adventure", idx.browse().last().subtitle)
-        assertEquals(listOf("Shooter templates", "Apex Legends", "GTA V"), idx.browse(genre = "shooter").map { it.title })
-        assertEquals(listOf("a"), idx.browse(genre = "shooter").last().entries.map { it.id })
+        assertEquals(listOf("Apex Legends", "GTA V"), idx.browse().last().cards.map { it.title })
+        assertEquals("Shooter · Action-adventure", idx.browse().last().cards.last().subtitle)
+        assertEquals(listOf("Shooter templates", "Games"), idx.browse(genre = "shooter").map { it.title })
+        assertEquals(listOf("c", "a"), idx.browse(genre = "shooter").last().entries.map { it.id })
         assertEquals(listOf("Racing templates"), idx.browse(genre = "racing").map { it.title })
-        assertEquals(2, idx.browse("gta").single().entries.size)
+        assertEquals(2, idx.browse("gta").single().cards.single().variants.size)
         assertEquals(listOf("Racing templates"), idx.browse("racing").map { it.title })
         assertTrue(idx.browse("gta", genre = "racing").isEmpty())
         assertEquals(2, idx.entries.first().preview.size)
@@ -219,7 +220,7 @@ class LayoutFileTest {
         }
         assertTrue("shooter" in idx.genres())
         assertEquals("Shooter templates", idx.browse().first().title)
-        assertTrue(idx.browse().any { it.title == "Grand Theft Auto V" })
+        assertTrue(idx.browse().flatMap { it.cards }.any { it.title == "GTA V" || it.title == "Grand Theft Auto V" })
     }
 
     @Test fun `shared layouts go where the library keeps them`() {

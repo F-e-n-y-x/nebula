@@ -45,22 +45,85 @@ data class LibraryEntry(
 
 data class PreviewBox(val kind: ElementKind, val x: Float, val y: Float, val w: Float, val h: Float, val round: Boolean = true)
 
-/** A heading in Browse layouts: one genre's templates, or one game's layouts. */
-data class LibrarySection(val title: String, val subtitle: String, val template: Boolean, val entries: List<LibraryEntry>)
+/**
+ * One card in Browse layouts: one game (GTA V), or one family of genre templates (Touch shooter),
+ * with its variants (controller / keyboard, set / single layout) picked inside the card.
+ */
+data class LibraryCard(val key: String, val title: String, val subtitle: String, val variants: List<LibraryVariant>) {
+    /** What the card shows and adds first: its first variant (never a superseded one while another is left). */
+    val default: LibraryVariant get() = variants.first()
+    val entries: List<LibraryEntry> get() = variants.map { it.entry }
+}
+
+/**
+ * A card's variant. [superseded]: a single layout of a game that also has a layout set for the
+ * same input (the set is the newer, fuller version); still offered, listed last.
+ */
+data class LibraryVariant(val entry: LibraryEntry, val superseded: Boolean = false) {
+    val isSet: Boolean get() = entry.layouts.isNotEmpty()
+
+    /** "Controller · 5 layouts", "Keyboard + mouse · single layout", "… · older". */
+    val label: String get() = listOfNotNull(
+        LibraryCards.targetLabel(entry.meta.target),
+        if (isSet) "${entry.layouts.size} layouts" else "single layout",
+        "older".takeIf { superseded },
+    ).joinToString(" · ")
+}
+
+/** A heading in Browse layouts: one genre's templates, or the games. */
+data class LibrarySection(val title: String, val subtitle: String, val template: Boolean, val cards: List<LibraryCard>) {
+    val entries: List<LibraryEntry> get() = cards.flatMap { it.entries }
+}
+
+/** Groups index entries into cards; works on any index, wherever it comes from. */
+object LibraryCards {
+    private val TARGET_ORDER = listOf(LayoutTarget.XINPUT, LayoutTarget.KBM, LayoutTarget.MIXED)
+
+    fun targetLabel(t: LayoutTarget) = when (t) {
+        LayoutTarget.XINPUT -> "Controller"
+        LayoutTarget.KBM -> "Keyboard + mouse"
+        LayoutTarget.MIXED -> "Mixed"
+    }
+
+    /** "GTA V · touch controls" → "GTA V"; null without a " · ". */
+    private fun prefix(name: String) = name.split(" · ", limit = 2).takeIf { it.size == 2 }?.first()?.trim()?.ifBlank { null }
+
+    /** The card a game entry belongs to: its Steam app id, else its game's name. */
+    fun gameKey(e: LibraryEntry): String = e.meta.game?.let { g -> g.steamAppId?.let { "steam:$it" } ?: "game:${g.name.trim().lowercase()}" } ?: templateKey(e)
+
+    /** Templates group by their name before " · " (Touch shooter · controller / · keyboard & mouse). */
+    fun templateKey(e: LibraryEntry): String = "template:" + (prefix(e.meta.name) ?: e.meta.name).lowercase()
+
+    /** Variants in order: sets first, then single layouts, each by input (controller, keyboard, mixed); superseded singles last. */
+    fun variants(entries: List<LibraryEntry>): List<LibraryVariant> {
+        val setTargets = entries.filter { it.layouts.isNotEmpty() }.map { it.meta.target }.toSet()
+        return entries.map { e -> LibraryVariant(e, superseded = e.layouts.isEmpty() && !e.isTemplate && e.meta.target in setTargets) }
+            .sortedWith(compareBy<LibraryVariant>({ it.superseded }, { !it.isSet }, { TARGET_ORDER.indexOf(it.entry.meta.target) }, { it.entry.meta.name.lowercase() }))
+    }
+
+    fun card(key: String, entries: List<LibraryEntry>, subtitle: String): LibraryCard {
+        val first = entries.first()
+        // The name the entries share before " · " ("GTA V"), else the game's own name.
+        val common = entries.map { prefix(it.meta.name) }.distinct().singleOrNull()
+        val title = common ?: first.meta.game?.name ?: first.meta.name
+        return LibraryCard(key, title, subtitle, variants(entries))
+    }
+}
 
 data class LibraryIndex(val entries: List<LibraryEntry>, val skipped: Int, val updated: String?) {
     /** The genres that have layouts, in [LayoutGenres.ALL] order, then any others by name. */
     fun genres(): List<String> = entries.flatMap { it.genres }.distinct().sortedWith(LayoutGenres.ORDER)
 
     /**
-     * Entries matching [query] (name, game, author, description, tags or genre) and [genre]
-     * (null for all): genre templates first, one section per genre, then one section per game.
+     * Entries matching [query] (name, game, author, description, tags, genre or layout names)
+     * and [genre] (null for all), as cards: genre templates first, one section per genre (a card
+     * per template family), then one "Games" section with a card per game.
      */
     fun browse(query: String = "", genre: String? = null): List<LibrarySection> {
         val q = query.trim().lowercase()
         val hits = entries.filter { e ->
             (genre == null || genre in e.genres) && (
-                q.isEmpty() || listOf(e.meta.name, e.meta.author, e.gameName, e.meta.description, e.meta.target.label, e.meta.tags.joinToString(" "), e.genres.joinToString(" ") { LayoutGenres.label(it) })
+                q.isEmpty() || listOf(e.meta.name, e.meta.author, e.gameName, e.meta.description, e.meta.target.label, LibraryCards.targetLabel(e.meta.target), e.meta.tags.joinToString(" "), e.genres.joinToString(" ") { LayoutGenres.label(it) }, e.layouts.joinToString(" "))
                     .any { q in it.lowercase() }
                 )
         }
@@ -68,13 +131,15 @@ data class LibraryIndex(val entries: List<LibraryEntry>, val skipped: Int, val u
         val templateSections = templates.groupBy { (genre?.takeIf { g -> g in it.genres } ?: it.genres.firstOrNull()) ?: "" }.toList()
             .sortedWith(compareBy(LayoutGenres.ORDER) { it.first })
             .map { (g, list) ->
-                if (g.isEmpty()) LibrarySection("Templates", "For any game", true, list)
-                else LibrarySection("${LayoutGenres.label(g)} templates", "For any ${LayoutGenres.noun(g)}", true, list)
+                val cards = list.groupBy(LibraryCards::templateKey).map { (k, l) -> LibraryCards.card(k, l, l.first().meta.author.takeIf { it.isNotBlank() }?.let { "by $it" }.orEmpty()) }
+                if (g.isEmpty()) LibrarySection("Templates", "For any game", true, cards)
+                else LibrarySection("${LayoutGenres.label(g)} templates", "For any ${LayoutGenres.noun(g)}", true, cards)
             }
-        val gameSections = games.groupBy { it.gameName }.toList().sortedBy { it.first.lowercase() }.map { (game, list) ->
-            LibrarySection(game, list.flatMap { it.genres }.distinct().sortedWith(LayoutGenres.ORDER).joinToString(" · ") { LayoutGenres.label(it) }, false, list)
-        }
-        return templateSections + gameSections
+        val gameCards = games.groupBy(LibraryCards::gameKey).map { (k, list) ->
+            LibraryCards.card(k, list, list.flatMap { it.genres }.distinct().sortedWith(LayoutGenres.ORDER).joinToString(" · ") { LayoutGenres.label(it) })
+        }.sortedBy { it.title.lowercase() }
+        val gameSection = if (gameCards.isEmpty()) emptyList() else listOf(LibrarySection("Games", "Layouts made for one game", false, gameCards))
+        return templateSections + gameSection
     }
 }
 

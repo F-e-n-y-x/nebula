@@ -92,6 +92,8 @@ class StreamMenuActions(
     val onTestConnection: () -> Unit = {},
     /** Adaptive bitrate on or off for this stream (the Adaptive quick toggle). */
     val onAbr: (Boolean) -> Unit = {},
+    /** Switches the game's layout set to this layout now (stream menu → Controls). */
+    val onPickLayout: (String) -> Unit = {},
 )
 
 /**
@@ -169,9 +171,12 @@ fun StreamMenu(
             Modifier.fillMaxSize().background(Color(0x99000000))
                 .pointerInput(Unit) { detectTapGestures { actions.onResume() } },
         )
+        val sections = remember { MenuSections() }
+        val menuScroll = rememberScrollState()
+        val disconnectFocus = remember { FocusRequester() }
         val panelShape = if (side) RoundedCornerShape(topStart = s.dp(20), bottomStart = s.dp(20)) else RoundedCornerShape(topStart = s.dp(20), topEnd = s.dp(20))
         Column(
-            (if (side) Modifier.align(Alignment.CenterEnd).width(s.dp(420)).fillMaxHeight() else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.78f))
+            (if (side) Modifier.align(Alignment.CenterEnd).width(s.dp(468)).fillMaxHeight() else Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.78f))
                 .background(NebulaColors.panel, panelShape)
                 .border(1.dp, NebulaColors.border, panelShape)
                 // Swallows taps on the panel's gaps (they'd reach the scrim); not a focus target.
@@ -179,13 +184,17 @@ fun StreamMenu(
                 .then(if (side) Modifier.statusBarsPadding() else Modifier)
                 .navigationBarsPadding(),
         ) {
-        // The menu scrolls; Disconnect and Quit stay pinned at the bottom, always reachable.
+        // The menu scrolls; Disconnect and Quit stay pinned at the bottom, always reachable. A
+        // thin rail on the right jumps to each section.
+        androidx.compose.runtime.CompositionLocalProvider(LocalMenuSections provides sections) {
+        Row(Modifier.weight(1f)) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = s.dp(22), end = s.dp(22), top = s.dp(22), bottom = s.dp(12)),
+            Modifier.weight(1f).verticalScroll(menuScroll).menuContent(sections).padding(start = s.dp(22), end = s.dp(16), top = s.dp(22), bottom = s.dp(12)),
             verticalArrangement = Arrangement.spacedBy(s.dp(18)),
         ) {
             // The title, then the quick toggles, so they're in view without scrolling even on a
             // phone held sideways; the stream's details follow.
+            Box(Modifier.menuSection(MenuSection.QUICK)) {
             QuickToggleStrip(
                 title = { m -> Text(gameName, style = Nebula.type.heading, color = NebulaColors.text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = m) },
                 ui = ui, prefs = prefs, tick = tick,
@@ -200,26 +209,38 @@ fun StreamMenu(
                 abrOn = stats?.abr != null, onAbr = actions.onAbr,
                 textFields = supports("text_context"),
             )
-            Header(mode, stats)
-            StatsBlock(stats, full = true)
-            resolution?.let {
-                ResolutionRow(it, onOpen = { picking = true })
-                RotateRow(it, onRotated = actions.onResume)
             }
-            io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
+            Column(Modifier.menuSection(MenuSection.STATS), verticalArrangement = Arrangement.spacedBy(s.dp(18))) {
+                Header(mode, stats)
+                StatsBlock(stats, full = true)
+            }
+            resolution?.let {
+                Column(Modifier.menuSection(MenuSection.DISPLAY), verticalArrangement = Arrangement.spacedBy(s.dp(18))) {
+                    ResolutionRow(it, onOpen = { picking = true })
+                    RotateRow(it, onRotated = actions.onResume)
+                }
+            }
+            Box(Modifier.menuSection(MenuSection.FRAMEGEN)) {
+                io.github.f_e_n_y_x.nebula.framegen.FramegenMenuSection(stats?.post, stats?.receivedFps, prefs, actions.onFramegenPause, onOpenSettings = { framegenSettings = true })
+            }
             Controls(ui, prefs, actions, gameKey, zoomed, hostSection != null, controlsProfileId, controlsProfile, tick, focusResume = !quickShown, cursorMode = cursorMode)
             hostSection?.invoke()
-            FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro)
+            Box(Modifier.menuSection(MenuSection.FEEDBACK)) { FeedbackSection(ui, prefs, supports, hapticsNote, phoneHasGyro) }
             if (unsupported.isNotEmpty()) {
                 Text("This game asked for: ${unsupported.joinToString()}.", style = Nebula.type.label, color = NebulaColors.textMuted)
             }
-            Bitrate(bitrateKbps, bitrateNote, stats, connectionTest, actions)
-            Keys(actions.onShortcut)
+            Box(Modifier.menuSection(MenuSection.NETWORK)) { Bitrate(bitrateKbps, bitrateNote, stats, connectionTest, actions) }
+            Box(Modifier.menuSection(MenuSection.KEYS)) { Keys(actions.onShortcut) }
             if (gamepads > 0) Text("$gamepads controller${if (gamepads > 1) "s" else ""} connected · Start + Select opens this menu", style = Nebula.type.label, color = NebulaColors.textMuted)
         }
+        Box(Modifier.width(1.dp).fillMaxHeight().background(NebulaColors.border))
+        StreamMenuRail(sections, menuScroll, onEnd = { runCatching { disconnectFocus.requestFocus() } })
+        }
+        }
+        LaunchedEffect(sections) { sections.pinned[MenuSection.END] = true }
         Box(Modifier.fillMaxWidth().height(1.dp).background(NebulaColors.border))
         Box(Modifier.fillMaxWidth().padding(horizontal = s.dp(22), vertical = s.dp(12))) {
-            Footer(actions, onQuit = { confirmQuit = true }, quitLabel = if (ui.quitDisconnectsOnly) "Quit (disconnect)" else "Quit game")
+            Footer(actions, onQuit = { confirmQuit = true }, quitLabel = if (ui.quitDisconnectsOnly) "Quit (disconnect)" else "Quit game", disconnectFocus = disconnectFocus)
         }
         }
     }
@@ -300,7 +321,7 @@ private fun Controls(
     val s = Nebula.scale
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { if (focusResume) runCatching { first.requestFocus() } }
-    Column(verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
+    Column(Modifier.menuSection(MenuSection.INPUT), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             NebulaButton("Resume", onClick = actions.onResume, icon = Icons.Rounded.PlayArrow, modifier = Modifier.focusRequester(first))
             NebulaButton("PC keyboard", onClick = actions.onPcKeyboard, style = ButtonStyle.Secondary, icon = Icons.Outlined.Keyboard)
@@ -345,11 +366,15 @@ private fun Controls(
             }
         }
         StatsQuick(ui, prefs)
-        io.github.f_e_n_y_x.nebula.controls.ui.ControlsMenuSection(
-            gameKey = gameKey, shown = ui.osc,
-            onShown = { prefs.put("checkbox_show_onscreen_controls", it) },
-            onEdit = actions.onEditControls,
-        )
+        Column(Modifier.menuSection(MenuSection.CONTROLS), verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
+            io.github.f_e_n_y_x.nebula.controls.ui.ControlsMenuSection(
+                gameKey = gameKey, shown = ui.osc,
+                onShown = { prefs.put("checkbox_show_onscreen_controls", it) },
+                onEdit = actions.onEditControls,
+                currentLayoutId = controlsProfileId,
+                onPickLayout = actions.onPickLayout,
+            )
+        }
     }
 }
 
@@ -454,12 +479,15 @@ private fun Keys(onShortcut: (Shortcut) -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: String) {
+private fun Footer(actions: StreamMenuActions, onQuit: () -> Unit, quitLabel: String, disconnectFocus: FocusRequester? = null) {
     val s = Nebula.scale
     // A Column: the caller's Box would otherwise stack the note on top of the buttons.
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-            NebulaButton("Disconnect", sublabel = "Game keeps running", onClick = actions.onDisconnect, style = ButtonStyle.Secondary, icon = Icons.Rounded.Close, compact = true)
+            NebulaButton(
+                "Disconnect", sublabel = "Game keeps running", onClick = actions.onDisconnect, style = ButtonStyle.Secondary, icon = Icons.Rounded.Close, compact = true,
+                modifier = if (disconnectFocus != null) Modifier.focusRequester(disconnectFocus) else Modifier,
+            )
             NebulaButton(
                 quitLabel, sublabel = if (quitLabel == "Quit game") "Closes it on the PC" else "Game keeps running",
                 onClick = onQuit, style = ButtonStyle.Danger, icon = Icons.Rounded.PowerSettingsNew, compact = true,

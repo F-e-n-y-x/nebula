@@ -282,7 +282,7 @@ fun StreamHostMenuSection(state: StreamHostState, prefs: LegacyPrefs, onTypeClip
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(14))) {
         // Microphone
         if (state.mic != MicUi.HIDDEN) {
-            Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            Column(Modifier.menuSection(MenuSection.MIC), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
                 SectionTitle("Microphone", Modifier.padding(bottom = 0.dp))
                 MicRow(state)
                 if (prefs.prefs.getString("list_mic_menu_action_mode", "show_button") == "show_button" && state.mic != MicUi.UNSUPPORTED) {
@@ -295,7 +295,7 @@ fun StreamHostMenuSection(state: StreamHostState, prefs: LegacyPrefs, onTypeClip
         }
 
         // Clipboard
-        Column(verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+        Column(Modifier.menuSection(MenuSection.PC), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             SectionTitle("Clipboard", Modifier.padding(bottom = 0.dp))
             val text = prefs.prefs.getBoolean("checkbox_clipboard_sync_text", false)
             val images = prefs.prefs.getBoolean("checkbox_clipboard_sync_image", false)

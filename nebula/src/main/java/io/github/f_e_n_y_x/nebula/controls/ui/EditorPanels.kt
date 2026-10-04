@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.FileDownload
@@ -614,6 +616,9 @@ internal fun ProfilesPanel(
     var browsing by remember { mutableStateOf(false) }
     var scanning by remember { mutableStateOf(false) }
     var linkToFetch by remember { mutableStateOf<String?>(null) }
+    var expandedSets by remember { mutableStateOf(mapOf<String, Boolean>()) }
+    var editingSet by remember { mutableStateOf<String?>(null) }
+    var creatingSet by remember { mutableStateOf(false) }
 
     fun open(p: ControlsProfile) { if (session.dirty && p.id != current.id) pendingOpen = p else onOpen(p) }
 
@@ -650,12 +655,23 @@ internal fun ProfilesPanel(
         if (gameKey != null) {
             val assigned = lib.assignedTo(gameKey)
             val default = lib.resolve(null)
+            // A layout of a set: the game can use the whole set (it switches between them) or just this layout.
+            val ownSet = lib.setOf(current.id)
+            val options = buildList {
+                if (ownSet != null) add("Set: ${ownSet.name}" to ownSet.id)
+                add((if (ownSet != null) "Only this layout" else "This profile") to current.id)
+                add("Default" to "")
+            }
             Field(
                 "${gameName ?: "This game"} uses",
-                if (assigned == null) "Following the default (${default.name})." else "Its own profile; other games keep the default.",
+                when {
+                    assigned == null -> "Following the default (${lib.resolveSet(null)?.name ?: default.name})."
+                    ownSet != null && assigned == ownSet.id -> "The whole set: the switch button moves between its layouts."
+                    else -> "Its own choice; other games keep the default."
+                },
             ) {
-                Segmented(listOf("This profile" to true, "Default" to false), assigned == current.id) { mine ->
-                    store.update { l -> l.assign(gameKey, if (mine) current.id else null) }
+                Segmented(options, assigned?.takeIf { a -> options.any { it.second == a } } ?: if (assigned == null) "" else "?") { id ->
+                    store.update { l -> l.assign(gameKey, id.ifEmpty { null }) }
                     onChanged()
                 }
             }
@@ -695,29 +711,25 @@ internal fun ProfilesPanel(
             if (!current.isBuiltIn) SmallAction("Delete", Icons.Rounded.Delete, { confirmDelete = true }, danger = true)
         }
 
-        Text("All profiles", style = Nebula.type.label, color = NebulaColors.textSecondary)
-        lib.all.forEach { p ->
-            val shape = RoundedCornerShape(s.dp(12))
-            val on = p.id == current.id
-            Row(
-                Modifier.fillMaxWidth().nebulaClickable(shape, { open(p) }, role = Role.RadioButton)
-                    .background(if (on) NebulaColors.accentTint else NebulaColors.surface, shape)
-                    .border(1.dp, if (on) NebulaColors.accentText else Color.Transparent, shape)
-                    .padding(horizontal = s.dp(14), vertical = s.dp(11)),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(p.name, style = Nebula.type.bodyStrong, color = NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("Profiles and layout sets", style = Nebula.type.label, color = NebulaColors.textSecondary)
+        // A set is one item; its layouts aren't listed again on their own.
+        lib.groups().forEach { g ->
+            when (g) {
+                is io.github.f_e_n_y_x.nebula.controls.ProfileGroup.Single -> ProfileRow(g.profile, current.id, lib, data, gameKey) { open(g.profile) }
+                is io.github.f_e_n_y_x.nebula.controls.ProfileGroup.SetItem -> {
+                    val key = g.set.id
+                    val isOpen = expandedSets[key] ?: g.layouts.any { it.id == current.id }
                     val tags = buildList {
-                        if (p.isBuiltIn) add("Built in")
-                        if (p.origin == "crown") add("From V+")
-                        if (lib.resolve(null).id == p.id) add("Default")
-                        if (gameKey != null && lib.assignedTo(gameKey) == p.id) add("This game")
-                        val games = data.games.count { it.value == p.id }
-                        if (games > 0 && !(gameKey != null && games == 1 && lib.assignedTo(gameKey) == p.id)) add("$games game${if (games == 1) "" else "s"}")
-                        add("${p.landscape.size} controls")
+                        if (g.set.isBuiltIn) add("Built in")
+                        if (lib.resolveSet(null)?.id == key && lib.assignedTo(gameKey ?: "") == null) add("Default")
+                        if (gameKey != null && lib.assignedTo(gameKey) == key) add("This game")
                     }
-                    Text(tags.joinToString(" · "), style = Nebula.type.label, color = NebulaColors.textMuted)
+                    SetGroupRow(g, current.id, tags, isOpen, onExpand = { expandedSets = expandedSets + (key to it) }, onLayout = { open(it) }) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+                            SmallAction("Edit set", Icons.Rounded.Edit, { editingSet = key })
+                            if (gameKey != null && lib.assignedTo(gameKey) != key) SmallAction("Use for ${gameName ?: "this game"}", null, { store.update { it.assign(gameKey, key) }; onChanged() })
+                        }
+                    }
                 }
             }
         }
@@ -726,6 +738,7 @@ internal fun ProfilesPanel(
             NebulaButton("Browse layouts", onClick = { browsing = true }, style = ButtonStyle.Secondary, modifier = Modifier.testTag("browse-layouts"))
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
+            NebulaButton("New set", onClick = { creatingSet = true }, style = ButtonStyle.Secondary, icon = Icons.Rounded.Layers, modifier = Modifier.testTag("editor-new-set"))
             SmallAction("New profile", null, {
                 var added: ControlsProfile? = null
                 store.update { l -> l.add(DefaultProfiles.standard(store.standardOptions()).copy(name = "New controls", origin = null)).also { added = it.second }.first }
@@ -804,6 +817,12 @@ internal fun ProfilesPanel(
     if (browsing) {
         LayoutBrowserDialog(store, onAdded = { a -> browsing = false; open(a) }, onDismiss = { browsing = false })
     }
+    if (creatingSet) SetEditorDialog(null, gameKey, onDismiss = { creatingSet = false }, onOpenLayout = { open(it) }, onCreated = { set ->
+        // Open the new set's start layout, so its layouts can be filled in right away.
+        store.library().let { l -> (set.startId() ?: set.members.firstOrNull())?.let(l::find) }?.let { open(it) }
+        onChanged()
+    })
+    editingSet?.let { id -> SetEditorDialog(id, gameKey, onDismiss = { editingSet = null; onChanged() }, onOpenLayout = { open(it) }) }
     if (scanning) {
         QrScanDialog(onCode = { code -> scanning = false; importText(code) }, onDismiss = { scanning = false })
     }
@@ -825,5 +844,41 @@ internal fun ProfilesPanel(
             confirmButton = { NebulaButton("OK", onClick = { importError = null }) },
             shape = RoundedCornerShape(s.dp(18)),
         )
+    }
+}
+
+/** One loose profile in the Profiles list. */
+@Composable
+private fun ProfileRow(
+    p: ControlsProfile,
+    currentId: String,
+    lib: io.github.f_e_n_y_x.nebula.controls.ProfileLibrary,
+    data: ProfileJson.StoreData,
+    gameKey: String?,
+    onClick: () -> Unit,
+) {
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(12))
+    val on = p.id == currentId
+    Row(
+        Modifier.fillMaxWidth().nebulaClickable(shape, onClick, role = Role.RadioButton)
+            .background(if (on) NebulaColors.accentTint else NebulaColors.surface, shape)
+            .border(1.dp, if (on) NebulaColors.accentText else Color.Transparent, shape)
+            .padding(horizontal = s.dp(14), vertical = s.dp(11)).testTag("profile:${p.id}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(p.name, style = Nebula.type.bodyStrong, color = NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val tags = buildList {
+                if (p.isBuiltIn) add("Built in")
+                if (p.origin == "crown") add("From V+")
+                if (lib.resolveSet(null) == null && lib.resolve(null).id == p.id) add("Default")
+                if (gameKey != null && lib.assignedTo(gameKey) == p.id) add("This game")
+                val games = data.games.count { it.value == p.id }
+                if (games > 0 && !(gameKey != null && games == 1 && lib.assignedTo(gameKey) == p.id)) add("$games game${if (games == 1) "" else "s"}")
+                add("${p.landscape.size} controls")
+            }
+            Text(tags.joinToString(" · "), style = Nebula.type.label, color = NebulaColors.textMuted)
+        }
     }
 }

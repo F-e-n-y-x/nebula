@@ -84,6 +84,11 @@ import io.github.f_e_n_y_x.nebula.controls.LayoutIndex
 import io.github.f_e_n_y_x.nebula.controls.LayoutMeta
 import io.github.f_e_n_y_x.nebula.controls.LayoutTarget
 import io.github.f_e_n_y_x.nebula.controls.LibraryEntry
+import io.github.f_e_n_y_x.nebula.controls.LibraryCard
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import io.github.f_e_n_y_x.nebula.controls.LayoutGenres
 import io.github.f_e_n_y_x.nebula.controls.LibraryIndex
 import io.github.f_e_n_y_x.nebula.controls.LibrarySource
@@ -593,7 +598,7 @@ internal fun LayoutBrowserDialog(store: ControlsStore, onAdded: (ControlsProfile
                                     if (sec.subtitle.isNotBlank()) Text(sec.subtitle, style = Nebula.type.label, color = NebulaColors.textMuted)
                                 }
                                 FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                                    sec.entries.forEach { e -> LibraryCard(e, busy = downloading == e.id) { if (downloading == null) pick = e } }
+                                    sec.cards.forEach { c -> LibraryCardView(c, downloading) { e -> if (downloading == null) pick = e } }
                                 }
                             }
                         }
@@ -614,27 +619,74 @@ internal fun LayoutBrowserDialog(store: ControlsStore, onAdded: (ControlsProfile
     }
 }
 
+/**
+ * One game (or template family) per card. Its variants (controller / keyboard, set / single
+ * layout) are chips inside; the thumbnail, facts and Get follow the chosen one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LibraryCard(e: LibraryEntry, busy: Boolean, onClick: () -> Unit) {
+private fun LibraryCardView(card: LibraryCard, downloading: String?, onGet: (LibraryEntry) -> Unit) {
     val s = Nebula.scale
     val shape = RoundedCornerShape(s.dp(14))
+    var chosen by remember(card.key, card.variants.size) { mutableStateOf(card.default.entry.id) }
+    val v = card.variants.firstOrNull { it.entry.id == chosen } ?: card.default
+    val e = v.entry
+    val busy = downloading == e.id
     Column(
-        Modifier.width(s.dp(220)).nebulaClickable(shape, onClick).background(NebulaColors.surface, shape).border(1.dp, NebulaColors.border, shape)
-            .padding(s.dp(10)).testTag("library:${e.id}"),
-        verticalArrangement = Arrangement.spacedBy(s.dp(6)),
+        Modifier.width(s.dp(268)).background(NebulaColors.surface, shape).border(1.dp, NebulaColors.border, shape)
+            .padding(s.dp(12)).testTag("library-card:${card.key}"),
+        verticalArrangement = Arrangement.spacedBy(s.dp(8)),
     ) {
-        Box {
+        Column(verticalArrangement = Arrangement.spacedBy(s.dp(2))) {
+            Text(card.title, style = Nebula.type.bodyStrong, color = NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (card.subtitle.isNotBlank()) Text(card.subtitle, style = Nebula.type.label, color = NebulaColors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Box(Modifier.nebulaClickable(RoundedCornerShape(s.dp(10)), { onGet(e) }).testTag("library:${e.id}")) {
             LayoutThumbnail(e.preview.map { it.thumb() }, e.meta.aspect)
             if (busy) CircularProgressIndicator(color = NebulaColors.accentText, modifier = Modifier.align(Alignment.Center).size(s.dp(28)))
         }
-        Text(e.meta.name, style = Nebula.type.bodyStrong, color = NebulaColors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(
-            listOfNotNull(e.meta.author.takeIf { it.isNotBlank() }?.let { "by $it" }, e.meta.target.label, if (e.layouts.isNotEmpty()) "${e.layouts.size} layouts" else "${e.controls} controls").joinToString(" · "),
-            style = Nebula.type.label, color = NebulaColors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
-        )
-        if (e.meta.description.isNotBlank()) {
+        if (card.variants.size > 1) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(6)), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
+                card.variants.forEach { o ->
+                    VariantChip(o.label, o.entry.id == e.id, dim = o.superseded, modifier = Modifier.testTag("variant:${o.entry.id}")) { chosen = o.entry.id }
+                }
+            }
+        } else {
+            Text(v.label, style = Nebula.type.label, color = NebulaColors.textSecondary)
+        }
+        if (v.isSet) {
+            Text(e.layouts.joinToString(" · "), style = Nebula.type.label, color = NebulaColors.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        if (v.superseded) {
+            Text("The layout set above replaces this older single layout.", style = Nebula.type.label, color = NebulaColors.textMuted)
+        } else if (e.meta.description.isNotBlank()) {
             Text(e.meta.description, style = Nebula.type.label, color = NebulaColors.textSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                listOfNotNull(e.meta.author.takeIf { it.isNotBlank() }?.let { "by $it" }, if (v.isSet) null else "${e.controls} controls").joinToString(" · "),
+                style = Nebula.type.label, color = NebulaColors.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            )
+            NebulaButton(
+                if (busy) "Getting…" else if (v.isSet) "Get set" else "Get",
+                onClick = { onGet(e) }, compact = true, modifier = Modifier.testTag("library-get:${card.key}"),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VariantChip(text: String, selected: Boolean, dim: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(8))
+    Box(
+        modifier.heightIn(min = s.dp(36)).nebulaClickable(shape, onClick, role = Role.RadioButton).semantics { this.selected = selected }
+            .background(if (selected) NebulaColors.accentTint else Color.Transparent, shape)
+            .border(1.dp, if (selected) NebulaColors.accentText else NebulaColors.controlBorder, shape)
+            .padding(horizontal = s.dp(10), vertical = s.dp(7)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = Nebula.type.label, color = if (selected) NebulaColors.text else if (dim) NebulaColors.textMuted else NebulaColors.textSecondary, maxLines = 1)
     }
 }
 

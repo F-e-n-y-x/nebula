@@ -730,6 +730,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     onNextLayout = {
                         controlsActive.set?.target(controlsProfile.id, io.github.f_e_n_y_x.nebula.controls.SwitchTarget.Next)?.let { activeLayoutId = it }
                     },
+                    onPickLayout = { id -> activeLayoutId = id },
                     onTestConnection = vm::testConnection,
                     onAbr = vm::setAdaptiveBitrate,
                 ),

@@ -140,16 +140,110 @@ class ProfileLibrary(
         return with(data.copy(sets = data.sets.map { if (it.id == set.id) clean else it }))
     }
 
-    /** Deletes a user set (its layouts stay as profiles); games and the default that used it go back to Standard. */
-    fun deleteSet(id: String): ProfileLibrary {
-        if (data.sets.none { it.id == id }) return this
+    /**
+     * Deletes a user set; games and the default that used it go back to Standard. Its layouts
+     * stay as loose profiles, unless [withLayouts]: then the ones no other set uses go too.
+     */
+    fun deleteSet(id: String, withLayouts: Boolean = false): ProfileLibrary {
+        val set = data.sets.firstOrNull { it.id == id } ?: return this
+        val left = data.sets.filterNot { it.id == id }
+        val dropped = if (withLayouts) set.members.filter { m -> left.none { m in it.members } && data.profiles.any { it.id == m } }.toSet() else emptySet()
+        val gone = dropped + id
         return with(
             data.copy(
-                sets = data.sets.filterNot { it.id == id },
-                activeProfileId = if (data.activeProfileId == id) builtIn.id else data.activeProfileId,
-                games = data.games.filterValues { it != id },
+                profiles = data.profiles.filterNot { it.id in dropped },
+                sets = left,
+                activeProfileId = if (data.activeProfileId in gone) builtIn.id else data.activeProfileId,
+                games = data.games.filterValues { it !in gone },
             ),
         )
+    }
+
+    fun renameSet(id: String, name: String): ProfileLibrary {
+        val clean = name.trim().take(LayoutSet.MAX_NAME)
+        val set = data.sets.firstOrNull { it.id == id } ?: return this
+        if (clean.isEmpty() || clean == set.name) return this
+        val unique = if (sets.any { it.id != id && it.name.equals(clean, ignoreCase = true) }) uniqueSetName(clean) else clean
+        return with(data.copy(sets = data.sets.map { if (it.id == id) it.copy(name = unique, updatedAtMs = now()) else it }))
+    }
+
+    // ---- grouping: a set is one item, its layouts aren't also loose profiles ----
+
+    /**
+     * Everything to list, a set as one item: loose built-in profiles (Standard) first, then the
+     * sets with their layouts in picker order, then the user's loose profiles by name. A profile
+     * in a set isn't listed loose; one in two sets shows in both. Nothing is changed or lost:
+     * delete the set and its layouts are loose again.
+     */
+    fun groups(): List<ProfileGroup> {
+        val setGroups = sets.mapNotNull { s -> s.members.mapNotNull(::find).takeIf { it.isNotEmpty() }?.let { ProfileGroup.SetItem(s, it) } }
+        val inSets = setGroups.flatMap { g -> g.layouts.map { it.id } }.toSet()
+        val (builtIns, mine) = all.filter { it.id !in inSets }.partition { it.isBuiltIn }
+        return builtIns.map(ProfileGroup::Single) + setGroups + mine.map(ProfileGroup::Single)
+    }
+
+    /** The first set [profileId] is a layout of, if any. */
+    fun setOf(profileId: String?): LayoutSet? = profileId?.let { id -> sets.firstOrNull { id in it.members } }
+
+    // ---- making sets on the device ----
+
+    /**
+     * A new set from [sources], in order: a new layout from the standard controller, a copy of
+     * a profile, or an existing profile moved in (a built-in one is copied, as it can't change).
+     * [start] and [inCycle] index [sources]. Every layout without a layout switch gets one (top
+     * centre, clear of its controls) going to [switchTo]. Null when nothing could be added.
+     */
+    fun newSet(
+        name: String,
+        sources: List<SetSource>,
+        start: Int = 0,
+        inCycle: List<Boolean>? = null,
+        switchTo: SwitchTarget = SwitchTarget.Next,
+    ): Pair<ProfileLibrary, LayoutSet>? {
+        var lib = this
+        val ids = mutableListOf<String?>()
+        for (src in sources.take(LayoutSet.MAX_LAYOUTS)) {
+            val (next, p) = lib.materialize(src, switchTo) ?: (lib to null)
+            lib = next
+            ids += p?.id
+        }
+        val members = ids.filterNotNull().distinct()
+        if (members.isEmpty()) return null
+        val cycle = inCycle?.let { flags -> ids.filterIndexed { i, id -> id != null && flags.getOrElse(i) { true } }.filterNotNull().distinct() }
+        val (made, set) = lib.createSet(name, members) ?: return null
+        val wanted = set.copy(start = ids.getOrNull(start), cycle = cycle?.takeIf { it.isNotEmpty() })
+        val done = made.updateSet(wanted)
+        return done to (done.findSet(set.id) ?: set)
+    }
+
+    /** Adds a layout to user set [setId] (with a switch, as [newSet] does); the new layout, or null. */
+    fun addToSet(setId: String, source: SetSource, switchTo: SwitchTarget = SwitchTarget.Next): Pair<ProfileLibrary, ControlsProfile>? {
+        val set = data.sets.firstOrNull { it.id == setId } ?: return null
+        if (set.members.size >= LayoutSet.MAX_LAYOUTS) return null
+        val (lib, p) = materialize(source, switchTo) ?: return null
+        if (p.id in set.members) return lib to p
+        // A layout added to a set that lists its cycle joins the cycle too.
+        val updated = lib.updateSet(set.copy(members = set.members + p.id, cycle = set.cycle?.plus(p.id)))
+        return updated to (updated.find(p.id) ?: p)
+    }
+
+    private fun materialize(src: SetSource, switchTo: SwitchTarget): Pair<ProfileLibrary, ControlsProfile>? {
+        val t = now()
+        val p: ControlsProfile = when (src) {
+            is SetSource.Blank -> builtIn.copy(id = newId(), name = uniqueName(src.name.trim().ifBlank { "Layout" }.take(MAX_NAME)), origin = null, meta = null, createdAtMs = t, updatedAtMs = t)
+            is SetSource.Copy -> {
+                val from = find(src.profileId) ?: return null
+                from.copy(id = newId(), name = uniqueName((src.name?.trim()?.ifBlank { null } ?: "${from.name} copy").take(MAX_NAME)), origin = null, createdAtMs = t, updatedAtMs = t)
+            }
+            is SetSource.Existing -> {
+                val from = find(src.profileId) ?: return null
+                if (from.isBuiltIn) from.copy(id = newId(), name = uniqueName("My ${from.name}".take(MAX_NAME)), origin = null, createdAtMs = t, updatedAtMs = t) else from
+            }
+        }
+        val withSwitch = SwitchPlacement.ensure(p, switchTo)
+        if (withSwitch === p && data.profiles.any { it.id == p.id }) return this to p
+        val list = if (data.profiles.any { it.id == p.id }) data.profiles.map { if (it.id == p.id) withSwitch.copy(updatedAtMs = t) else it } else data.profiles + withSwitch
+        return with(data.copy(profiles = list)) to withSwitch
     }
 
     /**
@@ -213,4 +307,23 @@ class ProfileLibrary(
     companion object {
         const val MAX_NAME = 40
     }
+}
+
+/** One item in a profiles list: a loose profile, or a layout set with its layouts. */
+sealed interface ProfileGroup {
+    data class Single(val profile: ControlsProfile) : ProfileGroup
+    data class SetItem(val set: LayoutSet, val layouts: List<ControlsProfile>) : ProfileGroup {
+        /** "GTA V · 5 layouts" */
+        val title: String get() = "${set.name} · ${layouts.size} layout${if (layouts.size == 1) "" else "s"}"
+    }
+}
+
+/** Where a layout of a new set comes from. */
+sealed interface SetSource {
+    /** A new layout, starting from the standard controller. */
+    data class Blank(val name: String) : SetSource
+    /** A copy of a profile (or of another set's layout). */
+    data class Copy(val profileId: String, val name: String? = null) : SetSource
+    /** A profile moved into the set as it is. */
+    data class Existing(val profileId: String) : SetSource
 }

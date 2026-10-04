@@ -13,6 +13,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.mutableStateOf
+import io.github.f_e_n_y_x.nebula.controls.ProfileGroup
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -37,12 +47,21 @@ import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 
 /**
- * Stream-menu controls: show/hide, switch profile live for this game, and open the editor.
- * On TV (no touchscreen) only the toggle is shown.
+ * Stream-menu controls: show/hide, pick this game's controls live, and open the editor. A layout
+ * set is one chip ("GTA V · 5 layouts") that expands to its layouts; picking one switches to it
+ * now ([onPickLayout]). On TV (no touchscreen) only the toggle is shown.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ControlsMenuSection(gameKey: String, shown: Boolean, onShown: (Boolean) -> Unit, onEdit: () -> Unit) {
+fun ControlsMenuSection(
+    gameKey: String,
+    shown: Boolean,
+    onShown: (Boolean) -> Unit,
+    onEdit: () -> Unit,
+    /** The layout on screen now (with a set, the set's current layout). */
+    currentLayoutId: String? = null,
+    onPickLayout: (String) -> Unit = {},
+) {
     val s = Nebula.scale
     val ctx = LocalContext.current
     val store = remember { ControlsStore.get(ctx) }
@@ -53,44 +72,66 @@ fun ControlsMenuSection(gameKey: String, shown: Boolean, onShown: (Boolean) -> U
     val active = lib.resolve(gameKey)
     val activeSet = lib.resolveSet(gameKey)
     val own = lib.assignedTo(gameKey) != null
-    var setsOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
-    var browsing by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var setsOpen by remember { mutableStateOf(false) }
+    var browsing by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf(false) }
+    // The set whose layouts are shown; the game's own set starts open.
+    var expanded by remember(activeSet?.id) { mutableStateOf(activeSet?.id) }
+    val groups = remember(lib) { lib.groups() }
     Column(verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
         Text(
-            if (own) "Controls profile · this game" else "Controls profile · the default, until you pick one for this game",
+            if (own) "Controls · this game" else "Controls · the default, until you pick one for this game",
             style = Nebula.type.label, color = NebulaColors.textSecondary,
         )
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-            // Layout sets first: the game then switches between their layouts on screen.
-            lib.sets.forEach { set ->
-                val on = activeSet?.id == set.id
-                val shape = RoundedCornerShape(s.dp(10))
-                Box(
-                    Modifier.heightIn(min = s.dp(40)).semantics { selected = on }
-                        .nebulaClickable(shape, { store.update { it.assign(gameKey, set.id) } }, role = Role.RadioButton)
-                        .background(if (on) NebulaColors.accent else NebulaColors.surface, shape)
-                        .border(1.dp, if (on) NebulaColors.accentText else NebulaColors.controlBorder, shape)
-                        .padding(horizontal = s.dp(12), vertical = s.dp(9)),
-                    contentAlignment = Alignment.Center,
-                ) { Text("${set.name} · ${set.members.size} layouts", style = Nebula.type.label, color = if (on) Color.White else NebulaColors.text, maxLines = 1) }
+            groups.forEach { g ->
+                when (g) {
+                    is ProfileGroup.SetItem -> {
+                        val on = activeSet?.id == g.set.id
+                        MenuChip(
+                            g.title, on, Modifier.testTag("menu-set:${g.set.id}"),
+                            trailing = if (expanded == g.set.id) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                            leading = Icons.Rounded.Layers,
+                        ) {
+                            if (!on) store.update { it.assign(gameKey, g.set.id) }
+                            expanded = if (expanded == g.set.id && on) null else g.set.id
+                        }
+                    }
+                    is ProfileGroup.Single -> {
+                        val on = activeSet == null && g.profile.id == active.id
+                        MenuChip(g.profile.name, on, Modifier.testTag("menu-profile:${g.profile.id}")) { store.update { it.assign(gameKey, g.profile.id) } }
+                    }
+                }
             }
-            lib.all.forEach { p ->
-                val on = activeSet == null && p.id == active.id
-                val shape = RoundedCornerShape(s.dp(10))
-                Box(
-                    Modifier.heightIn(min = s.dp(40)).semantics { selected = on }
-                        .nebulaClickable(shape, { store.update { it.assign(gameKey, p.id) } }, role = Role.RadioButton)
-                        .background(if (on) NebulaColors.accent else NebulaColors.surface, shape)
-                        .border(1.dp, if (on) NebulaColors.accentText else NebulaColors.controlBorder, shape)
-                        .padding(horizontal = s.dp(12), vertical = s.dp(9)),
-                    contentAlignment = Alignment.Center,
-                ) { Text(p.name, style = Nebula.type.label, color = if (on) Color.White else NebulaColors.text, maxLines = 1) }
+        }
+        // The open set's layouts: a second row, indented under the chips.
+        groups.filterIsInstance<ProfileGroup.SetItem>().firstOrNull { it.set.id == expanded }?.let { g ->
+            val on = activeSet?.id == g.set.id
+            Column(
+                Modifier.fillMaxWidth().background(NebulaColors.surface, RoundedCornerShape(s.dp(12))).border(1.dp, NebulaColors.border, RoundedCornerShape(s.dp(12)))
+                    .padding(s.dp(10)).testTag("menu-set-layouts"),
+                verticalArrangement = Arrangement.spacedBy(s.dp(8)),
+            ) {
+                Text(
+                    if (on) "${g.set.name}: tap a layout to switch to it now" else "${g.set.name}'s layouts",
+                    style = Nebula.type.label, color = NebulaColors.textMuted,
+                )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(6)), verticalArrangement = Arrangement.spacedBy(s.dp(6))) {
+                    val current = currentLayoutId?.takeIf { on }
+                    g.layouts.forEach { p ->
+                        MenuChip(p.name, p.id == current, Modifier.testTag("menu-layout:${p.id}"), compact = true) {
+                            if (!on) store.update { it.assign(gameKey, g.set.id) }
+                            onPickLayout(p.id)
+                        }
+                    }
+                }
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
             NebulaButton("Edit controls", onClick = onEdit, style = ButtonStyle.Secondary, icon = Icons.Outlined.Edit)
-            NebulaButton("Browse layouts", onClick = { browsing = true }, style = ButtonStyle.Secondary, modifier = androidx.compose.ui.Modifier.testTag("menu-browse-layouts"))
-            NebulaButton("Layout sets", onClick = { setsOpen = true }, style = ButtonStyle.Secondary, modifier = androidx.compose.ui.Modifier.testTag("open-layout-sets"))
+            NebulaButton("Browse layouts", onClick = { browsing = true }, style = ButtonStyle.Secondary, modifier = Modifier.testTag("menu-browse-layouts"))
+            NebulaButton("New set", onClick = { creating = true }, style = ButtonStyle.Secondary, icon = Icons.Rounded.Add, modifier = Modifier.testTag("menu-new-set"))
+            NebulaButton("Layout sets", onClick = { setsOpen = true }, style = ButtonStyle.Secondary, modifier = Modifier.testTag("open-layout-sets"))
         }
         if (lib.all.size == 1 && lib.sets.isEmpty()) {
             Text(
@@ -100,11 +141,41 @@ fun ControlsMenuSection(gameKey: String, shown: Boolean, onShown: (Boolean) -> U
         }
     }
     if (setsOpen) LayoutSetsDialog(gameKey, onDismiss = { setsOpen = false })
+    if (creating) SetEditorDialog(null, gameKey, onDismiss = { creating = false })
     // A layout (or set) added here is given to this game at once.
     if (browsing) LayoutBrowserDialog(store, onAdded = { a ->
         browsing = false
         store.update { l -> l.assign(gameKey, l.setsOf(a.id).firstOrNull()?.id ?: a.id) }
     }, onDismiss = { browsing = false })
+}
+
+/** A radio chip of the stream menu's Controls choice. */
+@Composable
+private fun MenuChip(
+    text: String,
+    on: Boolean,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    leading: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    trailing: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    onClick: () -> Unit,
+) {
+    val s = Nebula.scale
+    val shape = RoundedCornerShape(s.dp(10))
+    Row(
+        modifier.heightIn(min = s.dp(if (compact) 36 else 40)).semantics { selected = on }
+            .nebulaClickable(shape, onClick, role = Role.RadioButton)
+            .background(if (on) NebulaColors.accent else NebulaColors.surface, shape)
+            .border(1.dp, if (on) NebulaColors.accentText else NebulaColors.controlBorder, shape)
+            .padding(horizontal = s.dp(12), vertical = s.dp(if (compact) 7 else 9)),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(s.dp(6)),
+    ) {
+        val tint = if (on) Color.White else NebulaColors.text
+        if (leading != null) Icon(leading, null, tint = if (on) Color.White else NebulaColors.accentText, modifier = Modifier.size(s.dp(16)))
+        Text(text, style = Nebula.type.label, color = tint, maxLines = 1)
+        if (trailing != null) Icon(trailing, null, tint = tint, modifier = Modifier.size(s.dp(16)))
+    }
 }
 
 /**
@@ -126,19 +197,14 @@ fun ControlsSettingsSection(onOpenEditor: () -> Unit) {
             "Place, resize and rebind buttons, sticks, D-pads, triggers, touchpads, combos and macros. Save layouts as profiles, pick one per game from the stream menu, and import V+ Crown profiles.",
             style = Nebula.type.label, color = NebulaColors.textMuted,
         )
-        Text("Default profile", style = Nebula.type.label, color = NebulaColors.textSecondary)
+        Text("Default controls", style = Nebula.type.label, color = NebulaColors.textSecondary)
+        val defaultSet = lib.resolveSet(null)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalArrangement = Arrangement.spacedBy(s.dp(8))) {
-            lib.all.forEach { p ->
-                val on = p.id == default.id
-                val shape = RoundedCornerShape(s.dp(10))
-                Box(
-                    Modifier.heightIn(min = s.dp(40)).semantics { selected = on }
-                        .nebulaClickable(shape, { store.update { it.setDefault(p.id) } }, role = Role.RadioButton)
-                        .background(if (on) NebulaColors.accent else NebulaColors.surface, shape)
-                        .border(1.dp, if (on) NebulaColors.accentText else NebulaColors.controlBorder, shape)
-                        .padding(horizontal = s.dp(12), vertical = s.dp(9)),
-                    contentAlignment = Alignment.Center,
-                ) { Text(p.name, style = Nebula.type.label, color = if (on) Color.White else NebulaColors.text, maxLines = 1) }
+            lib.groups().forEach { g ->
+                when (g) {
+                    is ProfileGroup.SetItem -> MenuChip(g.title, defaultSet?.id == g.set.id, leading = Icons.Rounded.Layers) { store.update { it.setDefault(g.set.id) } }
+                    is ProfileGroup.Single -> MenuChip(g.profile.name, defaultSet == null && g.profile.id == default.id) { store.update { it.setDefault(g.profile.id) } }
+                }
             }
         }
         var setsOpen by remember { androidx.compose.runtime.mutableStateOf(false) }
