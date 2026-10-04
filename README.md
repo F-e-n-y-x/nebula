@@ -30,7 +30,7 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
   </tr>
   <tr>
     <td><img src="docs/images/screens/game-settings.webp" alt="Per-game settings"/></td>
-    <td><img src="docs/images/screens/stream-menu.webp" alt="Stream menu with quick toggles"/><br/><img src="docs/images/screens/controls-editor.webp" alt="On-screen controls editor with ready-made groups"/></td>
+    <td><img src="docs/images/screens/stream-menu-rail.webp" alt="Stream menu with quick toggles and the section rail"/><br/><img src="docs/images/screens/controls-editor.webp" alt="On-screen controls editor with ready-made groups"/></td>
   </tr>
 </table>
 
@@ -54,7 +54,7 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 - ✨ **Frame generation** (60 → 120 fps) and **upscaling** (Sharpen, SGSR 1, FSR 1), with a device
   self-test and automatic off when the phone gets hot.
 - 🧭 **Quick toggles** at the top of the stream menu — pin as many as you like, reorder them,
-  works with a TV remote.
+  works with a TV remote — and an **icon rail** on its edge that jumps straight to any section.
 - 📊 **Stats overlay** — pick the metrics, drag it anywhere; line, card or graph.
 
 **Input**
@@ -70,14 +70,21 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
   searchable **palette** with ready-made groups: ABXY, D-pad, shoulders and triggers, WASD, arrows,
   number row, F-keys, mouse buttons.
 - 🔀 **Layout sets** — several layouts per game (e.g. on foot, vehicle, aircraft) with an on-screen
-  **switch button**; switching releases everything you were holding.
+  **switch button**; switching releases everything you were holding. A set shows as one item
+  ("GTA V · 5 layouts"), and **New set** builds your own with the switch button added for you.
 - ➕ **Key combinations** — one button can send Shift+E or LB+RB, mixing gamepad, keyboard and mouse.
 - 👆 **Touch zones** — swipe-to-look camera, floating sticks, fire-and-look; every finger handled on its own.
 - 🌐 **Layout library** — the app ships with the standard controller only; add layouts and sets for any
   game from [nebula-layouts](https://github.com/F-e-n-y-x/nebula-layouts) (Browse layouts), or share
   your own as a file, code or QR code.
 
-<p><img src="docs/images/screens/gta-vehicle-layout.webp" alt="GTA V vehicle layout from the layout library" width="640"/></p>
+<table>
+  <tr>
+    <td><img src="docs/images/screens/layout-sets.webp" alt="A layout set shown as one item in the editor"/></td>
+    <td><img src="docs/images/screens/browse-layouts.webp" alt="Browse layouts: one card per game"/></td>
+    <td><img src="docs/images/screens/gta-vehicle-layout.webp" alt="GTA V vehicle layout"/></td>
+  </tr>
+</table>
 
 **Everywhere**
 - 🩺 **Diagnostics** — controller test, stick calibration, capability report, log export.
