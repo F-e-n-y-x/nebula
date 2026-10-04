@@ -23,64 +23,66 @@ with the whole Moonlight V+ streaming engine underneath, and works best with
 
 ## Features
 
-### Available now
+<table>
+  <tr>
+    <td width="34%"><img src="docs/images/screens/home-phone.webp" alt="Library on a phone, with the Now playing card"/></td>
+    <td><img src="docs/images/screens/home-tv.webp" alt="TV home"/><br/><img src="docs/images/screens/home-tablet.webp" alt="Tablet split view"/></td>
+  </tr>
+  <tr>
+    <td><img src="docs/images/screens/game-settings.webp" alt="Per-game settings"/></td>
+    <td><img src="docs/images/screens/stream-menu.webp" alt="Stream menu with quick toggles"/><br/><img src="docs/images/screens/controls-editor.webp" alt="On-screen controls editor with ready-made groups"/></td>
+  </tr>
+</table>
 
 **Library**
 - 🎮 **Console-style launcher** — game art, logos and details fetched by the host; each game has
   **Play on Virtual display** and **Play on desktop (Mirror)**.
-- 🔎 **Finds your PC automatically** and pairs under a real name (*Nebula from Ayush's S25 Ultra*).
-- 😴 **Wake and sleep the PC** — tapping Play on a sleeping PC wakes it, waits, then starts the game.
+- 🏠 **Home styles** — Spotlight, Shelf or Auto, a **TV home** built for the remote, and a **tablet
+  split view** (library left, game right).
+- ▶️ **Now playing** — Resume or Quit the game running on the PC; a notification if you leave it running.
+- ⚡ **Quick resume** — Quick Settings tile, home-screen widget and launcher shortcut that wake the PC
+  and pick up where you left off.
+- 🔎 **Finds your PC automatically**, pairs under a real name, and **wakes or sleeps the PC**.
+- ⭐ **Favourites** pinned to the top.
 
 **Streaming**
-- 📐 **Live resolution switch** — change size and frame rate mid-stream without leaving the game,
-  including sizes that match your screen exactly (no black bars) and desktop scaling.
-- 🔄 **Rotation** — the stream turns with the phone without reconnecting.
+- 🎚️ **Per-game settings** — resolution (including "this screen" sizes like 75 %), frame rate,
+  bitrate, codec, frame generation, upscaler and controls per game, plus the PC's frame-rate limit,
+  FSR, sharpening and power mode when the host is Nova.
+- 📶 **Adaptive bitrate** and a **connection test** that suggests a bitrate.
+- 📐 **Live resolution switch** and **rotation** without reconnecting.
 - ✨ **Frame generation** (60 → 120 fps) and **upscaling** (Sharpen, SGSR 1, FSR 1), with a device
   self-test and automatic off when the phone gets hot.
+- 🧭 **Quick toggles** at the top of the stream menu — pin as many as you like, reorder them,
+  works with a TV remote.
 - 📊 **Stats overlay** — pick the metrics, drag it anywhere; line, card or graph.
 
 **Input**
-- 🖱️ **Virtual mouse** — tap, two-finger right-click, drag, scroll and pinch; or direct touch.
-- ⌨️ **PC keyboard** — F-keys, sticky Ctrl/Alt/Shift/Win, adjustable size and transparency.
-- 🕹️ **Controllers** — correct stick and trigger mapping, rumble and trigger rumble, light bar,
-  gyro aiming (controller or phone), and audio haptics.
-- 🎤 **Microphone** and 📋 **two-way clipboard** with the PC.
-- ⚙️ **Host commands** — run PC actions you define in Nova.
+- 🖱️ **Virtual mouse** and a **local cursor**: the PC's pointer drawn on the device, so it moves instantly.
+- ⌨️ **PC keyboard**, and an **auto keyboard** that opens when you tap a text field on the PC.
+- 🔘 **Float ball** — drag it anywhere; tap for the menu, double tap for the keyboard, long press to
+  show or hide the on-screen controls.
+- 🕹️ **Controllers** — correct mapping, rumble and trigger rumble, gyro aiming, audio haptics.
+- 🎤 **Microphone**, 📋 **two-way clipboard** and ⚙️ **host commands** you define in Nova.
 
-**Touch controls**
-- 🎮 **On-screen controls editor** — place, resize and snap buttons, sticks, triggers and macros;
-  per-game profiles; import V+ layouts.
-- 👆 **Touch zones** — swipe-to-look camera, floating sticks, fire-and-look triggers; every finger
-  handled on its own, so you can move, look and shoot at once.
-- 🎯 **Ready-made layouts** — genre templates (touch shooter for controller or keyboard & mouse)
-  and game layouts (GTA V), with a second fire button, drag-to-aim, sprint and run-lock built in.
-- 📤 **Share layouts** — export as a file, a one-line code or a QR code, and import on any device
-  with a preview and "fit to this screen".
-- 🌐 **Layout library** — browse community layouts for any game or genre in the app
-  (Profiles → Browse layouts), from [nebula-layouts](https://github.com/F-e-n-y-x/nebula-layouts).
-  Made a good one? Tap *Share to library* in the app, or open a pull request there.
+**On-screen controls**
+- 🎮 **Editor** — place, resize and snap buttons, sticks, triggers, touch zones and macros. A
+  searchable **palette** with ready-made groups: ABXY, D-pad, shoulders and triggers, WASD, arrows,
+  number row, F-keys, mouse buttons.
+- 🔀 **Layout sets** — several layouts per game (e.g. on foot, vehicle, aircraft) with an on-screen
+  **switch button**; switching releases everything you were holding.
+- ➕ **Key combinations** — one button can send Shift+E or LB+RB, mixing gamepad, keyboard and mouse.
+- 👆 **Touch zones** — swipe-to-look camera, floating sticks, fire-and-look; every finger handled on its own.
+- 🌐 **Layout library** — the app ships with the standard controller only; add layouts and sets for any
+  game from [nebula-layouts](https://github.com/F-e-n-y-x/nebula-layouts) (Browse layouts), or share
+  your own as a file, code or QR code.
+
+<p><img src="docs/images/screens/gta-vehicle-layout.webp" alt="GTA V vehicle layout from the layout library" width="640"/></p>
 
 **Everywhere**
-- ⭐ **Favourites** pinned to the top of the library, and a **diagnostics** hub (controller test,
-  stick calibration, capability report, log export).
-- 🔄 **Updates** from GitHub releases right in the app (checksum and signature verified), and links to both projects in About.
-- 📱 Phone, tablet and Android TV layouts, full D-pad support.
-- 🔧 Every Moonlight V+ setting, with search — and a test that fails the build if any setting shown
-  does nothing.
-
-### In progress
-
-| Feature | Status |
-|---|---|
-| "Now playing" card and a notification when a game keeps running on the PC | 🔨 Building |
-| TV home, Shelf and Auto home styles, tablet split view, quick-connect tile and widget | 🔨 Building |
-| Adaptive bitrate and connection test | 🔨 Building |
-| Local cursor (instant pointer drawn on the device) | 🔨 Building |
-| Per-game presets (resolution, bitrate, frame generation, controls) | ⏸ Paused |
-
-### Planned
-
-Replay clips and an auto keyboard when a PC text field is focused.
+- 🩺 **Diagnostics** — controller test, stick calibration, capability report, log export.
+- 🔄 **In-app updates** from GitHub releases (checksum and signature verified).
+- 📱 Phone, tablet and Android TV, full D-pad support; every Moonlight V+ setting, with search.
 
 ## Install
 
