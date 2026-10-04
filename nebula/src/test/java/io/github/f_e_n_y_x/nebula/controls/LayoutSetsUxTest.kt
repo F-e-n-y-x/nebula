@@ -47,6 +47,15 @@ class ProfileGroupingTest {
     }
 
     @Test
+    fun `a set lists by the name before the dot, unless two would read the same`() {
+        val (l, _) = withSet()
+        val (l2, _) = l.renameSet(l.sets.single().id, "GTA V · on foot, vehicle, aircraft").createSet("Driving · wheel", listOf(loose.id))!!
+        assertEquals(listOf("Driving · 1 layout", "GTA V · 2 layouts"), l2.groups().filterIsInstance<ProfileGroup.SetItem>().map { it.title })
+        val (l3, _) = l2.createSet("GTA V · keyboard", listOf(foot.id))!!
+        assertTrue(l3.groups().filterIsInstance<ProfileGroup.SetItem>().map { it.title }.containsAll(listOf("GTA V · keyboard · 1 layout", "GTA V · on foot, vehicle, aircraft · 2 layouts")))
+    }
+
+    @Test
     fun `a layout in two sets shows in both, and once a set is gone its layouts are loose again`() {
         val (l, a) = withSet()
         val (l2, b) = l.createSet("Driving", listOf(car.id))!!

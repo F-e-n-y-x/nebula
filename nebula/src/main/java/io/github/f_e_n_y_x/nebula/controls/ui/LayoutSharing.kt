@@ -550,55 +550,58 @@ internal fun LayoutBrowserDialog(store: ControlsStore, onAdded: (ControlsProfile
             verticalArrangement = Arrangement.spacedBy(s.dp(10)),
         ) {
             PanelHeader("Layout library", "Browse layouts", onDismiss)
-            TextInput(query, { query = it.take(60) }, "Search games, layouts or authors")
-            val genres = remember(index) { index?.genres().orEmpty() }
-            if (genres.isNotEmpty()) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("library-genres"),
-                    horizontalArrangement = Arrangement.spacedBy(s.dp(6)),
-                ) {
-                    Chip("All genres", genre == null, Modifier.testTag("genre:all")) { genre = null }
-                    genres.forEach { g ->
-                        Chip(LayoutGenres.label(g), genre == g, Modifier.testTag("genre:$g")) { genre = if (genre == g) null else g }
+            // Search, filters and cards scroll together, so a phone held sideways shows the cards, not just the filters.
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+                TextInput(query, { query = it.take(60) }, "Search games, layouts or authors")
+                val genres = remember(index) { index?.genres().orEmpty() }
+                if (genres.isNotEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("library-genres"),
+                        horizontalArrangement = Arrangement.spacedBy(s.dp(6)),
+                    ) {
+                        Chip("All genres", genre == null, Modifier.testTag("genre:all")) { genre = null }
+                        genres.forEach { g ->
+                            Chip(LayoutGenres.label(g), genre == g, Modifier.testTag("genre:$g")) { genre = if (genre == g) null else g }
+                        }
                     }
                 }
-            }
-            if (BuildConfig.DEBUG) {
-                // Debug builds can use a LAN copy of the library (the owner's sample at :8765).
-                Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) { TextInput(editingUrl, { editingUrl = it.take(300) }, "Library index address") }
-                    SmallAction("Use", null, {
-                        val ok = runCatching { UrlPolicy(true).check(editingUrl) }
-                        if (ok.isSuccess) { prefs.prefs.edit().putString(LibrarySource.PREF_KEY, editingUrl.trim()).apply(); url = editingUrl.trim() } else error = ok.exceptionOrNull()?.message
-                    })
-                    SmallAction("LAN sample", null, { editingUrl = LibrarySource.LAN_SAMPLE; prefs.prefs.edit().putString(LibrarySource.PREF_KEY, LibrarySource.LAN_SAMPLE).apply(); url = LibrarySource.LAN_SAMPLE })
-                    SmallAction("GitHub", null, { editingUrl = LibrarySource.DEFAULT_URL; prefs.prefs.edit().remove(LibrarySource.PREF_KEY).apply(); url = LibrarySource.DEFAULT_URL })
-                }
-            }
-            note?.let { Text(it, style = Nebula.type.label, color = NebulaColors.textMuted) }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when {
-                    loading -> CircularProgressIndicator(color = NebulaColors.accentText, modifier = Modifier.align(Alignment.Center))
-                    index == null -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                        Text(error ?: "Nothing here yet.", style = Nebula.type.body, color = NebulaColors.textSecondary)
-                        NebulaButton("Try again", onClick = { reload++ }, style = ButtonStyle.Secondary)
+                if (BuildConfig.DEBUG) {
+                    // Debug builds can use a LAN copy of the library (the owner's sample at :8765).
+                    Row(horizontalArrangement = Arrangement.spacedBy(s.dp(8)), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { TextInput(editingUrl, { editingUrl = it.take(300) }, "Library index address") }
+                        SmallAction("Use", null, {
+                            val ok = runCatching { UrlPolicy(true).check(editingUrl) }
+                            if (ok.isSuccess) { prefs.prefs.edit().putString(LibrarySource.PREF_KEY, editingUrl.trim()).apply(); url = editingUrl.trim() } else error = ok.exceptionOrNull()?.message
+                        })
+                        SmallAction("LAN sample", null, { editingUrl = LibrarySource.LAN_SAMPLE; prefs.prefs.edit().putString(LibrarySource.PREF_KEY, LibrarySource.LAN_SAMPLE).apply(); url = LibrarySource.LAN_SAMPLE })
+                        SmallAction("GitHub", null, { editingUrl = LibrarySource.DEFAULT_URL; prefs.prefs.edit().remove(LibrarySource.PREF_KEY).apply(); url = LibrarySource.DEFAULT_URL })
                     }
-                    else -> {
-                        val g = genre?.takeIf { it in genres }
-                        val sections = remember(index, query, g) { index!!.browse(query, g) }
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                            if (sections.isEmpty()) {
-                                val q = query.trim()
-                                val what = g?.let { "${LayoutGenres.label(it).lowercase()} layouts" } ?: "layouts"
-                                Text(if (q.isEmpty()) "No $what yet." else "No $what match \"$q\".", style = Nebula.type.body, color = NebulaColors.textSecondary)
-                            }
-                            sections.forEach { sec ->
-                                Column(Modifier.testTag("library-section:${sec.title}"), verticalArrangement = Arrangement.spacedBy(s.dp(2))) {
-                                    Text(sec.title.uppercase(), style = Nebula.type.eyebrow, color = NebulaColors.accentText)
-                                    if (sec.subtitle.isNotBlank()) Text(sec.subtitle, style = Nebula.type.label, color = NebulaColors.textMuted)
+                }
+                note?.let { Text(it, style = Nebula.type.label, color = NebulaColors.textMuted) }
+                Box(Modifier.fillMaxWidth().heightIn(min = s.dp(160))) {
+                    when {
+                        loading -> CircularProgressIndicator(color = NebulaColors.accentText, modifier = Modifier.align(Alignment.Center))
+                        index == null -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+                            Text(error ?: "Nothing here yet.", style = Nebula.type.body, color = NebulaColors.textSecondary)
+                            NebulaButton("Try again", onClick = { reload++ }, style = ButtonStyle.Secondary)
+                        }
+                        else -> {
+                            val g = genre?.takeIf { it in genres }
+                            val sections = remember(index, query, g) { index!!.browse(query, g) }
+                            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+                                if (sections.isEmpty()) {
+                                    val q = query.trim()
+                                    val what = g?.let { "${LayoutGenres.label(it).lowercase()} layouts" } ?: "layouts"
+                                    Text(if (q.isEmpty()) "No $what yet." else "No $what match \"$q\".", style = Nebula.type.body, color = NebulaColors.textSecondary)
                                 }
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
-                                    sec.cards.forEach { c -> LibraryCardView(c, downloading) { e -> if (downloading == null) pick = e } }
+                                sections.forEach { sec ->
+                                    Column(Modifier.testTag("library-section:${sec.title}"), verticalArrangement = Arrangement.spacedBy(s.dp(2))) {
+                                        Text(sec.title.uppercase(), style = Nebula.type.eyebrow, color = NebulaColors.accentText)
+                                        if (sec.subtitle.isNotBlank()) Text(sec.subtitle, style = Nebula.type.label, color = NebulaColors.textMuted)
+                                    }
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(s.dp(10)), verticalArrangement = Arrangement.spacedBy(s.dp(10))) {
+                                        sec.cards.forEach { c -> LibraryCardView(c, downloading) { e -> if (downloading == null) pick = e } }
+                                    }
                                 }
                             }
                         }

@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -756,7 +757,7 @@ private fun EditorToolbar(
     ) {
         ToolIcon(Icons.Rounded.Close, "Close editor", onClose)
         Row(
-            Modifier.widthIn(max = s.dp(if (compact) 128 else 240)).nebulaClickable(RoundedCornerShape(50), onProfiles).padding(horizontal = s.dp(10), vertical = s.dp(6)),
+            Modifier.widthIn(max = s.dp(if (compact) 128 else 240)).nebulaClickable(RoundedCornerShape(50), onProfiles).testTag("editor-profiles").padding(horizontal = s.dp(10), vertical = s.dp(6)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             androidx.compose.foundation.layout.Column(Modifier.weight(1f, fill = false)) {

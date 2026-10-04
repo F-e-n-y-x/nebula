@@ -176,7 +176,12 @@ class ProfileLibrary(
      * delete the set and its layouts are loose again.
      */
     fun groups(): List<ProfileGroup> {
-        val setGroups = sets.mapNotNull { s -> s.members.mapNotNull(::find).takeIf { it.isNotEmpty() }?.let { ProfileGroup.SetItem(s, it) } }
+        // "GTA V · on foot, vehicle, aircraft" lists as "GTA V"; the full name only when two sets would read the same.
+        val short = sets.groupBy { it.name.substringBefore(" · ") }
+        val setGroups = sets.mapNotNull { s ->
+            val name = s.name.substringBefore(" · ").takeIf { short.getValue(it).size == 1 } ?: s.name
+            s.members.mapNotNull(::find).takeIf { it.isNotEmpty() }?.let { ProfileGroup.SetItem(s, it, name) }
+        }
         val inSets = setGroups.flatMap { g -> g.layouts.map { it.id } }.toSet()
         val (builtIns, mine) = all.filter { it.id !in inSets }.partition { it.isBuiltIn }
         return builtIns.map(ProfileGroup::Single) + setGroups + mine.map(ProfileGroup::Single)
@@ -312,9 +317,9 @@ class ProfileLibrary(
 /** One item in a profiles list: a loose profile, or a layout set with its layouts. */
 sealed interface ProfileGroup {
     data class Single(val profile: ControlsProfile) : ProfileGroup
-    data class SetItem(val set: LayoutSet, val layouts: List<ControlsProfile>) : ProfileGroup {
+    data class SetItem(val set: LayoutSet, val layouts: List<ControlsProfile>, val shortName: String = set.name) : ProfileGroup {
         /** "GTA V · 5 layouts" */
-        val title: String get() = "${set.name} · ${layouts.size} layout${if (layouts.size == 1) "" else "s"}"
+        val title: String get() = "$shortName · ${layouts.size} layout${if (layouts.size == 1) "" else "s"}"
     }
 }
 

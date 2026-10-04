@@ -721,7 +721,7 @@ internal fun ProfilesPanel(
                     val isOpen = expandedSets[key] ?: g.layouts.any { it.id == current.id }
                     val tags = buildList {
                         if (g.set.isBuiltIn) add("Built in")
-                        if (lib.resolveSet(null)?.id == key && lib.assignedTo(gameKey ?: "") == null) add("Default")
+                        if (lib.resolveSet(null)?.id == key) add("Default")
                         if (gameKey != null && lib.assignedTo(gameKey) == key) add("This game")
                     }
                     SetGroupRow(g, current.id, tags, isOpen, onExpand = { expandedSets = expandedSets + (key to it) }, onLayout = { open(it) }) {
