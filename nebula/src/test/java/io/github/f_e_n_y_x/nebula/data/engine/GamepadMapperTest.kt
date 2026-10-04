@@ -317,6 +317,40 @@ class GamepadMapperTest {
     }
 
     @Test
+    fun `on-screen controls coming up mid-stream announce player 1 before the first press`() {
+        mapper.announcePlayerOne()
+        assertEquals(listOf(0), out.arrivals)
+        assertTrue(mapper.hasPhonePad)
+        // Shown again (menu closed, toggled off and on): nothing new for the host.
+        mapper.announcePlayerOne()
+        assertEquals(listOf(0), out.arrivals)
+        mapper.onScreenState(ControllerPacket.A_FLAG, 0, 0, 0, 0, 0, 0)
+        assertEquals(listOf(0), out.arrivals)
+        assertEquals(ControllerPacket.A_FLAG, out.last.buttons)
+        assertEquals(0, out.last.controller)
+    }
+
+    @Test
+    fun `a new connection announces the pads again with their next input`() {
+        mapper.onScreenState(ControllerPacket.A_FLAG, 0, 0, 0, 0, 0, 0)
+        mapper.onScreenReleased()
+        assertEquals(listOf(0), out.arrivals)
+        mapper.newConnection()
+        // Nothing is sent for a pad the new host session doesn't know yet.
+        val before = out.states.size
+        mapper.releaseAll()
+        assertEquals(before, out.states.size)
+        mapper.onScreenState(ControllerPacket.B_FLAG, 0, 0, 0, 0, 0, 0)
+        assertEquals("announced again, same player", listOf(0, 0), out.arrivals)
+        assertEquals(ControllerPacket.B_FLAG, out.last.buttons)
+        assertEquals(0, out.last.controller)
+        // Controls shown on the new connection announce it before any press.
+        mapper.newConnection()
+        mapper.announcePlayerOne()
+        assertEquals(listOf(0, 0, 0), out.arrivals)
+    }
+
+    @Test
     fun `no phone pad is announced while a controller is attached`() {
         pad(7, androidXbox)
         mapper.announcePlayerOne()

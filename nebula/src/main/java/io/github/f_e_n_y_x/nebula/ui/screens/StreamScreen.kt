@@ -119,6 +119,7 @@ import io.github.f_e_n_y_x.nebula.ui.theme.Nebula
 import io.github.f_e_n_y_x.nebula.ui.theme.NebulaColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
+import androidx.compose.ui.platform.testTag
 import kotlin.math.roundToInt
 
 /** Mutable state the Android input objects read; updated from composition. */
@@ -335,6 +336,12 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
         gyroAssist = g
         onDispose { g.release(); gyroAssist = null }
     }
+    // Each connection is a new host session: pads announced on the previous one are announced again.
+    LaunchedEffect(pad, live) { if (live) pad.newConnection() }
+    // On-screen controls coming up (at the start or mid-stream, from Settings, the menu's quick
+    // toggle or the float ball) announce the phone pad at once, so the PC has player 1 before the
+    // first press instead of building it from that press.
+    LaunchedEffect(pad, live, oscShown) { if (live && oscShown) pad.announcePlayerOne() }
     // The mapping modes run while the stream has input; passthrough from this device with no
     // controller announces player 1 so the PC builds a motion-capable pad before a game asks.
     LaunchedEffect(gyroAssist, ui.motion, live, overlaysOn, devices) {
@@ -601,7 +608,7 @@ fun StreamScreen(container: AppContainer, nav: Navigator, hostId: String, gameId
                     when (action) {
                         "open_keyboard" -> openKeyboard()
                         "open_menu" -> menu = true
-                        "toggle_controls" -> prefs.put("checkbox_show_onscreen_controls", !ui.osc)
+                        "toggle_controls" -> prefs.put("checkbox_show_onscreen_controls", !uiNow.osc)
                         "toggle_visibility" -> prefs.put("checkbox_enable_float_ball", false)
                     }
                 },
@@ -815,12 +822,18 @@ private fun FloatBall(ui: StreamUiPrefs, sp: android.content.SharedPreferences, 
         mutableStateOf(FloatBallSpot.read(sp, ui.floatBallPosition) ?: FloatBallSpot.preset(ui.floatBallPosition))
     }
     var dragging by remember { mutableStateOf(false) }
+    // The tap detector below lives as long as the ball does; it must run the actions and read the
+    // state of now, not of the composition it started in (a long press toggling the on-screen
+    // controls would otherwise write the same value every time).
+    val uiNow by rememberUpdatedState(ui)
+    val onActionNow by rememberUpdatedState(onAction)
     BoxWithConstraints(Modifier.fillMaxSize().systemBarsPadding().padding(s.dp(10))) {
         val ballPx = with(androidx.compose.ui.platform.LocalDensity.current) { s.dp(44).toPx() }
         val maxX = (constraints.maxWidth - ballPx).coerceAtLeast(1f)
         val maxY = (constraints.maxHeight - ballPx).coerceAtLeast(1f)
         Box(
             Modifier.offset { IntOffset((spot.first * maxX).roundToInt(), (spot.second * maxY).roundToInt()) }
+                .testTag("float-ball")
                 .size(s.dp(44)).alpha(if (faded && !dragging) base * 0.4f else base)
                 .background(Color(0xCC17171A), CircleShape).border(1.dp, NebulaColors.controlBorder, CircleShape)
                 .pointerInput(maxX, maxY, ui.floatBallPosition) {
@@ -836,11 +849,11 @@ private fun FloatBall(ui: StreamUiPrefs, sp: android.content.SharedPreferences, 
                         onDragCancel = { dragging = false },
                     )
                 }
-                .pointerInput(ui.floatBallTap, ui.floatBallDoubleTap, ui.floatBallLongPress) {
+                .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = { poke++; onAction(ui.floatBallTap) },
-                        onDoubleTap = { poke++; onAction(ui.floatBallDoubleTap) },
-                        onLongPress = { poke++; onAction(ui.floatBallLongPress) },
+                        onTap = { poke++; onActionNow(uiNow.floatBallTap) },
+                        onDoubleTap = { poke++; onActionNow(uiNow.floatBallDoubleTap) },
+                        onLongPress = { poke++; onActionNow(uiNow.floatBallLongPress) },
                     )
                 },
             contentAlignment = Alignment.Center,

@@ -50,6 +50,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -272,6 +273,7 @@ private fun QuickTile(t: QuickToggle, st: QuickTileState, icon: ImageVector, onC
     Column(
         modifier
             .heightIn(min = s.dp(64))
+            .testTag("quick:${t.id}")
             .semantics {
                 contentDescription = t.longLabel
                 stateDescription = st.spoken

@@ -91,6 +91,34 @@ class PadPathTest {
         mapper.onKey(id, key, if (down) KeyEvent.ACTION_DOWN else KeyEvent.ACTION_UP, devices[id]?.isController == true)
 
     @Test
+    fun `on-screen controls turned on mid-stream, off and on again - every press reaches player 1`() = runTest {
+        val a = button("a", Binding.Pad(PadFlags.A))
+        // The stream runs without controls for a while: nothing reaches the PC.
+        assertTrue(wire.arrivals.isEmpty())
+        // Turned on mid-stream (StreamScreen announces player 1 as the controls come up).
+        mapper.announcePlayerOne()
+        var input = ControlsInput({ wire }, backgroundScope, pad = { osc })
+        input.elementDown(a)
+        assertEquals(Wire.State(0, 1, PadFlags.A, 0, 0, 0, 0, 0, 0), wire.last)
+        input.elementUp(a)
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
+        assertTrue(wire.last.atRest)
+        // Off (the overlay leaves composition and lets go), then on again: a new ControlsInput.
+        input.elementDown(a)
+        input.releaseAll()
+        assertTrue(wire.last.atRest)
+        mapper.announcePlayerOne()
+        input = ControlsInput({ wire }, backgroundScope, pad = { osc })
+        input.elementDown(a)
+        assertEquals(Wire.State(0, 1, PadFlags.A, 0, 0, 0, 0, 0, 0), wire.last)
+        input.elementUp(a)
+        advanceTimeBy(ControlsInput.MIN_HOLD_MS + 1); runCurrent()
+        assertTrue(wire.last.atRest)
+        assertEquals("one pad, announced once", listOf(Wire.Arrival(0, 1)), wire.arrivals)
+        assertTrue(wire.states.all { it.controller == 0 && it.mask == 1 })
+    }
+
+    @Test
     fun `on-screen controls only - one pad, every control reaches it, rest is all zero, gyro merges`() = runTest {
         val input = ControlsInput({ wire }, backgroundScope, pad = { osc })
         val a = button("a", Binding.Pad(PadFlags.A))

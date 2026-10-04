@@ -203,13 +203,24 @@ class GamepadMapper(
     }
 
     /**
-     * Announces player 1 now (motion passthrough from this device with no controller attached: the
-     * host must see a motion-capable pad before a game asks for motion). No-op once player 1 exists
-     * or while a controller is attached (its own arrival carries the phone's motion bits).
+     * Announces player 1 now, when the host must know the phone pad before its first input: motion
+     * passthrough from this device (a game asks for motion before any button), or the on-screen
+     * controls coming up, at stream start or mid-stream. No-op once player 1 is announced on this
+     * connection, or while a controller is attached (its own arrival carries the phone's motion bits).
      */
     fun announcePlayerOne() {
-        if (attached().isNotEmpty() || existingPlayerOne() != null) return
-        send(playerOne())
+        if (attached().isNotEmpty()) return
+        val pad = existingPlayerOne() ?: playerOne()
+        if (!pad.announced) send(pad)
+    }
+
+    /**
+     * The stream (re)connected. The host on the other end has not been told about any pad yet (a
+     * resumed host keeps its virtual pads but forgets the announcements), so every pad is announced
+     * again with its next input, with its real type and capabilities instead of a default pad.
+     */
+    fun newConnection() {
+        pads.values.distinct().forEach { it.announced = false }
     }
 
     /** The phone pad exists (player 1 without a controller). */
