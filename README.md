@@ -2,6 +2,8 @@
   <img src="nebula/src/main/res/mipmap-xxxhdpi/ic_launcher_nebula_round.png" alt="Nebula icon" width="120"/>
   <h1 align="center">Nebula</h1>
   <h4 align="center">A console-style Android game streaming client for Nova and Moonlight hosts.</h4>
+  <a href="https://github.com/sponsors/F-e-n-y-x"><img src="https://img.shields.io/badge/Sponsor-GitHub-A855F7?style=flat-square&logo=githubsponsors&logoColor=white&labelColor=0A0A0B" alt="Sponsor on GitHub"></a>
+  <a href="#-support-nebula"><img src="https://img.shields.io/badge/Support-UPI-B7A2FF?style=flat-square&labelColor=0A0A0B" alt="Support Nebula by UPI"></a>
 </div>
 
 <div align="center">
@@ -116,27 +118,31 @@ committed; public builds refuse to include it.
 Numeric [semantic versioning](https://semver.org), tagged `nebula-vX.Y.Z`. Everything before
 **1.0.0** is a pre-release.
 
-## Support
+## 💜 Support Nebula
 
-If Nebula is useful to you, you can support its development.
+Nebula is free, open source and built in spare time. If it's how you play your PC games away from the desk, or you just like where it's going, you can chip in — every contribution goes into development time and test hardware.
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="50%">
-        <b>🌍 Anywhere in the world</b><br/><br/>
-        <a href="https://github.com/sponsors/F-e-n-y-x"><img src="https://img.shields.io/badge/GitHub%20Sponsors-Fenyx-a855f7?style=flat-square&logo=githubsponsors&logoColor=white" alt="GitHub Sponsors"></a><br/><br/>
-        <sub>One-time or monthly, by card, through GitHub.</sub>
-      </td>
-      <td align="center" width="50%">
-        <b>🇮🇳 India (UPI)</b><br/><br/>
-        <img src="https://img.shields.io/badge/Google%20Pay-UPI-6d1fb8?style=flat-square&logo=googlepay&logoColor=white" alt="Google Pay UPI"><br/><br/>
-        <img src="docs/images/support/googlepay-upi.png" alt="Google Pay UPI QR code" width="200"/><br/>
-        <sub>UPI ID: <code>ayushsoni2911@okaxis</code></sub>
-      </td>
-    </tr>
-  </table>
-</div>
+### 🌍 Anywhere in the world — GitHub Sponsors
+
+Monthly or one-time, by card, straight through GitHub (no fee taken by GitHub).
+
+<p align="center">
+  <a href="https://github.com/sponsors/F-e-n-y-x"><img src="https://img.shields.io/badge/Sponsor_on_GitHub-%E2%9D%A4-A855F7?style=for-the-badge&logo=githubsponsors&logoColor=white&labelColor=0A0A0B" alt="Sponsor Nebula on GitHub"></a>
+</p>
+
+### 🇮🇳 In India — UPI
+
+<p align="center">
+  <img src="docs/images/nebula-support-upi.svg" width="640" alt="Support Nebula by UPI. Scan the QR code with any UPI app, or pay to the UPI ID ayushsoni2911@okaxis (Ayush Soni).">
+</p>
+
+| | |
+| :--- | :--- |
+| **UPI ID** | `ayushsoni2911@okaxis` |
+| **Name** | Ayush Soni |
+| **Apps** | Google Pay, PhonePe, Paytm, BHIM or any UPI app (India) |
+
+Can't send money? Starring the repo, [reporting a bug](https://github.com/F-e-n-y-x/nebula/issues) or sharing Nebula with a friend helps just as much.
 
 ## Credits & license
 
