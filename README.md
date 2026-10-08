@@ -116,6 +116,28 @@ committed; public builds refuse to include it.
 Numeric [semantic versioning](https://semver.org), tagged `nebula-vX.Y.Z`. Everything before
 **1.0.0** is a pre-release.
 
+## Support
+
+If Nebula is useful to you, you can support its development.
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <b>🌍 Anywhere in the world</b><br/><br/>
+        <a href="https://github.com/sponsors/F-e-n-y-x"><img src="https://img.shields.io/badge/GitHub%20Sponsors-Fenyx-a855f7?style=flat-square&logo=githubsponsors&logoColor=white" alt="GitHub Sponsors"></a><br/><br/>
+        <sub>One-time or monthly, by card, through GitHub.</sub>
+      </td>
+      <td align="center" width="50%">
+        <b>🇮🇳 India (UPI)</b><br/><br/>
+        <img src="https://img.shields.io/badge/Google%20Pay-UPI-6d1fb8?style=flat-square&logo=googlepay&logoColor=white" alt="Google Pay UPI"><br/><br/>
+        <img src="docs/images/support/googlepay-upi.png" alt="Google Pay UPI QR code" width="200"/><br/>
+        <sub>UPI ID: <code>ayushsoni2911@okaxis</code></sub>
+      </td>
+    </tr>
+  </table>
+</div>
+
 ## Credits & license
 
 Developed by [Fenyx](https://github.com/F-e-n-y-x).
